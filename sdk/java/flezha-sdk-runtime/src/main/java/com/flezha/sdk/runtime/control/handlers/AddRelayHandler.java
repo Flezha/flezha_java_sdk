@@ -1,8 +1,8 @@
 package com.flezha.sdk.runtime.control.handlers;
 
-import com.flezha.sdk.proto.AddProcessor;
+import com.flezha.sdk.proto.AddRelay;
 import com.flezha.sdk.proto.CommandRequest;
-import com.flezha.sdk.runtime.ComputeEngineContext;
+import com.flezha.sdk.runtime.ExecutorContext;
 import com.flezha.sdk.runtime.control.CommandHandler;
 import com.flezha.sdk.runtime.relay.InitValuesContext;
 import com.flezha.sdk.runtime.relay.RelayClassRegistry;
@@ -14,32 +14,32 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handler for {@code AddProcessor}. Spawns a {@link RelayInstance} keyed by
- * the wire-supplied {@code processor_id}.
+ * Handler for {@code AddRelay}. Spawns a {@link RelayInstance} keyed by
+ * the wire-supplied {@code relay_id}.
  *
- * <p>{@code init_values} (the JSON string from {@code AddProcessor.init_values})
+ * <p>{@code init_values} (the JSON string from {@code AddRelay.init_values})
  * is staged on a thread-local read by
  * {@link com.flezha.sdk.shard.Shard#initState} for any Shard×Partition that
  * needs to seed initial state.
  *
- * <p>Idempotent on reconnect: the agent re-issues {@code AddProcessor} for
- * every processor still tagged to this operator's profile after a restart.
+ * <p>Idempotent on reconnect: the controller re-issues {@code AddRelay} for
+ * every relay still tagged to this executor's profile after a restart.
  */
-public final class AddProcessorHandler implements CommandHandler {
+public final class AddRelayHandler implements CommandHandler {
 
-    private static final Logger LOG = LoggerFactory.getLogger(AddProcessorHandler.class);
+    private static final Logger LOG = LoggerFactory.getLogger(AddRelayHandler.class);
 
     @Override
-    public byte[] handle(ComputeEngineContext ctx, CommandRequest request, List<String> errors) {
-        AddProcessor cmd = request.getAddProcessor();
+    public byte[] handle(ExecutorContext ctx, CommandRequest request, List<String> errors) {
+        AddRelay cmd = request.getAddRelay();
         String factoryId = cmd.getFactoryId();
-        String processorId = cmd.getProcessorId();
+        String relayId = cmd.getRelayId();
         String initValues = cmd.getInitValues();
 
         RelayInstanceRegistry registry = ctx.relayInstanceRegistry();
 
-        if (registry.contains(processorId)) {
-            LOG.info("AddProcessor: relay instance {} already registered, skipping", processorId);
+        if (registry.contains(relayId)) {
+            LOG.info("AddRelay: relay instance {} already registered, skipping", relayId);
             return new byte[0];
         }
 
@@ -52,7 +52,7 @@ public final class AddProcessorHandler implements CommandHandler {
         InitValuesContext.set(initValues);
         try {
             RelayInstance instance = RelayInstance.create(
-                    topology, processorId, ctx, ctx.workerPool());
+                    topology, relayId, ctx, ctx.workerPool());
             registry.add(instance);
         } catch (RuntimeException e) {
             errors.add("Failed to spawn relay instance: " + e.getMessage());

@@ -1,7 +1,7 @@
 package com.flezha.sdk.runtime;
 
 /** Lifecycle state of a compute engine instance. */
-public enum ComputeEngineStatus {
+public enum ExecutorStatus {
     STARTING,
     RUNNING,
     STOPPED

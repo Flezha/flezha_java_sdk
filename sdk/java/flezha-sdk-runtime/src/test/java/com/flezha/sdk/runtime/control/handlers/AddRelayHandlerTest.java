@@ -3,11 +3,11 @@ package com.flezha.sdk.runtime.control.handlers;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.proto.AddProcessor;
+import com.flezha.sdk.proto.AddRelay;
 import com.flezha.sdk.proto.CommandRequest;
 import com.flezha.sdk.relay.Relay;
 import com.flezha.sdk.relay.RelayRegistry;
-import com.flezha.sdk.runtime.ComputeEngineContext;
+import com.flezha.sdk.runtime.ExecutorContext;
 import com.flezha.sdk.runtime.config.FlezhaEnv;
 import com.flezha.sdk.shard.Shard;
 import com.flezha.sdk.shard.ShardCtx;
@@ -21,7 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class AddProcessorHandlerTest {
+class AddRelayHandlerTest {
 
     private static final String FACTORY_ID = "idempotent_test_factory";
     private static final String PROCESSOR_ID = "idempotent_p1";
@@ -32,23 +32,23 @@ class AddProcessorHandlerTest {
     }
 
     @Test
-    @DisplayName("duplicate AddProcessor for the same processor_id is a no-op (no panic, no growth)")
-    void duplicateAddProcessorIsNoOp() {
+    @DisplayName("duplicate AddRelay for the same relay_id is a no-op (no panic, no growth)")
+    void duplicateAddRelayIsNoOp() {
         RelayRegistry.registerRelay(IdempotentRelay.class);
 
         FlezhaEnv.ResolvedConfig cfg = FlezhaEnv.resolve(Map.of("FLEZHA_WORKER_POOL_SIZE", "1"));
-        ComputeEngineContext ctx = new ComputeEngineContext("ns", cfg, 0L);
+        ExecutorContext ctx = new ExecutorContext("ns", cfg, 0L);
         ctx.setWorkerPool(Executors.newFixedThreadPool(1));
 
         CommandRequest request = CommandRequest.newBuilder()
                 .setReferenceId("ref")
-                .setAddProcessor(AddProcessor.newBuilder()
-                        .setProcessorId(PROCESSOR_ID)
+                .setAddRelay(AddRelay.newBuilder()
+                        .setRelayId(PROCESSOR_ID)
                         .setFactoryId(FACTORY_ID)
                         .build())
                 .build();
 
-        AddProcessorHandler subject = new AddProcessorHandler();
+        AddRelayHandler subject = new AddRelayHandler();
 
         List<String> errorsFirst = new ArrayList<>();
         subject.handle(ctx, request, errorsFirst);
@@ -62,7 +62,7 @@ class AddProcessorHandlerTest {
                 .as("idempotent path must not produce errors on duplicate ids")
                 .isEmpty();
         assertThat(ctx.relayInstanceRegistry().size())
-                .as("registry must hold exactly one entry after a duplicate AddProcessor")
+                .as("registry must hold exactly one entry after a duplicate AddRelay")
                 .isEqualTo(1);
     }
 

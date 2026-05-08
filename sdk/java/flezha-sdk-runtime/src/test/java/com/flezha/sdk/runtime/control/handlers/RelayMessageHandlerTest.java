@@ -3,9 +3,9 @@ package com.flezha.sdk.runtime.control.handlers;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.proto.CommandRequest;
-import com.flezha.sdk.proto.ProcessorMessage;
-import com.flezha.sdk.proto.ProcessorMessageResponse;
-import com.flezha.sdk.runtime.ComputeEngineContext;
+import com.flezha.sdk.proto.RelayMessage;
+import com.flezha.sdk.proto.RelayMessageResponse;
+import com.flezha.sdk.runtime.ExecutorContext;
 import com.flezha.sdk.runtime.config.FlezhaEnv;
 import com.google.protobuf.ByteString;
 import java.util.ArrayList;
@@ -15,33 +15,33 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Mirror of the Rust SDK's {@code processor-message-handlers} parking
+ * Mirror of the Rust SDK's {@code relay-message-handlers} parking
  * regression test (per {@code relay-mvp-rust/tasks.md §5.4}). Asserts the
- * canonical "unsupported" response is returned for every {@code ProcessorMessage}
+ * canonical "unsupported" response is returned for every {@code RelayMessage}
  * until {@code relay-message-handlers} ships.
  */
-class ProcessorMessageHandlerTest {
+class RelayMessageHandlerTest {
 
     @Test
-    @DisplayName("ProcessorMessage always returns canonical unsupported error")
+    @DisplayName("RelayMessage always returns canonical unsupported error")
     void canonicalUnsupportedError() throws Exception {
         FlezhaEnv.ResolvedConfig cfg = FlezhaEnv.resolve(Map.of());
-        ComputeEngineContext ctx = new ComputeEngineContext("ns", cfg, 0L);
+        ExecutorContext ctx = new ExecutorContext("ns", cfg, 0L);
 
         CommandRequest request = CommandRequest.newBuilder()
                 .setReferenceId("ref")
-                .setProcessorMessage(ProcessorMessage.newBuilder()
-                        .setProcessorId("any")
+                .setRelayMessage(RelayMessage.newBuilder()
+                        .setRelayId("any")
                         .setPayload(ByteString.copyFromUtf8("hello"))
                         .build())
                 .build();
 
         List<String> errors = new ArrayList<>();
-        byte[] reply = new ProcessorMessageHandler().handle(ctx, request, errors);
+        byte[] reply = new RelayMessageHandler().handle(ctx, request, errors);
 
         assertThat(errors).isEmpty();
-        ProcessorMessageResponse decoded = ProcessorMessageResponse.parseFrom(reply);
+        RelayMessageResponse decoded = RelayMessageResponse.parseFrom(reply);
         assertThat(decoded.getPayload().toByteArray()).isEmpty();
-        assertThat(decoded.getError()).isEqualTo("processor does not support handle_message");
+        assertThat(decoded.getError()).isEqualTo("relay does not support handle_message");
     }
 }

@@ -16,7 +16,7 @@ import javax.annotation.Nonnull;
  * sub-components under their own synchronization (each sub-component is
  * independently thread-safe).
  */
-public final class ComputeEngineContext {
+public final class ExecutorContext {
 
     private final String namespace;
     private final FlezhaEnv.ResolvedConfig config;
@@ -25,12 +25,12 @@ public final class ComputeEngineContext {
     private final RelayInstanceRegistry relayInstanceRegistry = new RelayInstanceRegistry();
     private final StreamRegistry streamRegistry = new StreamRegistry();
     private final Map<Long, PrimaryStreamReader> primaryReaders = new ConcurrentHashMap<>();
-    private final AtomicReference<String> computeEngineId = new AtomicReference<>("undefined");
-    private final AtomicReference<ComputeEngineStatus> status =
-            new AtomicReference<>(ComputeEngineStatus.STARTING);
+    private final AtomicReference<String> executorId = new AtomicReference<>("undefined");
+    private final AtomicReference<ExecutorStatus> status =
+            new AtomicReference<>(ExecutorStatus.STARTING);
     private ExecutorService workerPool;
 
-    public ComputeEngineContext(
+    public ExecutorContext(
             @Nonnull String namespace,
             @Nonnull FlezhaEnv.ResolvedConfig config,
             long nativeHandle) {
@@ -83,20 +83,20 @@ public final class ComputeEngineContext {
     }
 
     @Nonnull
-    public String computeEngineId() {
-        return computeEngineId.get();
+    public String executorId() {
+        return executorId.get();
     }
 
-    public void setComputeEngineId(@Nonnull String id) {
-        computeEngineId.set(id);
+    public void setExecutorId(@Nonnull String id) {
+        executorId.set(id);
     }
 
     @Nonnull
-    public ComputeEngineStatus status() {
+    public ExecutorStatus status() {
         return status.get();
     }
 
-    public void setStatus(@Nonnull ComputeEngineStatus newStatus) {
+    public void setStatus(@Nonnull ExecutorStatus newStatus) {
         status.set(newStatus);
     }
 }
