@@ -13,40 +13,40 @@ import org.junit.jupiter.api.io.TempDir;
  * read round-trip, missing/blank handling, derivation, reload, and the
  * no-persistence degradation contract.
  */
-class ExecutorIdStoreTest {
+class RunnerIdStoreTest {
 
     @Test
     void persistThenLoadRoundTrips(@TempDir Path dir) throws Exception {
         Path path = dir.resolve("id");
-        ExecutorIdStore.persistTo(path, "exec-123");
-        assertThat(ExecutorIdStore.loadFrom(path)).contains("exec-123");
+        RunnerIdStore.persistTo(path, "exec-123");
+        assertThat(RunnerIdStore.loadFrom(path)).contains("exec-123");
     }
 
     @Test
     void loadMissingFileIsEmpty(@TempDir Path dir) {
-        assertThat(ExecutorIdStore.loadFrom(dir.resolve("absent"))).isEmpty();
+        assertThat(RunnerIdStore.loadFrom(dir.resolve("absent"))).isEmpty();
     }
 
     @Test
     void blankIdIsEmpty(@TempDir Path dir) throws Exception {
         Path path = dir.resolve("id");
-        ExecutorIdStore.persistTo(path, "   \n");
-        assertThat(ExecutorIdStore.loadFrom(path)).isEmpty();
+        RunnerIdStore.persistTo(path, "   \n");
+        assertThat(RunnerIdStore.loadFrom(path)).isEmpty();
     }
 
     @Test
     void persistOverwritesPriorId(@TempDir Path dir) throws Exception {
         Path path = dir.resolve("id");
-        ExecutorIdStore.persistTo(path, "old");
-        ExecutorIdStore.persistTo(path, "new");
-        assertThat(ExecutorIdStore.loadFrom(path)).contains("new");
+        RunnerIdStore.persistTo(path, "old");
+        RunnerIdStore.persistTo(path, "new");
+        assertThat(RunnerIdStore.loadFrom(path)).contains("new");
         // The temp sidecar must not linger.
         assertThat(Files.exists(path.resolveSibling("id.tmp"))).isFalse();
     }
 
     @Test
     void deriveIdHasNamespacePrefixProfileHashAndRandomSuffix() {
-        String id = ExecutorIdStore.deriveId("default", List.of("b_factory", "a_factory"));
+        String id = RunnerIdStore.deriveId("default", List.of("b_factory", "a_factory"));
         String[] parts = id.split("-", 3);
         assertThat(parts).hasSize(3);
         assertThat(parts[0]).isEqualTo("default");
@@ -58,9 +58,9 @@ class ExecutorIdStoreTest {
     void deriveIdProfileSegmentIsOrderIndependentAndSetSensitive() {
         // Sorted before hashing → the profile segment is identical regardless of
         // input order, and differs for a different factory set.
-        String a = ExecutorIdStore.deriveId("ns", List.of("a", "b", "c")).split("-", 3)[1];
-        String b = ExecutorIdStore.deriveId("ns", List.of("c", "a", "b")).split("-", 3)[1];
-        String c = ExecutorIdStore.deriveId("ns", List.of("a", "b")).split("-", 3)[1];
+        String a = RunnerIdStore.deriveId("ns", List.of("a", "b", "c")).split("-", 3)[1];
+        String b = RunnerIdStore.deriveId("ns", List.of("c", "a", "b")).split("-", 3)[1];
+        String c = RunnerIdStore.deriveId("ns", List.of("a", "b")).split("-", 3)[1];
         assertThat(a).isEqualTo(b);
         assertThat(a).isNotEqualTo(c);
     }
@@ -70,10 +70,10 @@ class ExecutorIdStoreTest {
         // First derives + persists; a second call against the same path returns
         // the SAME id (binding continuity across restart).
         Path path = dir.resolve("id");
-        String first = ExecutorIdStore.deriveOrLoad(path, "ns", List.of("f1"));
-        String second = ExecutorIdStore.deriveOrLoad(path, "ns", List.of("f1"));
+        String first = RunnerIdStore.deriveOrLoad(path, "ns", List.of("f1"));
+        String second = RunnerIdStore.deriveOrLoad(path, "ns", List.of("f1"));
         assertThat(first).isEqualTo(second);
-        assertThat(ExecutorIdStore.loadFrom(path)).contains(first);
+        assertThat(RunnerIdStore.loadFrom(path)).contains(first);
     }
 
     @Test
@@ -83,8 +83,8 @@ class ExecutorIdStoreTest {
         Path blocker = dir.resolve("blocker");
         Files.writeString(blocker, "x");
         Path path = blocker.resolve("nested");
-        String id = ExecutorIdStore.deriveOrLoad(path, "ns", List.of("f1"));
+        String id = RunnerIdStore.deriveOrLoad(path, "ns", List.of("f1"));
         assertThat(id).startsWith("ns-");
-        assertThat(ExecutorIdStore.loadFrom(path)).isEmpty();
+        assertThat(RunnerIdStore.loadFrom(path)).isEmpty();
     }
 }

@@ -15,10 +15,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Self-owned, durable <b>stable identity</b> for the executor (Rust parity:
- * {@code executor/persistent_id.rs}).
+ * Self-owned, durable <b>stable identity</b> for the runner (Rust parity:
+ * {@code runner/persistent_id.rs}).
  *
- * <p>Created once on first boot and persisted at {@code FLEZHA_EXECUTOR_ID_PATH}
+ * <p>Created once on first boot and persisted at {@code FLEZHA_RUNNER_ID_PATH}
  * (atomically: temp file + move) so the controller can trust it as the
  * operative-binding key across a process restart on the same node. Derived for
  * readability as {@code "<namespace>-<profile_hash8>-<rand6>"} (the boot-time
@@ -28,20 +28,20 @@ import org.slf4j.LoggerFactory;
  * <p>Degradation: with no writable path a fresh per-boot id is generated, cached
  * for the life of the process (so reconnects present the same id), and a single
  * {@code warn} is logged. A restart then presents a new id whose old binding
- * ages out via {@code FLEZHA_EXECUTOR_KEEPALIVE}. The executor never refuses to
+ * ages out via {@code FLEZHA_RUNNER_KEEPALIVE}. The runner never refuses to
  * start.
  */
-public final class ExecutorIdStore {
+public final class RunnerIdStore {
 
-    private static final Logger LOG = LoggerFactory.getLogger(ExecutorIdStore.class);
-    private static final String ENV_ID_PATH = "FLEZHA_EXECUTOR_ID_PATH";
-    private static final String DEFAULT_ID_PATH = "/var/lib/flezha-executor/id";
+    private static final Logger LOG = LoggerFactory.getLogger(RunnerIdStore.class);
+    private static final String ENV_ID_PATH = "FLEZHA_RUNNER_ID_PATH";
+    private static final String DEFAULT_ID_PATH = "/var/lib/flezha-runner/id";
 
     // One stable id per process — reconnects present the SAME id even in the
     // degraded no-persist case where nothing is on disk to re-load.
     private static final AtomicReference<String> STABLE_ID = new AtomicReference<>();
 
-    private ExecutorIdStore() {}
+    private RunnerIdStore() {}
 
     @Nonnull
     public static Path idPath() {
@@ -50,7 +50,7 @@ public final class ExecutorIdStore {
     }
 
     /**
-     * The executor's stable identity for this process. Loads the persisted id if
+     * The runner's stable identity for this process. Loads the persisted id if
      * present; otherwise derives one from {@code namespace} + the declared
      * factory set, persists it best-effort, and caches it. Subsequent calls
      * (including every reconnect) return the same cached value.
@@ -83,9 +83,9 @@ public final class ExecutorIdStore {
             persistTo(path, id);
         } catch (IOException e) {
             // Degradation: no binding continuity across restart, but the
-            // executor runs normally with a per-boot id.
+            // runner runs normally with a per-boot id.
             LOG.warn(
-                    "executor stable-id persist failed at {}: {} — using a fresh per-boot id "
+                    "runner stable-id persist failed at {}: {} — using a fresh per-boot id "
                             + "(no binding continuity across restart)",
                     path,
                     e.toString());
@@ -122,8 +122,8 @@ public final class ExecutorIdStore {
     @Nonnull
     private static String rand6() {
         // Dependency-free entropy: clock noise mixed with the pid keeps two fresh
-        // executors distinct (cryptographic randomness is not needed — the
-        // persistence path already scopes uniqueness per executor).
+        // runners distinct (cryptographic randomness is not needed — the
+        // persistence path already scopes uniqueness per runner).
         long seed = System.nanoTime() ^ (ProcessHandle.current().pid() << 32) ^ Long.rotateLeft(System.nanoTime(), 17);
         final String alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
         StringBuilder out = new StringBuilder(6);

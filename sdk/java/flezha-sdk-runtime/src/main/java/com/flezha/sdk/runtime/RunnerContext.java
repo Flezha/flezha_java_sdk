@@ -16,7 +16,7 @@ import javax.annotation.Nonnull;
  * sub-components under their own synchronization (each sub-component is
  * independently thread-safe).
  */
-public final class ExecutorContext {
+public final class RunnerContext {
 
     private final String namespace;
     private final FlezhaEnv.ResolvedConfig config;
@@ -26,11 +26,11 @@ public final class ExecutorContext {
             new UnboundedOperativeInstanceRegistry();
     private final StreamRegistry streamRegistry = new StreamRegistry();
     private final Map<Long, PrimaryStreamReader> primaryReaders = new ConcurrentHashMap<>();
-    private final AtomicReference<String> executorId = new AtomicReference<>("undefined");
-    private final AtomicReference<ExecutorStatus> status = new AtomicReference<>(ExecutorStatus.STARTING);
+    private final AtomicReference<String> runnerId = new AtomicReference<>("undefined");
+    private final AtomicReference<RunnerStatus> status = new AtomicReference<>(RunnerStatus.STARTING);
     private ExecutorService workerPool;
 
-    public ExecutorContext(@Nonnull String namespace, @Nonnull FlezhaEnv.ResolvedConfig config, long nativeHandle) {
+    public RunnerContext(@Nonnull String namespace, @Nonnull FlezhaEnv.ResolvedConfig config, long nativeHandle) {
         this.namespace = namespace;
         this.config = config;
         this.nativeHandle = nativeHandle;
@@ -80,20 +80,20 @@ public final class ExecutorContext {
     }
 
     @Nonnull
-    public String executorId() {
-        return executorId.get();
+    public String runnerId() {
+        return runnerId.get();
     }
 
-    public void setExecutorId(@Nonnull String id) {
-        executorId.set(id);
+    public void setRunnerId(@Nonnull String id) {
+        runnerId.set(id);
     }
 
     @Nonnull
-    public ExecutorStatus status() {
+    public RunnerStatus status() {
         return status.get();
     }
 
-    public void setStatus(@Nonnull ExecutorStatus newStatus) {
+    public void setStatus(@Nonnull RunnerStatus newStatus) {
         status.set(newStatus);
     }
 }
