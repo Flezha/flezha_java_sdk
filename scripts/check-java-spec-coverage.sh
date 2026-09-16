@@ -2,12 +2,12 @@
 # Fails when a `java-sdk` scenario has no Java test that names it.
 #
 # `java-sdk-testing` requires at least one harness test per `java-sdk` scenario,
-# and requires the rule to be enforced by a gate `mvn -f sdk/java verify` runs.
+# and requires the rule to be enforced by a gate `mvn verify` runs.
 # This is that gate. Without it the requirement is unfalsifiable: it can never
 # be the reason a test exists, and a reader looking for the check finds nothing.
 #
 # It is run by the `java-spec-coverage` execution of `exec-maven-plugin` in
-# sdk/java/pom.xml, bound to `verify` on the aggregator alone, which
+# pom.xml, bound to `verify` on the aggregator alone, which
 # .github/workflows/java-sdk.yml reaches on every pull request. Unlike the
 # naming gates, it is not invoked from .github/workflows/naming.yml — the Java
 # build is where the requirement puts it, and running it twice would only mean
@@ -40,15 +40,15 @@
 #   * a baseline entry the spec no longer carries — a rotting list is the
 #     disease this gate treats, so it is not allowed to rot itself.
 #
-# TEST SOURCES ARE READ FROM DISK, not from `git ls-files` as the naming gates
-# are. This gate is bound to `mvn -f sdk/java verify`, so it runs in the inner
+# TEST SOURCES ARE READ FROM DISK, not from `git ls-files`. This gate is bound
+# to `mvn verify`, so it runs in the inner
 # loop, and it must judge the same files the build compiles. Reading the index
 # would fail a developer who has written the test and not yet staged it, and a
 # gate that goes red on correct work is a gate somebody disables.
 #
 # The gate has no answer when there is no spec, no scenario or no Java test
-# source. That is exit 3, not exit 2: `scripts/naming_gate.py` documents the
-# contract at the top, where 2 means a tool this gate needs is absent and 3
+# source, or no contract set to read the spec from. That is exit 3, not exit 2:
+# on the core's gate contract 2 means a tool this gate needs is absent and 3
 # means it ran and reached no verdict. Takes no arguments.
 set -euo pipefail
 
@@ -59,14 +59,29 @@ import pathlib
 import re
 import sys
 
-sys.dont_write_bytecode = True
-sys.path.insert(0, "scripts")
-import naming_gate
+import os
 
-SPEC = "openspec/specs/java-sdk/spec.md"
+# The core's gate contract: 1 is a finding, 3 a run that reached no verdict.
+FINDING = 1
+NO_ANSWER = 3
+
+# The spec is a member of the contract set, so it is read from where the
+# fixture tests read the set: `$FLEZHA_CONTRACT_DIR`, else `contract/`, else the
+# nearest enclosing tree that carries the set's manifest.
+MANIFEST = "test/fixtures/contract.txt"
+SPEC_MEMBER = "openspec/specs/java-sdk/spec.md"
 BASELINE = "scripts/java-spec-coverage-baseline.txt"
-TESTS = "sdk/java"
+TESTS = "."
 TEST_SOURCES = "*/src/test/java/**/*.java"
+
+
+def contract_root():
+    candidates = [os.environ.get("FLEZHA_CONTRACT_DIR") or None, "contract"]
+    candidates += [str(p) for p in pathlib.Path.cwd().resolve().parents]
+    for candidate in candidates:
+        if candidate and os.path.isfile(os.path.join(candidate, MANIFEST)):
+            return candidate
+    return None
 
 REQUIREMENT = "### Requirement:"
 SCENARIO = "#### Scenario:"
@@ -84,8 +99,20 @@ def fingerprint(text):
 
 def fail(message):
     print(message, file=sys.stderr)
-    sys.exit(naming_gate.NO_ANSWER)
+    sys.exit(NO_ANSWER)
 
+
+def load_baseline(path):
+    """The recorded debt, one entry per line; `#` comments and blanks ignored."""
+    with open(path, encoding="utf-8") as fh:
+        return {line.strip() for line in fh if line.strip() and not line.lstrip().startswith("#")}
+
+
+root = contract_root()
+if root is None:
+    fail(f"the contract set is nowhere this gate looked, so {SPEC_MEMBER} cannot be read: "
+         "unpack flezha-fixtures-<version>.tar.gz at contract/, or set FLEZHA_CONTRACT_DIR")
+SPEC = os.path.join(root, SPEC_MEMBER)
 
 try:
     with open(SPEC, encoding="utf-8") as fh:
@@ -144,7 +171,7 @@ uncovered = {entry for entry, (_, scenario) in scenarios.items()
              if not any(fingerprint(scenario) in name for name in named)}
 
 try:
-    baseline = naming_gate.load_baseline(BASELINE)
+    baseline = load_baseline(BASELINE)
 except OSError as exc:
     fail(f"cannot read {BASELINE}, so no gap can be told from the recorded debt: {exc}")
 
@@ -167,7 +194,7 @@ if problems:
           f"or — for a gap you are recording rather than closing — add its "
           f"`Requirement :: Scenario` line to {BASELINE}. That list may only shrink.",
           file=sys.stderr)
-    sys.exit(naming_gate.FINDING)
+    sys.exit(FINDING)
 
 print(f"java-sdk scenario coverage OK: {len(scenarios)} scenarios, "
       f"{len(scenarios) - len(uncovered)} named by a test, "

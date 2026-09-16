@@ -1,0 +1,57 @@
+name: Java SDK
+
+# Three tiers and no controller, then the source-shape check. Everything the
+# core contributes is fetched from one of its releases and checked against that
+# release's manifest, so nothing here needs a checkout of the core or a build
+# of it.
+#
+# What this cannot prove is the capability vocabulary the controller owns:
+# persistence, effectively-once, correction, partitioning, workflows, liveness,
+# restarts. Those are end-to-end scenarios and they run in the core's tree,
+# against the commit it pins this repository at. So does the portable jar's
+# release: the core's release job cross-builds the five libraries and packages
+# this repository through its submodule.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  # The core release every tier is proven against. One tag decides the library,
+  # the fake controller and the contract set, so a change to it is one line.
+  CORE_VERSION: "0.1.0"
+  CORE_RELEASE: https://github.com/flezha/flezha/releases/download/v0.1.0
+
+jobs:
+  tiers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run the three tiers
+        run: scripts/ci.sh --core "$CORE_RELEASE" --version "$CORE_VERSION"
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Formatting
+        run: mvn -B -q -DskipTests spotless:check

@@ -1,0 +1,15 @@
+Flezha Java SDK
+Copyright (c) 2026 Anuar Alfetahe
+
+Licensed under the Apache License, Version 2.0 (LICENSE).
+
+"Flezha" is the name of this project and its releases. The license grants no
+right to use the name, or a confusingly similar one, for a derived work, fork,
+or service (Apache-2.0 section 6).
+
+This software is provided "AS IS", without warranty of any kind, and liability
+is disclaimed to the extent the license allows (Apache-2.0 sections 7-8).
+
+Binary distributions (the Java SDK jar and the native libraries it bundles)
+include third-party components; their licenses and notices are reproduced in
+THIRD_PARTY_NOTICES.md.

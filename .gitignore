@@ -1,0 +1,62 @@
+# Maven build outputs
+target/
+dependency-reduced-pom.xml
+
+# Compiled class files
+*.class
+
+# Log files
+*.log
+
+# Package Files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# IDE - IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# IDE - Eclipse
+.settings/
+.classpath
+.project
+bin/
+
+# IDE - VSCode
+.vscode/
+
+# IDE - NetBeans
+nbproject/private/
+nbbuild/
+nbdist/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Temporary files
+*.swp
+*.swo
+*~
+*.tmp
+*.backup
+
+# Build output: the fat jars, and the native binaries a core release publishes.
+/flezha-sdk/dist/
+/test_app/dist/
+/flezha-sdk-native/src/main/resources/native/
+
+# Fetched from a core release and checked against its manifest: the fake
+# controller, and the contract set the fixture tests resolve against.
+/.core/
+/contract/

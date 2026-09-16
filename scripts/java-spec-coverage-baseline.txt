@@ -1,4 +1,4 @@
-# Scenarios in openspec/specs/java-sdk/spec.md that no Java test named when
+# Scenarios in the core's openspec/specs/java-sdk/spec.md that no Java test named when
 # scripts/check-java-spec-coverage.sh landed. This is recorded debt, not an
 # exemption: the gate fails on any scenario outside this list, and on any entry
 # here that has since been covered or that the spec no longer carries.
