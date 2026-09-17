@@ -116,15 +116,15 @@ final class ProcedureGenerator {
             return null;
         }
         String simple = procedure.getSimpleName().toString();
-        // The written `id` names the procedure too, so its state is saved under
-        // the same name its Rust twin uses; a class with no `id` keeps the
-        // derived one.
+        // The procedure's node name and the operative's factory id are one
+        // string: the written `id` where there is one, so Java state is saved
+        // under the same name its Rust twin uses, and the derived one
+        // otherwise.
         String id = ann.id().isEmpty() ? snake(simple) : ann.id();
         return new ProcedureModel(
                 pkg,
                 procedure.getQualifiedName().toString(),
                 simple + "Procedure",
-                id,
                 inputType.toString(),
                 outputType,
                 state.stateType(),
@@ -361,10 +361,10 @@ final class ProcedureGenerator {
         // The five type tokens are not generated: the `implements Procedure<…>`
         // clause above states them concretely, and the interface defaults read
         // them off it — the same path a hand-written procedure takes.
-        // The name is the author's written `id` where there is one, so it goes
-        // through the same escaping every other author-written string does.
+        // The node name is the model's one identity, escaped as every other
+        // author-written string is.
         b.append("    @Override public String name() { return ")
-                .append(mirrors.literal(m.name()))
+                .append(mirrors.literal(m.id()))
                 .append("; }\n");
         b.append("    @Override public ")
                 .append(m.stateType())

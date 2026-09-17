@@ -468,7 +468,7 @@ class FlezhaProcessorTest {
     }
 
     @Test
-    void keepsAQuoteInTheAutoWireStringsExactly() {
+    void keepsAQuoteInTheShortFormStringsExactly() {
         String code =
                 """
                 package t;
@@ -483,7 +483,7 @@ class FlezhaProcessorTest {
     }
 
     @Test
-    void keepsABackslashInTheAutoWireStringsExactly() {
+    void keepsABackslashInTheShortFormStringsExactly() {
         String code =
                 """
                 package t;

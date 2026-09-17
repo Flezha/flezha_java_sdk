@@ -13,7 +13,6 @@ record ProcedureModel(
         String pkg,
         String userFqn,
         String procedureSimple,
-        String name,
         String inputType,
         String outputType,
         String stateType,

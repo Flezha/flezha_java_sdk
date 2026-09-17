@@ -53,7 +53,7 @@ public @interface Procedure {
     OperativeKind[] kind() default {};
 
     /**
-     * Name of the entry channel of the operative {@link #sink()} auto-wires — the address an
+     * Name of the entry channel of the operative {@link #sink()} generates — the address an
      * operator injects on and the name a forwarded frame has to match. Empty (the default)
      * names it {@code input}. Setting it without a {@code sink} is an error: there is no
      * generated operative for it to name a channel on.
