@@ -77,6 +77,8 @@ public final class Main {
                 .defineStream(CoalescingCounterStreamOperative.class)
                 .defineStream(PersistenceOffStreamOperative.class)
                 .defineStream(HybridChannelStreamOperative.class)
+                .defineStream(MergedInputStreamOperative.class)
+                .defineStream(TransformChainStreamOperative.class)
                 .defineStream(ResumeProbeStreamOperative.class)
                 .defineStream(SchemaEvolutionStreamOperatives.V1.class)
                 .defineStream(SchemaEvolutionStreamOperatives.V2.class)

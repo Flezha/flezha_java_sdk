@@ -48,6 +48,7 @@ class FactoryIdsTest {
             "echo_workflow",
             "entity_stress",
             "hybrid_channel",
+            "merged_input",
             "mixed_operative",
             "optout_commit_block",
             "outbox_block_workflow",
@@ -70,6 +71,7 @@ class FactoryIdsTest {
             "sync_durable_workflow",
             "tier_commit_block_workflow",
             "tier_store",
+            "transform_chain",
             "undo_outbox_workflow",
             "wedge_probe");
 

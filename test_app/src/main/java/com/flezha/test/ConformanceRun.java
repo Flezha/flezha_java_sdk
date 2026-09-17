@@ -207,7 +207,9 @@ public final class ConformanceRun {
     /** The transform and key links declared before the terminator. */
     private static EdgeStream<String> reshape(EdgeStream<String> s, String link) {
         return switch (splitCall(link)[0]) {
-            case "map", "filter", "flat_map" -> s.map(String.class, value -> value);
+            case "map" -> s.map(String.class, value -> value);
+            case "filter" -> s.filter(value -> true);
+            case "flat_map" -> s.flatMap(String.class, value -> List.of(value));
             case "key" -> s.keyBy(value -> value);
             default -> throw new IllegalStateException(
                     "the fixture spells a link this interpreter does not map: " + link);
