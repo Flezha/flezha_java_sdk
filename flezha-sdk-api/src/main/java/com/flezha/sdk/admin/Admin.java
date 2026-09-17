@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.flezha.sdk.internal.RunnerHandle;
+import java.util.Locale;
 import javax.annotation.Nonnull;
 
 /**
@@ -33,10 +34,19 @@ public final class Admin {
         this.handle = handle;
     }
 
-    /** Start an operative. Answers the controller's own result. */
+    /**
+     * Start an operative, answering the id it runs under and what the start
+     * did. A refused start throws, as every refused call here does.
+     */
     @Nonnull
-    public JsonNode startOperative(OperativeSpec spec) {
-        return call("Operative.start", spec.fields());
+    public StartResult startOperative(OperativeSpec spec) {
+        JsonNode answer = call("Operative.start", spec.fields());
+        try {
+            String outcome = answer.required("outcome").asText().toUpperCase(Locale.ROOT);
+            return new StartResult(answer.required("id").asText(), StartOutcome.valueOf(outcome));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("the controller answered a start this SDK cannot read: " + answer, e);
+        }
     }
 
     /** Stop an operative, or the whole partition group it names. */

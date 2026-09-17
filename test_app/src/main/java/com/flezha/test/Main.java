@@ -96,6 +96,7 @@ public final class Main {
                 .defineStream(PoisonProbeStreamOperative.class)
                 .defineStream(WedgeProbeStreamOperative.class)
                 .defineStream(CandleStreamOperative.class)
+                .defineStream(SpawnRequesterStreamOperative.class)
                 .defineWorkflow(EchoWorkflowOperative.class)
                 .defineWorkflow(CommitBlockWorkflowOperative.class)
                 .defineWorkflow(SyncDurableWorkflowOperative.class)

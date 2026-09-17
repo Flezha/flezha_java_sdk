@@ -1,136 +1,75 @@
 package com.flezha.sdk.procedure;
 
-import com.flezha.sdk.Flezha;
-import com.flezha.sdk.Logger;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Locale;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
- * The async result of a {@link ProcedureCtx#spawnWorkflow} request. Observing it
- * is optional: a handle nobody looks at logs one warning if the request failed,
- * so a fire-and-forget requester never loses the diagnosis.
+ * The async result of a {@link ProcedureCtx#spawnWorkflow} request, returned before the controller
+ * answers. {@link #await} waits for the answer; {@link #tryResult} never waits.
  *
- * <p>"Nobody looked" is decided the moment the caller first asks — {@link #await}
- * and {@link #tryResult} claim the handle before they read it — so a caller that
- * handles its own failures is never also warned about. The exception is a
- * request that failed before it reached the wire (no control plane): it is
- * already resolved when the handle is built, so it always warns — a
- * misconfiguration worth one line whether or not anyone read it.
+ * <p>Read it inside the invocation that made it. Every read asks the core, which answers a resolved
+ * handle the same way until that invocation ends. Then the core releases the handle and logs a
+ * failure no read collected, once; a read after that throws an unchecked exception naming the
+ * released handle.
  */
 public final class SpawnHandle {
 
-    private static final Logger LOG = Flezha.log();
+    private static final ObjectMapper JSON = new ObjectMapper();
 
-    /**
-     * How long a result is awaited. Generous: the controller may have to start
-     * an instance, which waits for a runner advertising the factory.
-     */
+    /** How long after its request a result is awaited before it resolves as {@link SpawnException.Timeout}. */
     public static final long RESULT_TIMEOUT_MS = 30_000;
 
-    private final String instanceId;
-    private final String factoryId;
-    private final CompletableFuture<SpawnOutcome> result;
-    private final AtomicBoolean claimed = new AtomicBoolean(false);
-
-    private SpawnHandle(String instanceId, String factoryId, CompletableFuture<SpawnOutcome> result) {
-        this.instanceId = instanceId;
-        this.factoryId = factoryId;
-        this.result = result;
-        result.whenComplete((outcome, error) -> {
-            if (error != null && !claimed.get()) {
-                LOG.warn(
-                        "spawnWorkflow({}, {}) failed: {}",
-                        instanceId,
-                        factoryId,
-                        unwrap(error).getMessage());
-            }
-        });
+    /** One read of the core's handle: its answer as JSON, or {@code null} while pending. */
+    @FunctionalInterface
+    interface Answer {
+        @Nullable
+        String read(long timeoutMs);
     }
 
-    /** A handle awaiting the controller's {@code SpawnWorkflowResponse}. */
-    @Nonnull
-    public static SpawnHandle pending(String instanceId, String factoryId, CompletableFuture<String> reply) {
-        return new SpawnHandle(
-                instanceId, factoryId, reply.thenApply(outcome -> interpret(instanceId, factoryId, outcome)));
-    }
+    private final Answer answer;
 
-    /** A handle that already knows its answer — nothing was sent. */
-    @Nonnull
-    public static SpawnHandle resolved(String instanceId, String factoryId, SpawnOutcome outcome) {
-        return new SpawnHandle(instanceId, factoryId, CompletableFuture.completedFuture(outcome));
-    }
-
-    /** A handle that already knows it failed — nothing was sent. */
-    @Nonnull
-    public static SpawnHandle failed(String instanceId, String factoryId, SpawnException error) {
-        return new SpawnHandle(instanceId, factoryId, CompletableFuture.failedFuture(error));
-    }
-
-    /** Block for the controller's answer, up to {@link #RESULT_TIMEOUT_MS}. */
-    @Nonnull
-    public SpawnOutcome await() throws SpawnException {
-        claimed.set(true);
-        try {
-            return result.get(RESULT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new SpawnException.Timeout();
-        } catch (java.util.concurrent.TimeoutException e) {
-            throw new SpawnException.Timeout();
-        } catch (ExecutionException | CompletionException e) {
-            throw unwrap(e);
-        }
+    SpawnHandle(Answer answer) {
+        this.answer = answer;
     }
 
     /**
-     * The answer if it has already arrived, without blocking. An empty
-     * {@link Optional} leaves the handle claimed but unresolved, so a later
-     * {@link #await} still sees the result.
+     * Wait for the controller's answer. The core bounds the wait: {@link #RESULT_TIMEOUT_MS} after the
+     * request it resolves a timeout.
      */
     @Nonnull
-    public Optional<SpawnOutcome> tryResult() throws SpawnException {
-        claimed.set(true);
-        if (!result.isDone()) {
+    public SpawnResult await() throws SpawnException {
+        return read(Long.MAX_VALUE)
+                .orElseThrow(
+                        () -> new IllegalStateException("the core answered pending to a read bounded by its deadline"));
+    }
+
+    /** The answer if it has arrived, without waiting; empty while it is pending. */
+    @Nonnull
+    public Optional<SpawnResult> tryResult() throws SpawnException {
+        return read(0);
+    }
+
+    /** {@code {"id","outcome"}} is the result; {@code {"id","error","message"}} is thrown as its failure. */
+    private Optional<SpawnResult> read(long timeoutMs) throws SpawnException {
+        String json = answer.read(timeoutMs);
+        if (json == null) {
             return Optional.empty();
         }
-        return Optional.of(await());
-    }
-
-    /**
-     * Map the controller's outcome string onto the public result.
-     * {@code already_running} / {@code factory_unknown} arrive as outcomes
-     * rather than errors because they are the controller's decision, not a
-     * failed exchange; they become errors here, at the API boundary.
-     */
-    private static SpawnOutcome interpret(String instanceId, String factoryId, String outcome) {
-        switch (outcome) {
-            case "spawned":
-                return SpawnOutcome.SPAWNED;
-            case "delivered":
-                return SpawnOutcome.DELIVERED;
-            case "already_running":
-                throw new CompletionException(new SpawnException.AlreadyRunning(instanceId));
-            case "factory_unknown":
-                throw new CompletionException(new SpawnException.FactoryUnknown(factoryId));
-            default:
-                throw new CompletionException(new SpawnException.Refused("unknown outcome `" + outcome + "`"));
+        try {
+            JsonNode node = JSON.readTree(json);
+            JsonNode error = node.get("error");
+            if (error != null) {
+                throw SpawnException.of(error.asText(), node.required("message").asText());
+            }
+            String outcome = node.required("outcome").asText().toUpperCase(Locale.ROOT);
+            return Optional.of(new SpawnResult(node.required("id").asText(), SpawnOutcome.valueOf(outcome)));
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            throw new IllegalStateException("the core answered a spawn this SDK cannot read: " + json, e);
         }
-    }
-
-    /** The SpawnException behind a future's completion failure. */
-    private static SpawnException unwrap(Throwable error) {
-        Throwable cause = error;
-        while ((cause instanceof CompletionException || cause instanceof ExecutionException)
-                && cause.getCause() != null) {
-            cause = cause.getCause();
-        }
-        return cause instanceof SpawnException spawnException
-                ? spawnException
-                : new SpawnException.Refused(String.valueOf(cause));
     }
 }

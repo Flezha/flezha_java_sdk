@@ -61,6 +61,7 @@ class FactoryIdsTest {
             "schema_evolution_v1",
             "schema_evolution_v2",
             "session_timeout",
+            "spawn_requester",
             "stateful_counter",
             "stateless_loop_workflow",
             "static_entity",

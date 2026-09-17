@@ -171,7 +171,7 @@ public final class OperativeInstance {
         OptionalLong offset = item instanceof WorkItem.Input in ? in.consumedOffset() : OptionalLong.empty();
         boolean replay = item instanceof WorkItem.Input in && in.replay();
 
-        EmitContext ctx = new EmitContext(this, cell, activation.changeSeq(), now, replay);
+        EmitContext ctx = new EmitContext(this, cell, activation.token(), activation.changeSeq(), now, replay);
         TimerSession session = item instanceof WorkItem.Timer timer
                 ? cell.timerPolicy.firingSession(new PendingTimers(), timer.scheduledAt(), timer.kind())
                 : cell.timerPolicy.session(new PendingTimers(), now);
@@ -255,7 +255,8 @@ public final class OperativeInstance {
         // Compensation is wall-anchored (at-least-once, idempotent by
         // author contract) and carries no timer session — structural, the
         // same refusal the pre-core adapter enforced.
-        EmitContext ctx = new EmitContext(this, cell, activation.changeSeq(), System.currentTimeMillis(), false);
+        EmitContext ctx = new EmitContext(
+                this, cell, activation.token(), activation.changeSeq(), System.currentTimeMillis(), false);
         List<Change> buffer = new ArrayList<>();
         Procedure procedure = cell.procedure;
         StateHandle<Object, Change> handle = handleOver(cell, buffer);

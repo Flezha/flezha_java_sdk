@@ -4,6 +4,7 @@ import com.flezha.sdk.procedure.IfRunning;
 import com.flezha.sdk.procedure.Procedure;
 import com.flezha.sdk.procedure.ProcedureCtx;
 import com.flezha.sdk.procedure.ProcedureException;
+import com.flezha.sdk.procedure.SpawnOptions;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
@@ -34,9 +35,13 @@ public final class DetectProcedure implements Procedure<String, Void, String, No
         }
         String subject = input.substring("alert:".length());
 
-        // One worker per subject. The handle is ignored on purpose: a refused request logs
-        // itself, and this procedure carries on detecting.
-        ctx.spawnWorkflow("triage@" + subject, "triage", input.getBytes(StandardCharsets.UTF_8), IfRunning.DELIVER);
+        // One worker per subject, so the subject names it. The handle is ignored on purpose: a
+        // refused request unread by the end of this invocation logs itself, and this procedure
+        // carries on detecting.
+        ctx.spawnWorkflow(
+                "triage",
+                input.getBytes(StandardCharsets.UTF_8),
+                SpawnOptions.id("triage@" + subject).ifRunning(IfRunning.DELIVER));
 
         ctx.emit("detected:" + subject);
     }

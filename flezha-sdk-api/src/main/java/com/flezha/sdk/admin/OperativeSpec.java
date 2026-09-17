@@ -8,7 +8,7 @@ import javax.annotation.Nullable;
 
 /**
  * What an operative start takes, which is what {@code flz operative start}
- * takes: an id, the factory that serves it, and optionally its kind, the
+ * takes: the factory that serves it, and optionally its id, its kind, the
  * values it is seeded with and the start options.
  *
  * <p>Instances are immutable; each setter answers a new spec, so a spec is
@@ -23,7 +23,7 @@ public final class OperativeSpec {
     private final JsonNode opts;
 
     private OperativeSpec(
-            String id,
+            @Nullable String id,
             String factoryId,
             @Nullable String kind,
             @Nullable JsonNode initValues,
@@ -35,10 +35,24 @@ public final class OperativeSpec {
         this.opts = opts;
     }
 
-    /** A stream operative {@code id} served by {@code factoryId}. */
+    /**
+     * A stream operative served by {@code factoryId}, under an id the
+     * controller generates unless {@link #id} names one.
+     */
     @Nonnull
-    public static OperativeSpec of(String id, String factoryId) {
-        return new OperativeSpec(id, factoryId, null, null, null);
+    public static OperativeSpec of(String factoryId) {
+        return new OperativeSpec(null, factoryId, null, null, null);
+    }
+
+    /**
+     * The operative's own id. Without one every start runs a new operative
+     * under a generated id, so a start retried after a lost answer starts a
+     * second one, and a second stream runs until it is stopped. With one, a
+     * second start leaves the running operative untouched.
+     */
+    @Nonnull
+    public OperativeSpec id(String id) {
+        return new OperativeSpec(id, factoryId, kind, initValues, opts);
     }
 
     /** The operative kind: {@code "stream"} (the default) or {@code "workflow"}. */
@@ -59,12 +73,14 @@ public final class OperativeSpec {
         return new OperativeSpec(id, factoryId, kind, initValues, opts);
     }
 
-    /** The named parameters the controller builds the operative from. */
+    /** The named parameters the controller builds the operative from; no id asks for a generated one. */
     @Nonnull
     ObjectNode fields() {
         ObjectNode fields = JsonNodeFactory.instance.objectNode();
-        fields.put("id", id);
         fields.put("factory_id", factoryId);
+        if (id != null) {
+            fields.put("id", id);
+        }
         if (kind != null) {
             fields.put("kind", kind);
         }

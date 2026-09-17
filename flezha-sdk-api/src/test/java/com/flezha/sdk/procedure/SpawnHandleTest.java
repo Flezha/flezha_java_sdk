@@ -3,112 +3,191 @@ package com.flezha.sdk.procedure;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.concurrent.CompletableFuture;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Procedure-requested spawn, api half ({@code procedure-requested-spawn}):
- * the result mapping, the isolation from {@code run}, and the replay contract.
- * Mirrors the Rust {@code procedure::tests::spawn} suite scenario for scenario.
+ * Procedure-requested spawn, api half ({@code procedure-requested-spawn}): what the context sends
+ * to the core, and how a handle reads the core's answer. The core's own suite owns the replay
+ * skip, the deadline and the release; here a double answers as the core does.
  */
 class SpawnHandleTest {
+
+    private static final byte[] PAYLOAD = "p".getBytes(StandardCharsets.UTF_8);
+
+    private final FakeCore core = new FakeCore();
 
     @AfterEach
     void dropRequester() {
         SpawnRequests.uninstall();
     }
 
-    private static SpawnHandle answering(String outcome) {
-        return SpawnHandle.pending("w1", "worker", CompletableFuture.completedFuture(outcome));
+    @Test
+    @DisplayName("a spawn without an id asks for a generated one and answers it")
+    void aSpawnWithoutAnIdAnswersTheGeneratedId() throws Exception {
+        core.answer = "{\"id\":\"worker-k7m2qzxw4pd3fn2a\",\"outcome\":\"spawned\"}";
+        SpawnRequests.install(core);
+
+        SpawnResult result =
+                new StubCtx(false, 42).spawnWorkflow("worker", PAYLOAD).await();
+
+        assertThat(result).isEqualTo(new SpawnResult("worker-k7m2qzxw4pd3fn2a", SpawnOutcome.SPAWNED));
+        assertThat(core.requests).containsExactly("42/worker//p/deliver/false");
     }
 
     @Test
-    @DisplayName("a spawn and a delivery are distinguishable outcomes")
-    void spawnAndDeliveryAreDistinguishable() throws Exception {
-        assertThat(answering("spawned").await()).isEqualTo(SpawnOutcome.SPAWNED);
-        assertThat(answering("delivered").await()).isEqualTo(SpawnOutcome.DELIVERED);
+    @DisplayName("a spawn with an id carries it and delivers by default; the error policy is carried too")
+    void aSpawnWithAnIdCarriesItAndItsPolicy() throws Exception {
+        core.answer = "{\"id\":\"w1\",\"outcome\":\"delivered\"}";
+        SpawnRequests.install(core);
+        ProcedureCtx ctx = new StubCtx(false, 42);
+
+        assertThat(ctx.spawnWorkflow("worker", PAYLOAD, SpawnOptions.id("w1")).await())
+                .isEqualTo(new SpawnResult("w1", SpawnOutcome.DELIVERED));
+        ctx.spawnWorkflow("worker", PAYLOAD, SpawnOptions.id("w1").ifRunning(IfRunning.ERROR));
+
+        assertThat(core.requests).containsExactly("42/worker/w1/p/deliver/false", "42/worker/w1/p/error/false");
     }
 
     @Test
-    @DisplayName("the error policy and an unknown factory come back as errors")
-    void policyAndUnknownFactoryAreErrors() {
-        assertThatThrownBy(() -> answering("already_running").await())
-                .isInstanceOf(SpawnException.AlreadyRunning.class)
-                .hasMessageContaining("w1");
-        assertThatThrownBy(() -> answering("factory_unknown").await())
-                .isInstanceOf(SpawnException.FactoryUnknown.class)
-                .hasMessageContaining("worker");
-    }
+    @DisplayName("the error policy comes back as already running, in the core's own words")
+    void theErrorPolicyComesBackAsAlreadyRunning() {
+        String message = "an instance of `w1` is already running and if_running was Error";
+        core.answer = failure("w1", "already_running", message);
+        SpawnRequests.install(core);
 
-    @Test
-    @DisplayName("a refusal carries the controller's reason")
-    void refusalCarriesItsReason() {
-        SpawnHandle handle = SpawnHandle.pending(
-                "w1", "worker", CompletableFuture.failedFuture(new SpawnException.Refused("quota_exceeded")));
+        SpawnHandle handle = new StubCtx(false, 42)
+                .spawnWorkflow("worker", PAYLOAD, SpawnOptions.id("w1").ifRunning(IfRunning.ERROR));
 
         assertThatThrownBy(handle::await)
-                .isInstanceOf(SpawnException.Refused.class)
-                .hasMessageContaining("quota_exceeded");
+                .isInstanceOf(SpawnException.AlreadyRunning.class)
+                .hasMessage(message);
     }
 
     @Test
-    @DisplayName("tryResult leaves a pending handle pending")
-    void tryResultLeavesAPendingHandlePending() throws Exception {
-        CompletableFuture<String> reply = new CompletableFuture<>();
-        SpawnHandle handle = SpawnHandle.pending("w1", "worker", reply);
+    @DisplayName("a refusal does not fault the call; a read reports it with the core's sentence unprefixed")
+    void aRefusalIsReportedOnlyByARead() {
+        String message = "the controller refused the spawn: quota";
+        core.answer = failure("", "refused", message);
+        SpawnRequests.install(core);
+
+        SpawnHandle handle = new StubCtx(false, 42).spawnWorkflow("worker", PAYLOAD);
+
+        assertThatThrownBy(handle::tryResult)
+                .isInstanceOf(SpawnException.Refused.class)
+                .hasMessage(message);
+    }
+
+    @Test
+    @DisplayName("each failure kind is its own exception")
+    void eachFailureKindIsItsOwnException() {
+        Map<String, Class<? extends SpawnException>> kinds = Map.of(
+                "factory_unknown", SpawnException.FactoryUnknown.class,
+                "timeout", SpawnException.Timeout.class,
+                "unavailable", SpawnException.Unavailable.class);
+        SpawnRequests.install(core);
+        kinds.forEach((kind, type) -> {
+            core.answer = failure("", kind, "the core's sentence for " + kind);
+            assertThatThrownBy(new StubCtx(false, 42).spawnWorkflow("worker", PAYLOAD)::await)
+                    .isInstanceOf(type)
+                    .hasMessage("the core's sentence for " + kind);
+        });
+    }
+
+    @Test
+    @DisplayName("tryResult answers pending without waiting until the answer arrives")
+    void tryResultAnswersPendingUntilTheAnswerArrives() throws Exception {
+        SpawnRequests.install(core);
+        SpawnHandle handle = new StubCtx(false, 42).spawnWorkflow("worker", PAYLOAD);
 
         assertThat(handle.tryResult()).isEmpty();
 
-        reply.complete("spawned");
-        assertThat(handle.tryResult()).contains(SpawnOutcome.SPAWNED);
+        core.answer = "{\"id\":\"worker-k7m2qzxw4pd3fn2a\",\"outcome\":\"spawned\"}";
+        assertThat(handle.tryResult()).contains(new SpawnResult("worker-k7m2qzxw4pd3fn2a", SpawnOutcome.SPAWNED));
+        assertThat(core.reads).containsExactly(0L, 0L);
     }
 
     @Test
-    @DisplayName("without a control plane the request resolves instead of blocking the procedure")
-    void withoutAControlPlaneTheRequestResolves() {
-        assertThatThrownBy(() -> SpawnRequests.request("w1", "worker", new byte[] {1}, IfRunning.DELIVER, false)
+    @DisplayName("await leaves the deadline to the core, and every read asks the core")
+    void awaitLeavesTheDeadlineToTheCoreAndEveryReadAsksTheCore() throws Exception {
+        core.answer = "{\"id\":\"w1\",\"outcome\":\"spawned\"}";
+        SpawnRequests.install(core);
+        SpawnHandle handle = new StubCtx(false, 42).spawnWorkflow("worker", PAYLOAD, SpawnOptions.id("w1"));
+
+        assertThat(handle.await()).isEqualTo(handle.await());
+        assertThat(handle.tryResult()).contains(new SpawnResult("w1", SpawnOutcome.SPAWNED));
+
+        assertThat(core.reads).containsExactly(Long.MAX_VALUE, Long.MAX_VALUE, 0L);
+    }
+
+    @Test
+    @DisplayName("a replayed spawn carries the flag and answers skipped with its id, or an empty one without")
+    void aReplayedSpawnAnswersSkippedWithItsIdOrAnEmptyOne() throws Exception {
+        SpawnRequests.install(core);
+        ProcedureCtx replaying = new StubCtx(true, 42);
+
+        core.answer = "{\"id\":\"\",\"outcome\":\"skipped_on_replay\"}";
+        assertThat(replaying.spawnWorkflow("worker", PAYLOAD).await())
+                .isEqualTo(new SpawnResult("", SpawnOutcome.SKIPPED_ON_REPLAY));
+
+        core.answer = "{\"id\":\"w1\",\"outcome\":\"skipped_on_replay\"}";
+        assertThat(replaying
+                        .spawnWorkflow("worker", PAYLOAD, SpawnOptions.id("w1"))
                         .await())
-                .isInstanceOf(SpawnException.Unavailable.class);
+                .isEqualTo(new SpawnResult("w1", SpawnOutcome.SKIPPED_ON_REPLAY));
+
+        assertThat(core.requests).containsExactly("42/worker//p/deliver/true", "42/worker/w1/p/deliver/true");
     }
 
     @Test
-    @DisplayName("an ignored handle is not an error for the procedure")
-    void anIgnoredHandleIsNotAnError() {
-        SpawnRequests.install((instanceId, factoryId, payload, ifRunning) ->
-                CompletableFuture.failedFuture(new SpawnException.Refused("nope")));
+    @DisplayName("without a control plane every read answers unavailable, the call still returns, and one line says so")
+    void withoutAControlPlaneEveryReadAnswersUnavailable() {
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        SpawnHandle handle = capturingStderr(
+                stderr, () -> new StubCtx(false, 42).spawnWorkflow("worker", PAYLOAD, SpawnOptions.id("w1")));
 
-        // Fire-and-forget: never inspecting the handle must not throw. The
-        // failure it carries is reported to the log, not to the caller.
-        SpawnRequests.request("w1", "worker", new byte[] {1}, IfRunning.DELIVER, false);
+        assertThat(stderr.toString(StandardCharsets.UTF_8))
+                .isEqualTo("[flezha] spawnWorkflow(factory `worker`, id `w1`) failed: no control plane to request a"
+                        + " spawn on" + System.lineSeparator());
+        assertThatThrownBy(handle::tryResult).isInstanceOf(SpawnException.Unavailable.class);
+        assertThatThrownBy(handle::await)
+                .isInstanceOf(SpawnException.Unavailable.class)
+                .hasMessage("no control plane to request a spawn on");
     }
 
     @Test
-    @DisplayName("a replayed invocation issues no request")
-    void aReplayedInvocationIssuesNoRequest() throws Exception {
-        SpawnRequests.install((instanceId, factoryId, payload, ifRunning) -> {
-            throw new AssertionError("a replay must not reach the control plane");
-        });
+    @DisplayName(
+            "without a control plane a replayed spawn answers skipped with its id, or an empty one, and logs nothing")
+    void withoutAControlPlaneAReplayedSpawnAnswersSkipped() throws Exception {
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        ProcedureCtx replaying = new StubCtx(true, 42);
+        SpawnHandle unnamed = capturingStderr(stderr, () -> replaying.spawnWorkflow("worker", PAYLOAD));
+        SpawnHandle named =
+                capturingStderr(stderr, () -> replaying.spawnWorkflow("worker", PAYLOAD, SpawnOptions.id("w1")));
 
-        assertThat(SpawnRequests.request("w1", "worker", new byte[] {1}, IfRunning.DELIVER, true)
-                        .await())
-                .isEqualTo(SpawnOutcome.SKIPPED_ON_REPLAY);
+        assertThat(stderr.toString(StandardCharsets.UTF_8)).isEmpty();
+        assertThat(unnamed.tryResult()).contains(new SpawnResult("", SpawnOutcome.SKIPPED_ON_REPLAY));
+        assertThat(named.await()).isEqualTo(new SpawnResult("w1", SpawnOutcome.SKIPPED_ON_REPLAY));
     }
 
     @Test
-    @DisplayName("a live invocation does issue one, carrying the policy the controller reads")
-    void aLiveInvocationIssuesOne() throws Exception {
-        StringBuilder seen = new StringBuilder();
-        SpawnRequests.install((instanceId, factoryId, payload, ifRunning) -> {
-            seen.append(instanceId).append('/').append(factoryId).append('/').append(ifRunning);
-            return CompletableFuture.completedFuture("spawned");
-        });
+    @DisplayName("an answer this SDK cannot read is refused naming it")
+    void anUnreadableAnswerIsRefusedNamingIt() {
+        core.answer = "{\"id\":\"w1\",\"outcome\":\"hatched\"}";
+        SpawnRequests.install(core);
 
-        assertThat(SpawnRequests.request("w1", "worker", new byte[] {1}, IfRunning.ERROR, false)
-                        .await())
-                .isEqualTo(SpawnOutcome.SPAWNED);
-        assertThat(seen.toString()).isEqualTo("w1/worker/error");
+        assertThatThrownBy(new StubCtx(false, 42).spawnWorkflow("worker", PAYLOAD)::await)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("hatched");
     }
 
     @Test
@@ -118,29 +197,60 @@ class SpawnHandleTest {
         assertThat(IfRunning.ERROR.wire()).isEqualTo("error");
     }
 
-    @Test
-    @DisplayName("the default ProcedureCtx implementation routes through the installed requester")
-    void theCtxDefaultRoutesThroughTheRequester() throws Exception {
-        SpawnRequests.install(
-                (instanceId, factoryId, payload, ifRunning) -> CompletableFuture.completedFuture("delivered"));
-
-        ProcedureCtx live = new StubCtx(false);
-        assertThat(live.spawnWorkflow("w1", "worker", new byte[] {1}, IfRunning.DELIVER)
-                        .await())
-                .isEqualTo(SpawnOutcome.DELIVERED);
-
-        ProcedureCtx replaying = new StubCtx(true);
-        assertThat(replaying
-                        .spawnWorkflow("w1", "worker", new byte[] {1}, IfRunning.DELIVER)
-                        .await())
-                .isEqualTo(SpawnOutcome.SKIPPED_ON_REPLAY);
+    private static String failure(String id, String kind, String message) {
+        return "{\"id\":\"" + id + "\",\"error\":\"" + kind + "\",\"message\":\"" + message + "\"}";
     }
 
-    /** Only the two members {@code spawnWorkflow}'s default implementation reads. */
-    private record StubCtx(boolean replay) implements ProcedureCtx {
+    private static SpawnHandle capturingStderr(ByteArrayOutputStream into, Supplier<SpawnHandle> spawn) {
+        PrintStream stderr = System.err;
+        System.setErr(new PrintStream(into, true, StandardCharsets.UTF_8));
+        try {
+            return spawn.get();
+        } finally {
+            System.setErr(stderr);
+        }
+    }
+
+    /**
+     * The core's two entries: every request recorded, and a handle's reads answering {@link #answer}
+     * until one is non-null, then that same answer, as the core does.
+     */
+    private static final class FakeCore implements SpawnRequests.Requester {
+        final List<String> requests = new CopyOnWriteArrayList<>();
+        final List<Long> reads = new CopyOnWriteArrayList<>();
+        final Map<Long, String> resolved = new ConcurrentHashMap<>();
+        volatile String answer;
+
+        @Override
+        public long request(long token, String factoryId, String id, byte[] payload, String ifRunning, boolean replay) {
+            requests.add(String.join(
+                    "/",
+                    String.valueOf(token),
+                    factoryId,
+                    id,
+                    new String(payload, StandardCharsets.UTF_8),
+                    ifRunning,
+                    String.valueOf(replay)));
+            return requests.size();
+        }
+
+        @Override
+        public String result(long handle, long timeoutMs) {
+            reads.add(timeoutMs);
+            return resolved.computeIfAbsent(handle, pending -> answer);
+        }
+    }
+
+    /** Only the members {@code spawnWorkflow}'s default implementation reads. */
+    private record StubCtx(boolean replay, long token) implements ProcedureCtx {
         @Override
         public boolean replaying() {
             return replay;
+        }
+
+        @Override
+        public long activationToken() {
+            return token;
         }
 
         @Override
@@ -160,7 +270,7 @@ class SpawnHandleTest {
         public <C> void emitKeyed(String key, C value) {}
 
         @Override
-        public <C> void emitKeyedWithMeta(String key, C value, java.util.Map<String, String> meta) {}
+        public <C> void emitKeyedWithMeta(String key, C value, Map<String, String> meta) {}
 
         @Override
         public <C> void emit(C value) {}
@@ -169,9 +279,9 @@ class SpawnHandleTest {
         public <C> void emit(String channel, C value) {}
 
         @Override
-        public <C> void emitWithMeta(C value, java.util.Map<String, String> meta) {}
+        public <C> void emitWithMeta(C value, Map<String, String> meta) {}
 
         @Override
-        public <C> void emitWithMeta(String channel, C value, java.util.Map<String, String> meta) {}
+        public <C> void emitWithMeta(String channel, C value, Map<String, String> meta) {}
     }
 }

@@ -2,7 +2,7 @@ package com.flezha.sdk.procedure;
 
 /** A {@link ProcedureCtx#spawnWorkflow} request that reached an instance. */
 public enum SpawnOutcome {
-    /** The id was free: a fresh instance started with the payload as its first input. */
+    /** A fresh instance started with the payload as its first input. */
     SPAWNED,
     /** The id was taken: the payload became one more input of the running instance. */
     DELIVERED,

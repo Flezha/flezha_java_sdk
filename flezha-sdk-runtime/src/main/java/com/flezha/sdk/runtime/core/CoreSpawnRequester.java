@@ -2,40 +2,36 @@ package com.flezha.sdk.runtime.core;
 
 import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.procedure.SpawnRequests;
-import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
- * The {@link SpawnRequests.Requester} behind {@code ctx.spawnWorkflow}: the
- * poll core's {@code spawnWorkflow} ABI call, run off the caller's thread (the
- * ABI blocks on the controller round-trip). Installed by the runtime at
- * {@code start()}; the ABI function is injectable so the installation can be
- * tested without a native context.
+ * The {@link SpawnRequests.Requester} behind {@code ctx.spawnWorkflow}: the poll core's two spawn
+ * entries over one context. The request never waits, and the core holds the handle, so a read runs
+ * on the thread that asks. Installed by the runtime at {@code start()}.
  */
 public final class CoreSpawnRequester implements SpawnRequests.Requester {
 
-    /** The blocking spawn ABI — {@code FlzCore.spawnWorkflow} in production. */
-    @FunctionalInterface
-    public interface SpawnFn {
-        String spawn(long ctx, String instanceId, String factoryId, byte[] payload, String ifRunning);
-    }
-
     private final long ctx;
-    private final SpawnFn fn;
 
     public CoreSpawnRequester(long ctx) {
-        this(ctx, FlzCore::spawnWorkflow);
-    }
-
-    public CoreSpawnRequester(long ctx, @Nonnull SpawnFn fn) {
         this.ctx = ctx;
-        this.fn = fn;
     }
 
     @Override
-    @Nonnull
-    public CompletableFuture<String> request(
-            @Nonnull String instanceId, @Nonnull String factoryId, @Nonnull byte[] payload, @Nonnull String ifRunning) {
-        return CompletableFuture.supplyAsync(() -> fn.spawn(ctx, instanceId, factoryId, payload, ifRunning));
+    public long request(
+            long token,
+            @Nonnull String factoryId,
+            @Nonnull String id,
+            @Nonnull byte[] payload,
+            @Nonnull String ifRunning,
+            boolean replay) {
+        return FlzCore.spawnRequest(ctx, token, factoryId, id, payload, ifRunning, replay);
+    }
+
+    @Override
+    @Nullable
+    public String result(long handle, long timeoutMs) {
+        return FlzCore.spawnResult(ctx, handle, timeoutMs);
     }
 }

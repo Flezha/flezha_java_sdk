@@ -26,7 +26,7 @@ public final class Main {
         // drive this namespace from the application instead of from a terminal:
         //
         // Admin admin = runner.admin();
-        // admin.startOperative(OperativeSpec.of("my_echo", "echo"));
+        // admin.startOperative(OperativeSpec.of("echo").id("my_echo"));
         //
         // ObjectNode sink = JsonNodeFactory.instance.objectNode();
         // sink.put("id", "writer");

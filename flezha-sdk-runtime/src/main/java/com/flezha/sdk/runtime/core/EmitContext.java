@@ -32,6 +32,7 @@ final class EmitContext implements ProcedureCtx {
 
     private final OperativeInstance instance;
     private final EntityCell cell;
+    private final long token;
     private final long invocationSeq;
     private final long now;
     private final boolean replay;
@@ -46,9 +47,10 @@ final class EmitContext implements ProcedureCtx {
     private int stableIdOrdinal;
     private int emitOrdinal;
 
-    EmitContext(OperativeInstance instance, EntityCell cell, long invocationSeq, long now, boolean replay) {
+    EmitContext(OperativeInstance instance, EntityCell cell, long token, long invocationSeq, long now, boolean replay) {
         this.instance = instance;
         this.cell = cell;
+        this.token = token;
         this.invocationSeq = invocationSeq;
         this.now = now;
         this.replay = replay;
@@ -76,6 +78,11 @@ final class EmitContext implements ProcedureCtx {
     @Override
     public boolean replaying() {
         return replay;
+    }
+
+    @Override
+    public long activationToken() {
+        return token;
     }
 
     @Override

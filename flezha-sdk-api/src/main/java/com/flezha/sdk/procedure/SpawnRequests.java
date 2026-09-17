@@ -1,24 +1,30 @@
 package com.flezha.sdk.procedure;
 
-import java.util.concurrent.CompletableFuture;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.flezha.sdk.Flezha;
+import com.flezha.sdk.Logger;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
- * The seam between {@link ProcedureCtx#spawnWorkflow} and the control plane. The
- * runtime installs a {@link Requester} when it opens the control stream; the api
- * layer — which cannot see the wire — routes every request through it.
- *
- * <p>Mirrors the Rust SDK's process-global coordinator handle: one installed
- * sender, and a request that resolves immediately (rather than waiting out its
- * deadline) when there is nothing to send on.
+ * The seam between {@link ProcedureCtx#spawnWorkflow} and the control plane. The runtime installs a
+ * {@link Requester} when it starts the core; the api layer, which cannot see the core, routes every
+ * request through it. The core owns the rest: the replay skip, the deadline, the release of a handle
+ * when its activation ends, and the warning for a failure nobody read.
  */
 public final class SpawnRequests {
 
-    /** Ships one {@code SpawnWorkflowRequest} and returns its pending reply. */
-    @FunctionalInterface
+    private static final Logger LOG = Flezha.log();
+
+    /** The core's two spawn entries. */
     public interface Requester {
-        @Nonnull
-        CompletableFuture<String> request(String instanceId, String factoryId, byte[] payload, String ifRunning);
+        /** Ship one request from the activation {@code token}; the core's handle number, at once. */
+        long request(long token, String factoryId, String id, byte[] payload, String ifRunning, boolean replay);
+
+        /** Read {@code handle}, waiting up to {@code timeoutMs}: its answer as JSON, {@code null} while pending. */
+        @Nullable
+        String result(long handle, long timeoutMs);
     }
 
     private static volatile Requester requester;
@@ -36,21 +42,27 @@ public final class SpawnRequests {
     }
 
     /**
-     * Issue the request, unless this invocation is a replay — spawning is a
-     * side effect of live processing only, so a replay answers
-     * {@link SpawnOutcome#SKIPPED_ON_REPLAY} without touching the wire.
+     * Issue the request; an empty {@code id} asks the controller to generate one. With no requester
+     * installed there is no core to ask, so the handle answers what the core would: skipped on
+     * replay, otherwise unavailable, with one warning here because no core reports it unread.
      */
     @Nonnull
     public static SpawnHandle request(
-            String instanceId, String factoryId, byte[] payload, IfRunning ifRunning, boolean replaying) {
-        if (replaying) {
-            return SpawnHandle.resolved(instanceId, factoryId, SpawnOutcome.SKIPPED_ON_REPLAY);
-        }
+            long token, String factoryId, String id, byte[] payload, IfRunning ifRunning, boolean replay) {
         Requester current = requester;
         if (current == null) {
-            return SpawnHandle.failed(instanceId, factoryId, new SpawnException.Unavailable());
+            ObjectNode answer = JsonNodeFactory.instance.objectNode().put("id", id);
+            if (replay) {
+                answer.put("outcome", "skipped_on_replay");
+            } else {
+                String message = "no control plane to request a spawn on";
+                answer.put("error", "unavailable").put("message", message);
+                LOG.warn("spawnWorkflow(factory `{}`, id `{}`) failed: {}", factoryId, id, message);
+            }
+            String json = answer.toString();
+            return new SpawnHandle(timeoutMs -> json);
         }
-        return SpawnHandle.pending(
-                instanceId, factoryId, current.request(instanceId, factoryId, payload, ifRunning.wire()));
+        long handle = current.request(token, factoryId, id, payload, ifRunning.wire(), replay);
+        return new SpawnHandle(timeoutMs -> current.result(handle, timeoutMs));
     }
 }

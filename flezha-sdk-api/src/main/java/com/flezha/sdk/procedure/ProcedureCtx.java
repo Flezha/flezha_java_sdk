@@ -81,34 +81,48 @@ public interface ProcedureCtx {
     void checkpoint();
 
     /**
-     * Ask the controller for a workflow instance: start {@code factoryId} under
-     * {@code instanceId} if that id is free, otherwise apply {@code ifRunning}
-     * ({@link IfRunning#DELIVER} feeds the running instance,
-     * {@link IfRunning#ERROR} reports {@link SpawnException.AlreadyRunning}).
-     * {@code payload} is the instance's first input on a spawn, one more input
-     * on a delivery.
+     * Ask the controller for a new workflow instance of {@code factoryId}, under an id it
+     * generates, with {@code payload} as the instance's first input.
      *
-     * <p>Returns immediately. The request cannot fault this procedure: a
-     * refusal, an unreachable controller, or an unknown factory surfaces only
-     * through the returned {@link SpawnHandle} — or, if the handle is never
-     * inspected, as one warning line.
+     * <p>Returns a handle at once. The request cannot fault this procedure: a refusal, an
+     * unreachable controller or an unknown factory is reported only by a read of the returned
+     * {@link SpawnHandle}, and a failure no read collected is logged once when this invocation
+     * ends. Read the handle inside this invocation.
      *
-     * <p>Concurrent requests for one {@code instanceId} race-resolve
-     * controller-side: exactly one spawns and every other payload is delivered
-     * to it.
+     * <p>Without an id every call starts a new instance and never delivers into a running one. A
+     * spawn reissued after a lost or timed-out answer starts a second instance, and a replayed
+     * invocation answers an empty id, because the generated one existed only in the live run's
+     * answer. A caller who needs at most one instance, or the id on replay, passes its own id
+     * through {@link #spawnWorkflow(String, byte[], SpawnOptions)}.
      *
-     * <p>Spawning is a side effect of <b>live</b> processing. Replayed input — a
-     * crash-resume or a late-input correction re-running this invocation —
-     * issues no request and answers {@link SpawnOutcome#SKIPPED_ON_REPLAY}, so a
-     * replay never doubles the workers a run created.
+     * <p>Spawning is a side effect of <b>live</b> processing. Replayed input (a crash-resume or a
+     * late-input correction re-running this invocation) issues no request and answers
+     * {@link SpawnOutcome#SKIPPED_ON_REPLAY}, so a replay never doubles the workers a run created.
      *
-     * <p>The timer calls on this same context behave the OPPOSITE way and
-     * deliberately so: a timer is internal state, so a replay registers it,
-     * where skipping would rebuild a pending set the live run never had.
+     * <p>The timer calls on this same context behave the OPPOSITE way and deliberately so: a timer
+     * is internal state, so a replay registers it, where skipping would rebuild a pending set the
+     * live run never had.
      */
     @Nonnull
-    default SpawnHandle spawnWorkflow(String instanceId, String factoryId, byte[] payload, IfRunning ifRunning) {
-        return SpawnRequests.request(instanceId, factoryId, payload, ifRunning, replaying());
+    default SpawnHandle spawnWorkflow(String factoryId, byte[] payload) {
+        return SpawnRequests.request(activationToken(), factoryId, "", payload, IfRunning.DELIVER, replaying());
+    }
+
+    /**
+     * Ask the controller for the workflow instance {@code options} names: start {@code factoryId}
+     * under that id if it is free, otherwise apply its {@link IfRunning} policy
+     * ({@link IfRunning#DELIVER}, the default, feeds the running instance; {@link IfRunning#ERROR}
+     * reports {@link SpawnException.AlreadyRunning}). {@code payload} is the instance's first input
+     * on a spawn, one more input on a delivery.
+     *
+     * <p>Concurrent requests for one id resolve controller-side: exactly one spawns and every other
+     * payload is delivered to it. A replayed invocation answers
+     * {@link SpawnOutcome#SKIPPED_ON_REPLAY} with that id. The handle, the failures and the replay
+     * rule are those of {@link #spawnWorkflow(String, byte[])}.
+     */
+    @Nonnull
+    default SpawnHandle spawnWorkflow(String factoryId, byte[] payload, SpawnOptions options) {
+        return SpawnRequests.request(activationToken(), factoryId, options.id, payload, options.ifRunning, replaying());
     }
 
     /**
@@ -118,6 +132,14 @@ public interface ProcedureCtx {
      */
     default boolean replaying() {
         return false;
+    }
+
+    /**
+     * The poll core's token for the activation this invocation runs under, which every spawn
+     * handle it makes belongs to. Runtime detail: the dispatcher overrides it; 0 names none.
+     */
+    default long activationToken() {
+        return 0;
     }
 
     /**

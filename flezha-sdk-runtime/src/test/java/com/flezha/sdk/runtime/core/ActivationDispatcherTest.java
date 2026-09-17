@@ -3,6 +3,8 @@ package com.flezha.sdk.runtime.core;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flezha.sdk.procedure.SpawnOptions;
+import com.flezha.sdk.procedure.SpawnRequests;
 import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
 import java.util.List;
 import java.util.Optional;
@@ -55,6 +57,39 @@ class ActivationDispatcherTest extends DispatchTestBase {
     }
 
     @Test
+    @DisplayName("a spawn carries the activation's token and the item's replay flag to the core")
+    void aSpawnCarriesTheTokenAndTheReplayFlag() {
+        StreamOperativeClassRegistry.registerClass(SpawnProbeOperative.class);
+        SpawnRequests.install(new SpawnRequests.Requester() {
+            @Override
+            public long request(
+                    long token, String factoryId, String id, byte[] payload, String ifRunning, boolean replay) {
+                RECORDED.add(token + "/" + factoryId + "/" + id + "/" + replay);
+                return 1;
+            }
+
+            @Override
+            public String result(long handle, long timeoutMs) {
+                return null;
+            }
+        });
+        try {
+            for (boolean replay : new boolean[] {false, true}) {
+                outcome(new Activation(
+                        42,
+                        new EntityRef(OP, 0, Optional.empty()),
+                        new ActivationKind.Work(List.of(input(0, "w1", 1, OptionalLong.empty(), replay))),
+                        0,
+                        "spawn_probe"));
+            }
+        } finally {
+            SpawnRequests.uninstall();
+        }
+        assertThat(RECORDED)
+                .containsExactly("42/worker//false", "42/worker/w1/false", "42/worker//true", "42/worker/w1/true");
+    }
+
+    @Test
     @DisplayName("a procedure constructor that throws at materialization surfaces the author's error")
     void throwingProcedureConstructorAtMaterializationIsTheAuthorsError() {
         StreamOperativeClassRegistry.registerClass(RefusingOperative.class);
@@ -63,6 +98,22 @@ class ActivationDispatcherTest extends DispatchTestBase {
         assertThatThrownBy(() -> OperativeInstance.materialize(OP, "refusing_op"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage(REFUSAL);
+    }
+
+    public static final class SpawnProbeOperative extends Op {
+        public SpawnProbeOperative() {
+            super("spawn_probe", c -> c.input(String.class, "in").into(SpawnProbeProc.class));
+        }
+    }
+
+    /** Spawns once without an id and once under its input. */
+    public static final class SpawnProbeProc extends Proc<Void> {
+        public SpawnProbeProc() {
+            super("spawn_probe_proc", (input, ctx) -> {
+                ctx.spawnWorkflow("worker", new byte[0]);
+                ctx.spawnWorkflow("worker", new byte[0], SpawnOptions.id(input));
+            });
+        }
     }
 
     public static final class RefusingOperative extends Op {

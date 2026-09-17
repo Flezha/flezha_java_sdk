@@ -157,14 +157,26 @@ public final class FlzCore {
     public static native boolean workflowCancelled(long ctx, String instanceId);
 
     /**
-     * The ABI form of {@code ctx.spawnWorkflow}: spawn-or-deliver a workflow
-     * instance in the runner's own namespace. {@code ifRunning} is the wire
-     * string {@code "deliver"} or {@code "error"}. Returns the controller's
-     * outcome string ({@code "spawned"}, {@code "delivered"}, ...); throws on
-     * refusal, no control plane, or timeout.
+     * The ABI form of {@code ctx.spawnWorkflow}: request a workflow instance
+     * in the runner's own namespace from the polled activation {@code token},
+     * returning the handle number at once. An empty {@code id} asks the
+     * controller to generate one; {@code ifRunning} is the wire string
+     * {@code "deliver"} or {@code "error"}; {@code replay} sends nothing and
+     * resolves the handle as skipped. A refusal reaches only
+     * {@link #spawnResult}. Throws for an unreadable argument or a token that
+     * is not outstanding.
      */
-    public static native String spawnWorkflow(
-            long ctx, String instanceId, String factoryId, byte[] payload, String ifRunning);
+    public static native long spawnRequest(
+            long ctx, long token, String factoryId, String id, byte[] payload, String ifRunning, boolean replay);
+
+    /**
+     * Read a spawn handle, waiting up to {@code timeoutMs} (0 never waits):
+     * {@code null} while pending, otherwise its answer as JSON,
+     * {@code {"id","outcome"}} or {@code {"id","error","message"}}. Every
+     * read of a resolved handle answers the same until the activation that
+     * made it ends, which releases it; reading a released handle throws.
+     */
+    public static native String spawnResult(long ctx, long handle, long timeoutMs);
 
     /**
      * Administer the namespace this connection proved: one entry for the whole

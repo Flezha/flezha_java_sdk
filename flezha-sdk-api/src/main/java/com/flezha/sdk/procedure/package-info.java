@@ -25,11 +25,13 @@
  * was originally observed. {@code ctx.now()} and {@link com.flezha.sdk.procedure.StableId} exist to
  * remove both sources of divergence.
  *
- * <p>{@link com.flezha.sdk.procedure.SpawnRequests}, {@link com.flezha.sdk.procedure.SpawnHandle},
- * {@link com.flezha.sdk.procedure.SpawnOutcome} and {@link com.flezha.sdk.procedure.IfRunning}
+ * <p>{@link com.flezha.sdk.procedure.SpawnRequests}, {@link com.flezha.sdk.procedure.SpawnOptions},
+ * {@link com.flezha.sdk.procedure.IfRunning}, {@link com.flezha.sdk.procedure.SpawnHandle},
+ * {@link com.flezha.sdk.procedure.SpawnResult} and {@link com.flezha.sdk.procedure.SpawnOutcome}
  * cover procedure-requested workflow spawning, in which a procedure asks the controller for a
- * worker instance rather than dispatching one itself. The request is resolved controller-side, so
- * concurrent requests against one instance id converge on a single instance.
+ * worker instance rather than dispatching one itself. Without an id the controller generates one
+ * and starts a new instance; with one, the request is resolved controller-side, so concurrent
+ * requests against that id converge on a single instance.
  * {@link com.flezha.sdk.procedure.ProcedureException} is the checked failure type a procedure
  * raises; a raised failure is classified, retried according to the channel's policy, and parked in
  * the dead-letter queue if the retry ladder is exhausted.
