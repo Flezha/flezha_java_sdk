@@ -127,7 +127,7 @@ import com.flezha.sdk.Flezha;
 public final class Main {
     public static void main(String[] args) throws Exception {
         Flezha.createRunner("my_app")
-                .defineStream(EchoOperative.class)
+                .registerFactory(EchoOperative.class)
                 .run();
     }
 }
@@ -138,7 +138,7 @@ public final class Main {
 the runner to be closed explicitly.
 
 Every operative must be declared on the builder before the runner starts. One
-runner can serve several, and `defineWorkflow(...)` is the equivalent call for
+runner can serve several, and `registerFactory(...)` is the equivalent call for
 the workflow kind.
 
 To run this without a controller, replace the main with `LocalOperative`, which

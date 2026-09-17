@@ -7,7 +7,7 @@ import javax.annotation.Nonnull;
 /**
  * Frozen, immutable per-StreamOperative-class topology produced by
  * {@link com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder} at
- * {@code FlezhaRunner.defineStream(Class)}
+ * {@code FlezhaRunner.registerFactory(Class)}
  * time. Shared across every {@link StreamOperativeInstance} of this StreamOperative class.
  *
  * <p>The hot path (entry-channel input → consumer-procedure entity) reads

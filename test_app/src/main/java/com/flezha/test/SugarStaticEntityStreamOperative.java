@@ -1,15 +1,12 @@
 package com.flezha.test;
 
-import com.flezha.sdk.authoring.StreamOperative;
 import com.flezha.sdk.channel.ChannelBuilder;
 
 /**
- * Multiprocedure reference operative authored with explicit topology, wiring the
- * generated {@code SugarEntryProcedure} -> {@code SugarDownstreamProcedure} -> plugin.
- * {@code @StreamOperative} collects it into
- * {@code GeneratedStreamOperatives.defineAll(FlezhaRunner)}.
+ * Multiprocedure reference operative authored with explicit topology, wiring the generated
+ * {@code SugarEntryProcedure} -> {@code SugarDownstreamProcedure} -> plugin. {@code Main} registers
+ * it with {@code registerFactory}, as it registers every operative.
  */
-@StreamOperative
 public class SugarStaticEntityStreamOperative implements com.flezha.sdk.operative.StreamOperative {
 
     @Override

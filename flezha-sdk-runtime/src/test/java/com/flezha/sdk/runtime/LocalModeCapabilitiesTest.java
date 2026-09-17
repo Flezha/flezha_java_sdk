@@ -68,9 +68,9 @@ class LocalModeCapabilitiesTest {
     private static final Duration SESSION_TIMEOUT = Duration.ofMillis(200);
 
     @Test
-    @DisplayName("graph_builder: a declared graph is built and run with no controller")
-    void aDeclaredGraphIsBuiltAndRunWithNoController() {
-        declares("graph_builder", "sugar_do_nothing");
+    @DisplayName("shorthand: a short form is built and run with no controller")
+    void aShortFormIsBuiltAndRunWithNoController() {
+        declares("shorthand", "sugar_do_nothing");
 
         List<SinkOutput> released = release(
                 SugarDoNothingStreamOperative.class, "input", "sugar_do_nothing_echo", List.of("alpha", "beta"));
@@ -246,7 +246,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    /** The graph the test app's {@code @Procedure}-annotated {@code SugarDoNothing} generates. */
+    /** The graph the test app's {@code @Procedure}-annotated {@code SugarDoNothing} short form generates. */
     public static final class SugarDoNothingStreamOperative implements StreamOperative {
         @Override
         public String factoryId() {

@@ -1,5 +1,6 @@
 package com.flezha.sdk.processor;
 
+import com.flezha.sdk.authoring.OperativeKind;
 import java.util.List;
 
 /**
@@ -24,6 +25,7 @@ record ProcedureModel(
         String emitKey,
         String id,
         String sink,
+        OperativeKind kind,
         String input,
         String onFull,
         int capacity,

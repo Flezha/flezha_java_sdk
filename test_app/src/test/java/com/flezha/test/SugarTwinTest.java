@@ -1,8 +1,8 @@
 package com.flezha.test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.flezha.generated.GeneratedStreamOperatives;
 import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder;
 import com.flezha.sdk.state.NoChange;
@@ -16,16 +16,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Asserts the {@code @Procedure} / {@code @State} / {@code @StreamOperative}-generated
- * operatives register and process input identically to the hand-written equivalents, and
- * that the 2-procedure reference operative matches the cross-SDK authoring contract
- * (see {@code docs/sdk/authoring_contract.md} §6).
+ * Asserts the {@code @Procedure} / {@code @State}-generated operatives register and process input
+ * identically to the hand-written equivalents, and that the 2-procedure reference operative matches
+ * the cross-SDK authoring contract (see {@code docs/sdk/authoring_contract.md} §6).
  */
 class SugarTwinTest {
 
     @BeforeEach
     void reset() {
         StreamOperativeClassRegistry.reset();
+        com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry.reset();
     }
 
     @Test
@@ -62,11 +62,63 @@ class SugarTwinTest {
         assertThat(h.replayEquals()).isEmpty();
     }
 
+    /**
+     * fails when: a short form registers itself again. Nothing is collected and nothing is
+     * harvested: every generated operative is one the application hands to the runner.
+     */
     @Test
-    void generatedStreamOperativesDefine() {
-        GeneratedStreamOperatives.defineAll(com.flezha.sdk.Flezha.createRunner("sugar_twin_ns"));
-        assertThat(com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry.factoryIds())
-                .contains("sugar_do_nothing", "sugar_store_input", "sugar_static_entity");
+    void shortFormsRegisterOnlyWhenTheAuthorRegistersThem() {
+        var runner = com.flezha.sdk.Flezha.createRunner("sugar_twin_ns");
+        assertThat(StreamOperativeClassRegistry.factoryIds()).isEmpty();
+
+        runner.registerFactory(SugarDoNothingStreamOperative.class)
+                .registerFactory(SugarStoreStreamOperative.class)
+                .registerFactory(SugarNamedInputStreamOperative.class)
+                .registerFactory(SugarStaticEntityStreamOperative.class);
+
+        assertThat(StreamOperativeClassRegistry.factoryIds())
+                .contains("sugar_do_nothing", "sugar_store_input", "sugar_named_input", "sugar_static_entity");
+    }
+
+    /** fails when: the workflow short form stops declaring a workflow operative. */
+    @Test
+    void theWorkflowShortFormRegistersAsAWorkflow() {
+        com.flezha.sdk.Flezha.createRunner("sugar_twin_workflow_ns")
+                .registerFactory(SugarWorkflowWorkflowOperative.class);
+        assertThat(com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry.factoryIds())
+                .contains("sugar_workflow");
+    }
+
+    /** fails when: the short form stops honouring the entry channel name the author wrote. */
+    @Test
+    void theGeneratedShorthandNamesItsEntryChannel() {
+        var topology = StreamOperativeTopologyBuilder.build(new SugarNamedInputStreamOperative());
+        assertThat(topology.channels().get(0).name()).isEqualTo("prices");
+    }
+
+    /** fails when: a written id stops naming the procedure, so its state is saved elsewhere. */
+    @Test
+    void aWrittenIdNamesTheProcedure() {
+        assertThat(new SugarStoreProcedure().name()).isEqualTo("sugar_store_input");
+    }
+
+    /**
+     * fails when: the two kinds stop sharing one factory-id namespace, so a workflow could be
+     * placed under an id a stream already answers. The refusal is the real registries' — this is
+     * the module where both are on the classpath.
+     */
+    @Test
+    void aWorkflowUnderAStreamsFactoryIdIsRefused() {
+        var runner = com.flezha.sdk.Flezha.createRunner("sugar_twin_dup_ns")
+                .registerFactory(ShorthandDupStreamStreamOperative.class);
+
+        assertThatThrownBy(() -> runner.registerFactory(ShorthandDupWorkflowWorkflowOperative.class))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageStartingWith("DuplicateFactoryId")
+                .hasMessageContaining("plain");
+
+        assertThat(com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry.factoryIds())
+                .doesNotContain("plain");
     }
 
     /**

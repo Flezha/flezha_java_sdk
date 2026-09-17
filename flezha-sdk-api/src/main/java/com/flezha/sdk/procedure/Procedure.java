@@ -419,7 +419,7 @@ public interface Procedure<
      * {@link #mailboxCapacityOverridden()} to return {@code true} so the
      * runtime applies the Procedure value over any {@code FLEZHA_MAILBOX_CAPACITY}
      * env value. Capacity must be in {@code 1..=1_048_576}; out-of-range
-     * values fail {@code FlezhaRunner.defineStream(...)} with the
+     * values fail {@code FlezhaRunner.registerFactory(...)} with the
      * offending Procedure's name.
      */
     default int mailboxCapacity() {

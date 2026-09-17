@@ -71,7 +71,16 @@ public final class ConformanceRun {
      * {@code conformance.json} declares. A row needing anything else is skipped
      * BY NAME, which is what makes the skip checkable.
      */
-    private static final List<String> SURFACES = List.of("merge", "branch", "workflow");
+    private static final List<String> SURFACES =
+            List.of("merge", "branch", "workflow", "shorthand", "shorthand_typed_output", "shorthand_omittable_sink");
+
+    /**
+     * The §5 short-form refusals Java raises at COMPILE time, each with the {@code FlezhaProcessorTest}
+     * case that pins the message. A row the compiler answers cannot be driven through a builder that
+     * never sees it, so the app cites the test and the drill checks the cited file carries the name.
+     */
+    private static final String PROCESSOR_TEST =
+            "sdk/java/flezha-sdk-processor/src/test/java/com/flezha/sdk/processor/FlezhaProcessorTest.java";
 
     /** The capacity a row declared per role, read as the procedure is minted. */
     private static final Map<String, Integer> MAILBOX = new HashMap<>();
@@ -387,6 +396,10 @@ public final class ConformanceRun {
             entry.put("needs", row.needs());
             return entry;
         }
+        List<Shorthand> shorthand = shorthandSteps(row);
+        if (!shorthand.isEmpty()) {
+            return judgeShorthand(json, entry, shorthand);
+        }
         try {
             StreamOperativeTopology topology = topologyOf(row);
             entry.put("outcome", "accepted");
@@ -397,6 +410,99 @@ public final class ConformanceRun {
             refusal.refusals().forEach(names::add);
         }
         return entry;
+    }
+
+    /**
+     * A {@code shorthand(<id>|-, <kind>|-, <sink>|-, <input>|-)} step. {@code -} is a field the row
+     * leaves unwritten; {@code .noout} marks a procedure declaring no output.
+     */
+    private record Shorthand(String id, String kind, String sink, boolean noout) {
+
+        /**
+         * The refusal this declaration earns. A {@code sink} is what makes a short form, so its
+         * absence is judged first; the identity and the kind follow, and an output the compiler can
+         * see is last.
+         */
+        String refusal() {
+            if (sink == null) {
+                return "ShorthandKeyWithoutSink";
+            }
+            if (id == null) {
+                return "SinkWithoutId";
+            }
+            if (kind == null) {
+                return "SinkWithoutKind";
+            }
+            if (noout) {
+                return "SinkWithoutOutput";
+            }
+            throw new IllegalStateException("a well-formed shorthand declaration earns no refusal of its own");
+        }
+    }
+
+    /** The shorthand steps of a row, empty when it declares none. */
+    private static List<Shorthand> shorthandSteps(Row row) {
+        List<Shorthand> parsed = new ArrayList<>();
+        for (String step : row.steps().split(";")) {
+            Shorthand declaration = parseShorthand(step.trim());
+            if (declaration != null) {
+                parsed.add(declaration);
+            }
+        }
+        return parsed;
+    }
+
+    private static Shorthand parseShorthand(String step) {
+        boolean noout = step.endsWith(".noout");
+        String body = noout ? step.substring(0, step.length() - ".noout".length()) : step;
+        String[] call = splitCall(body);
+        if (!call[0].equals("shorthand")) {
+            return null;
+        }
+        String[] fields = call[1].split(",");
+        if (fields.length != 4) {
+            throw new IllegalStateException("a shorthand step declares id, kind, sink and input: read `" + step + "`");
+        }
+        return new Shorthand(written(fields[0]), written(fields[1]), written(fields[2]), noout);
+    }
+
+    private static String written(String field) {
+        String value = field.trim();
+        return value.equals("-") ? null : value;
+    }
+
+    /**
+     * A short-form row's verdict. A row the compiler answers is {@code cited}: the name and the
+     * processor test that holds the message. A second declaration under one factory id is a runtime
+     * refusal in every SDK, so that row is driven for real.
+     */
+    private static ObjectNode judgeShorthand(ObjectMapper json, ObjectNode entry, List<Shorthand> declarations) {
+        if (declarations.size() > 1) {
+            try {
+                driveDuplicate(com.flezha.sdk.Flezha.createRunner("conformance_shorthand"));
+                entry.put("outcome", "accepted");
+            } catch (IllegalArgumentException refusal) {
+                entry.put("outcome", "refused");
+                entry.putArray("names").add(refusalName(refusal.getMessage()));
+            }
+            return entry;
+        }
+        entry.put("outcome", "cited");
+        entry.putArray("names").add(declarations.get(0).refusal());
+        entry.put("citation", PROCESSOR_TEST);
+        return entry;
+    }
+
+    /** Register the duplicate row's pair; the second call is the one under test. */
+    private static void driveDuplicate(FlezhaRunner runner) {
+        runner.registerFactory(ShorthandDupStreamStreamOperative.class);
+        runner.registerFactory(ShorthandDupWorkflowWorkflowOperative.class);
+    }
+
+    /** The leading refusal name of a message the contract requires to begin with one. */
+    private static String refusalName(String message) {
+        int colon = message.indexOf(':');
+        return colon < 0 ? message : message.substring(0, colon).trim();
     }
 
     /**
@@ -474,13 +580,32 @@ public final class ConformanceRun {
                     + "`, so the row is skipped and nothing is registered");
             System.exit(1);
         }
+        // A short form the compiler refuses cannot be booted at all, so the app
+        // answers the row by naming the refusal and the test that pins it; the
+        // drill checks the cited file exists and carries the name.
+        List<Shorthand> shorthand = shorthandSteps(row);
+        if (!shorthand.isEmpty()) {
+            if (shorthand.size() > 1) {
+                try {
+                    driveDuplicate(runner);
+                } catch (IllegalArgumentException refusal) {
+                    System.err.println(topology + ": " + refusal.getMessage());
+                    System.exit(1);
+                }
+                System.err.println(topology + ": the runner accepted a second operative under one factory id");
+                System.exit(1);
+            }
+            System.err.println(topology + ": " + shorthand.get(0).refusal()
+                    + " is a compile error here; pinned by " + PROCESSOR_TEST);
+            System.exit(1);
+        }
         if (row.steps().equals("cited above")) {
             cited(row.topology());
             return;
         }
         load(row);
         try {
-            runner.defineStream(RowStreamOperative.class);
+            runner.registerFactory(RowStreamOperative.class);
         } catch (StreamOperativeConfigurationException refusal) {
             System.err.println(topology + ": " + refusal.getMessage());
             System.exit(1);

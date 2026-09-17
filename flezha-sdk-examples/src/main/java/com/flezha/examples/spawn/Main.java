@@ -7,8 +7,8 @@ public final class Main {
 
     public static void main(String[] args) throws Exception {
         Flezha.createRunner(args.length > 0 ? args[0] : "my_app")
-                .defineStream(AlertDetectorOperative.class)
-                .defineWorkflow(TriageOperative.class)
+                .registerFactory(AlertDetectorOperative.class)
+                .registerFactory(TriageOperative.class)
                 .run();
     }
 

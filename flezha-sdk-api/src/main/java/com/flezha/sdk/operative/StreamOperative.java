@@ -36,7 +36,7 @@ import com.flezha.sdk.channel.ChannelBuilder;
  * <p>The class is then declared on a runner, which is what starts serving it:
  *
  * <pre>{@code
- * Flezha.createRunner("my_app").defineStream(WordCountOperative.class).run();
+ * Flezha.createRunner("my_app").registerFactory(WordCountOperative.class).run();
  * }</pre>
  *
  * <p>Implementations must provide a public no-argument constructor. The runtime instantiates the
@@ -47,7 +47,7 @@ public interface StreamOperative extends Operative {
 
     /**
      * Declares the graph. Called exactly once per class, at
-     * {@link com.flezha.sdk.FlezhaRunner#defineStream(Class) defineStream} time, and the resulting
+     * {@link com.flezha.sdk.FlezhaRunner#registerFactory(Class) registerFactory} time, and the resulting
      * graph is shared by every instance of this operative that the controller later starts.
      *
      * <p>Channels are never constructed directly. Each call on the builder returns the next handle

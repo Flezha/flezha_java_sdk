@@ -1,7 +1,7 @@
 package com.flezha.sdk.operative;
 
 /**
- * Thrown at {@link com.flezha.sdk.FlezhaRunner#defineWorkflow declaration} time when a
+ * Thrown at {@link com.flezha.sdk.FlezhaRunner#registerFactory declaration} time when a
  * {@link WorkflowOperative}'s authoring is invalid: an external-stop-only
  * operative (no self-termination and no {@code maxDuration()}), or a structured
  * {@link WorkflowOperative#procedures} declaration that is not a single connected

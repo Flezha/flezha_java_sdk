@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Thrown by {@link com.flezha.sdk.FlezhaRunner#defineStream(Class)} when a
+ * Thrown by {@link com.flezha.sdk.FlezhaRunner#registerFactory(Class)} when a
  * StreamOperative's declared topology is refused. The verdict it carries is
  * the core's, rendered once by {@code flz_core::host::issue::render_issues}:
  *

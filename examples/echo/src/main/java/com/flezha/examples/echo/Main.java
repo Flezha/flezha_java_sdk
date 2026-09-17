@@ -11,7 +11,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  * Starts a runner: a process that connects to the controller and serves your operatives.
  *
  * <p>Declare every operative you want served before calling {@code run()}. One runner can serve
- * several, and {@code defineWorkflow(...)} is the same call for the workflow kind.
+ * several, and {@code registerFactory(...)} is the same call for the workflow kind.
  */
 public final class Main {
 
@@ -19,7 +19,7 @@ public final class Main {
         // run() is start() followed by awaitTermination(). Splitting them keeps the handle,
         // which is the only way to reach admin(), and still blocks until shutdown.
         FlezhaRunner runner = Flezha.createRunner(args.length > 0 ? args[0] : "default")
-                .defineStream(EchoOperative.class)
+                .registerFactory(EchoOperative.class)
                 .start();
 
         // Everything `flz operative` and `flz plugin` do is also a method here. Uncomment to

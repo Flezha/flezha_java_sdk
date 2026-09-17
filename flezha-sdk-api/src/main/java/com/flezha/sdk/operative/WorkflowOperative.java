@@ -39,7 +39,7 @@ import javax.annotation.Nonnull;
  * </ul>
  *
  * <p>The simplest form is a bare {@link #run} body, declared with
- * {@link com.flezha.sdk.FlezhaRunner#defineWorkflow(Class)}, the sibling of {@code defineStream}:
+ * {@link com.flezha.sdk.FlezhaRunner#registerFactory(Class)}, the sibling of {@code registerFactory}:
  *
  * <pre>{@code
  * public final class GreetWorkflowOperative implements WorkflowOperative {
@@ -48,7 +48,7 @@ import javax.annotation.Nonnull;
  *         ctx.complete(("hello " + args).getBytes(StandardCharsets.UTF_8));
  *     }
  * }
- * Flezha.createRunner("my_app").defineWorkflow(GreetWorkflowOperative.class).run();
+ * Flezha.createRunner("my_app").registerFactory(GreetWorkflowOperative.class).run();
  * }</pre>
  *
  * <p>A multi-step workflow overrides {@link #procedures} instead, and declares its chain on the

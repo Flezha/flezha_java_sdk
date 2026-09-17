@@ -16,8 +16,9 @@ import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 
 /**
- * This JVM's runner: create → mutate ({@code define*} / {@code remove*}) →
- * start on one object, returned by {@link Flezha#createRunner(String)}.
+ * This JVM's runner: create → declare ({@link #registerFactory} /
+ * {@link #unregisterFactory}) → start on one object, returned by
+ * {@link Flezha#createRunner(String)}.
  * Operative types may be declared and removed before AND after
  * {@link #start()}, until the started runner is closed; a post-start change
  * is declared to the core immediately and reaches the controller on the next
@@ -79,53 +80,73 @@ public final class FlezhaRunner implements AutoCloseable {
     }
 
     /**
-     * Declare a StreamOperative class the runtime can spawn instances of
-     * later (via the controller's {@code AddOperative}). Calls the class's
-     * {@code channels(...)} once and records the topology in the class
-     * registry. Legal before and after {@link #start()}. An invalid topology
-     * is reported here, at the declaring call site, as
-     * {@code StreamOperativeConfigurationException}.
+     * Declare an operative class the runtime can spawn instances of later (via the controller's
+     * {@code AddOperative}), of either kind: the kind is read from the interface the class
+     * implements, never named by the call. Calls the class's {@code channels(...)} or
+     * {@code procedures(...)} once and records the topology in the class registry of its kind.
+     * Legal before and after {@link #start()}. Invalid authoring is reported here, at the declaring
+     * call site, as {@code StreamOperativeConfigurationException} or
+     * {@code WorkflowOperativeConfigurationException}.
      *
-     * @throws IllegalArgumentException on a duplicate factory id.
+     * <p>Streams and workflows share one factory-id namespace per runner, so a second class under
+     * an id this runner already holds is refused whichever kind either one is.
+     *
+     * @throws IllegalArgumentException on a duplicate factory id (the message begins with
+     *     {@code DuplicateFactoryId}), or when the class implements both kind interfaces
+     *     ({@code AmbiguousOperativeKind}) or neither ({@code UnknownOperativeKind}).
      * @throws IllegalStateException on a closed runner.
      */
     @Nonnull
-    public FlezhaRunner defineStream(Class<? extends StreamOperative> operativeClass) {
-        return define(stream, "defineStream()", operativeClass);
+    public FlezhaRunner registerFactory(Class<? extends Operative> operativeClass) {
+        open("registerFactory()");
+        if (isWorkflow(operativeClass, "registerFactory()")) {
+            workflow.register(operativeClass.asSubclass(WorkflowOperative.class));
+        } else {
+            stream.register(operativeClass.asSubclass(StreamOperative.class));
+        }
+        syncFactoriesIfStarted();
+        return this;
     }
 
     /**
-     * Declare a {@link WorkflowOperative} class. Sibling of
-     * {@link #defineStream(Class)}; invalid authoring is reported here, at
-     * the declaring call site.
+     * Remove a declared operative class from this runner — the inverse of
+     * {@link #registerFactory(Class)}, taking what it took. Legal before and after
+     * {@link #start()}.
      *
-     * @throws IllegalArgumentException on a factory id colliding with any declared class.
+     * @throws IllegalArgumentException if the class's factory id is not currently defined on this
+     *     runner, or its kind cannot be read.
+     * @throws OperativeTypeInUseException if the runner is started and live operative instances of
+     *     the factory exist — the type stays defined.
      * @throws IllegalStateException on a closed runner.
      */
     @Nonnull
-    public FlezhaRunner defineWorkflow(Class<? extends WorkflowOperative> workflowClass) {
-        return define(workflow, "defineWorkflow()", workflowClass);
+    public FlezhaRunner unregisterFactory(Class<? extends Operative> operativeClass) {
+        open("unregisterFactory()");
+        return isWorkflow(operativeClass, "unregisterFactory()")
+                ? remove(workflow, operativeClass.asSubclass(WorkflowOperative.class))
+                : remove(stream, operativeClass.asSubclass(StreamOperative.class));
     }
 
     /**
-     * Remove a declared StreamOperative class from this runner. Legal
-     * before and after {@link #start()}.
-     *
-     * @throws IllegalArgumentException if the class's factory id is not
-     *     currently defined on this runner.
-     * @throws OperativeTypeInUseException if the runner is started and live
-     *     operative instances of the factory exist — the type stays defined.
-     * @throws IllegalStateException on a closed runner.
+     * Which kind the class declares, read from the interface it implements. A class of both kinds,
+     * or of neither, is refused by the contract's name for it
+     * ({@code docs/sdk/authoring_contract.md} §5.1).
      */
-    @Nonnull
-    public FlezhaRunner removeStream(Class<? extends StreamOperative> operativeClass) {
-        return remove(stream, "removeStream()", operativeClass);
-    }
-
-    /** Remove a declared {@link WorkflowOperative} class. Sibling of {@link #removeStream(Class)}. */
-    @Nonnull
-    public FlezhaRunner removeWorkflow(Class<? extends WorkflowOperative> workflowClass) {
-        return remove(workflow, "removeWorkflow()", workflowClass);
+    private static boolean isWorkflow(Class<? extends Operative> operativeClass, String what) {
+        if (operativeClass == null) {
+            throw new IllegalArgumentException(what + ": the operative class must not be null");
+        }
+        boolean isStream = StreamOperative.class.isAssignableFrom(operativeClass);
+        boolean isWorkflow = WorkflowOperative.class.isAssignableFrom(operativeClass);
+        if (isStream && isWorkflow) {
+            throw new IllegalArgumentException("AmbiguousOperativeKind: " + operativeClass.getName()
+                    + " implements both StreamOperative and WorkflowOperative, so its kind cannot be read");
+        }
+        if (!isStream && !isWorkflow) {
+            throw new IllegalArgumentException("UnknownOperativeKind: " + operativeClass.getName()
+                    + " implements neither StreamOperative nor WorkflowOperative");
+        }
+        return isWorkflow;
     }
 
     /**
@@ -157,15 +178,7 @@ public final class FlezhaRunner implements AutoCloseable {
         return this;
     }
 
-    private <C extends Operative> FlezhaRunner define(RegistryCore<C> core, String what, Class<? extends C> cls) {
-        open(what);
-        core.register(cls);
-        syncFactoriesIfStarted();
-        return this;
-    }
-
-    private <C extends Operative> FlezhaRunner remove(RegistryCore<C> core, String what, Class<? extends C> cls) {
-        open(what);
+    private <C extends Operative> FlezhaRunner remove(RegistryCore<C> core, Class<? extends C> cls) {
         String factoryId = core.definedFactoryIdOf(cls);
         RunnerHandle h = handle.get();
         if (h != null) {

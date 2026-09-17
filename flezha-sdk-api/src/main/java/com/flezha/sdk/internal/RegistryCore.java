@@ -42,8 +42,13 @@ public final class RegistryCore<C extends Operative> {
      * Register a class: validate via the runtime side (which returns the
      * controller-facing factory id), then record it here.
      *
+     * <p>A factory id already held by the OTHER kind is refused by the runtime
+     * registries themselves, which see both kinds' process-global entries; this
+     * core owns only its own runner's set.
+     *
      * @return the controller-facing factory id.
-     * @throws IllegalArgumentException on a null class or duplicate factory id.
+     * @throws IllegalArgumentException on a null class or a duplicate factory
+     *     id; the message begins with {@code DuplicateFactoryId}.
      */
     public String register(Class<? extends C> cls) {
         if (cls == null) {
@@ -59,11 +64,21 @@ public final class RegistryCore<C extends Operative> {
                     "Failed to register " + kindLabel + " '" + cls.getName() + "'",
                     cls);
             if (entries.containsKey(factoryId)) {
-                throw new IllegalArgumentException("Duplicate factory id: '" + factoryId + "'");
+                throw new IllegalArgumentException(
+                        "DuplicateFactoryId: '" + factoryId + "' is already defined on this runner");
             }
             entries.put(factoryId, cls);
             return factoryId;
         }
+    }
+
+    private void unregisterInRuntime(String factoryId) {
+        RuntimeBridge.invoke(
+                runtimeRegistryFqn,
+                "unregisterClass",
+                new Class<?>[] {String.class},
+                "Failed to remove " + kindLabel + " factory '" + factoryId + "'",
+                factoryId);
     }
 
     /**
@@ -91,12 +106,7 @@ public final class RegistryCore<C extends Operative> {
      */
     public void remove(String factoryId) {
         synchronized (lock) {
-            RuntimeBridge.invoke(
-                    runtimeRegistryFqn,
-                    "unregisterClass",
-                    new Class<?>[] {String.class},
-                    "Failed to remove " + kindLabel + " factory '" + factoryId + "'",
-                    factoryId);
+            unregisterInRuntime(factoryId);
             dropEntry(factoryId);
         }
     }

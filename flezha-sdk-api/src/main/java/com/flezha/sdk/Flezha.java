@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
  *
  * <pre>{@code
  * Flezha.createRunner("my_app")
- *     .defineStream(MyOperative.class)
+ *     .registerFactory(MyOperative.class)
  *     .run(); // .start() instead to keep the calling thread
  * }</pre>
  *
@@ -68,8 +68,8 @@ public final class Flezha {
     /**
      * Create this JVM's runner for {@code namespace} — one object carries
      * declaration and lifecycle. Declare operative classes with
-     * {@link FlezhaRunner#defineStream(Class)} /
-     * {@link FlezhaRunner#defineWorkflow(Class)} (legal before AND after
+     * {@link FlezhaRunner#registerFactory(Class)} /
+     * {@link FlezhaRunner#registerFactory(Class)} (legal before AND after
      * start), then {@link FlezhaRunner#start()} (keep the calling thread) or
      * {@link FlezhaRunner#run()} (block until shutdown). Creating a runner
      * never connects, claims the JVM singleton slot, or spawns a thread.

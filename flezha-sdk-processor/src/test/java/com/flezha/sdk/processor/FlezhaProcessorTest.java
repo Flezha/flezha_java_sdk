@@ -192,8 +192,8 @@ class FlezhaProcessorTest {
         String code =
                 """
                 package t;
-                import com.flezha.sdk.authoring.Procedure;
-                @Procedure(id = "sugar", sink = "items_output")
+                import com.flezha.sdk.authoring.*;
+                @Procedure(id = "sugar", kind = OperativeKind.STREAM, sink = "items_output")
                 public class Sugared {
                     public String run(String in) { return in; }
                 }
@@ -314,8 +314,8 @@ class FlezhaProcessorTest {
         String code =
                 """
                 package t;
-                import com.flezha.sdk.authoring.Procedure;
-                @Procedure(id = "default_entry", sink = "echo")
+                import com.flezha.sdk.authoring.*;
+                @Procedure(id = "default_entry", kind = OperativeKind.STREAM, sink = "echo")
                 public class DefaultEntry {
                     public String run(String in) { return in; }
                 }
@@ -329,8 +329,8 @@ class FlezhaProcessorTest {
         String code =
                 """
                 package t;
-                import com.flezha.sdk.authoring.Procedure;
-                @Procedure(id = "named_entry", sink = "echo", input = "prices")
+                import com.flezha.sdk.authoring.*;
+                @Procedure(id = "named_entry", kind = OperativeKind.STREAM, sink = "echo", input = "prices")
                 public class NamedEntry {
                     public String run(String in) { return in; }
                 }
@@ -350,7 +350,121 @@ class FlezhaProcessorTest {
                     public String run(String in) { return in; }
                 }
                 """;
-        assertThat(diagnose("t.NoSink", code)).anyMatch(m -> m.contains("prices") && m.contains("sink"));
+        assertThat(diagnose("t.NoSink", code))
+                .anyMatch(
+                        m -> m.startsWith("ShorthandKeyWithoutSink") && m.contains("`input`") && m.contains("`sink`"));
+    }
+
+    @Test
+    void rejectsAKindWithoutASink() {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.*;
+                @Procedure(id = "no_sink", kind = OperativeKind.STREAM)
+                public class NoSinkKind {
+                    public String run(String in) { return in; }
+                }
+                """;
+        assertThat(diagnose("t.NoSinkKind", code))
+                .anyMatch(m -> m.startsWith("ShorthandKeyWithoutSink") && m.contains("`kind`"));
+    }
+
+    @Test
+    void rejectsASinkWithoutAnId() {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.*;
+                @Procedure(kind = OperativeKind.STREAM, sink = "out")
+                public class Upcase {
+                    public String run(String in) { return in; }
+                }
+                """;
+        assertThat(diagnose("t.Upcase", code)).anyMatch(m -> m.startsWith("SinkWithoutId"));
+    }
+
+    @Test
+    void rejectsASinkWithoutAKind() {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.Procedure;
+                @Procedure(id = "upcase", sink = "out")
+                public class UpcaseNoKind {
+                    public String run(String in) { return in; }
+                }
+                """;
+        assertThat(diagnose("t.UpcaseNoKind", code)).anyMatch(m -> m.startsWith("SinkWithoutKind"));
+    }
+
+    @Test
+    void rejectsASinkOnAProcedureWithNoOutput() {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.*;
+                @Procedure(id = "log", kind = OperativeKind.STREAM, sink = "out")
+                public class LogOnly {
+                    public void run(String in) {}
+                }
+                """;
+        assertThat(diagnose("t.LogOnly", code)).anyMatch(m -> m.startsWith("SinkWithoutOutput"));
+    }
+
+    @Test
+    void rejectsMoreThanOneKind() {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.*;
+                @Procedure(
+                        id = "two_kinds",
+                        kind = {OperativeKind.STREAM, OperativeKind.WORKFLOW},
+                        sink = "out")
+                public class TwoKinds {
+                    public String run(String in) { return in; }
+                }
+                """;
+        assertThat(diagnose("t.TwoKinds", code)).anyMatch(m -> m.contains("declares one kind"));
+    }
+
+    @Test
+    void aWorkflowShortFormGeneratesAWorkflowOperative() {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.*;
+                @Procedure(
+                        id = "place",
+                        kind = OperativeKind.WORKFLOW,
+                        sink = "placed",
+                        input = "order")
+                public class Place {
+                    public String run(String in) { return in; }
+                }
+                """;
+        String source = generated("t.Place", "t.PlaceWorkflowOperative", code);
+        assertThat(source).contains("implements WorkflowOperative");
+        assertThat(source).contains("public void procedures(ChannelBuilder c)");
+        assertThat(source)
+                .contains("c.input(java.lang.String.class, \"order\").into(PlaceProcedure.class).sink(\"placed\");");
+    }
+
+    @Test
+    void writesNoAggregateRegistrationClass() {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.*;
+                @Procedure(id = "alone", kind = OperativeKind.STREAM, sink = "out")
+                public class Alone {
+                    public String run(String in) { return in; }
+                }
+                """;
+        assertThat(generatedFiles("t.Alone", code))
+                .contains("t/AloneProcedure.java", "t/AloneStreamOperative.java")
+                .noneMatch(name -> name.contains("GeneratedStreamOperatives"));
     }
 
     @Test
@@ -358,8 +472,8 @@ class FlezhaProcessorTest {
         String code =
                 """
                 package t;
-                import com.flezha.sdk.authoring.Procedure;
-                @Procedure(id = "p\\"id", sink = "s\\"sink", input = "i\\"in")
+                import com.flezha.sdk.authoring.*;
+                @Procedure(id = "p\\"id", kind = OperativeKind.STREAM, sink = "s\\"sink", input = "i\\"in")
                 public class Quoted {
                     public String run(String in) { return in; }
                 }
@@ -373,8 +487,8 @@ class FlezhaProcessorTest {
         String code =
                 """
                 package t;
-                import com.flezha.sdk.authoring.Procedure;
-                @Procedure(id = "p\\\\nid", sink = "s\\\\nsink", input = "i\\\\nin")
+                import com.flezha.sdk.authoring.*;
+                @Procedure(id = "p\\\\nid", kind = OperativeKind.STREAM, sink = "s\\\\nsink", input = "i\\\\nin")
                 public class Backslashed {
                     public String run(String in) { return in; }
                 }
@@ -399,6 +513,21 @@ class FlezhaProcessorTest {
                 """;
         assertThat(stringLiterals(generated("t.OddKeys", "t.OddKeysProcedure", code)))
                 .contains("k\"1", "k\\n2");
+    }
+
+    @Test
+    void namesTheProcedureAfterTheWrittenId() {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.*;
+                @Procedure(id = "sugar_store_input", kind = OperativeKind.STREAM, sink = "sugar_store_sink")
+                public class SugarStore {
+                    public String run(String in) { return in; }
+                }
+                """;
+        assertThat(generated("t.SugarStore", "t.SugarStoreProcedure", code))
+                .contains("public String name() { return \"sugar_store_input\"; }");
     }
 
     /** The value of every string literal in a generated source, which must parse. */
@@ -450,6 +579,34 @@ class FlezhaProcessorTest {
                 .isTrue();
         try {
             return Files.readString(gen.resolve(generatedFqn.replace('.', '/') + ".java"));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /** Every source the processor wrote for {@code fqn}, as paths relative to the output root. */
+    private List<String> generatedFiles(String fqn, String code) {
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        DiagnosticCollector<JavaFileObject> diags = new DiagnosticCollector<>();
+        StandardJavaFileManager fm = compiler.getStandardFileManager(diags, null, StandardCharsets.UTF_8);
+        Path gen;
+        try {
+            gen = Files.createDirectories(out.resolve("gen-files-" + fqn));
+            fm.setLocation(StandardLocation.CLASS_OUTPUT, List.of(out.toFile()));
+            fm.setLocation(StandardLocation.SOURCE_OUTPUT, List.of(gen.toFile()));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        JavaCompiler.CompilationTask task =
+                compiler.getTask(null, fm, diags, List.of("-proc:only"), null, List.of(new StringSource(fqn, code)));
+        task.setProcessors(List.of(new FlezhaProcessor()));
+        assertThat(task.call())
+                .as("processing a well-formed @Procedure should succeed: %s", diags.getDiagnostics())
+                .isTrue();
+        try (var walk = Files.walk(gen)) {
+            return walk.filter(Files::isRegularFile)
+                    .map(path -> gen.relativize(path).toString())
+                    .toList();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

@@ -44,7 +44,7 @@ public final class WorkflowOperativeClassRegistry {
         String factoryId = spec.factoryId();
 
         if (StreamOperativeClassRegistry.getTopology(factoryId) != null) {
-            throw new IllegalArgumentException("Duplicate factory id `" + factoryId + "` for WorkflowOperative class `"
+            throw new IllegalArgumentException("DuplicateFactoryId: `" + factoryId + "` for WorkflowOperative class `"
                     + workflowClass.getName() + "` (already registered as a StreamOperative)");
         }
 
@@ -53,7 +53,7 @@ public final class WorkflowOperativeClassRegistry {
     }
 
     /**
-     * On-demand removal ({@code FlezhaRunner.removeWorkflow}). Returns the
+     * On-demand removal ({@code FlezhaRunner.unregisterFactory}). Returns the
      * removed spec (for {@code FlezhaImpl.removeType}'s re-register-on-live-hit
      * path), or {@code null} when the id is unknown. Reached reflectively from
      * the api module's {@code RegistryCore} on the pre-start path.

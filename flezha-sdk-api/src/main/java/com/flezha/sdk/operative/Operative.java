@@ -25,8 +25,8 @@ import javax.annotation.Nonnull;
  *
  * <pre>{@code
  * Flezha.createRunner("my_app")
- *         .defineStream(WordCount.class)
- *         .defineWorkflow(Checkout.class)
+ *         .registerFactory(WordCount.class)
+ *         .registerFactory(Checkout.class)
  *         .run();
  * }</pre>
  *

@@ -3,10 +3,12 @@ package com.flezha.sdk.processor;
 import com.flezha.sdk.authoring.EntitiesFor;
 import com.flezha.sdk.authoring.EntityKey;
 import com.flezha.sdk.authoring.InitState;
+import com.flezha.sdk.authoring.OperativeKind;
 import com.flezha.sdk.authoring.Procedure;
 import com.flezha.sdk.processor.ProcedureModel.Output;
 import com.flezha.sdk.processor.ProcedureModel.StateShape;
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Element;
@@ -20,11 +22,10 @@ import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 
 /**
- * Generates {@code <Name>Procedure} from a {@code @Procedure} class and, when it
- * declares a {@code sink}, the single-procedure {@code <Name>StreamOperative}
- * that auto-wires it. Resolution reads the {@code run} signature and the
- * annotation and reports every refusal; rendering is a pure function of the
- * {@link ProcedureModel}.
+ * Generates {@code <Name>Procedure} from a {@code @Procedure} class and, when it declares a
+ * {@code sink}, the §5 short form's single-procedure {@code <Name>StreamOperative} or
+ * {@code <Name>WorkflowOperative}. Resolution reads the {@code run} signature and the annotation
+ * and reports every refusal; rendering is a pure function of the {@link ProcedureModel}.
  */
 final class ProcedureGenerator {
 
@@ -39,28 +40,24 @@ final class ProcedureGenerator {
         this.mirrors = mirrors;
     }
 
-    /**
-     * Writes the procedure and, with a {@code sink}, its auto-wire operative.
-     * Returns that operative's fully-qualified name, or {@code null} when there
-     * is none to register.
-     */
-    String generate(TypeElement procedure) {
+    /** Writes the procedure and, with a {@code sink}, the short form's operative of its kind. */
+    void generate(TypeElement procedure) {
         ProcedureModel model = resolve(procedure);
         if (model == null) {
-            return null;
+            return;
         }
         out.write(TypeMirrors.qualify(model.pkg(), model.procedureSimple()), renderProcedure(model), procedure);
         if (model.sink().isEmpty()) {
-            return null;
+            return;
         }
         if (!model.hasOutput()) {
             out.error(
                     procedure,
-                    "@Procedure(sink = ...) requires an output type to feed the plugin — a non-void return,"
-                            + " or `emits = Type.class` on the context-parameter shape");
-            return null;
+                    "SinkWithoutOutput: a `sink` requires an output type to feed the plugin — a non-void"
+                            + " return, or `emits = Type.class` on the context-parameter shape");
+            return;
         }
-        return generateSinkOperative(model, procedure);
+        generateShortFormOperative(model, procedure);
     }
 
     /** The {@code run} signature half; hands the annotation half on. {@code null} once refused. */
@@ -119,11 +116,15 @@ final class ProcedureGenerator {
             return null;
         }
         String simple = procedure.getSimpleName().toString();
+        // The written `id` names the procedure too, so its state is saved under
+        // the same name its Rust twin uses; a class with no `id` keeps the
+        // derived one.
+        String id = ann.id().isEmpty() ? snake(simple) : ann.id();
         return new ProcedureModel(
                 pkg,
                 procedure.getQualifiedName().toString(),
                 simple + "Procedure",
-                snake(simple),
+                id,
                 inputType.toString(),
                 outputType,
                 state.stateType(),
@@ -135,8 +136,9 @@ final class ProcedureGenerator {
                 entitiesFor == null ? null : entitiesFor.getSimpleName().toString(),
                 keys,
                 ann.key(),
-                ann.id().isEmpty() ? snake(simple) : ann.id(),
+                id,
                 ann.sink(),
+                kindOf(ann),
                 ann.input().isEmpty() ? "input" : ann.input(),
                 ann.onFull(),
                 ann.capacity(),
@@ -230,14 +232,59 @@ final class ProcedureGenerator {
             out.error(procedure, "@Procedure(keys = {...}) requires a @EntitiesFor method");
             return false;
         }
-        if (!ann.input().isEmpty() && ann.sink().isEmpty()) {
+        return shortFormAgrees(procedure, ann);
+    }
+
+    /**
+     * The §5 short form's own rules: a {@code sink} makes one procedure a whole operative, so it
+     * needs an identity and a kind, and the keys that describe that operative need a {@code sink}.
+     * Each message begins with the refusal's contract name
+     * ({@code docs/sdk/authoring_contract.md} §5.2).
+     */
+    private boolean shortFormAgrees(TypeElement procedure, Procedure ann) {
+        if (ann.sink().isEmpty()) {
+            List<String> keys = new ArrayList<>();
+            if (!ann.input().isEmpty()) {
+                keys.add("input");
+            }
+            if (ann.kind().length > 0) {
+                keys.add("kind");
+            }
+            if (keys.isEmpty()) {
+                return true;
+            }
             out.error(
                     procedure,
-                    "@Procedure(input = \"" + ann.input() + "\") names the entry channel of the operative a"
-                            + " `sink` auto-wires; this class declares no `sink`, so there is no channel to name");
+                    "ShorthandKeyWithoutSink: `" + String.join("`, `", keys)
+                            + "` name(s) of the operative a `sink` generates; this class declares no `sink`,"
+                            + " so there is nothing for them to describe");
+            return false;
+        }
+        if (ann.id().isEmpty()) {
+            out.error(
+                    procedure,
+                    "SinkWithoutId: a `sink` makes this class a whole operative, whose factory id is an"
+                            + " address an operator types; write it as `id = \"...\"` rather than deriving it"
+                            + " from the class name");
+            return false;
+        }
+        if (ann.kind().length == 0) {
+            out.error(
+                    procedure,
+                    "SinkWithoutKind: a `sink` makes this class a whole operative; write"
+                            + " `kind = OperativeKind.STREAM` or `kind = OperativeKind.WORKFLOW`");
+            return false;
+        }
+        if (ann.kind().length > 1) {
+            out.error(procedure, "@Procedure(kind = ...) declares one kind, not " + ann.kind().length);
             return false;
         }
         return true;
+    }
+
+    /** The declared kind, or {@code STREAM} for a class with no {@code sink} (which has no operative). */
+    private static OperativeKind kindOf(Procedure ann) {
+        return ann.kind().length == 1 ? ann.kind()[0] : OperativeKind.STREAM;
     }
 
     /** Reconciles {@code emits} and {@code key} with the run shape; the output type, or {@code null} once refused. */
@@ -314,9 +361,11 @@ final class ProcedureGenerator {
         // The five type tokens are not generated: the `implements Procedure<…>`
         // clause above states them concretely, and the interface defaults read
         // them off it — the same path a hand-written procedure takes.
-        b.append("    @Override public String name() { return \"")
-                .append(m.name())
-                .append("\"; }\n");
+        // The name is the author's written `id` where there is one, so it goes
+        // through the same escaping every other author-written string does.
+        b.append("    @Override public String name() { return ")
+                .append(mirrors.literal(m.name()))
+                .append("; }\n");
         b.append("    @Override public ")
                 .append(m.stateType())
                 .append(" initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) { return ")
@@ -408,23 +457,35 @@ final class ProcedureGenerator {
         b.append("    }\n");
     }
 
-    /** The single-procedure auto-wire operative a {@code sink} asks for; returns its name. */
-    private String generateSinkOperative(ProcedureModel m, Element origin) {
-        String operativeSimple = m.procedureSimple().replaceFirst("Procedure$", "") + "StreamOperative";
+    /**
+     * The §5 short form's operative: one entry channel into this procedure and this procedure to
+     * the named plugin sink, with every other operative method at its interface default. The two
+     * kinds differ only in the interface they state and the method they fill, because both author
+     * on the same builder.
+     */
+    private void generateShortFormOperative(ProcedureModel m, Element origin) {
+        boolean workflow = m.kind() == OperativeKind.WORKFLOW;
+        String operativeInterface = workflow ? "WorkflowOperative" : "StreamOperative";
+        String declaration = workflow ? "procedures" : "channels";
+        String operativeSimple = m.procedureSimple().replaceFirst("Procedure$", "") + operativeInterface;
         String operativeFqn = TypeMirrors.qualify(m.pkg(), operativeSimple);
         String onFullCall = onFullCall(m.onFull(), origin);
 
         StringBuilder b = FlezhaProcessor.source(m.pkg());
         b.append("import com.flezha.sdk.channel.ChannelBuilder;\n");
-        b.append("import com.flezha.sdk.operative.StreamOperative;\n\n");
-        b.append("/** Generated single-procedure auto-wire operative for ")
+        b.append("import com.flezha.sdk.operative.").append(operativeInterface).append(";\n\n");
+        b.append("/** Generated single-procedure short-form operative for ")
                 .append(m.procedureSimple())
                 .append(". */\n");
-        b.append("public final class ").append(operativeSimple).append(" implements StreamOperative {\n");
+        b.append("public final class ")
+                .append(operativeSimple)
+                .append(" implements ")
+                .append(operativeInterface)
+                .append(" {\n");
         b.append("    @Override public String factoryId() { return ")
                 .append(mirrors.literal(m.id()))
                 .append("; }\n");
-        b.append("    @Override public void channels(ChannelBuilder c) {\n");
+        b.append("    @Override public void ").append(declaration).append("(ChannelBuilder c) {\n");
         b.append("        c.input(")
                 .append(TypeMirrors.classLit(m.inputType()))
                 .append(", ")
@@ -439,7 +500,6 @@ final class ProcedureGenerator {
         b.append("    }\n}\n");
 
         out.write(operativeFqn, b.toString(), origin);
-        return operativeFqn;
     }
 
     /**

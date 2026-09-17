@@ -11,7 +11,7 @@ public final class Main {
 
     public static void main(String[] args) throws Exception {
         Flezha.createRunner(args.length > 0 ? args[0] : "my_app")
-                .defineWorkflow(CheckoutOperative.class)
+                .registerFactory(CheckoutOperative.class)
                 .run();
     }
 

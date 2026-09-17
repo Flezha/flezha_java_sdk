@@ -11,9 +11,10 @@
  * that is not derivable from the wiring. {@link com.flezha.sdk.authoring.InitState} marks the
  * method that constructs the initial per-entity state, and
  * {@link com.flezha.sdk.authoring.Journal} marks the type recorded in the change log.
- * {@link com.flezha.sdk.authoring.Procedure}, {@link com.flezha.sdk.authoring.State} and
- * {@link com.flezha.sdk.authoring.StreamOperative} identify the authoring roles a class plays, and
- * share their names with the interfaces of the same names in other packages.
+ * {@link com.flezha.sdk.authoring.Procedure} and {@link com.flezha.sdk.authoring.State} identify
+ * the authoring roles a class plays, and share their names with the interfaces of the same names in
+ * other packages; {@link com.flezha.sdk.authoring.OperativeKind} names which operative kind a
+ * {@code Procedure} with a {@code sink} generates.
  *
  * <p>Reach for one of these only when the compiler cannot infer the fact on its own. An annotation
  * that duplicates something already visible in the type signature adds a second place for the same
