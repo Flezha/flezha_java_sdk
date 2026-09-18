@@ -246,7 +246,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    /** The graph the test app's {@code @Procedure}-annotated {@code SugarDoNothing} short form generates. */
+    /** The graph the test app's {@code @StreamOperative}-annotated {@code SugarDoNothing} short form generates. */
     public static final class SugarDoNothingStreamOperative implements StreamOperative {
         @Override
         public String factoryId() {

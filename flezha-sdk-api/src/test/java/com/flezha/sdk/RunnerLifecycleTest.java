@@ -97,6 +97,25 @@ class RunnerLifecycleTest {
         }
     }
 
+    /** A short form: the runner registers the operative generated from it, {@link ShortFormStreamOperative}. */
+    @com.flezha.sdk.authoring.StreamOperative(id = "lifecycle_short", sink = "out")
+    public static final class ShortForm {
+        public String run(String input) {
+            return input;
+        }
+    }
+
+    /** A short form with no generated operative beside it, as when the processor never ran. */
+    @com.flezha.sdk.authoring.WorkflowOperative(id = "lifecycle_orphan")
+    public static final class Orphan {
+        public String run(String input) {
+            return input;
+        }
+    }
+
+    /** Neither an operative nor a short form. */
+    public static final class NotAnOperative {}
+
     public static final class ThrowingConstructorOperative implements StreamOperative {
         public ThrowingConstructorOperative() {
             throw new IllegalStateException(AUTHORS_REFUSAL);
@@ -319,8 +338,40 @@ class RunnerLifecycleTest {
                 .hasMessageStartingWith("UnknownOperativeKind")
                 .hasMessageContaining("NeitherKind");
 
+        assertThatThrownBy(() -> runner.registerFactory(NotAnOperative.class))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageStartingWith("UnknownOperativeKind")
+                .hasMessageContaining("NotAnOperative")
+                .hasMessageContaining("@StreamOperative");
+
         assertThat(com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry.registeredIds())
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName("the author registers the class they wrote, and a hand-written operative beside it")
+    void theAuthorRegistersTheClassTheyWrote() {
+        FlezhaRunner runner = Flezha.createRunner("ns_short_form")
+                .registerFactory(ShortForm.class)
+                .registerFactory(OperativeA.class);
+        assertThat(com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry.registeredIds())
+                .containsExactly("lifecycle_short", "lifecycle_a");
+
+        runner.unregisterFactory(ShortForm.class);
+        assertThat(com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry.registeredIds())
+                .as("unregister takes what register took")
+                .containsExactly("lifecycle_a");
+    }
+
+    @Test
+    @DisplayName("a short form whose generated operative is missing is refused naming the processor")
+    void aShortFormWithoutItsGeneratedOperativeIsRefused() {
+        FlezhaRunner runner = Flezha.createRunner("ns_orphan");
+
+        assertThatThrownBy(() -> runner.registerFactory(Orphan.class))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("OrphanWorkflowOperative")
+                .hasMessageContaining("flezha-sdk-processor");
     }
 
     @Test

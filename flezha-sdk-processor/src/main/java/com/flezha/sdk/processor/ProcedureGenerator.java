@@ -3,14 +3,24 @@ package com.flezha.sdk.processor;
 import com.flezha.sdk.authoring.EntitiesFor;
 import com.flezha.sdk.authoring.EntityKey;
 import com.flezha.sdk.authoring.InitState;
-import com.flezha.sdk.authoring.OperativeKind;
 import com.flezha.sdk.authoring.Procedure;
+import com.flezha.sdk.authoring.StreamOperative;
+import com.flezha.sdk.authoring.WorkflowOperative;
+import com.flezha.sdk.processor.ProcedureModel.Declares;
 import com.flezha.sdk.processor.ProcedureModel.Output;
 import com.flezha.sdk.processor.ProcedureModel.StateShape;
+import com.sun.source.tree.AnnotationTree;
+import com.sun.source.tree.AssignmentTree;
+import com.sun.source.tree.ExpressionTree;
+import com.sun.source.util.Trees;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
@@ -22,49 +32,209 @@ import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 
 /**
- * Generates {@code <Name>Procedure} from a {@code @Procedure} class and, when it declares a
- * {@code sink}, the §5 short form's single-procedure {@code <Name>StreamOperative} or
- * {@code <Name>WorkflowOperative}. Resolution reads the {@code run} signature and the annotation
- * and reports every refusal; rendering is a pure function of the {@link ProcedureModel}.
+ * Generates {@code <Name>Procedure} from a {@code @Procedure} class, and from a
+ * {@code @StreamOperative} or {@code @WorkflowOperative} class also the §5 short form's
+ * single-procedure {@code <Name>StreamOperative} or {@code <Name>WorkflowOperative}. Resolution
+ * reads the {@code run} signature and the annotation and reports every refusal; rendering is a pure
+ * function of the {@link ProcedureModel}.
  */
 final class ProcedureGenerator {
 
+    /** The three annotations a class declares itself with, one per class. */
+    static final Set<Class<? extends Annotation>> DECLARATIONS =
+            Set.of(Procedure.class, StreamOperative.class, WorkflowOperative.class);
+
     private static final String STATE_HANDLE = "com.flezha.sdk.state.StateHandle";
     private static final String PROCEDURE_CTX = "com.flezha.sdk.procedure.ProcedureCtx";
+    private static final String OPERATIVE_PACKAGE = "com.flezha.sdk.operative.";
+
+    /** Members that describe an operative rather than a procedure, refused by name on {@code @Procedure}. */
+    private static final List<String> OPERATIVE_MEMBERS = List.of("kind", "sink", "input", "onFull");
+
+    /** The entry channel's overflow policies, each its {@code OverflowPolicy} constant in lower case. */
+    private static final List<String> OVERFLOW_POLICIES = List.of("drop_nothing", "drop_newest", "drop_oldest");
 
     private final FlezhaProcessor out;
     private final TypeMirrors mirrors;
 
-    ProcedureGenerator(FlezhaProcessor out, TypeMirrors mirrors) {
+    /** The source trees, or {@code null} on a compiler that exposes none. */
+    private final Trees trees;
+
+    ProcedureGenerator(FlezhaProcessor out, TypeMirrors mirrors, Trees trees) {
         this.out = out;
         this.mirrors = mirrors;
+        this.trees = trees;
     }
 
-    /** Writes the procedure and, with a {@code sink}, the short form's operative of its kind. */
-    void generate(TypeElement procedure) {
-        ProcedureModel model = resolve(procedure);
+    /** Writes the procedure and, for an operative annotation, the short form's operative of its kind. */
+    void generate(TypeElement type) {
+        Declaration d = declarationOf(type);
+        if (d == null || !annotationAgrees(d)) {
+            return;
+        }
+        ProcedureModel model = resolve(d);
         if (model == null) {
             return;
         }
-        out.write(TypeMirrors.qualify(model.pkg(), model.procedureSimple()), renderProcedure(model), procedure);
-        if (model.sink().isEmpty()) {
-            return;
+        out.write(TypeMirrors.qualify(model.pkg(), model.procedureSimple()), renderProcedure(model), type);
+        if (model.declares() != Declares.PROCEDURE && operativeAgrees(model, type)) {
+            out.write(TypeMirrors.qualify(model.pkg(), model.operativeSimple()), renderShortFormOperative(model), type);
         }
-        if (!model.hasOutput()) {
+    }
+
+    /**
+     * A class and the one declaring annotation it carries, read alike from each of the three.
+     * {@code emits} is the declared output type, {@code null} when unset.
+     */
+    private record Declaration(
+            TypeElement type,
+            Declares declares,
+            String id,
+            String sink,
+            String input,
+            String key,
+            String emits,
+            List<String> keys,
+            int capacity,
+            String onFull) {
+
+        String annotation() {
+            return declares.annotation();
+        }
+    }
+
+    /** The one declaring annotation a class carries, or {@code null} once refused. */
+    private Declaration declarationOf(TypeElement type) {
+        List<Declaration> found = new ArrayList<>();
+        Procedure p = type.getAnnotation(Procedure.class);
+        if (p != null) {
+            found.add(new Declaration(
+                    type,
+                    Declares.PROCEDURE,
+                    p.id(),
+                    "",
+                    "",
+                    p.key(),
+                    declaredEmits(p::emits),
+                    List.of(p.keys()),
+                    p.capacity(),
+                    ""));
+        }
+        StreamOperative s = type.getAnnotation(StreamOperative.class);
+        if (s != null) {
+            found.add(new Declaration(
+                    type,
+                    Declares.STREAM,
+                    s.id(),
+                    s.sink(),
+                    s.input(),
+                    s.key(),
+                    declaredEmits(s::emits),
+                    List.of(s.keys()),
+                    s.capacity(),
+                    s.onFull()));
+        }
+        WorkflowOperative w = type.getAnnotation(WorkflowOperative.class);
+        if (w != null) {
+            found.add(new Declaration(
+                    type,
+                    Declares.WORKFLOW,
+                    w.id(),
+                    w.sink(),
+                    w.input(),
+                    w.key(),
+                    declaredEmits(w::emits),
+                    List.of(w.keys()),
+                    w.capacity(),
+                    w.onFull()));
+        }
+        if (found.size() > 1) {
             out.error(
-                    procedure,
-                    "SinkWithoutOutput: a `sink` requires an output type to feed the plugin — a non-void"
-                            + " return, or `emits = Type.class` on the context-parameter shape");
-            return;
+                    type,
+                    found.stream().map(Declaration::annotation).collect(Collectors.joining(" and "))
+                            + ": a class declares one procedure or one operative; keep one annotation");
+            return null;
         }
-        generateShortFormOperative(model, procedure);
+        return found.get(0);
+    }
+
+    /**
+     * The annotation's own rules: {@code @Procedure} carries no operative member, and a §5 short
+     * form writes its factory id, never derived, and declares no topology body beside its procedure
+     * body. A refusal with a contract name begins with it ({@code docs/sdk/authoring_contract.md}
+     * §5.2).
+     */
+    private boolean annotationAgrees(Declaration d) {
+        if (d.declares() == Declares.PROCEDURE) {
+            return declaresNoOperative(d.type());
+        }
+        if (d.id().isEmpty()) {
+            out.error(
+                    d.type(),
+                    d.annotation() + " requires `id`: an operative's factory id is an address an operator"
+                            + " types, so write it as `id = \"...\"` rather than deriving it from the class name");
+            return false;
+        }
+        List<String> topology = new ArrayList<>();
+        for (Declares kind : List.of(Declares.STREAM, Declares.WORKFLOW)) {
+            if (mirrors.isSubtypeOf(d.type().asType(), OPERATIVE_PACKAGE + kind.simpleName)) {
+                topology.add(kind.simpleName);
+            }
+        }
+        if (topology.isEmpty()) {
+            return true;
+        }
+        out.error(
+                d.type(),
+                "ShortFormWithTopology: " + d.annotation() + " makes this class's `run` a whole operative, and"
+                        + " the class also implements " + String.join(" and ", topology)
+                        + ", which declares a topology body; write the short form or the full form, not both");
+        return false;
+    }
+
+    /**
+     * {@code @Procedure} declares no {@code kind}, {@code sink}, {@code input} or {@code onFull}, so
+     * the compiler drops a written one before the model sees it and names only a missing symbol. The
+     * source tree still carries it, which lets the refusal name the annotations it belongs on.
+     */
+    private boolean declaresNoOperative(TypeElement type) {
+        boolean agrees = true;
+        for (String member : writtenMembers(type, Procedure.class)) {
+            if (OPERATIVE_MEMBERS.contains(member)) {
+                out.error(
+                        type,
+                        "@Procedure declares a procedure; `" + member + "` belongs to an operative declaration:"
+                                + " write the short form as @StreamOperative(...) or @WorkflowOperative(...)");
+                agrees = false;
+            }
+        }
+        return agrees;
+    }
+
+    /** The member names {@code type}'s source writes on {@code annotation}; none without source trees. */
+    private List<String> writtenMembers(TypeElement type, Class<? extends Annotation> annotation) {
+        List<String> names = new ArrayList<>();
+        if (trees == null) {
+            return names;
+        }
+        for (AnnotationMirror mirror : type.getAnnotationMirrors()) {
+            if (mirror.getAnnotationType().toString().equals(annotation.getCanonicalName())
+                    && trees.getTree(type, mirror) instanceof AnnotationTree tree) {
+                for (ExpressionTree argument : tree.getArguments()) {
+                    if (argument instanceof AssignmentTree assignment) {
+                        names.add(assignment.getVariable().toString());
+                    }
+                }
+            }
+        }
+        return names;
     }
 
     /** The {@code run} signature half; hands the annotation half on. {@code null} once refused. */
-    private ProcedureModel resolve(TypeElement procedure) {
-        ExecutableElement run = findRun(procedure);
+    private ProcedureModel resolve(Declaration d) {
+        ExecutableElement run = findRun(d.type());
         if (run == null) {
-            out.error(procedure, "@Procedure requires exactly one public method named `run`");
+            out.error(d.type(), d.annotation() + " requires exactly one public method named `run`");
             return null;
         }
         List<? extends VariableElement> params = run.getParameters();
@@ -76,26 +246,26 @@ final class ProcedureGenerator {
         if (valueParams < 1 || valueParams > 2) {
             out.error(
                     run,
-                    "@Procedure `run` must be `Output run(Input)` or `Output run(Input, StateHandle<State, Change>)`,"
+                    d.annotation()
+                            + " `run` must be `Output run(Input)` or `Output run(Input, StateHandle<State, Change>)`,"
                             + " each optionally followed by a `ProcedureCtx ctx` parameter");
             return null;
         }
-        String pkg = mirrors.packageOf(procedure);
-        Output output = resolveOutput(run);
+        String pkg = mirrors.packageOf(d.type());
+        Output output = resolveOutput(d, run);
         if (output == null) {
             return null;
         }
-        StateShape state = resolveState(run, params, valueParams == 2, pkg);
+        StateShape state = resolveState(d, run, params, valueParams == 2, pkg);
         if (state == null) {
             return null;
         }
-        return resolveDeclaration(
-                procedure, run, params.get(0).asType(), pkg, ctxParam, valueParams == 2, output, state);
+        return resolveDeclaration(d, run, params.get(0).asType(), pkg, ctxParam, valueParams == 2, output, state);
     }
 
-    /** The {@code @Procedure(...)} half: the entity rules, the emit shape, and the model. */
+    /** The annotation half: the entity rules, the emit shape, and the model. */
     private ProcedureModel resolveDeclaration(
-            TypeElement procedure,
+            Declaration d,
             ExecutableElement run,
             TypeMirror inputType,
             String pkg,
@@ -103,28 +273,24 @@ final class ProcedureGenerator {
             boolean stateful,
             Output output,
             StateShape state) {
-        ExecutableElement entitiesFor = findAnnotated(procedure, EntitiesFor.class);
-        ExecutableElement initState = findAnnotated(procedure, InitState.class);
-        Procedure ann = procedure.getAnnotation(Procedure.class);
-        List<String> keys = List.of(ann.keys());
-        if (!declarationsAgree(procedure, entitiesFor, initState, ann, stateful)) {
+        ExecutableElement entitiesFor = findAnnotated(d.type(), EntitiesFor.class);
+        ExecutableElement initState = findAnnotated(d.type(), InitState.class);
+        if (!declarationsAgree(d, entitiesFor, initState, stateful)) {
             return null;
         }
-        String emitsType = declaredEmits(ann);
-        String outputType = resolveEmitShape(procedure, run, ann.key(), ctxParam, output, emitsType);
+        String outputType = resolveEmitShape(d, run, ctxParam, output);
         if (outputType == null) {
             return null;
         }
-        String simple = procedure.getSimpleName().toString();
-        // The procedure's node name and the operative's factory id are one
-        // string: the written `id` where there is one, so Java state is saved
-        // under the same name its Rust twin uses, and the derived one
-        // otherwise.
-        String id = ann.id().isEmpty() ? snake(simple) : ann.id();
+        String simple = d.type().getSimpleName().toString();
+        // A short form's written id is both its factory id and its procedure's
+        // name, verbatim, so its entities keep their state path when it grows
+        // into the full form.
+        String id = d.id().isEmpty() ? snake(simple) : d.id();
         return new ProcedureModel(
                 pkg,
-                procedure.getQualifiedName().toString(),
-                simple + "Procedure",
+                d.type().getQualifiedName().toString(),
+                simple,
                 inputType.toString(),
                 outputType,
                 state.stateType(),
@@ -134,23 +300,23 @@ final class ProcedureGenerator {
                         ? "impl." + initState.getSimpleName() + "(entityKey)"
                         : "new " + state.stateType() + "()",
                 entitiesFor == null ? null : entitiesFor.getSimpleName().toString(),
-                keys,
-                ann.key(),
+                d.keys(),
+                d.key(),
                 id,
-                ann.sink(),
-                kindOf(ann),
-                ann.input().isEmpty() ? "input" : ann.input(),
-                ann.onFull(),
-                ann.capacity(),
+                d.declares(),
+                d.sink(),
+                d.input().isEmpty() ? "input" : d.input(),
+                d.onFull(),
+                d.capacity(),
                 stateful,
                 ctxParam,
                 output.emits(),
                 output.optional(),
-                output.emits() || emitsType != null);
+                output.emits() || d.emits() != null);
     }
 
     /** What the return type declares, or {@code null} once refused. */
-    private Output resolveOutput(ExecutableElement run) {
+    private Output resolveOutput(Declaration d, ExecutableElement run) {
         TypeMirror returnType = run.getReturnType();
         // `void` = no output; `Optional<O>` = emit-on-present; bare `O` = always emit.
         if (returnType.getKind() == TypeKind.VOID) {
@@ -161,7 +327,7 @@ final class ProcedureGenerator {
         }
         TypeMirror element = mirrors.optionalElement(returnType);
         if (element == null) {
-            out.error(run, "@Procedure `run` returning Optional must be parameterized as Optional<Output>");
+            out.error(run, d.annotation() + " `run` returning Optional must be parameterized as Optional<Output>");
             return null;
         }
         return new Output(true, true, element.toString());
@@ -169,7 +335,11 @@ final class ProcedureGenerator {
 
     /** The state types the generated procedure threads, or {@code null} once refused. */
     private StateShape resolveState(
-            ExecutableElement run, List<? extends VariableElement> params, boolean stateful, String pkg) {
+            Declaration d,
+            ExecutableElement run,
+            List<? extends VariableElement> params,
+            boolean stateful,
+            String pkg) {
         if (!stateful) {
             return new StateShape("com.flezha.sdk.state.Stateless", "com.flezha.sdk.state.NoChange", "state");
         }
@@ -190,7 +360,7 @@ final class ProcedureGenerator {
         if (!handleName.endsWith("Handle")) {
             out.error(
                     run,
-                    "@Procedure stateful `run` second parameter must be a @State-generated `<State>Handle` "
+                    d.annotation() + " stateful `run` second parameter must be a @State-generated `<State>Handle` "
                             + "or `StateHandle<State, Change>`");
             return null;
         }
@@ -201,17 +371,12 @@ final class ProcedureGenerator {
 
     /** The keying and static-entity declaration rules, in the order they refuse today. */
     private boolean declarationsAgree(
-            TypeElement procedure,
-            ExecutableElement entitiesFor,
-            ExecutableElement initState,
-            Procedure ann,
-            boolean stateful) {
-        List<String> keys = List.of(ann.keys());
+            Declaration d, ExecutableElement entitiesFor, ExecutableElement initState, boolean stateful) {
         // Entity mode: static keying is the only mode a procedure can declare
         // — dynamic keying moved to the wiring.
-        if (findAnnotated(procedure, EntityKey.class) != null) {
+        if (findAnnotated(d.type(), EntityKey.class) != null) {
             out.error(
-                    procedure,
+                    d.type(),
                     "@EntityKey no longer exists; declare the Entity key on the wiring instead — "
                             + "`.keyBy(f)` on the stream that feeds this procedure");
             return false;
@@ -219,110 +384,55 @@ final class ProcedureGenerator {
         // Per-entity state init: @InitState maps the procedure key to State.
         if (initState != null && !stateful) {
             out.error(
-                    procedure,
+                    d.type(),
                     "@InitState requires a stateful run (a @State handle parameter); a stateless procedure "
                             + "has no state to initialize");
             return false;
         }
-        if (entitiesFor != null && keys.isEmpty()) {
-            out.error(procedure, "static entity requires @Procedure(keys = {...}) alongside the @EntitiesFor method");
-            return false;
-        }
-        if (!keys.isEmpty() && entitiesFor == null) {
-            out.error(procedure, "@Procedure(keys = {...}) requires a @EntitiesFor method");
-            return false;
-        }
-        return shortFormAgrees(procedure, ann);
-    }
-
-    /**
-     * The §5 short form's own rules: a {@code sink} makes one procedure a whole operative, so it
-     * needs an identity and a kind, and the keys that describe that operative need a {@code sink}.
-     * Each message begins with the refusal's contract name
-     * ({@code docs/sdk/authoring_contract.md} §5.2).
-     */
-    private boolean shortFormAgrees(TypeElement procedure, Procedure ann) {
-        if (ann.sink().isEmpty()) {
-            List<String> keys = new ArrayList<>();
-            if (!ann.input().isEmpty()) {
-                keys.add("input");
-            }
-            if (ann.kind().length > 0) {
-                keys.add("kind");
-            }
-            if (keys.isEmpty()) {
-                return true;
-            }
+        if (entitiesFor != null && d.keys().isEmpty()) {
             out.error(
-                    procedure,
-                    "ShorthandKeyWithoutSink: `" + String.join("`, `", keys)
-                            + "` name(s) of the operative a `sink` generates; this class declares no `sink`,"
-                            + " so there is nothing for them to describe");
+                    d.type(),
+                    "static entity requires " + d.annotation() + "(keys = {...}) alongside the @EntitiesFor method");
             return false;
         }
-        if (ann.id().isEmpty()) {
-            out.error(
-                    procedure,
-                    "SinkWithoutId: a `sink` makes this class a whole operative, whose factory id is an"
-                            + " address an operator types; write it as `id = \"...\"` rather than deriving it"
-                            + " from the class name");
-            return false;
-        }
-        if (ann.kind().length == 0) {
-            out.error(
-                    procedure,
-                    "SinkWithoutKind: a `sink` makes this class a whole operative; write"
-                            + " `kind = OperativeKind.STREAM` or `kind = OperativeKind.WORKFLOW`");
-            return false;
-        }
-        if (ann.kind().length > 1) {
-            out.error(procedure, "@Procedure(kind = ...) declares one kind, not " + ann.kind().length);
+        if (!d.keys().isEmpty() && entitiesFor == null) {
+            out.error(d.type(), d.annotation() + "(keys = {...}) requires a @EntitiesFor method");
             return false;
         }
         return true;
     }
 
-    /** The declared kind, or {@code STREAM} for a class with no {@code sink} (which has no operative). */
-    private static OperativeKind kindOf(Procedure ann) {
-        return ann.kind().length == 1 ? ann.kind()[0] : OperativeKind.STREAM;
-    }
-
     /** Reconciles {@code emits} and {@code key} with the run shape; the output type, or {@code null} once refused. */
-    private String resolveEmitShape(
-            TypeElement procedure,
-            ExecutableElement run,
-            String emitKey,
-            boolean ctxParam,
-            Output output,
-            String emitsType) {
+    private String resolveEmitShape(Declaration d, ExecutableElement run, boolean ctxParam, Output output) {
         String outputType = output.type();
         if (ctxParam) {
             if (output.emits()) {
                 out.error(
                         run,
-                        "@Procedure `run` with a `ProcedureCtx` parameter makes the body responsible for every"
+                        d.annotation() + " `run` with a `ProcedureCtx` parameter makes the body responsible for every"
                                 + " emit; it must return void, and `emits = Type.class` declares the output type");
                 return null;
             }
-            if (!emitKey.isEmpty()) {
+            if (!d.key().isEmpty()) {
                 out.error(
-                        procedure,
-                        "@Procedure(key = ...) conflicts with a `ProcedureCtx` parameter; the body keys its own"
+                        d.type(),
+                        d.annotation() + "(key = ...) conflicts with a `ProcedureCtx` parameter; the body keys its own"
                                 + " emits with ctx.emitKeyed(..)");
                 return null;
             }
-            if (emitsType != null) {
-                outputType = emitsType;
+            if (d.emits() != null) {
+                outputType = d.emits();
             }
-        } else if (emitsType != null) {
+        } else if (d.emits() != null) {
             out.error(
-                    procedure,
-                    "@Procedure(emits = ...) declares the output type of a `ProcedureCtx` `run`; without that"
+                    d.type(),
+                    d.annotation() + "(emits = ...) declares the output type of a `ProcedureCtx` `run`; without that"
                             + " parameter the return type declares it");
             return null;
         }
-        if (!emitKey.isEmpty() && !output.emits()) {
-            out.error(procedure, "@Procedure(key = ...) requires a non-void return type; there is no emit to key");
+        if (!d.key().isEmpty() && !output.emits()) {
+            out.error(
+                    d.type(), d.annotation() + "(key = ...) requires a non-void return type; there is no emit to key");
             return null;
         }
         return outputType;
@@ -339,7 +449,9 @@ final class ProcedureGenerator {
         b.append("import com.flezha.sdk.state.WallClock;\n");
         b.append("import java.util.List;\n");
         b.append("import java.util.Optional;\n\n");
-        b.append("/** Generated by FlezhaProcessor from @Procedure on ")
+        b.append("/** Generated by FlezhaProcessor from ")
+                .append(m.declares().annotation())
+                .append(" on ")
                 .append(m.userFqn())
                 .append(". */\n");
         b.append("public final class ")
@@ -458,18 +570,35 @@ final class ProcedureGenerator {
     }
 
     /**
-     * The §5 short form's operative: one entry channel into this procedure and this procedure to
-     * the named plugin sink, with every other operative method at its interface default. The two
-     * kinds differ only in the interface they state and the method they fill, because both author
-     * on the same builder.
+     * The short form's operative rules, which read the resolved body: a {@code sink} needs an output
+     * to feed, and {@code onFull} names one of the entry channel's overflow policies.
      */
-    private void generateShortFormOperative(ProcedureModel m, Element origin) {
-        boolean workflow = m.kind() == OperativeKind.WORKFLOW;
-        String operativeInterface = workflow ? "WorkflowOperative" : "StreamOperative";
-        String declaration = workflow ? "procedures" : "channels";
-        String operativeSimple = m.procedureSimple().replaceFirst("Procedure$", "") + operativeInterface;
-        String operativeFqn = TypeMirrors.qualify(m.pkg(), operativeSimple);
-        String onFullCall = onFullCall(m.onFull(), origin);
+    private boolean operativeAgrees(ProcedureModel m, TypeElement type) {
+        if (!m.sink().isEmpty() && !m.hasOutput()) {
+            out.error(
+                    type,
+                    "SinkWithoutOutput: a `sink` requires an output type to feed the plugin: a non-void"
+                            + " return, or `emits = Type.class` on the context-parameter shape");
+            return false;
+        }
+        if (!m.onFull().isEmpty() && !OVERFLOW_POLICIES.contains(m.onFull())) {
+            out.error(
+                    type,
+                    m.declares().annotation() + " onFull must be one of: " + String.join(", ", OVERFLOW_POLICIES));
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * The §5 short form's operative: one entry channel into this procedure and, with a
+     * {@code sink}, this procedure to that plugin sink, with every other operative method at its
+     * interface default. The two kinds differ only in the interface they state and the method they
+     * fill, because both author on the same builder.
+     */
+    private String renderShortFormOperative(ProcedureModel m) {
+        String operativeInterface = m.declares().simpleName;
+        String declaration = m.declares() == Declares.WORKFLOW ? "procedures" : "channels";
 
         StringBuilder b = FlezhaProcessor.source(m.pkg());
         b.append("import com.flezha.sdk.channel.ChannelBuilder;\n");
@@ -478,7 +607,7 @@ final class ProcedureGenerator {
                 .append(m.procedureSimple())
                 .append(". */\n");
         b.append("public final class ")
-                .append(operativeSimple)
+                .append(m.operativeSimple())
                 .append(" implements ")
                 .append(operativeInterface)
                 .append(" {\n");
@@ -490,16 +619,18 @@ final class ProcedureGenerator {
                 .append(TypeMirrors.classLit(m.inputType()))
                 .append(", ")
                 .append(mirrors.literal(m.input()))
-                .append(")")
-                .append(onFullCall)
-                .append(".into(")
-                .append(m.procedureSimple())
-                .append(".class).sink(")
-                .append(mirrors.literal(m.sink()))
-                .append(");\n");
-        b.append("    }\n}\n");
-
-        out.write(operativeFqn, b.toString(), origin);
+                .append(")");
+        if (!m.onFull().isEmpty()) {
+            b.append(".onFull(com.flezha.sdk.channel.OverflowPolicy.")
+                    .append(m.onFull().toUpperCase(Locale.ROOT))
+                    .append(")");
+        }
+        b.append(".into(").append(m.procedureSimple()).append(".class)");
+        if (!m.sink().isEmpty()) {
+            b.append(".sink(").append(mirrors.literal(m.sink())).append(")");
+        }
+        b.append(";\n    }\n}\n");
+        return b.toString();
     }
 
     /**
@@ -507,33 +638,15 @@ final class ProcedureGenerator {
      * unset. Reading a {@code Class} member during annotation processing throws
      * {@link MirroredTypeException} — the mirror it carries is the answer.
      */
-    private String declaredEmits(Procedure ann) {
+    private static String declaredEmits(Supplier<Class<?>> emits) {
         TypeMirror mirror;
         try {
-            Class<?> declared = ann.emits();
+            Class<?> declared = emits.get();
             return declared == void.class ? null : declared.getCanonicalName();
         } catch (MirroredTypeException e) {
             mirror = e.getTypeMirror();
         }
         return mirror.getKind() == TypeKind.VOID ? null : mirror.toString();
-    }
-
-    private String onFullCall(String onFull, Element origin) {
-        if (onFull == null || onFull.isEmpty()) {
-            return "";
-        }
-        String variant =
-                switch (onFull) {
-                    case "drop_nothing" -> "DROP_NOTHING";
-                    case "drop_newest" -> "DROP_NEWEST";
-                    case "drop_oldest" -> "DROP_OLDEST";
-                    default -> null;
-                };
-        if (variant == null) {
-            out.error(origin, "@Procedure onFull must be one of: drop_nothing, drop_newest, drop_oldest");
-            return "";
-        }
-        return ".onFull(com.flezha.sdk.channel.OverflowPolicy." + variant + ")";
     }
 
     private static ExecutableElement findRun(TypeElement procedure) {

@@ -88,21 +88,29 @@ public final class FlezhaRunner implements AutoCloseable {
      * call site, as {@code StreamOperativeConfigurationException} or
      * {@code WorkflowOperativeConfigurationException}.
      *
+     * <p>A short form is registered by the class the author wrote, annotated
+     * {@link com.flezha.sdk.authoring.StreamOperative @StreamOperative} or
+     * {@link com.flezha.sdk.authoring.WorkflowOperative @WorkflowOperative}: the call declares the
+     * operative the annotation processor generated from it, {@code <Class>StreamOperative} or
+     * {@code <Class>WorkflowOperative} in the class's package.
+     *
      * <p>Streams and workflows share one factory-id namespace per runner, so a second class under
      * an id this runner already holds is refused whichever kind either one is.
      *
      * @throws IllegalArgumentException on a duplicate factory id (the message begins with
-     *     {@code DuplicateFactoryId}), or when the class implements both kind interfaces
-     *     ({@code AmbiguousOperativeKind}) or neither ({@code UnknownOperativeKind}).
+     *     {@code DuplicateFactoryId}), when the class implements both kind interfaces
+     *     ({@code AmbiguousOperativeKind}), when it implements neither and is not a short form
+     *     ({@code UnknownOperativeKind}), or when a short form's generated operative is missing.
      * @throws IllegalStateException on a closed runner.
      */
     @Nonnull
-    public FlezhaRunner registerFactory(Class<? extends Operative> operativeClass) {
+    public FlezhaRunner registerFactory(Class<?> operativeClass) {
         open("registerFactory()");
-        if (isWorkflow(operativeClass, "registerFactory()")) {
-            workflow.register(operativeClass.asSubclass(WorkflowOperative.class));
+        Class<? extends Operative> operative = operativeOf(operativeClass, "registerFactory()");
+        if (isWorkflow(operative)) {
+            workflow.register(operative.asSubclass(WorkflowOperative.class));
         } else {
-            stream.register(operativeClass.asSubclass(StreamOperative.class));
+            stream.register(operative.asSubclass(StreamOperative.class));
         }
         syncFactoriesIfStarted();
         return this;
@@ -120,11 +128,47 @@ public final class FlezhaRunner implements AutoCloseable {
      * @throws IllegalStateException on a closed runner.
      */
     @Nonnull
-    public FlezhaRunner unregisterFactory(Class<? extends Operative> operativeClass) {
+    public FlezhaRunner unregisterFactory(Class<?> operativeClass) {
         open("unregisterFactory()");
-        return isWorkflow(operativeClass, "unregisterFactory()")
-                ? remove(workflow, operativeClass.asSubclass(WorkflowOperative.class))
-                : remove(stream, operativeClass.asSubclass(StreamOperative.class));
+        Class<? extends Operative> operative = operativeOf(operativeClass, "unregisterFactory()");
+        return isWorkflow(operative)
+                ? remove(workflow, operative.asSubclass(WorkflowOperative.class))
+                : remove(stream, operative.asSubclass(StreamOperative.class));
+    }
+
+    /**
+     * The operative a registration names: the class itself when it is one, or the operative the
+     * annotation processor generated from a short form, resolved by the processor's naming rule.
+     */
+    private static Class<? extends Operative> operativeOf(Class<?> declared, String what) {
+        if (declared == null) {
+            throw new IllegalArgumentException(what + ": the operative class must not be null");
+        }
+        if (Operative.class.isAssignableFrom(declared)) {
+            return declared.asSubclass(Operative.class);
+        }
+        Class<? extends Operative> kind;
+        if (declared.isAnnotationPresent(com.flezha.sdk.authoring.StreamOperative.class)) {
+            kind = StreamOperative.class;
+        } else if (declared.isAnnotationPresent(com.flezha.sdk.authoring.WorkflowOperative.class)) {
+            kind = WorkflowOperative.class;
+        } else {
+            throw new IllegalArgumentException("UnknownOperativeKind: " + declared.getName()
+                    + " implements neither StreamOperative nor WorkflowOperative, and is annotated with"
+                    + " neither @StreamOperative nor @WorkflowOperative");
+        }
+        String simpleName = declared.getSimpleName() + kind.getSimpleName();
+        String generated =
+                declared.getPackageName().isEmpty() ? simpleName : declared.getPackageName() + "." + simpleName;
+        try {
+            return Class.forName(generated, true, declared.getClassLoader()).asSubclass(kind);
+        } catch (ClassNotFoundException e) {
+            throw new IllegalArgumentException(
+                    declared.getName() + " is annotated @" + kind.getSimpleName() + ", but " + generated
+                            + ", the operative the annotation processor generates from it, is not"
+                            + " on the class path: put flezha-sdk-processor on the annotation processor path",
+                    e);
+        }
     }
 
     /**
@@ -132,10 +176,7 @@ public final class FlezhaRunner implements AutoCloseable {
      * or of neither, is refused by the contract's name for it
      * ({@code docs/sdk/authoring_contract.md} §5.1).
      */
-    private static boolean isWorkflow(Class<? extends Operative> operativeClass, String what) {
-        if (operativeClass == null) {
-            throw new IllegalArgumentException(what + ": the operative class must not be null");
-        }
+    private static boolean isWorkflow(Class<? extends Operative> operativeClass) {
         boolean isStream = StreamOperative.class.isAssignableFrom(operativeClass);
         boolean isWorkflow = WorkflowOperative.class.isAssignableFrom(operativeClass);
         if (isStream && isWorkflow) {

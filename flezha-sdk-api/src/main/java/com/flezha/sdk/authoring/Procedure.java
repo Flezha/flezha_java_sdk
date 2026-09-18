@@ -24,41 +24,16 @@ import java.lang.annotation.Target;
  *   <li>A {@code void} return declares no output channel.</li>
  * </ul>
  *
- * <p>When {@link #sink()} is set, the class is a §5 short form: the processor also generates a
- * single-procedure {@code input -> procedure -> plugin(sink)} operative of the declared
- * {@link #kind()}, named {@code <Class>StreamOperative} or {@code <Class>WorkflowOperative}, which
- * the application registers with {@code FlezhaRunner.registerFactory}. Nothing registers itself.
+ * <p>The annotation declares a procedure and nothing else. A class whose one procedure is a whole
+ * operative is annotated {@link StreamOperative} or {@link WorkflowOperative} instead, which take
+ * the same {@code run} shapes.
  */
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.TYPE)
 public @interface Procedure {
 
-    /**
-     * Stable name / factory id. Defaults to the snake_case class name — but a class declaring a
-     * {@link #sink()} must write it, because the factory id is an address an operator types and a
-     * class rename must not move it.
-     */
+    /** Stable name, which saved state is filed under. Defaults to the snake_case class name. */
     String id() default "";
-
-    /** Plugin sink name; set to make this one procedure a whole operative. */
-    String sink() default "";
-
-    /**
-     * The kind of operative a {@link #sink()} generates, {@code STREAM} or {@code WORKFLOW}.
-     * Required with a {@code sink} and refused without one.
-     *
-     * <p>Declared as an array so an absent kind is detectable: {@code kind = OperativeKind.STREAM}
-     * still reads as a single value, which is the annotation idiom for an optional enum.
-     */
-    OperativeKind[] kind() default {};
-
-    /**
-     * Name of the entry channel of the operative {@link #sink()} generates — the address an
-     * operator injects on and the name a forwarded frame has to match. Empty (the default)
-     * names it {@code input}. Setting it without a {@code sink} is an error: there is no
-     * generated operative for it to name a channel on.
-     */
-    String input() default "";
 
     /**
      * Name of a {@code static String <name>(Output out)} method on this class supplying the
@@ -82,7 +57,4 @@ public @interface Procedure {
 
     /** Per-entity mailbox capacity override. {@code 0} keeps the default. */
     int capacity() default 0;
-
-    /** Channel overflow policy: {@code "drop_nothing"}, {@code "drop_newest"}, or {@code "drop_oldest"}. */
-    String onFull() default "";
 }

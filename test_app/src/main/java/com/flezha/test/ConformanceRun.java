@@ -72,12 +72,14 @@ public final class ConformanceRun {
      * BY NAME, which is what makes the skip checkable.
      */
     private static final List<String> SURFACES =
-            List.of("merge", "branch", "workflow", "shorthand", "shorthand_typed_output", "shorthand_omittable_sink");
+            List.of("merge", "branch", "workflow", "shorthand", "shorthand_typed_output");
 
     /**
      * The §5 short-form refusals Java raises at COMPILE time, each with the {@code FlezhaProcessorTest}
-     * case that pins the message. A row the compiler answers cannot be driven through a builder that
-     * never sees it, so the app cites the test and the drill checks the cited file carries the name.
+     * case that pins the message: {@code ShortFormWithTopology} in
+     * {@code anAnnotatedClassImplementingAnOperativeInterfaceIsRefused}, {@code SinkWithoutOutput} in
+     * {@code aSinkOnAVoidRunIsRefused}. A row the compiler answers cannot be driven through a builder
+     * that never sees it, so the app cites the test and the drill checks the cited file carries the name.
      */
     private static final String PROCESSOR_TEST =
             "sdk/java/flezha-sdk-processor/src/test/java/com/flezha/sdk/processor/FlezhaProcessorTest.java";
@@ -412,27 +414,18 @@ public final class ConformanceRun {
     }
 
     /**
-     * A {@code shorthand(<id>|-, <kind>|-, <sink>|-, <input>|-)} step. {@code -} is a field the row
-     * leaves unwritten; {@code .noout} marks a procedure declaring no output.
+     * A {@code shorthand(<id>|-, <sink>|-, <input>|-)} step. {@code -} is a field the row leaves
+     * unwritten; {@code .noout} marks a body declaring no output, and {@code .topology} a class that
+     * also implements an operative interface.
      */
-    private record Shorthand(String id, String kind, String sink, boolean noout) {
+    private record Shorthand(boolean hasSink, boolean noout, boolean topology) {
 
-        /**
-         * The refusal this declaration earns. A {@code sink} is what makes a short form, so its
-         * absence is judged first; the identity and the kind follow, and an output the compiler can
-         * see is last.
-         */
+        /** The refusal this declaration earns: the topology body is judged before the output. */
         String refusal() {
-            if (sink == null) {
-                return "ShorthandKeyWithoutSink";
+            if (topology) {
+                return "ShortFormWithTopology";
             }
-            if (id == null) {
-                return "SinkWithoutId";
-            }
-            if (kind == null) {
-                return "SinkWithoutKind";
-            }
-            if (noout) {
+            if (noout && hasSink) {
                 return "SinkWithoutOutput";
             }
             throw new IllegalStateException("a well-formed shorthand declaration earns no refusal of its own");
@@ -453,21 +446,17 @@ public final class ConformanceRun {
 
     private static Shorthand parseShorthand(String step) {
         boolean noout = step.endsWith(".noout");
-        String body = noout ? step.substring(0, step.length() - ".noout".length()) : step;
+        boolean topology = step.endsWith(".topology");
+        String body = step.substring(0, step.lastIndexOf(')') + 1);
         String[] call = splitCall(body);
         if (!call[0].equals("shorthand")) {
             return null;
         }
         String[] fields = call[1].split(",");
-        if (fields.length != 4) {
-            throw new IllegalStateException("a shorthand step declares id, kind, sink and input: read `" + step + "`");
+        if (fields.length != 3) {
+            throw new IllegalStateException("a shorthand step declares id, sink and input: read `" + step + "`");
         }
-        return new Shorthand(written(fields[0]), written(fields[1]), written(fields[2]), noout);
-    }
-
-    private static String written(String field) {
-        String value = field.trim();
-        return value.equals("-") ? null : value;
+        return new Shorthand(!fields[1].trim().equals("-"), noout, topology);
     }
 
     /**
@@ -494,8 +483,8 @@ public final class ConformanceRun {
 
     /** Register the duplicate row's pair; the second call is the one under test. */
     private static void driveDuplicate(FlezhaRunner runner) {
-        runner.registerFactory(ShorthandDupStreamStreamOperative.class);
-        runner.registerFactory(ShorthandDupWorkflowWorkflowOperative.class);
+        runner.registerFactory(ShorthandDupStream.class);
+        runner.registerFactory(ShorthandDupWorkflow.class);
     }
 
     /** The leading refusal name of a message the contract requires to begin with one. */

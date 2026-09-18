@@ -68,6 +68,7 @@ class FactoryIdsTest {
             "store_input",
             "sugar_do_nothing",
             "sugar_named_input",
+            "sugar_state_only",
             "sugar_static_entity",
             "sugar_store_input",
             "sugar_workflow",

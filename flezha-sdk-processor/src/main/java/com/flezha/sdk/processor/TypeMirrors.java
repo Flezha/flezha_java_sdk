@@ -2,6 +2,7 @@ package com.flezha.sdk.processor;
 
 import java.util.List;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
@@ -51,6 +52,12 @@ final class TypeMirrors {
     /** Whether the erasure of {@code ty} is exactly {@code fqn}. */
     boolean erasesTo(TypeMirror ty, String fqn) {
         return ty instanceof DeclaredType dt && types.erasure(dt).toString().equals(fqn);
+    }
+
+    /** Whether {@code ty} is {@code fqn} or a subtype of it; {@code false} when {@code fqn} does not resolve. */
+    boolean isSubtypeOf(TypeMirror ty, String fqn) {
+        TypeElement target = elements.getTypeElement(fqn);
+        return target != null && types.isSubtype(types.erasure(ty), types.erasure(target.asType()));
     }
 
     /** The type arguments of a declared type; empty for everything else. */

@@ -1,12 +1,13 @@
 package com.flezha.sdk.processor;
 
-import com.flezha.sdk.authoring.Procedure;
 import com.flezha.sdk.authoring.State;
+import com.sun.source.util.Trees;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Set;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
@@ -17,22 +18,28 @@ import javax.tools.Diagnostic;
 
 /**
  * Generates {@code Procedure} and short-form operative implementations from the
- * {@code @Procedure} / {@code @State} authoring annotations, mirroring the Rust SDK macros. See
- * {@code docs/sdk/authoring_contract.md}.
+ * {@code @Procedure} / {@code @StreamOperative} / {@code @WorkflowOperative} / {@code @State}
+ * authoring annotations, mirroring the Rust SDK macros. See {@code docs/sdk/authoring_contract.md}.
  *
  * <p>Per round: {@code @State} classes generate a {@code <Name>Change}
  * (field-granular variants + {@code apply} + {@code kryoTypes}); {@code @Procedure}
- * classes generate a {@code <Name>Procedure} and, with a {@code sink}, the §5 short form's
+ * classes generate a {@code <Name>Procedure}, and {@code @StreamOperative} /
+ * {@code @WorkflowOperative} classes generate it beside the §5 short form's
  * {@code <Name>StreamOperative} or {@code <Name>WorkflowOperative}.
  *
- * <p>Nothing is collected and nothing registers itself: the application hands each generated
- * operative to {@code FlezhaRunner.registerFactory}, as it hands it any operative.
+ * <p>Nothing is collected and nothing registers itself: the application hands each short-form
+ * class to {@code FlezhaRunner.registerFactory}, as it hands it any operative.
  *
  * <p>This class owns the rounds and the two sinks every generator writes through
  * ({@link #write} and {@link #error}); {@link StateGenerator} and
  * {@link ProcedureGenerator} own what is generated.
  */
-@SupportedAnnotationTypes({"com.flezha.sdk.authoring.Procedure", "com.flezha.sdk.authoring.State"})
+@SupportedAnnotationTypes({
+    "com.flezha.sdk.authoring.Procedure",
+    "com.flezha.sdk.authoring.StreamOperative",
+    "com.flezha.sdk.authoring.WorkflowOperative",
+    "com.flezha.sdk.authoring.State"
+})
 @SupportedSourceVersion(SourceVersion.RELEASE_21)
 public final class FlezhaProcessor extends AbstractProcessor {
 
@@ -41,12 +48,21 @@ public final class FlezhaProcessor extends AbstractProcessor {
     private ProcedureGenerator procedures;
 
     @Override
-    public synchronized void init(javax.annotation.processing.ProcessingEnvironment env) {
+    public synchronized void init(ProcessingEnvironment env) {
         super.init(env);
         this.filer = env.getFiler();
         TypeMirrors mirrors = new TypeMirrors(env.getElementUtils(), env.getTypeUtils());
         this.states = new StateGenerator(this, mirrors);
-        this.procedures = new ProcedureGenerator(this, mirrors);
+        this.procedures = new ProcedureGenerator(this, mirrors, sourceTrees(env));
+    }
+
+    /** The compiler's source trees, which only javac exposes; {@code null} elsewhere. */
+    private static Trees sourceTrees(ProcessingEnvironment env) {
+        try {
+            return Trees.instance(env);
+        } catch (IllegalArgumentException notJavac) {
+            return null;
+        }
     }
 
     @Override
@@ -54,7 +70,7 @@ public final class FlezhaProcessor extends AbstractProcessor {
         for (Element e : roundEnv.getElementsAnnotatedWith(State.class)) {
             states.generate((TypeElement) e);
         }
-        for (Element e : roundEnv.getElementsAnnotatedWith(Procedure.class)) {
+        for (Element e : roundEnv.getElementsAnnotatedWithAny(ProcedureGenerator.DECLARATIONS)) {
             procedures.generate((TypeElement) e);
         }
         return false;

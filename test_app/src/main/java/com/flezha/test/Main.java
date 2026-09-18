@@ -116,12 +116,13 @@ public final class Main {
                 .registerFactory(BenchChain16WorkflowOperative.class)
                 .registerFactory(BenchChainOptOut4WorkflowOperative.class)
                 .registerFactory(BenchLoopWorkflowOperative.class)
-                // The §5 short forms. Each generated operative is registered here,
-                // as every hand-written one is: nothing collects itself.
-                .registerFactory(SugarDoNothingStreamOperative.class)
-                .registerFactory(SugarStoreStreamOperative.class)
-                .registerFactory(SugarNamedInputStreamOperative.class)
-                .registerFactory(SugarWorkflowWorkflowOperative.class)
+                // The §5 short forms, registered by the classes the author wrote, as
+                // every hand-written operative is: nothing collects itself.
+                .registerFactory(SugarDoNothing.class)
+                .registerFactory(SugarStore.class)
+                .registerFactory(SugarNamedInput.class)
+                .registerFactory(SugarWorkflow.class)
+                .registerFactory(SugarStateOnly.class)
                 .registerFactory(SugarStaticEntityStreamOperative.class);
         return runner;
     }
