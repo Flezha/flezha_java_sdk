@@ -10,7 +10,8 @@ import javax.annotation.Nonnull;
  * The effect record of one processed {@link WorkItem} — the shape the flusher
  * drains today ({@code EffectRecordBody}), plus the verdict. {@code changes}
  * elements are host-encoded (Kryo) and core-opaque. {@code dlq} is normally
- * empty; the core mints the entry when its ladder parks.
+ * empty; the core mints the entry when its ladder parks. {@code complete} is
+ * the result of the invocation's last {@code ctx.complete} call.
  */
 public record ItemEffect(
         @Nonnull Verdict verdict,
@@ -20,4 +21,5 @@ public record ItemEffect(
         long eventTime,
         @Nonnull List<TimerOp> timers,
         boolean checkpoint,
-        @Nonnull Optional<DlqEntry> dlq) {}
+        @Nonnull Optional<DlqEntry> dlq,
+        @Nonnull Optional<byte[]> complete) {}

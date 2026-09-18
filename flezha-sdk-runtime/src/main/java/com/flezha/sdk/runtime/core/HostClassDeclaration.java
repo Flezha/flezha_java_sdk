@@ -186,9 +186,7 @@ public final class HostClassDeclaration {
 
     @Nonnull
     public static byte[] forWorkflow(@Nonnull WorkflowSpec spec) {
-        StreamOperativeTopology topology = spec.topology().orElse(null);
-        Map<String, Object> decl =
-                topology != null ? new LinkedHashMap<>(topology.declaration()) : emptyRecord(spec.factoryId());
+        Map<String, Object> decl = new LinkedHashMap<>(spec.topology().declaration());
         // Durability is the workflow's own declaration, not what its
         // procedures' Change types imply.
         decl.remove("persistent");
@@ -235,14 +233,6 @@ public final class HostClassDeclaration {
         decl.put("sdk_lang", SDK_LANG_JAVA);
         decl.put("sdk_version", SDK_VERSION);
         decl.put("change_format_id", FORMAT_ID_KRYO);
-        return decl;
-    }
-
-    /** A class that declared no channels and no procedures: the run-sugar shape. */
-    private static Map<String, Object> emptyRecord(String factoryId) {
-        Map<String, Object> decl = base(factoryId);
-        decl.put("channels", List.of());
-        decl.put("procedures", List.of());
         return decl;
     }
 

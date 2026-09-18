@@ -143,19 +143,6 @@ public final class FlzCore {
      */
     public static native void abandon(long ctx, long token);
 
-    /** Emit one output payload from a live workflow run-sugar body. */
-    public static native void workflowEmit(long ctx, String instanceId, byte[] payload);
-
-    /**
-     * Block up to {@code timeoutMs} for the next inbox item of a live workflow
-     * run-sugar body. {@code null} = timeout; throws when the body is gone or
-     * the inbox closed.
-     */
-    public static native byte[] workflowRecv(long ctx, String instanceId, long timeoutMs);
-
-    /** Whether the named workflow body's cancellation token has tripped. */
-    public static native boolean workflowCancelled(long ctx, String instanceId);
-
     /**
      * The ABI form of {@code ctx.spawnWorkflow}: request a workflow instance
      * in the runner's own namespace from the polled activation {@code token},

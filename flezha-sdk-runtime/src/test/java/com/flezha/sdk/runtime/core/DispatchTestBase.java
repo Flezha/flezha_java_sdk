@@ -5,8 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operative.StreamOperative;
 import com.flezha.sdk.operative.WorkflowOperative;
-import com.flezha.sdk.operative.WorkflowOperativeCtx;
-import com.flezha.sdk.operative.WorkflowOperativeException;
 import com.flezha.sdk.procedure.Procedure;
 import com.flezha.sdk.procedure.ProcedureCtx;
 import com.flezha.sdk.procedure.ProcedureException;
@@ -23,9 +21,6 @@ import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.state.WallClock;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -56,7 +51,6 @@ abstract class DispatchTestBase {
 
     static final String REFUSAL = "the author's own refusal";
 
-    FakeSession session;
     ActivationDispatcher dispatcher;
 
     @BeforeEach
@@ -67,8 +61,7 @@ abstract class DispatchTestBase {
         REFUSE.set(false);
         StreamOperativeClassRegistry.reset();
         WorkflowOperativeClassRegistry.reset();
-        session = new FakeSession();
-        dispatcher = new ActivationDispatcher(id -> session);
+        dispatcher = new ActivationDispatcher();
     }
 
     // ------------------------------------------------------------------
@@ -173,28 +166,6 @@ abstract class DispatchTestBase {
         @Override
         public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) throws ProcedureException {
             body.run(input, ctx);
-        }
-    }
-
-    /** A workflow session fake: scripted inbox, captured emits. */
-    static final class FakeSession implements WorkflowSession {
-        final Deque<byte[]> inbox = new ArrayDeque<>();
-        final List<byte[]> emitted = new ArrayList<>();
-        boolean cancelled;
-
-        @Override
-        public void emit(byte[] payload) {
-            emitted.add(payload);
-        }
-
-        @Override
-        public byte[] recv(long timeoutMs) {
-            return inbox.poll();
-        }
-
-        @Override
-        public boolean cancelled() {
-            return cancelled;
         }
     }
 
@@ -659,35 +630,39 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class GreetWorkflow implements WorkflowOperative {
-        @Override
-        public String factoryId() {
-            return "greet_workflow";
-        }
-
-        @Override
-        public void run(WorkflowOperativeCtx ctx, String args) throws WorkflowOperativeException {
-            ctx.emit("hi " + args);
-            ctx.recv().ifPresent(item -> {
-                try {
-                    ctx.emit(item);
-                } catch (WorkflowOperativeException e) {
-                    throw new IllegalStateException(e);
+    /** Completes twice, the later call with its input; on {@code fail} it then throws. */
+    public static final class CompletingProc extends Proc<Void> {
+        public CompletingProc() {
+            super("completing_proc", (input, ctx) -> {
+                ctx.complete("superseded");
+                ctx.complete("done:" + input);
+                if (input.equals("fail")) {
+                    throw new ProcedureException("failed after completing");
                 }
             });
-            ctx.complete("done:" + args);
         }
     }
 
-    public static final class ThrowingWorkflow implements WorkflowOperative {
+    public static final class CompletingStreamOperative extends Op {
+        public CompletingStreamOperative() {
+            super("completing_stream", c -> c.input(String.class, "in").into(CompletingProc.class));
+        }
+    }
+
+    public static final class CompletingWorkflow implements WorkflowOperative {
         @Override
         public String factoryId() {
-            return "throwing_workflow";
+            return "completing_workflow";
         }
 
         @Override
-        public void run(WorkflowOperativeCtx ctx, String args) throws WorkflowOperativeException {
-            throw WorkflowOperativeException.nonRetryable("nope");
+        public boolean persistenceEnabled() {
+            return false;
+        }
+
+        @Override
+        public void procedures(ChannelBuilder c) {
+            c.input(String.class, "seed").into(CompletingProc.class);
         }
     }
 

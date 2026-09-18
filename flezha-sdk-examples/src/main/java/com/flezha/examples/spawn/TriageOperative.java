@@ -1,12 +1,10 @@
 package com.flezha.examples.spawn;
 
+import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operative.WorkflowOperative;
-import com.flezha.sdk.operative.WorkflowOperativeCtx;
-import com.flezha.sdk.operative.WorkflowOperativeException;
-import java.nio.charset.StandardCharsets;
 import javax.annotation.Nonnull;
 
-/** The worker: one per subject, torn down when it returns. */
+/** The worker: one per subject, torn down when its single pass completes. */
 public final class TriageOperative implements WorkflowOperative {
 
     @Override
@@ -15,8 +13,9 @@ public final class TriageOperative implements WorkflowOperative {
         return "triage";
     }
 
+    /** The spawn payload, the alert that asked for this worker, seeds the one pass. */
     @Override
-    public void run(@Nonnull WorkflowOperativeCtx ctx, @Nonnull String args) throws WorkflowOperativeException {
-        ctx.emit(("triaged:" + args).getBytes(StandardCharsets.UTF_8));
+    public void procedures(@Nonnull ChannelBuilder c) {
+        c.input(String.class, "alert").into(TriageProcedure.class).sink("triaged");
     }
 }

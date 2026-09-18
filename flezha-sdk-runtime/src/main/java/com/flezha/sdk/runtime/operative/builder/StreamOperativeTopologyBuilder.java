@@ -302,11 +302,6 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
                 channels,
                 procedures,
                 capacities);
-        // An empty declaration is the workflow run-sugar shape: no topology to
-        // derive, and the class facts are the core's own at declare time.
-        if (channels.isEmpty() && procedures.isEmpty()) {
-            return TopologyMaterializer.empty(factoryId, record);
-        }
         return TopologyMaterializer.materialize(
                 factoryId, channels, procedures, capacities, record, HostClassDeclaration.check(record));
     }

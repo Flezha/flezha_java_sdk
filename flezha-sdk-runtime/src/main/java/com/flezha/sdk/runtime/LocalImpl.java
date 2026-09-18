@@ -63,12 +63,7 @@ public final class LocalImpl implements LocalRunHandle {
             FlzCore.contextFree(core);
             throw e;
         }
-        LocalImpl handle = new LocalImpl(
-                core,
-                new ActivationDispatcher(instanceId -> {
-                    throw new IllegalStateException("local mode runs stream operatives, not workflows");
-                }),
-                FlezhaEnv.resolveFromEnv());
+        LocalImpl handle = new LocalImpl(core, new ActivationDispatcher(), FlezhaEnv.resolveFromEnv());
         handle.pollHost.start();
         handle.outputs.start();
         return handle;

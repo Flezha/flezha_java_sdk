@@ -10,7 +10,6 @@ import com.flezha.sdk.runtime.config.FlezhaEnv;
 import com.flezha.sdk.runtime.core.ActivationDispatcher;
 import com.flezha.sdk.runtime.core.CoreSpawnRequester;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
-import com.flezha.sdk.runtime.core.WorkflowSession;
 import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
 import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
 import java.util.List;
@@ -21,7 +20,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 /**
  * Runtime implementation of the internal {@link RunnerHandle} SPI the public
@@ -89,8 +87,7 @@ public final class FlezhaImpl implements RunnerHandle {
             throw e;
         }
 
-        ActivationDispatcher dispatcher =
-                new ActivationDispatcher(instanceId -> new FlzCoreWorkflowSession(core, instanceId));
+        ActivationDispatcher dispatcher = new ActivationDispatcher();
         SpawnRequests.install(new CoreSpawnRequester(core));
 
         FlezhaImpl handle = new FlezhaImpl(
@@ -195,32 +192,5 @@ public final class FlezhaImpl implements RunnerHandle {
         // unblocked from awaitTermination() can immediately start a new runner.
         onTerminated.run();
         terminationLatch.countDown();
-    }
-
-    /** Production {@link WorkflowSession}: the core's per-instance workflow ABI. */
-    private static final class FlzCoreWorkflowSession implements WorkflowSession {
-        private final long core;
-        private final String instanceId;
-
-        FlzCoreWorkflowSession(long core, String instanceId) {
-            this.core = core;
-            this.instanceId = instanceId;
-        }
-
-        @Override
-        public void emit(@Nonnull byte[] payload) {
-            FlzCore.workflowEmit(core, instanceId, payload);
-        }
-
-        @Override
-        @Nullable
-        public byte[] recv(long timeoutMs) {
-            return FlzCore.workflowRecv(core, instanceId, timeoutMs);
-        }
-
-        @Override
-        public boolean cancelled() {
-            return FlzCore.workflowCancelled(core, instanceId);
-        }
     }
 }

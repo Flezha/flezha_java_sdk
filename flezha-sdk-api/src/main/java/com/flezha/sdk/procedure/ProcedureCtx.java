@@ -1,5 +1,6 @@
 package com.flezha.sdk.procedure;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
@@ -79,6 +80,26 @@ public interface ProcedureCtx {
      * <p>A no-op unless the Operative declared {@code checkpointAck()}.
      */
     void checkpoint();
+
+    /**
+     * End the workflow this procedure runs in, with {@code result}. The call does not stop the
+     * iteration: its remaining procedures still run and commit, and the instance then ends with
+     * status {@code ok} and this result instead of waiting for its next input, re-seeding a chained
+     * loop or parking. In a {@code ONCE} workflow it is the result the single pass ends with.
+     *
+     * <p>A later call in the same invocation replaces an earlier one. When several entities call it
+     * in one iteration, the instance ends once, with the result of the procedure latest in the
+     * chain and, within it, of the greatest entity key.
+     *
+     * <p>A stream never completes: a stream procedure calling this fails its input with a
+     * non-retryable {@code CompleteOutsideWorkflow} error.
+     */
+    void complete(byte[] result);
+
+    /** {@link #complete(byte[])} with the UTF-8 bytes of {@code result}. */
+    default void complete(String result) {
+        complete(result.getBytes(StandardCharsets.UTF_8));
+    }
 
     /**
      * Ask the controller for a new workflow instance of {@code factoryId}, under an id it

@@ -22,9 +22,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 /**
  * One live operative instance: the registered class resolved from the
@@ -32,17 +30,16 @@ import javax.annotation.Nullable;
  * first activation naming an unknown operative id.
  *
  * <p>This is the mutable half of the host — the cell map and the user state
- * inside it. Its three collaborators read the topology and mutate nothing that
+ * inside it. Its two collaborators read the topology and mutate nothing that
  * outlives a call: {@link EntityRouting} answers where a payload goes,
- * {@link StateExchange} moves state across the boundary, {@link WorkflowDispatch}
- * owns the workflow questions. Each is built once here, never per activation.
+ * {@link StateExchange} moves state across the boundary. Each is built once
+ * here, never per activation.
  */
 public final class OperativeInstance {
 
     private final String operativeId;
     private final String factoryId;
 
-    @Nullable
     final StreamOperativeTopology topology;
 
     /** Per-Procedure routing instances — {@code entitiesFor} / {@code eventTime} only. */
@@ -61,9 +58,9 @@ public final class OperativeInstance {
      */
     final KryoCodec edgeCodec = new KryoCodec(List.of(), false);
 
-    final WorkflowDispatch workflow;
+    /** A workflow class, whose stages the core folds into the driver's collect sink instead of routing them. */
+    final boolean workflow;
 
-    @Nullable
     private final EntityRouting routing;
 
     private final ConcurrentHashMap<CellKey, EntityCell> cells = new ConcurrentHashMap<>();
@@ -71,38 +68,31 @@ public final class OperativeInstance {
     private record CellKey(int procedure, String entityKey) {}
 
     private OperativeInstance(
-            String operativeId,
-            String factoryId,
-            @Nullable StreamOperativeTopology topology,
-            @Nullable WorkflowSpec workflowSpec) {
+            String operativeId, String factoryId, StreamOperativeTopology topology, boolean workflow) {
         this.operativeId = operativeId;
         this.factoryId = factoryId;
         this.topology = topology;
-        this.workflow = new WorkflowDispatch(operativeId, factoryId, workflowSpec);
-        if (topology != null) {
-            for (ProcedureDescriptor desc : topology.procedures()) {
-                Procedure<?, ?, ?, ?, ?, ?> instance = instantiate(desc);
-                routers.add(instance);
-                // The descriptor's list, not the instance's: it starts as a
-                // copy of `kryoTypes()` and is where the wiring adds a type
-                // only the wiring knows (a `routeLatest` document class).
-                codecs.add(new KryoCodec(desc.kryoTypes()));
-                timerPolicies.add(TimerPolicy.of(instance.maxTimersPerEntity(), desc.name(), desc.clockType()));
-            }
+        this.workflow = workflow;
+        for (ProcedureDescriptor desc : topology.procedures()) {
+            Procedure<?, ?, ?, ?, ?, ?> instance = instantiate(desc);
+            routers.add(instance);
+            // The descriptor's list, not the instance's: it starts as a
+            // copy of `kryoTypes()` and is where the wiring adds a type
+            // only the wiring knows (a `routeLatest` document class).
+            codecs.add(new KryoCodec(desc.kryoTypes()));
+            timerPolicies.add(TimerPolicy.of(instance.maxTimersPerEntity(), desc.name(), desc.clockType()));
         }
-        this.routing = topology == null
-                ? null
-                : new EntityRouting(topology, routers, edgeCodec, workflow.isStructuredWorkflow());
+        this.routing = new EntityRouting(topology, routers, edgeCodec, workflow);
     }
 
     static OperativeInstance materialize(String operativeId, String factoryId) {
         StreamOperativeTopology topology = StreamOperativeClassRegistry.getTopology(factoryId);
         if (topology != null) {
-            return new OperativeInstance(operativeId, factoryId, topology, null);
+            return new OperativeInstance(operativeId, factoryId, topology, false);
         }
         WorkflowSpec spec = WorkflowOperativeClassRegistry.getSpec(factoryId);
         if (spec != null) {
-            return new OperativeInstance(operativeId, factoryId, spec.topology().orElse(null), spec);
+            return new OperativeInstance(operativeId, factoryId, spec.topology(), true);
         }
         throw new IllegalStateException("unknown factory `" + factoryId + "` for operative `" + operativeId + "`");
     }
@@ -121,7 +111,7 @@ public final class OperativeInstance {
         }
     }
 
-    ActivationOutcome dispatch(Activation activation, Function<String, WorkflowSession> sessions) {
+    ActivationOutcome dispatch(Activation activation) {
         return switch (activation.kind()) {
             case ActivationKind.Work work -> dispatchWork(activation, work.items());
             case ActivationKind.RestoreFold fold -> restoreFold(activation, fold);
@@ -137,11 +127,7 @@ public final class OperativeInstance {
                 StateExchange.applyState(cellFor(activation.target()), apply.stateJson());
                 yield new ActivationOutcome.StateApplied();
             }
-            case ActivationKind.KeyRequest request -> {
-                requireTopology("KeyRequest");
-                yield new ActivationOutcome.Prepared(routing.prepare(request));
-            }
-            case ActivationKind.WorkflowRun run -> workflow.run(run.args(), sessions);
+            case ActivationKind.KeyRequest request -> new ActivationOutcome.Prepared(routing.prepare(request));
             case ActivationKind.CompensateRun comp -> compensateRun(activation, comp.outputs());
         };
     }
@@ -151,7 +137,6 @@ public final class OperativeInstance {
     // ------------------------------------------------------------------
 
     private ActivationOutcome dispatchWork(Activation activation, List<WorkItem> items) {
-        requireTopology("Work");
         EntityCell cell = cellFor(activation.target());
         List<ItemEffect> effects = new ArrayList<>(items.size());
         for (WorkItem item : items) {
@@ -194,7 +179,8 @@ public final class OperativeInstance {
         });
 
         if (!(verdict instanceof Verdict.Ok)) {
-            return new ItemEffect(verdict, List.of(), List.of(), offset, now, List.of(), false, Optional.empty());
+            return new ItemEffect(
+                    verdict, List.of(), List.of(), offset, now, List.of(), false, Optional.empty(), Optional.empty());
         }
         return new ItemEffect(
                 verdict,
@@ -204,7 +190,8 @@ public final class OperativeInstance {
                 now,
                 timerOps.get(),
                 ctx.checkpointed,
-                Optional.empty());
+                Optional.empty(),
+                ctx.completion);
     }
 
     /** The state handle every user-code invocation writes through. */
@@ -246,7 +233,6 @@ public final class OperativeInstance {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private ActivationOutcome compensateRun(Activation activation, List<byte[]> outputBytes) {
-        requireTopology("CompensateRun");
         EntityCell cell = cellFor(activation.target());
         List<Object> outputs = new ArrayList<>(outputBytes.size());
         for (byte[] bytes : outputBytes) {
@@ -269,7 +255,8 @@ public final class OperativeInstance {
                 0,
                 List.of(),
                 false,
-                Optional.empty())));
+                Optional.empty(),
+                ctx.completion)));
     }
 
     // ------------------------------------------------------------------
@@ -277,7 +264,6 @@ public final class OperativeInstance {
     // ------------------------------------------------------------------
 
     private ActivationOutcome restoreFold(Activation activation, ActivationKind.RestoreFold fold) {
-        requireTopology("RestoreFold");
         EntityRef target = activation.target();
         EntityCell cell = freshCell(target.procedure(), target.entityKey());
         StateExchange.foldInto(cell, fold);
@@ -285,19 +271,11 @@ public final class OperativeInstance {
         return new ActivationOutcome.Restored();
     }
 
-    private void requireTopology(String kind) {
-        if (topology == null) {
-            throw new IllegalStateException(
-                    kind + " activation for run-sugar workflow class `" + factoryId + "`, which has no procedures");
-        }
-    }
-
     private EntityCell cellFor(EntityRef target) {
         return cellFor(target.procedure(), target.entityKey());
     }
 
     private EntityCell cellFor(int procedureId, Optional<String> entityKey) {
-        requireTopology("entity");
         return cells.computeIfAbsent(
                 new CellKey(procedureId, entityKey.orElse("")), k -> freshCell(procedureId, entityKey));
     }

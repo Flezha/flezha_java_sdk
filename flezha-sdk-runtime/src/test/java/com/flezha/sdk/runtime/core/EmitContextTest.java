@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 /**
  * The emit funnel: the Change and plugin output an invocation produces, the
  * identity stamps a keyed channel adds, the two keyed-emit refusals, the timer
- * ops that ride the effect, and the checkpoint mark.
+ * ops that ride the effect, the checkpoint mark and the completion request.
  */
 class EmitContextTest extends DispatchTestBase {
 
@@ -157,5 +157,19 @@ class EmitContextTest extends DispatchTestBase {
 
         ItemEffect closing = soleEffect(work("ckpt_op", 0, Optional.empty(), 0, input(0, "commit", 2)));
         assertThat(closing.checkpoint()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a stream procedure's complete rides its effect the same way, for the core to refuse")
+    void aStreamProceduresCompleteRidesItsEffect() {
+        StreamOperativeClassRegistry.registerClass(CompletingStreamOperative.class);
+        ItemEffect effect = soleEffect(work("completing_stream", 0, Optional.empty(), 0, input(0, "x", 1)));
+
+        assertThat(effect.verdict())
+                .as("the host does not judge the operative kind; the core's stream fold refuses the request")
+                .isInstanceOf(Verdict.Ok.class);
+        assertThat(effect.complete())
+                .hasValueSatisfying(result ->
+                        assertThat(new String(result, StandardCharsets.UTF_8)).isEqualTo("done:x"));
     }
 }

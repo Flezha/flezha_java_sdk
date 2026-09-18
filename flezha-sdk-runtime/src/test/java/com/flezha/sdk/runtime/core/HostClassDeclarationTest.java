@@ -11,8 +11,6 @@ import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.operative.LoopMode;
 import com.flezha.sdk.operative.StreamOperative;
 import com.flezha.sdk.operative.WorkflowOperative;
-import com.flezha.sdk.operative.WorkflowOperativeCtx;
-import com.flezha.sdk.operative.WorkflowOperativeException;
 import com.flezha.sdk.procedure.ProcedureCtx;
 import com.flezha.sdk.runtime.RepositoryFixture;
 import com.flezha.sdk.runtime.operative.StatelessTestProcedure;
@@ -145,15 +143,16 @@ class HostClassDeclarationTest {
     }
 
     @Test
-    @DisplayName("a run-sugar workflow declaration is empty channels + procedures with the workflow block")
-    void runSugarWorkflowDeclaration() throws Exception {
+    @DisplayName("a workflow declaration carries its procedures with the workflow block")
+    void workflowDeclaration() throws Exception {
         WorkflowOperativeClassRegistry.registerClass(DeclWorkflow.class);
         WorkflowSpec spec = WorkflowOperativeClassRegistry.getSpec("decl_workflow");
         JsonNode decl = JSON.readTree(HostClassDeclaration.forWorkflow(spec));
 
         assertThat(decl.get("factory_id").asText()).isEqualTo("decl_workflow");
-        assertThat(decl.get("channels")).isEmpty();
-        assertThat(decl.get("procedures")).isEmpty();
+        assertThat(decl.get("channels")).isNotEmpty();
+        assertThat(decl.get("procedures")).hasSize(1);
+        assertThat(decl.get("procedures").get(0).get("name").asText()).isEqualTo("v1_proc");
         assertThat(decl.get("persistent").asBoolean()).isTrue();
 
         JsonNode workflow = decl.get("workflow");
@@ -176,10 +175,8 @@ class HostClassDeclarationTest {
         WorkflowSpec spec = WorkflowOperativeClassRegistry.getSpec("decl_tier_workflow");
         JsonNode decl = JSON.readTree(HostClassDeclaration.forWorkflow(spec));
 
-        assertThat(spec.topology())
+        assertThat(spec.topology().declaration())
                 .as("the in-process tier is the topology's, and the wire record must not gate it")
-                .isPresent();
-        assertThat(spec.topology().orElseThrow().declaration())
                 .containsEntry("effectively_once", true)
                 .containsEntry("checkpoint_ack", true);
 
@@ -454,8 +451,8 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public void run(WorkflowOperativeCtx ctx, String args) throws WorkflowOperativeException {
-            ctx.complete(args.getBytes(StandardCharsets.UTF_8));
+        public void procedures(ChannelBuilder c) {
+            c.input(String.class, "in").into(VersionOneProc.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -670,8 +667,8 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public void run(WorkflowOperativeCtx ctx, String args) throws WorkflowOperativeException {
-            ctx.complete(args);
+        public void procedures(ChannelBuilder c) {
+            c.input(String.class, "in").into(VersionOneProc.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -716,11 +713,6 @@ class HostClassDeclarationTest {
             c.checkpointAck();
             c.input(String.class, "in").into(DeclProc.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
-
-        @Override
-        public void run(WorkflowOperativeCtx ctx, String args) throws WorkflowOperativeException {
-            ctx.complete(args);
-        }
     }
 
     public static final class DeclWorkflow implements WorkflowOperative {
@@ -735,8 +727,8 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public void run(WorkflowOperativeCtx ctx, String args) throws WorkflowOperativeException {
-            ctx.complete(args);
+        public void procedures(ChannelBuilder c) {
+            c.input(String.class, "in").into(VersionOneProc.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 }

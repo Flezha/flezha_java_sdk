@@ -372,8 +372,7 @@ public final class ConformanceRun {
         return switch (topology) {
             case "hybrid_channel" -> StreamOperativeTopologyBuilder.build(new HybridChannelStreamOperative());
             case "commit_block_chain" -> WorkflowSpec.build(TierCommitBlockWorkflowOperative.class)
-                    .topology()
-                    .orElseThrow(() -> new IllegalStateException("a structured workflow declares a topology"));
+                    .topology();
             default -> throw new IllegalStateException(
                     "the fixture cites a topology this app does not declare: " + topology);
         };

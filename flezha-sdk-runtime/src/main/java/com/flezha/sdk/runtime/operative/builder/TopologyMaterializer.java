@@ -29,11 +29,6 @@ final class TopologyMaterializer {
 
     private TopologyMaterializer() {}
 
-    /** A class that declared no topology at all: the workflow run-sugar shape. */
-    static StreamOperativeTopology empty(String factoryId, Map<String, Object> declaration) {
-        return new StreamOperativeTopology(factoryId, List.of(), Map.of(), List.of(), Map.of(), false, declaration);
-    }
-
     static StreamOperativeTopology materialize(
             String factoryId,
             List<ChannelEntry> channels,

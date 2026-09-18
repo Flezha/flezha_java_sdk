@@ -43,7 +43,6 @@ Java SDK implements the effectively-once output tier :: A poisoned tier invocati
 Java SDK implements the effectively-once output tier :: A tier class with a non-keyed plugin channel fails registration
 Java SDK implements the effectively-once output tier :: A tier invocation ships one effect record, not separate frames
 Java SDK implements the effectively-once output tier :: Effect-record bytes are byte-identical to the Rust encoder
-Java SDK implements the workflow durable loop and suspension :: A loop on run-sugar is refused
 Java SDK implements the workflow durable loop and suspension :: A resumed loop restarts at the journaled iteration
 Java SDK implements the workflow durable loop and suspension :: An idle loop parks instead of completing
 Java SDK implements the workflow durable loop and suspension :: Each loop iteration commits at its boundary
@@ -62,7 +61,6 @@ Java SDK implements workflow loop rewind :: A rewind does not re-deliver consume
 Java SDK implements workflow loop rewind :: A rewind undoes committed iterations in reverse order
 Java SDK implements workflow staged commit and the transactional outbox :: A failing stage leaks no staged output
 Java SDK implements workflow staged commit and the transactional outbox :: A proc's emits are staged, not shipped, until the barrier
-Java SDK implements workflow staged commit and the transactional outbox :: run-sugar keeps the direct path
 Kryo serialization with stable registered type IDs :: Built-in types registered with stable IDs
 Kryo serialization with stable registered type IDs :: Unregistered class fails loud
 Kryo serialization with stable registered type IDs :: User types registered after built-ins

@@ -9,8 +9,8 @@ import javax.annotation.Nonnull;
 
 /**
  * Process-global registry of registered {@link WorkflowOperative} classes keyed by
- * {@code factoryId}, each carrying its frozen {@link WorkflowSpec} (the run-sugar
- * body or the validated structured linear chain). The runtime sibling of
+ * {@code factoryId}, each carrying its frozen {@link WorkflowSpec} (the validated
+ * procedure DAG). The runtime sibling of
  * {@link StreamOperativeClassRegistry}; reached reflectively from the api
  * module's {@code RegistryCore} so {@code flezha-sdk-api}
  * compiles standalone. Overwrite-on-insert — the per-runner declared set owns

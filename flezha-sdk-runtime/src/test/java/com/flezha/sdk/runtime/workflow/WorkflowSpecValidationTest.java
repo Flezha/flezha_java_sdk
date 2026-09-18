@@ -8,8 +8,6 @@ import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operative.LoopMode;
 import com.flezha.sdk.operative.WorkflowOperative;
 import com.flezha.sdk.operative.WorkflowOperativeConfigurationException;
-import com.flezha.sdk.operative.WorkflowOperativeCtx;
-import com.flezha.sdk.operative.WorkflowOperativeException;
 import com.flezha.sdk.procedure.ProcedureCtx;
 import com.flezha.sdk.runtime.operative.StatelessTestProcedure;
 import com.flezha.sdk.state.NoChange;
@@ -34,17 +32,17 @@ class WorkflowSpecValidationTest {
     @DisplayName("a structured chain resolves its topological order")
     void structuredChainResolves() {
         WorkflowSpec spec = WorkflowSpec.build(LinearWorkflow.class);
-        assertThat(spec.isRunSugar()).isFalse();
         assertThat(spec.chain()).containsExactly(0, 1);
         assertThat(spec.loopMode()).isEqualTo(LoopMode.ONCE);
     }
 
     @Test
-    @DisplayName("a loop on run-sugar is a contradiction, not a no-op")
-    void loopWithoutChainIsRefused() {
-        assertThatThrownBy(() -> WorkflowSpec.build(LoopingRunSugar.class))
+    @DisplayName("a workflow that declares no procedure is refused")
+    void noProceduresIsRefused() {
+        assertThatThrownBy(() -> WorkflowSpec.build(NoProceduresWorkflow.class))
                 .isInstanceOf(WorkflowOperativeConfigurationException.class)
-                .hasMessageContaining("loop");
+                .hasMessageContaining("vb_no_procedures")
+                .hasMessageContaining("at least one procedure");
     }
 
     @Test
@@ -145,20 +143,10 @@ class WorkflowSpecValidationTest {
         }
     }
 
-    public static final class LoopingRunSugar implements WorkflowOperative {
+    public static final class NoProceduresWorkflow implements WorkflowOperative {
         @Override
         public String factoryId() {
-            return "vb_loop_sugar";
-        }
-
-        @Override
-        public LoopMode loopMode() {
-            return LoopMode.PER_INPUT;
-        }
-
-        @Override
-        public void run(WorkflowOperativeCtx ctx, String args) throws WorkflowOperativeException {
-            ctx.complete(args);
+            return "vb_no_procedures";
         }
     }
 
@@ -174,8 +162,8 @@ class WorkflowSpecValidationTest {
         }
 
         @Override
-        public void run(WorkflowOperativeCtx ctx, String args) throws WorkflowOperativeException {
-            ctx.complete(args);
+        public void procedures(ChannelBuilder c) {
+            c.input(String.class, "seed").into(EchoProc.class).into(SinkProc.class);
         }
     }
 
@@ -227,8 +215,8 @@ class WorkflowSpecValidationTest {
         }
 
         @Override
-        public void run(WorkflowOperativeCtx ctx, String args) throws WorkflowOperativeException {
-            ctx.complete(new byte[0]);
+        public void procedures(ChannelBuilder c) {
+            c.input(String.class, "seed").into(EchoProc.class).into(SinkProc.class);
         }
     }
 
@@ -240,11 +228,6 @@ class WorkflowSpecValidationTest {
         @Override
         public String factoryId() {
             return "vb_throwing_constructor";
-        }
-
-        @Override
-        public void run(WorkflowOperativeCtx ctx, String args) throws WorkflowOperativeException {
-            ctx.complete(args);
         }
     }
 }

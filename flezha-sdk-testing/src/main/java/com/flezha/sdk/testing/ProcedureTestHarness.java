@@ -376,6 +376,10 @@ public final class ProcedureTestHarness<Input, State, Output, ChangeT extends Ch
         @Override
         public void checkpoint() {}
 
+        /** No-op: the harness drives one Procedure directly, with no workflow instance to end. */
+        @Override
+        public void complete(@Nonnull byte[] result) {}
+
         @Override
         @Nonnull
         public StableId stableId() {

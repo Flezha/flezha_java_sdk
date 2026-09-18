@@ -267,6 +267,9 @@ class SpawnHandleTest {
         public void checkpoint() {}
 
         @Override
+        public void complete(byte[] result) {}
+
+        @Override
         public <C> void emitKeyed(String key, C value) {}
 
         @Override

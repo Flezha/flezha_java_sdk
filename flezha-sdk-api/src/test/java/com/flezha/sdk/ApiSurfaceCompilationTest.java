@@ -51,10 +51,7 @@ class ApiSurfaceCompilationTest {
     void theWorkflowKindIsNotInAPackageOfItsOwn() {
         for (String type : List.of(
                 "com.flezha.sdk.workflow.WorkflowOperative",
-                "com.flezha.sdk.workflow.WorkflowOperativeCtx",
-                "com.flezha.sdk.workflow.WorkflowOperativeException",
                 "com.flezha.sdk.workflow.WorkflowOperativeConfigurationException",
-                "com.flezha.sdk.workflow.WorkflowLoopBody",
                 "com.flezha.sdk.workflow.LoopMode",
                 "com.flezha.sdk.workflow.RollbackMode")) {
             assertDoesNotCompile(usesImport(type));
@@ -72,11 +69,8 @@ class ApiSurfaceCompilationTest {
                         import com.flezha.sdk.operative.Operative;
                         import com.flezha.sdk.operative.RollbackMode;
                         import com.flezha.sdk.operative.StreamOperative;
-                        import com.flezha.sdk.operative.WorkflowLoopBody;
                         import com.flezha.sdk.operative.WorkflowOperative;
                         import com.flezha.sdk.operative.WorkflowOperativeConfigurationException;
-                        import com.flezha.sdk.operative.WorkflowOperativeCtx;
-                        import com.flezha.sdk.operative.WorkflowOperativeException;
                         public final class UsesLegacyApi {
                             // Both kinds are the base, so one return type holds either.
                             Operative eitherKind(StreamOperative s, WorkflowOperative w, boolean b) {
@@ -85,9 +79,6 @@ class ApiSurfaceCompilationTest {
 
                             LoopMode loop;
                             RollbackMode rollback;
-                            WorkflowLoopBody body;
-                            WorkflowOperativeCtx ctx;
-                            WorkflowOperativeException failure;
                             WorkflowOperativeConfigurationException refusal;
                         }
                         """))

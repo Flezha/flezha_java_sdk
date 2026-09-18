@@ -1,11 +1,7 @@
 package com.flezha.sdk.runtime.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.flezha.sdk.operative.WorkflowOperative;
-import com.flezha.sdk.operative.WorkflowOperativeCtx;
-import com.flezha.sdk.operative.WorkflowOperativeException;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
 import java.nio.charset.StandardCharsets;
@@ -16,55 +12,32 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Workflow activations: the run-sugar body and its failure classification, the
- * one edge output a structured stage releases, the transform each consumer
- * applies at delivery, and compensation.
+ * Workflow activations: a procedure's completion request, the one edge output a
+ * stage releases, the transform each consumer applies at delivery, and
+ * compensation.
  */
 class WorkflowDispatchTest extends DispatchTestBase {
 
     @Test
-    @DisplayName("a run-sugar body emits and recvs through the session and reports WorkflowDone")
-    void workflowRunSugar() {
-        WorkflowOperativeClassRegistry.registerClass(GreetWorkflow.class);
-        session.inbox.add("ping".getBytes(StandardCharsets.UTF_8));
+    @DisplayName("a workflow procedure's complete rides its effect, the later call winning")
+    void aWorkflowProceduresCompleteRidesItsEffect() {
+        WorkflowOperativeClassRegistry.registerClass(CompletingWorkflow.class);
+        ItemEffect effect = soleEffect(work("completing_workflow", 0, Optional.empty(), 0, input(0, "bob", 1)));
 
-        ActivationOutcome out = outcome(command(
-                "greet_workflow",
-                0,
-                Optional.empty(),
-                new ActivationKind.WorkflowRun("bob".getBytes(StandardCharsets.UTF_8))));
-        assertThat(out).isInstanceOf(ActivationOutcome.WorkflowDone.class);
-        ActivationOutcome.WorkflowDone done = (ActivationOutcome.WorkflowDone) out;
-        assertThat(done.completed()).isTrue();
-        assertThat(new String(done.result(), StandardCharsets.UTF_8)).isEqualTo("done:bob");
-        assertThat(session.emitted.stream()
-                        .map(b -> new String(b, StandardCharsets.UTF_8))
-                        .toList())
-                .containsExactly("hi bob", "ping");
+        assertThat(effect.verdict()).isInstanceOf(Verdict.Ok.class);
+        assertThat(effect.complete())
+                .hasValueSatisfying(result ->
+                        assertThat(new String(result, StandardCharsets.UTF_8)).isEqualTo("done:bob"));
     }
 
     @Test
-    @DisplayName("a throwing run-sugar body fails the activation with its classification")
-    void workflowRunSugarFailure() {
-        WorkflowOperativeClassRegistry.registerClass(ThrowingWorkflow.class);
-        ActivationOutcome out =
-                outcome(command("throwing_workflow", 0, Optional.empty(), new ActivationKind.WorkflowRun(new byte[0])));
-        assertThat(out).isInstanceOf(ActivationOutcome.Failed.class);
-        WorkError error = ((ActivationOutcome.Failed) out).error();
-        assertThat(error.message()).contains("nope");
-        assertThat(error.nonRetryable()).isTrue();
-    }
+    @DisplayName("an item that fails after completing carries no completion")
+    void aFailedItemCarriesNoCompletion() {
+        WorkflowOperativeClassRegistry.registerClass(CompletingWorkflow.class);
+        ItemEffect effect = soleEffect(work("completing_workflow", 0, Optional.empty(), 0, input(0, "fail", 1)));
 
-    @Test
-    @DisplayName("a run-sugar body whose constructor throws surfaces the author's error")
-    void throwingRunSugarConstructorIsTheAuthorsError() {
-        WorkflowOperativeClassRegistry.registerClass(RefusingWorkflow.class);
-        OperativeInstance instance = OperativeInstance.materialize(OP, "refusing_workflow");
-        REFUSE.set(true);
-
-        assertThatThrownBy(() -> instance.workflow.run(new byte[0], id -> session))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage(REFUSAL);
+        assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
+        assertThat(effect.complete()).isEmpty();
     }
 
     @Test
@@ -166,25 +139,7 @@ class WorkflowDispatchTest extends DispatchTestBase {
         assertThat(effects.get(0).outputs())
                 .as("the undo emit rides the effect")
                 .hasSize(1);
+        assertThat(effects.get(0).complete()).isEmpty();
         assertThat(RECORDED).containsExactly("compensated:fwd:job");
-    }
-
-    /** Constructs at definition, then refuses once armed, as a resource gone by run time would. */
-    public static final class RefusingWorkflow implements WorkflowOperative {
-        public RefusingWorkflow() {
-            if (REFUSE.get()) {
-                throw new IllegalStateException(REFUSAL);
-            }
-        }
-
-        @Override
-        public String factoryId() {
-            return "refusing_workflow";
-        }
-
-        @Override
-        public void run(WorkflowOperativeCtx ctx, String args) throws WorkflowOperativeException {
-            ctx.complete(args);
-        }
     }
 }

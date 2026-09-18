@@ -4,17 +4,15 @@ import com.flezha.sdk.Flezha;
 import com.flezha.sdk.Logger;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 import javax.annotation.Nonnull;
 
 /**
  * The pure host layer over the poll core: {@link #dispatch} turns one
  * {@link Activation} into one {@link ActivationResult} by running user code —
  * no native calls, which is what makes the whole typed layer unit-testable
- * without the core. The only impurities are injected: a per-instance
- * {@link WorkflowSession} for run-sugar bodies (and the api-side
- * {@code SpawnRequests} static, reached through {@code ProcedureCtx}'s
- * default {@code spawnWorkflow}).
+ * without the core. The only impurity is the api-side {@code SpawnRequests}
+ * static, reached through {@code ProcedureCtx}'s default
+ * {@code spawnWorkflow}.
  *
  * <p>The core guarantees per-Entity exclusivity — it never hands out a second
  * activation for the same Entity until the first completes — so there is no
@@ -26,11 +24,6 @@ public final class ActivationDispatcher {
     private static final Logger LOG = Flezha.log();
 
     private final ConcurrentHashMap<String, OperativeInstance> instances = new ConcurrentHashMap<>();
-    private final Function<String, WorkflowSession> workflowSessions;
-
-    public ActivationDispatcher(@Nonnull Function<String, WorkflowSession> workflowSessions) {
-        this.workflowSessions = workflowSessions;
-    }
 
     /** Live operative instances keyed by operative id — the {@code operatives()} view. */
     @Nonnull
@@ -55,7 +48,7 @@ public final class ActivationDispatcher {
                     (id, existing) -> existing != null && existing.factoryId().equals(activation.factory())
                             ? existing
                             : OperativeInstance.materialize(id, activation.factory()));
-            return new ActivationResult(activation.token(), instance.dispatch(activation, workflowSessions));
+            return new ActivationResult(activation.token(), instance.dispatch(activation));
         } catch (Throwable t) {
             String message = t.getMessage() == null ? t.toString() : t.getMessage();
             LOG.error(

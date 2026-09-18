@@ -39,6 +39,7 @@ final class EmitContext implements ProcedureCtx {
 
     final List<Output> outputs = new ArrayList<>();
     boolean checkpointed;
+    Optional<byte[]> completion = Optional.empty();
 
     @Nullable
     TimerSession timers;
@@ -73,6 +74,11 @@ final class EmitContext implements ProcedureCtx {
     @Override
     public void checkpoint() {
         checkpointed = true;
+    }
+
+    @Override
+    public void complete(@Nonnull byte[] result) {
+        completion = Optional.of(result.clone());
     }
 
     @Override
@@ -238,7 +244,7 @@ final class EmitContext implements ProcedureCtx {
         if (descriptor.consumers().isEmpty()) {
             return;
         }
-        if (instance.workflow.isStructuredWorkflow()) {
+        if (instance.workflow) {
             outputs.add(new Output(
                     // The consumer the fold discards; naming the channel's
                     // first keeps the target a well-formed Edge.

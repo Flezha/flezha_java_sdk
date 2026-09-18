@@ -23,15 +23,13 @@ import javax.annotation.Nonnull;
 /**
  * Frozen per-class authoring result for a {@link WorkflowOperative}, produced and
  * validated once at registration and reused for every spawn of the class.
- * Mirrors the Rust SDK's {@code WorkflowSpec}: {@link #topology} is empty for the
- * bare {@code run}-sugar form, present (with the ordered {@link #chain}) for the
- * structured DAG form.
+ * Mirrors the Rust SDK's {@code WorkflowSpec}: the declared {@link #topology}
+ * and its ordered {@link #chain}.
  */
 public final class WorkflowSpec {
 
     private final String factoryId;
-    private final Class<? extends WorkflowOperative> operativeClass;
-    private final Optional<StreamOperativeTopology> topology;
+    private final StreamOperativeTopology topology;
     private final List<Integer> chain;
     private final Optional<Duration> maxDuration;
     private final RollbackMode rollbackMode;
@@ -42,23 +40,12 @@ public final class WorkflowSpec {
     private final int barrierRetryAttempts;
     private final Optional<Duration> wakeAfter;
 
-    /**
-     * Every value but the shape is read off the probe here, so the two build
-     * arms cannot record a class's declarations differently.
-     */
-    private WorkflowSpec(
-            Class<? extends WorkflowOperative> operativeClass,
-            WorkflowOperative probe,
-            Optional<StreamOperativeTopology> topology,
-            List<Integer> chain,
-            LoopMode loopMode,
-            Optional<Duration> wakeAfter) {
+    private WorkflowSpec(WorkflowOperative probe, StreamOperativeTopology topology, List<Integer> chain) {
         this.factoryId = probe.factoryId();
-        this.operativeClass = operativeClass;
         this.topology = topology;
         this.chain = List.copyOf(chain);
-        this.loopMode = loopMode;
-        this.wakeAfter = wakeAfter;
+        this.loopMode = probe.loopMode();
+        this.wakeAfter = probe.wakeAfter();
         this.maxDuration = probe.maxDuration();
         this.rollbackMode = probe.rollbackMode();
         this.persistenceEnabled = probe.persistenceEnabled();
@@ -73,17 +60,11 @@ public final class WorkflowSpec {
     }
 
     @Nonnull
-    public Class<? extends WorkflowOperative> operativeClass() {
-        return operativeClass;
-    }
-
-    /** Structured topology, or empty for the {@code run}-sugar form. */
-    @Nonnull
-    public Optional<StreamOperativeTopology> topology() {
+    public StreamOperativeTopology topology() {
         return topology;
     }
 
-    /** Procedures in execution order (entry consumer → … → terminal). Empty for {@code run}-sugar. */
+    /** Procedures in execution order (entry consumer → … → terminal). */
     @Nonnull
     public List<Integer> chain() {
         return chain;
@@ -141,19 +122,20 @@ public final class WorkflowSpec {
         return syncDurability;
     }
 
-    /** True when this spec runs the bare {@code run} body (no declared procedures). */
-    public boolean isRunSugar() {
-        return topology.isEmpty();
-    }
-
     /**
-     * Build and validate the spec for a workflow class. An empty
-     * {@link WorkflowOperative#procedures} selects the {@code run}-sugar path; a
-     * non-empty declaration is validated as a single entry-rooted DAG.
+     * Build and validate the spec for a workflow class: its
+     * {@link WorkflowOperative#procedures} declaration, validated as a single
+     * entry-rooted DAG. Nothing about the handoffs is judged here: the journal
+     * codec is the core's to derive, and the one rule a durable CHAINED loop
+     * still owes (a terminal procedure releasing an inter-procedure channel,
+     * the only kind the journal carries) is refused once in `flz_core`'s
+     * `register_structured_workflow`, which every host reaches through
+     * `declareClass`. Restating it here would be a second implementation of a
+     * core rule, which is how `BranchingChainedLoop` is already handled.
      *
      * @throws WorkflowOperativeConfigurationException on invalid authoring
-     *     (external-stop-only, branching, cycle, dynamic entity mode,
-     *     disconnected procedure, or no entry channel).
+     *     (external-stop-only, no procedure, branching, cycle, dynamic entity
+     *     mode, disconnected procedure, or no entry channel).
      */
     @Nonnull
     public static WorkflowSpec build(@Nonnull Class<? extends WorkflowOperative> operativeClass) {
@@ -164,15 +146,13 @@ public final class WorkflowSpec {
         try {
             topology = StreamOperativeTopologyBuilder.build(factoryId, probe::procedures);
         } catch (StreamOperativeConfigurationException e) {
-            // A structured workflow reuses the unbounded topology builder, which
-            // rejects dynamic-entity procedures and unwired channels.
+            // A workflow reuses the unbounded topology builder, which rejects
+            // an empty declaration, dynamic-entity procedures and unwired
+            // channels.
             throw new WorkflowOperativeConfigurationException(
                     "workflow operative `" + factoryId + "` has an invalid topology: " + e.getMessage());
         }
-
-        return topology.procedures().isEmpty()
-                ? buildRunSugar(operativeClass, probe, factoryId)
-                : buildStructured(operativeClass, probe, factoryId, topology);
+        return new WorkflowSpec(probe, topology, chainOrder(factoryId, topology, entryChannelOf(factoryId, topology)));
     }
 
     /**
@@ -197,45 +177,10 @@ public final class WorkflowSpec {
         }
         if (!probe.selfTerminating() && probe.maxDuration().isEmpty()) {
             throw new WorkflowOperativeConfigurationException("workflow operative `" + factoryId
-                    + "` is not terminable: its only possible exit is an external stop. Add a terminal condition — "
-                    + "let run()/the chain complete, give the loop a terminal predicate, or declare maxDuration().");
+                    + "` is not terminable: its only possible exit is an external stop. Add a terminal condition: "
+                    + "let the chain complete, have a procedure call ctx.complete, or declare maxDuration().");
         }
         return probe;
-    }
-
-    /**
-     * The bare {@code run} body. A loop iterates the CHAIN and run-sugar has
-     * none — its body owns its own control flow, so a declared loop mode has
-     * nothing to iterate and is a contradiction, not a no-op.
-     */
-    @Nonnull
-    private static WorkflowSpec buildRunSugar(
-            Class<? extends WorkflowOperative> operativeClass, WorkflowOperative probe, String factoryId) {
-        if (probe.loopMode() != LoopMode.ONCE) {
-            throw WorkflowOperativeConfigurationException.loopWithoutChain(factoryId);
-        }
-        return new WorkflowSpec(operativeClass, probe, Optional.empty(), List.of(), LoopMode.ONCE, Optional.empty());
-    }
-
-    /**
-     * The declared DAG and its ordered chain. Nothing about the handoffs is
-     * judged here: the journal codec is the core's to derive, and the one rule
-     * a durable CHAINED loop still owes — a terminal procedure releasing an
-     * inter-procedure channel, the only kind the journal carries — is refused
-     * once in `flz_core`'s `register_structured_workflow`, which every host
-     * reaches through `declareClass`. Restating it here would be a second
-     * implementation of a core rule, which is how `BranchingChainedLoop` is
-     * already handled.
-     */
-    @Nonnull
-    private static WorkflowSpec buildStructured(
-            Class<? extends WorkflowOperative> operativeClass,
-            WorkflowOperative probe,
-            String factoryId,
-            StreamOperativeTopology topology) {
-        List<Integer> chain = chainOrder(factoryId, topology, entryChannelOf(factoryId, topology));
-        return new WorkflowSpec(
-                operativeClass, probe, Optional.of(topology), chain, probe.loopMode(), probe.wakeAfter());
     }
 
     /** Resolve the retry ladder, rejecting a hot-spinning zero backoff. */

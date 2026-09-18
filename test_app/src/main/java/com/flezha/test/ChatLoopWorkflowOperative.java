@@ -10,7 +10,8 @@ import java.util.Optional;
  * Mirror of the Rust test app's {@code chat_loop_workflow}: the durable-loop +
  * suspension shape. One iteration per inbox item — proc TURN commits the turn to
  * Entity state and emits it, proc REPLY emits the answer to the sink. Between
- * turns the loop finds an empty inbox at a committed boundary and PARKS.
+ * turns the loop finds an empty inbox at a committed boundary and PARKS. The
+ * turn {@code bye} ends the session.
  */
 public final class ChatLoopWorkflowOperative implements WorkflowOperative {
 
@@ -24,15 +25,7 @@ public final class ChatLoopWorkflowOperative implements WorkflowOperative {
         return LoopMode.PER_INPUT;
     }
 
-    /**
-     * A chat session ends on an external stop, not on its own; the duration
-     * backstop keeps a stray e2e instance from outliving the test run.
-     */
-    @Override
-    public boolean selfTerminating() {
-        return false;
-    }
-
+    /** The duration backstop keeps a stray e2e instance from outliving the test run. */
     @Override
     public Optional<Duration> maxDuration() {
         return Optional.of(Duration.ofSeconds(600));

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.runtime.state.TimerOp;
 import com.flezha.sdk.state.TimerKind;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,6 +39,10 @@ class ActivationCodecTest {
     }
 
     private static ActivationResult resultFixture() {
+        return resultFixture(Optional.empty());
+    }
+
+    private static ActivationResult resultFixture(Optional<byte[]> complete) {
         return new ActivationResult(
                 42,
                 new ActivationOutcome.Work(List.of(new ItemEffect(
@@ -53,7 +58,8 @@ class ActivationCodecTest {
                         1_000,
                         List.of(TimerOp.cancel(TimerKind.PROCESSING_TIME, 2_000)),
                         true,
-                        Optional.empty()))));
+                        Optional.empty(),
+                        complete))));
     }
 
     @Test
@@ -71,10 +77,24 @@ class ActivationCodecTest {
     @DisplayName("result bytes are pinned to the Rust fixture")
     void resultBytesArePinned() {
         byte[] encoded = ActivationCodec.encodeResult(resultFixture());
-        assertThat(hex(encoded)).isEqualTo("2a0001000101010101036f757401026b32000001020107e8070101d00f000100");
+        assertThat(hex(encoded)).isEqualTo("2a0001000101010101036f757401026b32000001020107e8070101d00f00010000");
         assertThat(ActivationCodec.decodeResult(encoded))
                 .usingRecursiveComparison()
                 .isEqualTo(resultFixture());
+    }
+
+    @Test
+    @DisplayName("a completion request is the effect's last field")
+    void completionIsTheEffectsLastField() {
+        ActivationResult completing = resultFixture(Optional.of("3".getBytes(StandardCharsets.UTF_8)));
+        byte[] encoded = ActivationCodec.encodeResult(completing);
+
+        // The pinned fixture's absent completion (`00`) becomes `01`, the
+        // length and the bytes, after the dlq's `00`.
+        assertThat(hex(encoded)).isEqualTo("2a0001000101010101036f757401026b32000001020107e8070101d00f000100010133");
+        assertThat(ActivationCodec.decodeResult(encoded))
+                .usingRecursiveComparison()
+                .isEqualTo(completing);
     }
 
     @Test
@@ -98,8 +118,7 @@ class ActivationCodecTest {
                 Map.entry(
                         new ActivationKind.KeyRequest(2, List.of(new byte[] {0x70}), true, false),
                         "06020101700100000166"),
-                Map.entry(new ActivationKind.WorkflowRun("go".getBytes()), "0702676f000166"),
-                Map.entry(new ActivationKind.CompensateRun(List.of(new byte[] {0x0A})), "0801010a000166"));
+                Map.entry(new ActivationKind.CompensateRun(List.of(new byte[] {0x0A})), "0701010a000166"));
         for (Map.Entry<ActivationKind, String> entry : kinds) {
             Activation act = new Activation(1, new EntityRef("o", 0, Optional.empty()), entry.getKey(), 0, "f");
             byte[] bytes = ActivationCodec.encodeActivation(act);
@@ -125,7 +144,6 @@ class ActivationCodecTest {
                         new PrepareResult.Ok(new PrepareAnswer(List.of("k1", "k2"), OptionalLong.of(77))),
                         new PrepareResult.Err(new WorkError("bad key", true)))),
                 new ActivationOutcome.Failed(new WorkError("boom", false)),
-                new ActivationOutcome.WorkflowDone(true, new byte[] {0x09}),
                 new ActivationOutcome.Work(List.of(new ItemEffect(
                         new Verdict.RetryableError("later"),
                         List.of(),
@@ -139,7 +157,8 @@ class ActivationCodecTest {
                         0,
                         List.of(TimerOp.register(TimerKind.EVENT_TIME, 9_000)),
                         false,
-                        Optional.of(new DlqEntry("ch", "poison", 3, Optional.of(new byte[] {0x0C})))))),
+                        Optional.of(new DlqEntry("ch", "poison", 3, Optional.of(new byte[] {0x0C}))),
+                        Optional.empty()))),
                 new ActivationOutcome.Work(List.of(new ItemEffect(
                         new Verdict.NonRetryableError("never"),
                         List.of(new byte[] {0x02}),
@@ -148,7 +167,8 @@ class ActivationCodecTest {
                         2,
                         List.of(),
                         false,
-                        Optional.empty()))));
+                        Optional.empty(),
+                        Optional.of(new byte[] {0x09})))));
         for (ActivationOutcome outcome : outcomes) {
             ActivationResult result = new ActivationResult(7, outcome);
             byte[] bytes = ActivationCodec.encodeResult(result);

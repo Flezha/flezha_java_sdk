@@ -20,41 +20,28 @@ import javax.annotation.Nonnull;
  * per-entity state, {@code ctx.emit}) under a different lifecycle:
  *
  * <ul>
- *   <li><strong>{@code run} sugar</strong> — the trivial case is a bare
- *       {@link #run} body: a single implicit Procedure/Entity.</li>
- *   <li><strong>Structured</strong> — override {@link #procedures} to author
+ *   <li><strong>Procedures</strong>: override {@link #procedures} to author
  *       Procedures/Channels/Entities on the same {@link ChannelBuilder} a
  *       stream operative uses; the workflow driver runs the static DAG in
  *       topological order with a per-procedure count-based barrier (entities
- *       within one procedure still run in parallel) — fan-out branches are
+ *       within one procedure still run in parallel); fan-out branches are
  *       independent, and a fan-in node runs once, after every producer
  *       feeding it committed, with the accumulated batch.</li>
- *   <li><strong>Exit triggers</strong> — the operative terminates on the first
- *       of: the chain running to quiescence, {@link WorkflowOperativeCtx#complete},
- *       a loop's terminal predicate, a declared {@link #maxDuration}, or
+ *   <li><strong>Exit triggers</strong>: the operative terminates on the first
+ *       of: the chain running to quiescence, a procedure calling
+ *       {@link com.flezha.sdk.procedure.ProcedureCtx#complete(byte[])}, a chained
+ *       loop releasing an empty batch, a declared {@link #maxDuration}, or
  *       external {@code flz operative stop}. Every trigger converges on the
  *       single {@code WorkflowCompleted} teardown.</li>
- *   <li><strong>Inbox</strong> — a running operative receives input after it
- *       starts via {@link WorkflowOperativeCtx#recv}.</li>
+ *   <li><strong>Inbox</strong>: a {@link LoopMode#PER_INPUT} loop runs one
+ *       iteration per input delivered after the start, and parks between them.</li>
  * </ul>
  *
- * <p>The simplest form is a bare {@link #run} body, declared with
- * {@link com.flezha.sdk.FlezhaRunner#registerFactory(Class)}, the sibling of {@code registerFactory}:
- *
- * <pre>{@code
- * public final class GreetWorkflowOperative implements WorkflowOperative {
- *     public String factoryId() { return "greet"; }
- *     public void run(WorkflowOperativeCtx ctx, String args) throws WorkflowOperativeException {
- *         ctx.complete(("hello " + args).getBytes(StandardCharsets.UTF_8));
- *     }
- * }
- * Flezha.createRunner("my_app").registerFactory(GreetWorkflowOperative.class).run();
- * }</pre>
- *
- * <p>A multi-step workflow overrides {@link #procedures} instead, and declares its chain on the
- * same builder a stream operative uses. The value passed between two steps is written down at that
- * boundary, which is what allows a resumed workflow to pick up there; the runtime derives how to
- * write it, so the chain declares nothing about it:
+ * <p>A workflow declares its chain in {@link #procedures}, on the same builder a stream operative
+ * uses, and is declared with {@link com.flezha.sdk.FlezhaRunner#registerFactory(Class)}. The value
+ * passed between two steps is written down at that boundary, which is what allows a resumed
+ * workflow to pick up there; the runtime derives how to write it, so the chain declares nothing
+ * about it:
  *
  * <pre>{@code
  * @Override
@@ -77,33 +64,13 @@ import javax.annotation.Nonnull;
 public interface WorkflowOperative extends Operative {
 
     /**
-     * Run-sugar body: the single-Procedure, single-Entity case. Invoked once
-     * per started instance with {@code args} from {@code init_values}. Emit
-     * output via {@code ctx}, optionally call {@link WorkflowOperativeCtx#complete}
-     * with a result, and return normally; throwing
-     * {@link WorkflowOperativeException} is a terminal failure (no retry).
-     *
-     * <p>The default throws — a class must implement either {@code run} or
-     * {@link #procedures}. A structured operative (non-empty {@code procedures})
-     * never has {@code run} invoked.
-     *
-     * @param ctx lifecycle context bound to this workflow instance
-     * @param args the {@code init_values} string shipped with the start
-     */
-    default void run(WorkflowOperativeCtx ctx, String args) throws WorkflowOperativeException {
-        throw new WorkflowOperativeException(
-                "WorkflowOperative `" + factoryId() + "`: neither run() nor procedures() was implemented");
-    }
-
-    /**
-     * Structured form: declare a static <strong>DAG</strong> of Procedures /
-     * Channels / Entities on the same graph builder a stream operative
-     * uses. The default is empty, selecting the {@link #run}-sugar path. The
-     * workflow driver runs the declaration in topological order: a procedure
-     * becomes runnable only after <strong>every</strong> producer feeding it
-     * has committed — fan-out branches are independent, and a fan-in node is
-     * dispatched once, with the accumulated batch of all its producers'
-     * outputs. Cycles are rejected at registration.
+     * Declare a static <strong>DAG</strong> of Procedures / Channels / Entities
+     * on the same graph builder a stream operative uses. The workflow driver
+     * runs the declaration in topological order: a procedure becomes runnable
+     * only after <strong>every</strong> producer feeding it has committed;
+     * fan-out branches are independent, and a fan-in node is dispatched once,
+     * with the accumulated batch of all its producers' outputs. Cycles are
+     * rejected at registration, and so is a class that declares no procedure.
      */
     default void procedures(ChannelBuilder c) {}
 
@@ -119,8 +86,8 @@ public interface WorkflowOperative extends Operative {
 
     /**
      * Self-termination guarantee, validated at registration. Default {@code true}:
-     * the operative ends on its own (a {@code run}/chain that returns, or a loop
-     * with a terminal predicate / exhausted input). An operative whose
+     * the operative ends on its own (a chain that runs to its end, a procedure
+     * calling {@code ctx.complete}, or a loop with exhausted input). An operative whose
      * <strong>only</strong> possible exit is an external stop returns
      * {@code false}; combined with no {@link #maxDuration} it is
      * <strong>rejected</strong> at registration with a message directing the

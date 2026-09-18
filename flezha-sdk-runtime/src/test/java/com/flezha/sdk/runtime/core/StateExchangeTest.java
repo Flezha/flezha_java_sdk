@@ -21,7 +21,7 @@ class StateExchangeTest extends DispatchTestBase {
     @DisplayName("a RestoreFold body tagged with an older version goes to the migration, not the codec")
     void restoreFoldMigratesTaggedBodies() {
         StreamOperativeClassRegistry.registerClass(MigratingCounterOperative.class);
-        ActivationDispatcher dispatcher = new ActivationDispatcher(id -> session);
+        ActivationDispatcher dispatcher = new ActivationDispatcher();
 
         ActivationOutcome restored = dispatcher
                 .dispatch(command(
@@ -48,7 +48,7 @@ class StateExchangeTest extends DispatchTestBase {
     @DisplayName("a Procedure declaring no migration refuses an older body rather than decoding it")
     void restoreFoldWithoutAMigrationRefuses() {
         StreamOperativeClassRegistry.registerClass(CounterOperative.class);
-        ActivationDispatcher dispatcher = new ActivationDispatcher(id -> session);
+        ActivationDispatcher dispatcher = new ActivationDispatcher();
 
         ActivationOutcome outcome = dispatcher
                 .dispatch(command(
@@ -86,7 +86,7 @@ class StateExchangeTest extends DispatchTestBase {
         byte[] snapshot = ((ActivationOutcome.Snapshot) snap).state();
 
         // A fresh dispatcher (a rebind) folds snapshot(n=2) + one change → 3.
-        ActivationDispatcher rebound = new ActivationDispatcher(id -> session);
+        ActivationDispatcher rebound = new ActivationDispatcher();
         ActivationOutcome restored = rebound.dispatch(command(
                         "counter_op",
                         0,

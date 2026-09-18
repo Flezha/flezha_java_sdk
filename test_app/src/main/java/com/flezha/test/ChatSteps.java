@@ -23,12 +23,18 @@ public final class ChatSteps {
     /** The turn whose payload BLOCKS while the release env is unset. */
     static final String CRASH_TURN = "mid-crash";
 
+    /** The closing turn: not a turn of the conversation, it ends the session. */
+    static final String CLOSING_TURN = "bye";
+
     private ChatSteps() {}
 
     /**
      * Commits the turn to Entity state and passes it on. The change is keyed by
      * the TURN, so the WAL record count is the number of DISTINCT turns that ran
      * — a re-run of a committed iteration would show up.
+     *
+     * <p>The closing turn is passed on unrecorded and ends the session with the
+     * number of turns the state holds.
      */
     public static final class Turn extends DurableStep {
 
@@ -40,6 +46,11 @@ public final class ChatSteps {
         @Override
         public void run(String input, StateHandle<SeenState, Insert> state, ProcedureCtx ctx)
                 throws ProcedureException {
+            if (CLOSING_TURN.equals(input)) {
+                ctx.emit(input);
+                ctx.complete(Integer.toString(state.get().items.size()));
+                return;
+            }
             if (CRASH_TURN.equals(input)) {
                 WorkflowE2eGate.blockUntilReleased();
             }

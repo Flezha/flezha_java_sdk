@@ -43,10 +43,4 @@ public sealed interface ActivationOutcome {
      * (host-side panic equivalent).
      */
     record Failed(@Nonnull WorkError error) implements ActivationOutcome {}
-
-    /**
-     * Discriminant 8 — a workflow run-sugar body returned. {@code completed}
-     * mirrors {@code ctx.complete(...)} having been called.
-     */
-    record WorkflowDone(boolean completed, @Nonnull byte[] result) implements ActivationOutcome {}
 }
