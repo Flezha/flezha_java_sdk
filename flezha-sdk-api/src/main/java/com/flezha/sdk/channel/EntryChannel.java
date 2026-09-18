@@ -5,7 +5,7 @@ package com.flezha.sdk.channel;
  * {@link ChannelBuilder#input(Class, String)}. This is where a graph starts.
  *
  * <pre>{@code
- * c.input(String.class, "lines").into(Split.class).sink("words");
+ * c.input(String.class, "lines").into(SplitProcedure.class).sink("words");
  * }</pre>
  *
  * <p>An entry channel is fed by the controller, so it has no producer side. Everything it offers is
@@ -16,7 +16,7 @@ package com.flezha.sdk.channel;
  * c.input(Trade.class, "trades")
  *         .filter(t -> t.qty() > 0)
  *         .keyBy(Trade::symbol)
- *         .into(Candle.class);
+ *         .into(CandleProcedure.class);
  * }</pre>
  *
  * <p>Sharing that surface is deliberate: it keeps the entry side from drifting away from

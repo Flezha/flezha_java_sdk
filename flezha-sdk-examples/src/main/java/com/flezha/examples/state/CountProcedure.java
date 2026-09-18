@@ -13,9 +13,10 @@ import javax.annotation.Nonnull;
 /**
  * Counts the messages one entity has observed, retaining the count across restarts.
  *
- * <p>Compared with the echo example, exactly one type argument changed: {@code NoChange} became
- * {@link Increment}, and the empty state record became {@link Counter}. Declaring a change type is
- * the whole of what makes a procedure durable; the operative is unmodified.
+ * <p>Unlike the echo example's {@code @Procedure} class, this one implements {@link Procedure}
+ * directly, because the change it records is its own: {@link Increment} updates two fields at once,
+ * which a {@code @State} class cannot derive. Declaring a change type is the whole of what makes a
+ * procedure durable; the operative is unmodified.
  *
  * <p>State is not persisted by serialising the state object. The runtime records the ordered list
  * of changes applied and reconstructs the object after a restart by replaying that list, over the

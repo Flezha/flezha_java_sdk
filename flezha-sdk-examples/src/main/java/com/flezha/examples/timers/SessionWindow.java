@@ -13,7 +13,12 @@ import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nonnull;
 
-/** One user's session, closed once it has been quiet for a while. */
+/**
+ * One user's session, closed once it has been quiet for a while.
+ *
+ * <p>This implements {@link Procedure} directly rather than through {@code @Procedure}, because
+ * {@link #onTimer} is a method of the interface, which an annotated class has no way to supply.
+ */
 public final class SessionWindow
         implements Procedure<String, SessionWindow.SessionState, ClosedSession, SessionChange, WallClock, Void> {
 

@@ -1,25 +1,24 @@
 /**
- * Annotations supplying declarations the type signature cannot express.
+ * The annotations a procedure, its state and a short-form operative are written with.
  *
- * <p>The runtime recovers most of what it needs from a procedure's or operative's {@code implements}
- * clause, reading the type arguments as {@code Class} handles. These annotations cover the
- * remainder: facts that are not expressible as a type argument, or that Java's erasure removes
- * before the runtime can observe them.
+ * <p>{@link com.flezha.sdk.authoring.Procedure} marks a class with one public {@code run} method.
+ * The annotation processor generates {@code <Class>Procedure} from it, the
+ * {@link com.flezha.sdk.procedure.Procedure} implementation an operative wires, reading the input
+ * and output types from the {@code run} signature so that nothing is declared twice.
+ * {@link com.flezha.sdk.authoring.State} marks a state class, from which the processor generates the
+ * change type and the handle a stateful {@code run} takes, and
+ * {@link com.flezha.sdk.authoring.Journal} opts one of its map fields into per-key recording.
  *
- * <p>{@link com.flezha.sdk.authoring.EntityKey} marks the member that identifies an entity.
- * {@link com.flezha.sdk.authoring.EntitiesFor} declares which entities an input is routed to where
- * that is not derivable from the wiring. {@link com.flezha.sdk.authoring.InitState} marks the
- * method that constructs the initial per-entity state, and
- * {@link com.flezha.sdk.authoring.Journal} marks the type recorded in the change log.
- * {@link com.flezha.sdk.authoring.Procedure}, {@link com.flezha.sdk.authoring.State},
- * {@link com.flezha.sdk.authoring.StreamOperative} and
- * {@link com.flezha.sdk.authoring.WorkflowOperative} identify the authoring roles a class plays, and
- * share their names with the interfaces of the same names in other packages; the two operative
- * annotations declare a whole single-procedure operative of their kind.
+ * <p>{@link com.flezha.sdk.authoring.EntitiesFor} marks the method that routes an input to the
+ * static entities a procedure's {@code keys} name, and {@link com.flezha.sdk.authoring.InitState}
+ * the method that builds an entity's initial state from its key.
+ * {@link com.flezha.sdk.authoring.EntityKey} generates nothing: declaring it fails processing with
+ * the instruction to key the stream on the wiring instead.
  *
- * <p>Reach for one of these only when the compiler cannot infer the fact on its own. An annotation
- * that duplicates something already visible in the type signature adds a second place for the same
- * declaration to be wrong.
+ * <p>{@link com.flezha.sdk.authoring.StreamOperative} and
+ * {@link com.flezha.sdk.authoring.WorkflowOperative} declare a whole single-procedure operative of
+ * their kind, the short form. These two and {@code @Procedure} share their names with the
+ * interfaces the generated classes implement.
  */
 @javax.annotation.ParametersAreNonnullByDefault
 package com.flezha.sdk.authoring;

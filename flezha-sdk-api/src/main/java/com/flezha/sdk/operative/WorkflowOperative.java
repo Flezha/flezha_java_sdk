@@ -15,9 +15,10 @@ import javax.annotation.Nonnull;
  * continuously through procedures, use {@link StreamOperative} instead; this is the heavier
  * mechanism and costs a journal write per step.
  *
- * <p>A workflow is started with {@code args}, runs until an exit trigger, and is then torn down. It
- * reuses the same building blocks a stream operative uses (procedures, channels, entities,
- * per-entity state, {@code ctx.emit}) under a different lifecycle:
+ * <p>A workflow is started with the values that seed its entry channel, runs until an exit
+ * trigger, and is then torn down. It reuses the same building blocks a stream operative uses
+ * (procedures, channels, entities, per-entity state, {@code ctx.emit}) under a different
+ * lifecycle:
  *
  * <ul>
  *   <li><strong>Procedures</strong>: override {@link #procedures} to author
@@ -99,7 +100,7 @@ public interface WorkflowOperative extends Operative {
 
     /**
      * How many times this Operative runs its chain. Defaults to
-     * {@link LoopMode#ONCE} — one pass, byte-identical to the pre-loop behaviour.
+     * {@link LoopMode#ONCE}: one pass.
      */
     @Nonnull
     default LoopMode loopMode() {

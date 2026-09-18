@@ -10,7 +10,12 @@ import com.flezha.sdk.state.StateHandle;
 import java.util.Optional;
 import javax.annotation.Nonnull;
 
-/** A one-minute candle. Input is {@code <epochMillis>:<price>}. */
+/**
+ * A one-minute candle. Input is {@code <epochMillis>:<price>}.
+ *
+ * <p>This implements {@link Procedure} directly rather than through {@code @Procedure}, because its
+ * clock is {@link EventTimeFrom}, a type argument the annotation does not take.
+ */
 public final class CandleProcedure
         implements Procedure<String, CandleProcedure.Candle, String, CandleProcedure.Tick, EventTimeFrom, Void> {
 

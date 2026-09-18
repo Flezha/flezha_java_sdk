@@ -11,10 +11,13 @@ import javax.annotation.Nonnull;
  * for a replay-stable identifier, register a timer, request a worker.
  *
  * <pre>{@code
- * @Override
- * public void run(Order order, StateHandle<Cart, Added> state, ProcedureCtx ctx) {
- *     state.apply(new Added(order.item(), ctx.now()));   // ctx.now(), never System.currentTimeMillis()
- *     ctx.emit("added " + order.item());                 // where this goes is the operative's business
+ * @Procedure(id = "add_to_cart", emits = String.class)
+ * public final class AddToCart {
+ *     public void run(Order order, CartHandle cart, ProcedureCtx ctx) throws ProcedureException {
+ *         cart.pushItems(order.item());
+ *         cart.setUpdatedMs(ctx.now());          // ctx.now(), never System.currentTimeMillis()
+ *         ctx.emit("added " + order.item());     // where this goes is the operative's business
+ *     }
  * }
  * }</pre>
  *
@@ -244,9 +247,8 @@ public interface ProcedureCtx {
 
     /**
      * Emit a typed value on this Procedure's declared output channel. The channel
-     * id was cached at {@code registerStream} time from
-     * {@code c.channel(T.class, "name").from(S.class)} wiring, so this call
-     * performs no name lookups.
+     * id was resolved once, when the operative's wiring was registered, so this
+     * call performs no name lookups.
      *
      * <p>Inter-procedure channels: the value is passed by reference to consumer
      * Procedures; the user MUST treat it as immutable from the producer side

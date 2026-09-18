@@ -1,35 +1,23 @@
 package com.flezha.examples.spawn;
 
+import com.flezha.sdk.authoring.Procedure;
 import com.flezha.sdk.procedure.IfRunning;
-import com.flezha.sdk.procedure.Procedure;
 import com.flezha.sdk.procedure.ProcedureCtx;
 import com.flezha.sdk.procedure.ProcedureException;
 import com.flezha.sdk.procedure.SpawnOptions;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.WallClock;
 import java.nio.charset.StandardCharsets;
-import java.util.Optional;
-import javax.annotation.Nonnull;
 
-/** Watches the stream and asks for a triage worker per subject. */
-public final class DetectProcedure implements Procedure<String, Void, String, NoChange, WallClock, Void> {
+/**
+ * Watches the stream and asks for a triage worker per subject.
+ *
+ * <p>{@code run} takes the context because it does more than return a value: it spawns, and it
+ * emits only for some inputs. {@code emits} declares the output type, which a {@code void} return
+ * cannot.
+ */
+@Procedure(id = "detect", emits = String.class)
+public final class Detect {
 
-    @Override
-    @Nonnull
-    public String name() {
-        return "detect";
-    }
-
-    @Override
-    public Void initState(@Nonnull Optional<String> entityKey, @Nonnull Optional<RestoreInitPayload> initPayload) {
-        return null;
-    }
-
-    @Override
-    public void run(@Nonnull String input, @Nonnull StateHandle<Void, NoChange> state, @Nonnull ProcedureCtx ctx)
-            throws ProcedureException {
+    public void run(String input, ProcedureCtx ctx) throws ProcedureException {
         if (!input.startsWith("alert:")) {
             return;
         }

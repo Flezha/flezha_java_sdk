@@ -29,26 +29,26 @@ import javax.annotation.Nonnull;
  *
  * <pre>{@code
  * c.input(String.class, "in")
- *         .into(Normalize.class)
+ *         .into(NormalizeProcedure.class)
  *         .named("normalized")
- *         .into(Shout.class)
+ *         .into(ShoutProcedure.class)
  *         .sink("shouted");
  * }</pre>
  *
  * <p>Fan-out is the same handle used twice, so both consumers receive every value:
  *
  * <pre>{@code
- * Stream<Trade> trades = c.input(Trade.class, "trades").into(Parse.class);
- * trades.into(Risk.class);
- * trades.into(Audit.class);
+ * Stream<Trade> trades = c.input(Trade.class, "trades").into(ParseProcedure.class);
+ * trades.into(RiskProcedure.class);
+ * trades.into(AuditProcedure.class);
  * }</pre>
  *
  * <p>Fan-in is two different streams naming the same consumer class, which unify into one node
  * receiving both producers' values:
  *
  * <pre>{@code
- * c.input(Trade.class, "eu").into(Parse.class).into(Ledger.class);
- * c.input(Trade.class, "us").into(Parse.class).into(Ledger.class);
+ * c.input(Trade.class, "eu").into(ParseProcedure.class).into(LedgerProcedure.class);
+ * c.input(Trade.class, "us").into(ParseProcedure.class).into(LedgerProcedure.class);
  * }</pre>
  *
  * <p>The channel out of a node is created lazily on first use of the handle

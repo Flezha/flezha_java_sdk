@@ -33,9 +33,9 @@ public final class PipelineOperative implements StreamOperative {
         // The labels are identities rather than documentation: "normalized" and "shouted" are what
         // a sink registers against and what a test feeds or reads.
         c.input(String.class, "in")
-                .into(Normalize.class)
+                .into(NormalizeProcedure.class)
                 .named("normalized")
-                .into(Shout.class)
+                .into(ShoutProcedure.class)
                 .sink("shouted");
     }
 }

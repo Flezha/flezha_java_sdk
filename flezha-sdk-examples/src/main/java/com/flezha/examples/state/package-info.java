@@ -2,9 +2,10 @@
  * Durable per-entity state, and the reason a procedure never assigns to its own fields.
  *
  * <p>The procedure here counts the messages an entity has seen, and the count survives a restart.
- * Compared with the {@code echo} example, exactly one thing changed: the change type argument
- * became a real type instead of {@link com.flezha.sdk.state.NoChange}. Declaring a change type is
- * the whole of what makes a procedure durable, and the wiring is untouched.
+ * Compared with the {@code echo} example, the procedure declares a change type, and implements
+ * {@link com.flezha.sdk.procedure.Procedure} directly so that the change machinery is in plain
+ * view. Declaring a change type is the whole of what makes a procedure durable, and the wiring is
+ * untouched.
  *
  * <p>The mechanism is a change log rather than object serialisation. Flezha records the ordered
  * list of changes the procedure applied and reconstructs the state object after a restart by
@@ -22,6 +23,10 @@
  * change during reconstruction. {@code run} applies changes and emits, and reads the declared clock
  * through {@code ctx.now()} rather than the system clock, because it will be executed a second time
  * during recovery and must produce the same result.
+ *
+ * <p>Where each change sets one field, none of this is written by hand: a {@code @State} class
+ * generates the change type and a handle with one recorder per field, and a {@code @Procedure}
+ * class takes that handle in {@code run}. The {@code keyed} example is written that way.
  *
  * <p>Declaring a change type also makes an entity readable from outside the pipeline. Nothing
  * further is required: {@code flz state get} returns the current value of any entity of a running

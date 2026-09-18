@@ -38,6 +38,15 @@
             <artifactId>flezha-sdk-runtime</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Generates <Name>Procedure from each @Procedure class and <Name>Handle from each @State
+             class. A standalone project lists it under annotationProcessorPaths instead (see
+             examples/echo); a dependency here lets the reactor build it before this module. -->
+        <dependency>
+            <groupId>com.flezha</groupId>
+            <artifactId>flezha-sdk-processor</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
 
         <dependency>
             <groupId>com.flezha</groupId>
@@ -63,4 +72,20 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <compilerArgs combine.children="append">
+                        <!-- The processor claims none of the annotations it reads, so javac's
+                             processing lint would warn on every build. -->
+                        <arg>-Xlint:-processing</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

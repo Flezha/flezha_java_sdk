@@ -15,12 +15,15 @@ import java.lang.annotation.Target;
  * <p>Supported {@code run} shapes:
  * <ul>
  *   <li>{@code Output run(Input input)} — stateless.</li>
+ *   <li>{@code Output run(Input input, <State>Handle state)}: stateful, taking
+ *       the handle a {@link State} class generates.</li>
  *   <li>{@code Output run(Input input, StateHandle<State, Change> state)} —
  *       stateful; {@code State}/{@code Change} are read from the handle's type
  *       arguments.</li>
  *   <li>A trailing {@code ProcedureCtx ctx} parameter with a {@code void}
  *       return — the body performs any number of emits itself and
  *       {@link #emits()} declares the output type.</li>
+ *   <li>An {@code Optional<Output>} return emits only when a value is present.</li>
  *   <li>A {@code void} return declares no output channel.</li>
  * </ul>
  *

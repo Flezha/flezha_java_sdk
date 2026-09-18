@@ -21,7 +21,8 @@ import javax.annotation.Nonnull;
  * public final class Checkout implements WorkflowOperative { ... }   // ordered steps, resumable
  * }</pre>
  *
- * <p>Both are declared on the same runner, through the method matching their kind:
+ * <p>Both are declared on the same runner, through the same call, which reads the kind from the
+ * interface the class implements:
  *
  * <pre>{@code
  * Flezha.createRunner("my_app")
@@ -30,9 +31,9 @@ import javax.annotation.Nonnull;
  *         .run();
  * }</pre>
  *
- * <p>Adding a further operative kind means implementing this interface and adding the matching
- * {@code defineX} and {@code removeX} methods on the runner, without modifying either existing
- * authoring surface.
+ * <p>Adding a further operative kind means extending this interface and teaching
+ * {@link com.flezha.sdk.FlezhaRunner#registerFactory(Class)} to read it, without modifying either
+ * existing authoring surface.
  */
 public interface Operative {
 

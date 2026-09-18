@@ -72,7 +72,7 @@ public interface ChannelBuilder {
      *     .from(trades, DetectorInput::ofTrade)
      *     .from(routed, DetectorInput::ofThresholds)
      *     .keyBy(DetectorInput::key)
-     *     .into(Detector.class);
+     *     .into(DetectorProcedure.class);
      * }</pre>
      *
      * <p>Why this shape rather than a broadcast: a dynamically-keyed procedure

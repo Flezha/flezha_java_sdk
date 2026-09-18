@@ -86,8 +86,7 @@ step, and an exhausted retry ladder unwinds what was already done.
 **[`agent/`](src/main/java/com/flezha/examples/agent)** is a long-lived agent
 that holds its conversation in durable state and resumes mid-thread after a
 restart, waking on a message or on a timer. This is the shape to copy for
-anything intended to run for weeks. It is also the one example where the Kryo
-type list must be written by hand, and it explains when that is necessary.
+anything intended to run for weeks.
 
 **[`spawn/`](src/main/java/com/flezha/examples/spawn)** shows a stream procedure
 requesting a workflow worker from the controller, so a detector can delegate

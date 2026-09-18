@@ -3,7 +3,7 @@ package com.flezha.sdk.operative;
 /** How many times a structured workflow Operative runs its chain. */
 public enum LoopMode {
 
-    /** One pass, then done. The default, and byte-identical to the pre-loop behaviour. */
+    /** One pass, then done. The default. */
     ONCE,
 
     /**

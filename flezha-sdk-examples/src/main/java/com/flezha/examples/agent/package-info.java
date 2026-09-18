@@ -11,14 +11,12 @@
  * when no message has arrived, which is how an agent produces a nudge, a summary or a follow-up
  * without being addressed; omit it and the agent wakes only when spoken to.
  *
- * <p>{@link com.flezha.examples.agent.ReplyProcedure} is where a real implementation would call a
- * model, passing the accumulated turns as history. Keeping the reply a function of that history is
+ * <p>{@link com.flezha.examples.agent.Reply} is where a real implementation would call a model,
+ * passing the accumulated turns as history. Keeping the reply a function of that history is
  * what allows an iteration that failed part-way to be re-executed safely.
  *
- * <p>This is also the example where {@code kryoTypes} must be written by hand. The default covers
- * the change and state classes recovered from the type signature, but the conversation holds an
- * {@code ArrayList}, which is not visible there and must be declared. Entries are positional and
- * therefore append-only: reordering the list reinterprets previously written state as the wrong
- * type.
+ * <p>{@link com.flezha.examples.agent.Conversation} is a {@code @State} class, so each turn is
+ * recorded by the generated {@code pushTurns} rather than added to the list directly, and the
+ * processor also generates the Kryo type list, so nothing is registered by hand.
  */
 package com.flezha.examples.agent;

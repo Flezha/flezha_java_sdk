@@ -24,6 +24,24 @@ and delivery guarantee available there is available here.
 ```
 
 Java 21 or later. `flezha-sdk-testing` is a separate artifact, with `<scope>test</scope>`.
+The annotation processor generates the procedure classes an operative wires, so it
+goes on the compiler's processor path:
+
+```xml
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-compiler-plugin</artifactId>
+    <configuration>
+        <annotationProcessorPaths>
+            <path>
+                <groupId>com.flezha</groupId>
+                <artifactId>flezha-sdk-processor</artifactId>
+                <version>0.1.0</version>
+            </path>
+        </annotationProcessorPaths>
+    </configuration>
+</plugin>
+```
 
 ## A complete example
 
@@ -38,43 +56,24 @@ hosts. This procedure declares no state, so it is a pure function of its input.
 ```java
 package com.example.echo;
 
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
-import com.flezha.sdk.state.*;
-import java.util.Optional;
+import com.flezha.sdk.authoring.Procedure;
 
-public final class EchoProcedure
-        implements Procedure<String, EchoProcedure.None, String, NoChange, WallClock, Void> {
+/** The id is durable: it names this procedure in saved state. Choose it once. */
+@Procedure(id = "echo")
+public final class Echo {
 
-    /** Nothing is remembered between messages, so the state type is empty. */
-    public record None() {}
-
-    /** Durable: it names this procedure in saved state. Choose it once. */
-    @Override
-    public String name() {
-        return "echo";
-    }
-
-    @Override
-    public None initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
-        return new None();
-    }
-
-    @Override
-    public void run(String input, StateHandle<None, NoChange> state, ProcedureCtx ctx)
-            throws ProcedureException {
-        ctx.emit("echo: " + input);
+    public String run(String input) {
+        return "echo: " + input;
     }
 }
 ```
 
-The six type arguments on `Procedure` are, in declaration order: the input value,
-the per-entity state, the emitted output, the change type used to record state
-mutations, the clock the procedure reads, and its configuration type. The runtime
-recovers all six as `Class` handles from the `implements` clause, so they must be
-concrete there. `NoChange` opts out of the persistence machinery entirely, and
-`Void` declares that the procedure takes no configuration.
+The annotation processor generates `EchoProcedure` from this class at compile
+time, reading the input and output types from the `run` signature, and what `run`
+returns is emitted. The operative names that generated class. `run` takes no state
+parameter, so nothing is kept between messages and nothing is journaled. A second
+parameter, the handle a `@State` class generates, makes the procedure durable, and
+a trailing `ProcedureCtx` parameter lets the body read the clock and emit for itself.
 
 **The operative** declares the graph and holds no logic of its own. A procedure
 cannot be deployed alone, because nothing in the system knows where its messages
@@ -137,9 +136,8 @@ public final class Main {
 `close()` from another thread. `start()` returns to the caller instead and leaves
 the runner to be closed explicitly.
 
-Every operative must be declared on the builder before the runner starts. One
-runner can serve several, and `registerFactory(...)` is the equivalent call for
-the workflow kind.
+Declare every operative on the builder before the runner starts. One runner can
+serve several, and `registerFactory(...)` is the same call for the workflow kind.
 
 To run this without a controller, replace the main with `LocalOperative`, which
 executes the same declared wiring inside the calling JVM and delivers sink output
@@ -173,7 +171,7 @@ controller are refused at startup with the responsible declaration named.
 
 | Capability | Declare | Gives you |
 |---|---|---|
-| Durable state | `Change` type + `state.apply(...)` | State survives restart, rebuilt from a change log. |
+| Durable state | `@State` class, or a `Change` type + `state.apply(...)` | State survives restart, rebuilt from a change log. |
 | Effectively-once output | `c.effectivelyOnce()` + `.keyed()` channels | State, output and consumed offset become durable in ONE record. A crash cannot advance the offset while losing the output. |
 | Checkpointed intervals | `c.checkpointAck()` + `ctx.checkpoint()` | The offset is withheld until the state is coherent, so a half-built window is never persisted. |
 | Late-input correction | `c.correctionWindow(ms)` | A late input rewinds the Entity and replays the slice in event-time order, repairing the earlier result. |
@@ -194,6 +192,7 @@ retention, and a tier without keyed sinks is refused at registration.
 | Module | Purpose |
 |---|---|
 | `flezha-sdk-api` | Public API: `Flezha`, `StreamOperative`, `WorkflowOperative`, `Procedure`, `ProcedureCtx`, `StableId`, channel builders, clocks. No native dependency. |
+| `flezha-sdk-processor` | Annotation processor: `<Class>Procedure` from `@Procedure`, the change type and handle from `@State`, the short-form operatives. Goes on the compiler's processor path. |
 | `flezha-sdk-runtime` | Control plane, data plane, framing, worker pool, reconnect, state persistence, workflow driver. |
 | `flezha-sdk-native` | JNI bindings + bundled per-OS `libflz_core_ffi`. |
 | `flezha-sdk-testing` | `ProcedureTestHarness`, added with `<scope>test</scope>`. |

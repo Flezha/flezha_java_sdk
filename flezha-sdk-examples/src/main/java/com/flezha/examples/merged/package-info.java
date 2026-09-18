@@ -17,8 +17,8 @@
  *
  * <p>The configuration message is an ordinary input and is recorded in the same durable state as
  * the readings, so a restart resumes with the threshold that was in force rather than the deployed
- * default. {@link com.flezha.examples.merged.DetectorProcedure} initialises that threshold to
- * positive infinity, so an operative that starts before receiving its configuration alerts on
- * nothing rather than on everything.
+ * default. {@link com.flezha.examples.merged.DetectorState} initialises that threshold to positive
+ * infinity, so an operative that starts before receiving its configuration alerts on nothing rather
+ * than on everything.
  */
 package com.flezha.examples.merged;

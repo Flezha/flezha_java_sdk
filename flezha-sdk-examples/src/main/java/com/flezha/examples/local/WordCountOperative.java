@@ -16,9 +16,9 @@ public final class WordCountOperative implements StreamOperative {
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
         c.input(String.class, "lines")
-                .into(Split.class)
+                .into(SplitProcedure.class)
                 .keyBy(word -> word)
-                .into(Tally.class)
+                .into(TallyProcedure.class)
                 .keyed()
                 .sink("totals");
     }

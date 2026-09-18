@@ -18,6 +18,13 @@ import javax.annotation.Nonnull;
  * into {@link #run} through a {@link StateHandle}, so the class itself carries no mutable fields of
  * its own that matter across messages.
  *
+ * <p>Most procedures are written as a class annotated
+ * {@link com.flezha.sdk.authoring.Procedure @Procedure}, from whose {@code run} method the
+ * annotation processor generates this interface's implementation, {@code <Class>Procedure}.
+ * Implement the interface directly for what the annotation does not express: a hand-written
+ * {@link Change}, a clock other than {@link WallClock}, a configuration type, {@link #onTimer} or
+ * {@link #compensate}.
+ *
  * <p>A stateless procedure declares {@link NoChange} and is a plain function of its input:
  *
  * <pre>{@code

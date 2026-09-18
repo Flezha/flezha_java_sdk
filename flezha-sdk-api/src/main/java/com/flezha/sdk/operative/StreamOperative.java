@@ -24,11 +24,10 @@ import com.flezha.sdk.channel.ChannelBuilder;
  *     @Override
  *     public void channels(ChannelBuilder c) {
  *         c.input(String.class, "lines")
- *                 .into(Split.class)
+ *                 .into(SplitProcedure.class)
  *                 .keyBy(word -> word)
- *                 .into(Tally.class)
- *                 .named("totals")
- *                 .sink("word_totals");
+ *                 .into(TallyProcedure.class)
+ *                 .sink("totals");
  *     }
  * }
  * }</pre>
