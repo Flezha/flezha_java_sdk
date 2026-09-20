@@ -1,8 +1,6 @@
 package com.flezha.examples.tradedesk;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.channel.EntryChannel;
-import com.flezha.sdk.channel.Stream;
 import com.flezha.sdk.operative.WorkflowOperative;
 import javax.annotation.Nonnull;
 
@@ -17,7 +15,8 @@ import javax.annotation.Nonnull;
  *
  * <p>When a step fails and its retries are spent, the instance ends abnormally instead, and the
  * default rollback undoes every step that finished, in reverse, through their {@code compensate}
- * methods: the order is cancelled, then the money is released.
+ * methods: the order is cancelled, then the money is released. A step with no {@code compensate}
+ * is skipped, which is why the desk's book is left alone.
  */
 public final class PaperOrderOperative implements WorkflowOperative {
 
@@ -26,9 +25,6 @@ public final class PaperOrderOperative implements WorkflowOperative {
      * values are decoded into it: {@code --init-values '{"symbol": "AAPL", "quantity": 10}'}.
      */
     public record OrderTicket(String symbol, int quantity) {}
-
-    /** What the two steps before {@link PlaceOrder} deliver, and which of them sent it. */
-    public record Step(String source, OrderTicket order, String note) {}
 
     /**
      * The operative's stable identity, and the name {@code flz operative start paper_order
@@ -44,26 +40,27 @@ public final class PaperOrderOperative implements WorkflowOperative {
     /**
      * Invoked once at registration to declare the chain.
      *
-     * <p>A workflow has a single root, so its entry channel feeds one step. What the first step
-     * hands on is read twice: the risk desk looks at it while it also waits at the merge, and the
-     * step that places the order is dispatched only once both have committed. The handoffs between
-     * steps are named and nothing else, so only the fill reaches the plugin layer, on
-     * {@code orders}, and {@code sealed} states that nothing follows it.
+     * <p>Two steps in order, then a fan-out. The placement is where the chain stops being a line:
+     * confirming the fill and booking the order are two independent consequences of it, and
+     * neither waits for the other. Each arm of {@code branch} receives the same handle, so the
+     * declaration is exactly two {@code into} statements on the placed channel, written as one.
+     *
+     * <p>The driver runs the chain level by level: every step of a level commits before any of its
+     * children run, so the desk's order of events is fixed rather than a race. A step that fails
+     * poisons its whole level, which is why a refusal on either arm unwinds what the other arm did.
+     *
+     * <p>Nothing ends on a sink: the last step ends the instance with its result, which
+     * {@code flz operative info} shows. Nothing names a channel either, so each one carries the
+     * name of the step that produces it, which is what appears in the journal and in an error;
+     * {@code named(...)} overrides that where a stable name of your own matters more.
      */
     @Override
     public void procedures(@Nonnull ChannelBuilder c) {
-        EntryChannel<OrderTicket> order = c.input(OrderTicket.class, "order");
-
-        Stream<ReserveFunds.Reserved> reserved = order.into(ReserveFunds.class).named("reserved");
-        Stream<CheckRisk.Verdict> risk = reserved.into(CheckRisk.class).named("risk");
-
-        c.merge(Step.class)
-                .from(reserved, r -> new Step("funds", r.order(), r.reservationId()))
-                .from(risk, v -> new Step("risk", v.order(), v.verdict()))
+        c.input(OrderTicket.class, "order")
+                .into(ReserveFunds.class)
                 .into(PlaceOrder.class)
-                .named("placed")
-                .into(ConfirmFill.class)
-                .sink("orders")
-                .sealed();
+                .branch(
+                        fill -> fill.into(ConfirmFillProcedure.class),
+                        book -> book.into(RecordOrderProcedure.class));
     }
 }

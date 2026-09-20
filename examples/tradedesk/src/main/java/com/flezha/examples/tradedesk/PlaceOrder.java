@@ -1,7 +1,7 @@
 package com.flezha.examples.tradedesk;
 
 import com.flezha.examples.tradedesk.PaperOrderOperative.OrderTicket;
-import com.flezha.examples.tradedesk.PaperOrderOperative.Step;
+import com.flezha.examples.tradedesk.ReserveFunds.Reserved;
 import com.flezha.sdk.procedure.Procedure;
 import com.flezha.sdk.procedure.ProcedureCtx;
 import com.flezha.sdk.procedure.ProcedureException;
@@ -15,12 +15,11 @@ import java.util.Optional;
 /**
  * Step two: place the order with the paper exchange, keeping the id it answers with.
  *
- * <p>Two steps feed this one, so it is handed each of their values in turn, and both have
- * committed before the first of them arrives. The order is placed on the money's value; the risk
- * desk's is only a note.
+ * <p>It sits on the arm of the fan-out that does the work, beside the risk desk's arm, and like
+ * step one it implements {@link Procedure} directly because it has something to undo.
  */
 public final class PlaceOrder
-        implements Procedure<Step, PlaceOrder.Placement, PlaceOrder.PlacedOrder, PlaceOrder.Placed, WallClock, Void> {
+        implements Procedure<Reserved, PlaceOrder.Placement, PlaceOrder.PlacedOrder, PlaceOrder.Placed, WallClock, Void> {
 
     /** What this step remembers: the id cancelling the order needs. */
     public static final class Placement {
@@ -30,8 +29,8 @@ public final class PlaceOrder
     /** The one change it records. */
     public record Placed(String orderId) implements Change {}
 
-    /** What it hands on, and, with {@code cancelled}, what its undo emits. */
-    public record PlacedOrder(OrderTicket order, String orderId, boolean cancelled) {}
+    /** What it hands on: the order, and the exchange's id for it. */
+    public record PlacedOrder(OrderTicket order, String orderId) {}
 
     @Override
     public String name() {
@@ -54,14 +53,11 @@ public final class PlaceOrder
     }
 
     @Override
-    public void run(Step step, StateHandle<Placement, Placed> state, ProcedureCtx ctx) throws ProcedureException {
-        if (!"funds".equals(step.source())) {
-            return;
-        }
-
-        String orderId = "ord-" + ctx.activationToken();
+    public void run(Reserved reserved, StateHandle<Placement, Placed> state, ProcedureCtx ctx)
+            throws ProcedureException {
+        String orderId = "ord-" + ctx.stableId();
         state.apply(new Placed(orderId));
-        ctx.emit(new PlacedOrder(step.order(), orderId, false));
+        ctx.emit(new PlacedOrder(reserved.order(), orderId));
     }
 
     @Override
@@ -73,8 +69,6 @@ public final class PlaceOrder
     @Override
     public void compensate(List<PlacedOrder> completedOutput, StateHandle<Placement, Placed> state, ProcedureCtx ctx)
             throws ProcedureException {
-        for (PlacedOrder placed : completedOutput) {
-            ctx.emit(new PlacedOrder(placed.order(), placed.orderId(), true));
-        }
+        System.out.println("[undo] cancelled " + state.get().orderId);
     }
 }

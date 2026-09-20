@@ -14,10 +14,11 @@ import java.util.Optional;
 /**
  * Step one: put the money for the order aside.
  *
- * <p>The steps are written as {@code Procedure} classes rather than with the {@code @Procedure}
- * annotation, because a step that has something to undo needs {@link #compensate}, and the
- * annotation knows only {@code run}. The six type arguments are, in order, the input, the state,
- * the output, the change, the clock and the configuration.
+ * <p>A step that keeps state or has something to undo implements {@link Procedure} directly, and
+ * this one does both. The six type arguments are, in order, the input, the state, the output, the
+ * change, the clock and the configuration. The desk's stateless steps take the
+ * {@code @Procedure} short form instead, which is why the operative wires some classes by their
+ * own name and others by a generated one.
  */
 public final class ReserveFunds
         implements Procedure<OrderTicket, ReserveFunds.Reservation, ReserveFunds.Reserved, ReserveFunds.Taken, WallClock, Void> {
@@ -30,8 +31,8 @@ public final class ReserveFunds
     /** The one change it records. Applying it twice leaves the same id, which a resume needs. */
     public record Taken(String id) implements Change {}
 
-    /** What it hands on, and, with {@code released}, what its undo emits. */
-    public record Reserved(OrderTicket order, String reservationId, boolean released) {}
+    /** What it hands on: the order, and the reservation holding the money for it. */
+    public record Reserved(OrderTicket order, String reservationId) {}
 
     @Override
     public String name() {
@@ -57,11 +58,11 @@ public final class ReserveFunds
     @Override
     public void run(OrderTicket order, StateHandle<Reservation, Taken> state, ProcedureCtx ctx)
             throws ProcedureException {
-        // The activation token is the same on a replay, so a resumed step reserves under the id it
-        // reserved under the first time rather than putting a second sum aside.
-        String reservationId = "res-" + ctx.activationToken();
+        // ctx.stableId(), not a random id: a re-executed step derives the same one, so the ledger
+        // sees a retry rather than a second sum put aside.
+        String reservationId = "res-" + ctx.stableId();
         state.apply(new Taken(reservationId));
-        ctx.emit(new Reserved(order, reservationId, false));
+        ctx.emit(new Reserved(order, reservationId));
     }
 
     @Override
@@ -71,14 +72,15 @@ public final class ReserveFunds
 
     /**
      * The undo. The workflow driver calls it only when the instance ends abnormally, in reverse
-     * order of the steps that finished, handing back what this step emitted. It has to be safe to
-     * call twice: a crash part way through a rollback runs it again.
+     * order of the steps that finished. It has to be safe to call twice: a crash part way through
+     * a rollback runs it again.
+     *
+     * <p>The id comes from the state, not from {@code completedOutput}: state is restored on
+     * resume and emitted output is not, so after a crash-resumed rollback that list can be empty.
      */
     @Override
     public void compensate(List<Reserved> completedOutput, StateHandle<Reservation, Taken> state, ProcedureCtx ctx)
             throws ProcedureException {
-        for (Reserved reserved : completedOutput) {
-            ctx.emit(new Reserved(reserved.order(), reserved.reservationId(), true));
-        }
+        System.out.println("[undo] released " + state.get().id);
     }
 }

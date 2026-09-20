@@ -2,24 +2,31 @@ package com.flezha.examples.tradedesk;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operative.StreamOperative;
+import java.util.List;
 import javax.annotation.Nonnull;
 
 /**
- * The desk's stream: trades in, one candle per minute out, and an order started when a candle
- * gives a signal.
+ * The desk's stream: trades in, one candle per minute out, and an order started when a symbol
+ * moves far enough.
  *
- * <p>A stream operative runs for as long as the desk does. Trades arrive on its entry channel,
- * are routed to an entity per symbol, and each entity folds its trades into the candle it is
- * building. A candle that closes leaves on its own channel and is handed to the step that decides
- * whether to trade.
+ * <p>A stream operative runs for as long as the desk does. The exchange delivers several trades in
+ * one frame, so the wiring splits the frame before anything else sees it, drops what the desk does
+ * not trade on, and routes the rest to an entity per symbol.
  */
 public final class CandlesOperative implements StreamOperative {
 
-    /** One trade, as the exchange reports it. The entry channel decodes the JSON into this. */
-    public record Trade(String symbol, double price, long ts) {}
+    /** One frame from the exchange's feed, carrying however many trades happened in it. */
+    public record TradeBatch(List<Trade> trades) {}
 
-    /** A finished minute for one symbol. */
-    public record Candle(String symbol, long minute, int trades, double close) {}
+    /** One trade, as the exchange reports it. */
+    public record Trade(String symbol, double price, int quantity, long ts) {}
+
+    /**
+     * A finished minute for one symbol, carrying the close of the minute before it. The desk's
+     * decision is a comparison between the two, and putting the pair in the value is what keeps
+     * the stage that makes it free of state.
+     */
+    public record Candle(String symbol, long minute, int trades, double close, double previousClose) {}
 
     @Override
     @Nonnull
@@ -28,19 +35,42 @@ public final class CandlesOperative implements StreamOperative {
     }
 
     /**
-     * Trades enter on {@code trades} and are keyed by symbol, which is what gives each symbol an
-     * entity of its own with its own state. The candle channel carries that symbol as its key and
-     * is named as a sink, so every closed candle is on the plugin layer as well as handed to the
-     * step that decides whether to trade.
+     * Three transforms on the wiring, then two procedures, and two places output leaves the desk.
+     *
+     * <p>{@code flatMap} turns one frame into its trades, each routed on its own. {@code filter}
+     * drops the feed's zero-quantity frames. {@code keyBy} names the entity each trade belongs to,
+     * which is what gives every symbol its own state and its own order of arrival; it has to be
+     * the last link before {@code into}, because it is evaluated on whatever the transforms above
+     * it produced. The three run at the routing seam rather than as procedures of their own: no
+     * entity, no mailbox, no dispatch hop, which is why they must stay cheap and free of side
+     * effects.
+     *
+     * <p>A procedure's output is an ordinary channel, so each stage is wired onto the one before it
+     * with the same {@code into} the entry channel used, and the expression reads in flow order.
+     *
+     * <p>{@code sink("candles")} sits in the middle of that chain, which is the point: a sink is an
+     * address on the plugin layer, not the end of anything. Every finished candle is delivered
+     * there for whatever is listening, and the same value carries on to the next stage.
+     *
+     * <p>Only the first stage is keyed, because keying is declared per edge rather than inherited:
+     * a plain {@code into} leaves its consumer single-entity. That is the right shape here, since
+     * the second stage keeps nothing per symbol. A stage that did would need its own
+     * {@code keyBy}, or one entity would hold every symbol at once.
+     *
+     * <p>{@code sealed()} states that the signals channel is where the desk's output ends. It
+     * is purely type-level: the declared topology is the same without it, but a later
+     * {@code into} on this chain no longer compiles.
      */
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
-        c.input(Trade.class, "trades")
+        c.input(TradeBatch.class, "trades")
+                .flatMap(Trade.class, TradeBatch::trades)
+                .filter(trade -> trade.quantity() > 0)
                 .keyBy(Trade::symbol)
                 .into(BuildCandles.class)
-                .keyed()
                 .sink("candles")
-                .into(DecideTrade.class)
-                .sink("signals");
+                .into(MeasureMoveProcedure.class)
+                .sink("signals")
+                .sealed();
     }
 }
