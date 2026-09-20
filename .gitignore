@@ -60,3 +60,6 @@ Thumbs.db
 # controller, and the contract set the fixture tests resolve against.
 /.core/
 /contract/
+
+# Runtime state a locally started runner or controller leaves in its working directory
+app_data/

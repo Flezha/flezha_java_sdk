@@ -1,0 +1,30 @@
+package com.flezha.examples.tradedesk;
+
+import com.flezha.sdk.Flezha;
+import com.flezha.sdk.FlezhaRunner;
+
+/**
+ * Starts the desk's runner: the process that connects to the controller and serves tradedesk's
+ * operatives.
+ *
+ * <p>The namespace is the first argument and defaults to {@code trading}. A runner serves one
+ * namespace, and at most one runner may run per process. Under an enforced controller it proves
+ * its namespace with that namespace's key, read from {@code FLEZHA_NAMESPACE_SECRET}.
+ *
+ * <p>The guides write the desk's operatives one at a time, and each is registered here before
+ * {@code start()}. {@code registerFactory(...)} is the same call for both kinds, the stream that
+ * builds candles and the workflow that places one order.
+ */
+public final class Main {
+
+    public static void main(String[] args) throws Exception {
+        FlezhaRunner runner = Flezha.createRunner(args.length > 0 ? args[0] : "trading")
+                .registerFactory(CandlesOperative.class)
+                .registerFactory(PaperOrderOperative.class)
+                .start();
+
+        runner.awaitTermination();
+    }
+
+    private Main() {}
+}
