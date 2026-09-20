@@ -26,6 +26,9 @@ import java.util.Optional;
  * }
  * }</pre>
  *
+ * <p>{@link com.flezha.sdk.authoring.State @State} derives exactly this shape from a state
+ * class, so a derived change and a hand-written one read the same at every call site.
+ *
  * <p>A procedure that persists nothing declares {@link NoChange} instead, which removes the change
  * machinery entirely.
  */

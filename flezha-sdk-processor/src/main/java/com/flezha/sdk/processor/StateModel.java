@@ -23,32 +23,30 @@ record StateModel(
     record Variant(String name, String method, List<Field> fields, String applyBody) {}
 
     /**
-     * One component of a variant record. {@code name} spells it on the record
-     * and in its canonical constructor ({@code k} / {@code v} / {@code n} /
-     * {@code value}); {@code param} spells it in the factory and the mutator
-     * ({@code key} / {@code value} / {@code n}).
+     * One component of a variant record: its type and the one name it carries —
+     * on the record, in the canonical constructor, and in the factory and mutator
+     * that mint it. That name is the accessor an author reads, so it is spelled
+     * as a hand-written Change spells it: {@code key}, {@code value}, {@code n}.
      */
-    record Field(String type, String name, String param) {}
+    record Field(String type, String name) {}
 
     /** {@code (T value)} — one whole value the author supplies. */
     static Variant value(String name, String method, String type, String applyBody) {
-        return new Variant(name, method, List.of(new Field(type, "value", "value")), applyBody);
+        return new Variant(name, method, List.of(new Field(type, "value")), applyBody);
     }
 
     /** {@code (K key, V value)} — a per-key map mutation. */
     static Variant keyed(String name, String method, String keyType, String valType, String applyBody) {
-        return new Variant(
-                name, method, List.of(new Field(keyType, "k", "key"), new Field(valType, "v", "value")), applyBody);
+        return new Variant(name, method, List.of(new Field(keyType, "key"), new Field(valType, "value")), applyBody);
     }
 
     /** {@code (K key, int n)} — a count-based mutation on one key's collection. */
     static Variant keyedCount(String name, String method, String keyType, String applyBody) {
-        return new Variant(
-                name, method, List.of(new Field(keyType, "k", "key"), new Field("int", "n", "n")), applyBody);
+        return new Variant(name, method, List.of(new Field(keyType, "key"), new Field("int", "n")), applyBody);
     }
 
     /** {@code (int n)} — a count-based mutation on a flat collection. */
     static Variant count(String name, String method, String applyBody) {
-        return new Variant(name, method, List.of(new Field("int", "n", "n")), applyBody);
+        return new Variant(name, method, List.of(new Field("int", "n")), applyBody);
     }
 }

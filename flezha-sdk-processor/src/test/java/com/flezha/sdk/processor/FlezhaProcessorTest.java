@@ -233,19 +233,31 @@ class FlezhaProcessorTest {
         String code =
                 """
                 package t;
+                import com.flezha.sdk.authoring.Journal;
                 import com.flezha.sdk.authoring.State;
                 import java.util.ArrayList;
+                import java.util.HashMap;
                 import java.util.List;
+                import java.util.Map;
                 @State
                 public class TallyState {
                     public long n;
                     public List<String> seen = new ArrayList<>();
+                    @Journal(Journal.Mode.MAP_SET)
+                    public Map<String, Double> last = new HashMap<>();
                 }
                 """;
         String change = generated("t.TallyState", "t.TallyStateChange", code);
         assertThat(change).contains("public sealed interface TallyStateChange extends Change {");
         assertThat(change).contains("record SetN(long value) implements TallyStateChange {}");
         assertThat(change).contains("record PushSeen(java.lang.String value) implements TallyStateChange {}");
+        // The components are spelled as a hand-written Change spells them
+        // (`RollingWindowTwin.WindowChange` in the test app), so a derived
+        // variant and its twin read the same at every call site.
+        assertThat(change)
+                .contains(
+                        "record SetLast(java.lang.String key, java.lang.Double value) implements TallyStateChange {}");
+        assertThat(change).contains("state.last.put(c.key(), c.value());");
         // The record brings its own equality and its own construction; neither
         // is hand-written any more, and there is no class to construct.
         assertThat(change).doesNotContain("abstract class");

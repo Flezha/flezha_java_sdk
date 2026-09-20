@@ -155,7 +155,7 @@ final class StateGenerator {
                         "set" + pascal,
                         keyType,
                         kv[1].toString(),
-                        "state." + fname + ".put(c.k(), c.v()); return;"));
+                        "state." + fname + ".put(c.key(), c.value()); return;"));
                 yield true;
             }
             case MAP_VEC -> mapVecVariants(f, fname, pascal, keyType, kv[1], variants);
@@ -174,15 +174,15 @@ final class StateGenerator {
             return false;
         }
         String u = elem.toString();
-        String at = "state." + fname + ".computeIfAbsent(c.k(), __k -> new java.util.ArrayList<>())";
-        variants.add(StateModel.keyed("Push" + pascal, "push" + pascal, keyType, u, at + ".add(c.v()); return;"));
+        String at = "state." + fname + ".computeIfAbsent(c.key(), __k -> new java.util.ArrayList<>())";
+        variants.add(StateModel.keyed("Push" + pascal, "push" + pascal, keyType, u, at + ".add(c.value()); return;"));
         variants.add(StateModel.keyed(
                 "ReplaceLast" + pascal,
                 "replaceLast" + pascal,
                 keyType,
                 u,
-                "var __l = " + at + "; if (__l.isEmpty()) { __l.add(c.v()); } else { "
-                        + "__l.set(__l.size() - 1, c.v()); } return;"));
+                "var __l = " + at + "; if (__l.isEmpty()) { __l.add(c.value()); } else { "
+                        + "__l.set(__l.size() - 1, c.value()); } return;"));
         variants.add(StateModel.keyedCount(
                 "Drain" + pascal + "Front",
                 "drain" + pascal + "Front",
@@ -203,9 +203,9 @@ final class StateGenerator {
             return false;
         }
         String u = elem.toString();
-        String at = "state." + fname + ".computeIfAbsent(c.k(), __k -> new java.util.ArrayDeque<>())";
+        String at = "state." + fname + ".computeIfAbsent(c.key(), __k -> new java.util.ArrayDeque<>())";
         variants.add(StateModel.keyed(
-                "PushBack" + pascal, "pushBack" + pascal, keyType, u, at + ".addLast(c.v()); return;"));
+                "PushBack" + pascal, "pushBack" + pascal, keyType, u, at + ".addLast(c.value()); return;"));
         variants.add(StateModel.keyedCount(
                 "PopFront" + pascal,
                 "popFront" + pascal,
@@ -231,8 +231,7 @@ final class StateGenerator {
                 .append(". */\n");
         b.append("public sealed interface ").append(m.changeSimple()).append(" extends Change {\n");
         for (Variant v : m.variants()) {
-            b.append(factory(m.changeSimple(), v));
-            variantRecord(b, m.changeSimple(), v);
+            b.append(factory(m.changeSimple(), v)).append(variantRecord(m.changeSimple(), v));
         }
         applyMethod(b, m);
         kryoTypesMethod(b, m);
@@ -300,15 +299,9 @@ final class StateGenerator {
                 + argList(v) + "); }\n";
     }
 
-    /** The nested variant: {@code record <Variant>(<fields>) implements <Change> {}}. */
-    private static void variantRecord(StringBuilder b, String changeSimple, Variant v) {
-        b.append("    record ")
-                .append(v.name())
-                .append("(")
-                .append(fieldList(v))
-                .append(") implements ")
-                .append(changeSimple)
-                .append(" {}\n\n");
+    /** {@code record <Variant>(<components>) implements <Change> {}} */
+    private static String variantRecord(String changeSimple, Variant v) {
+        return "    record " + v.name() + "(" + paramList(v) + ") implements " + changeSimple + " {}\n\n";
     }
 
     /** {@code public void <method>(<params>) { h.apply(<Change>.<method>(<args>)); }} */
@@ -317,19 +310,14 @@ final class StateGenerator {
                 + "(" + argList(v) + ")); }\n";
     }
 
-    /** {@code K key, V value} — the factory and mutator parameter list. */
+    /** {@code K key, V value} — the record's components, and the factory and mutator parameters. */
     private static String paramList(Variant v) {
-        return v.fields().stream().map(f -> f.type() + " " + f.param()).collect(Collectors.joining(", "));
-    }
-
-    /** {@code key, value} — what the factory hands the constructor. */
-    private static String argList(Variant v) {
-        return v.fields().stream().map(Field::param).collect(Collectors.joining(", "));
-    }
-
-    /** {@code K k, V v} — the record's component list, named for the fields it sets. */
-    private static String fieldList(Variant v) {
         return v.fields().stream().map(f -> f.type() + " " + f.name()).collect(Collectors.joining(", "));
+    }
+
+    /** {@code key, value} — what the factory hands the canonical constructor. */
+    private static String argList(Variant v) {
+        return v.fields().stream().map(Field::name).collect(Collectors.joining(", "));
     }
 
     private static String pascal(String s) {
