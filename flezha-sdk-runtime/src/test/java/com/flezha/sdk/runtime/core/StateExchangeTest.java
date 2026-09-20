@@ -105,6 +105,37 @@ class StateExchangeTest extends DispatchTestBase {
                 .isEqualTo("{\"n\":3}");
     }
 
+    // The write side of a derived change was always exercised; the read side
+    // was not, and a generated variant could not be rebuilt at all (KB-467).
+    // No snapshot here, so the state comes from the journal alone.
+    @Test
+    @DisplayName("a restore fold reads back a @State-derived change and rebuilds the state from it")
+    void restoreFoldReadsBackADerivedChange() {
+        StreamOperativeClassRegistry.registerClass(SugarTallyStreamOperative.class);
+        ItemEffect ran = soleEffect(work("sugar_tally_op", 0, Optional.empty(), 0, input(0, "a", 1)));
+        assertThat(ran.changes()).as("pushSeen then setN").hasSize(2);
+
+        ActivationDispatcher rebound = new ActivationDispatcher();
+        ActivationOutcome restored = rebound.dispatch(command(
+                        "sugar_tally_op",
+                        0,
+                        Optional.empty(),
+                        new ActivationKind.RestoreFold(
+                                Optional.empty(),
+                                ran.changes().stream()
+                                        .map(c -> new ActivationKind.RestoreBody(c, OptionalInt.empty()))
+                                        .toList())))
+                .outcome();
+        assertThat(restored).isInstanceOf(ActivationOutcome.Restored.class);
+
+        ActivationOutcome json = rebound.dispatch(
+                        command("sugar_tally_op", 0, Optional.empty(), new ActivationKind.LiveStateRead()))
+                .outcome();
+        assertThat(new String(((ActivationOutcome.StateJson) json).json(), StandardCharsets.UTF_8))
+                .contains("\"n\":1")
+                .contains("\"seen\":[\"a\"]");
+    }
+
     @Test
     @DisplayName("ApplyState replaces the state from its JSON form; MigrationSerialize reads it back")
     void applyStateRoundTrips() {

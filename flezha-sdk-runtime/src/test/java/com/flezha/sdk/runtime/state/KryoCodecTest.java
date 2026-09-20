@@ -7,6 +7,7 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.KryoSerializable;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
+import com.flezha.sdk.runtime.core.SugarTallyStateChange;
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -24,6 +25,10 @@ import org.junit.jupiter.api.Test;
  * array never aliases the buffer, a nested encode is refused rather than
  * corrupting the encode it sits inside, and an outsized value does not pin its
  * capacity on the thread that encoded it.
+ *
+ * <p>And one rule the buffer has nothing to do with: every shape a
+ * {@code @State}-derived change arrives in has to decode again, because the
+ * journal is read back through this codec.
  */
 class KryoCodecTest {
 
@@ -52,6 +57,29 @@ class KryoCodecTest {
         assertThat(first).containsExactly(firstAsTaken);
         assertThat(codec.deserialize(first, String.class)).isEqualTo("first value");
         assertThat(codec.deserialize(second, String.class)).isEqualTo("a second value, longer than the first");
+    }
+
+    // Kryo rebuilds a registered type through a record's canonical constructor
+    // or a no-arg one, and a generated variant had neither: every read of a
+    // journaled derived change failed on the shape alone (KB-467). One case per
+    // variant shape the generator emits.
+    @Test
+    @DisplayName("every shape a @State-derived change arrives in decodes again")
+    void derivedChangeVariantsRoundTrip() {
+        KryoCodec codec = new KryoCodec(SugarTallyStateChange.kryoTypes());
+
+        List<SugarTallyStateChange> changes = List.of(
+                SugarTallyStateChange.setN(7L),
+                SugarTallyStateChange.pushSeen("a"),
+                SugarTallyStateChange.popFrontWindow(2),
+                SugarTallyStateChange.pushByKey("k", "v"),
+                SugarTallyStateChange.drainByKeyFront("k", 3));
+
+        for (SugarTallyStateChange change : changes) {
+            assertThat(codec.deserialize(codec.serialize(change), SugarTallyStateChange.class))
+                    .as("%s", change)
+                    .isEqualTo(change);
+        }
     }
 
     @Test

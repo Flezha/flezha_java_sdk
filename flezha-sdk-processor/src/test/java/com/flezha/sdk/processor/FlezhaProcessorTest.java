@@ -220,8 +220,36 @@ class FlezhaProcessorTest {
         String change = generated("t.WindowState", "t.WindowStateChange", code);
         assertThat(change).contains("pushBackTicks");
         assertThat(change).contains("popFrontTicks");
-        assertThat(change).contains(".addLast(c.value)");
+        assertThat(change).contains(".addLast(c.value())");
         assertThat(change).contains("pollFirst()");
+    }
+
+    // Kryo builds a registered type from a record's canonical constructor or
+    // from a no-arg one, and the generated variants have neither until they are
+    // records: every read of a journaled derived change failed on the shape
+    // alone (KB-467).
+    @Test
+    void aDerivedChangeIsASealedInterfaceOfRecords() {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.State;
+                import java.util.ArrayList;
+                import java.util.List;
+                @State
+                public class TallyState {
+                    public long n;
+                    public List<String> seen = new ArrayList<>();
+                }
+                """;
+        String change = generated("t.TallyState", "t.TallyStateChange", code);
+        assertThat(change).contains("public sealed interface TallyStateChange extends Change {");
+        assertThat(change).contains("record SetN(long value) implements TallyStateChange {}");
+        assertThat(change).contains("record PushSeen(java.lang.String value) implements TallyStateChange {}");
+        // The record brings its own equality and its own construction; neither
+        // is hand-written any more, and there is no class to construct.
+        assertThat(change).doesNotContain("abstract class");
+        assertThat(change).doesNotContain("hashCode");
     }
 
     @Test
