@@ -178,6 +178,29 @@ class ActivationCodecTest {
         }
     }
 
+    @Test
+    @DisplayName("the unreadable verdict is discriminant 3 on the wire")
+    void unreadableVerdictIsDiscriminantThree() {
+        ActivationResult result = new ActivationResult(
+                1,
+                new ActivationOutcome.Work(List.of(new ItemEffect(
+                        new Verdict.Unreadable("bad"),
+                        List.of(),
+                        List.of(),
+                        OptionalLong.empty(),
+                        0,
+                        List.of(),
+                        false,
+                        Optional.empty(),
+                        Optional.empty()))));
+        byte[] bytes = ActivationCodec.encodeResult(result);
+        // token 1, outcome Work (0), one effect, verdict 3, message "bad".
+        assertThat(hex(bytes)).startsWith("01" + "00" + "01" + "03" + "03" + "626164");
+        assertThat(ActivationCodec.decodeResult(bytes))
+                .usingRecursiveComparison()
+                .isEqualTo(result);
+    }
+
     private static String hex(byte[] bytes) {
         StringBuilder sb = new StringBuilder(bytes.length * 2);
         for (byte b : bytes) {

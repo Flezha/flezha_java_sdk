@@ -18,12 +18,12 @@ import javax.annotation.Nonnull;
  * }</pre>
  *
  * <p>Sources may be entry channels (sealed payloads) or another tasklet's
- * output stream, freely mixed — on an <b>stream</b> operative. A workflow
- * operative is seeded from its spawn args (and, for a {@code PER_INPUT} loop,
- * its inbox items) through one entry channel, and nothing on that path says
- * which channel a payload arrived on, so a workflow merge over an entry channel
- * is refused at registration ({@code MergeFromEntryChannel}); its sources are
- * the output streams of two or more of its tasklets.
+ * output stream, freely mixed, on a stream operative and on a workflow
+ * operative alike: every message a workflow receives carries the channel it
+ * arrived on, so the mapping of that source is selected as it is on a
+ * stream. On a workflow, a merged tasklet fed by an entry channel is a root
+ * of that channel's chain, and a message on it runs the merged tasklet once,
+ * on that message's mapping, in the pass the message starts.
  *
  * <p>{@code cellsFor} and the merge's own {@link #keyBy} are evaluated on
  * the <b>mapped</b> value, so per-source cell mode is encoded in the sum

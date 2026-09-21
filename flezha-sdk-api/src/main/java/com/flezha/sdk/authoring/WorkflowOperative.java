@@ -7,8 +7,8 @@ import java.lang.annotation.Target;
 
 /**
  * Declares a whole single-tasklet workflow operative from a class with one public {@code run}
- * method: the short form of {@code docs/sdk/authoring_contract.md} §5, a {@code once} workflow whose
- * entry channel receives its start values. The {@code run} shapes are {@link Tasklet}'s.
+ * method: the short form of {@code docs/sdk/authoring_contract.md} §5, a {@code once} workflow that
+ * runs on its first message. The {@code run} shapes are {@link Tasklet}'s.
  *
  * <p>The annotation processor generates {@code <Class>Tasklet}, named {@link #id()}, and
  * {@code <Class>WorkflowOperative}, which wires the entry channel {@link #input()} into that

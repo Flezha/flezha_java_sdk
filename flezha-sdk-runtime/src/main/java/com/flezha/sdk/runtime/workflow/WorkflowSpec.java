@@ -9,7 +9,6 @@ import com.flezha.sdk.operative.StreamOperativeConfigurationException;
 import com.flezha.sdk.operative.WorkflowOperative;
 import com.flezha.sdk.operative.WorkflowOperativeConfigurationException;
 import com.flezha.sdk.runtime.operative.ChannelDescriptor;
-import com.flezha.sdk.runtime.operative.ConsumerEdge;
 import com.flezha.sdk.runtime.operative.StreamOperativeTopology;
 import com.flezha.sdk.runtime.operative.TaskletDescriptor;
 import com.flezha.sdk.runtime.operative.builder.GraphShape;
@@ -152,7 +151,7 @@ public final class WorkflowSpec {
             throw new WorkflowOperativeConfigurationException(
                     "workflow operative `" + factoryId + "` has an invalid topology: " + e.getMessage());
         }
-        return new WorkflowSpec(probe, topology, chainOrder(factoryId, topology, entryChannelOf(factoryId, topology)));
+        return new WorkflowSpec(probe, topology, chainOrder(factoryId, topology, entryRoots(factoryId, topology)));
     }
 
     /**
@@ -194,49 +193,36 @@ public final class WorkflowSpec {
     }
 
     /**
-     * The entry channel that seeds the first tasklet(s) from the spawn args.
-     * The seed is a bare payload naming no channel — the spawn args, or a
-     * PER_INPUT loop's inbox item — and it bypasses the routing seam entirely,
-     * so no edge closure declared there could ever be selected: a merge mapping
-     * (every entry channel past the first would be unreadable) or a plain
-     * transform (it would silently never run). Refuse the shape rather than
-     * accept one that cannot run. Mirrors Rust's MergeFromEntryChannel.
+     * The tasklets the entry channels feed: the roots of the chain each
+     * message starts. Every message carries the channel it arrived on and
+     * takes that channel's parser and edge transforms, so several entry
+     * channels, a transform on an entry edge and an entry channel as a merge
+     * source are all ordinary; what a workflow needs is at least one entry
+     * channel, with something to feed.
      */
     @Nonnull
-    private static ChannelDescriptor entryChannelOf(String factoryId, StreamOperativeTopology topology) {
-        ChannelDescriptor entry = null;
+    private static List<Integer> entryRoots(String factoryId, StreamOperativeTopology topology) {
+        List<Integer> roots = new ArrayList<>();
         for (ChannelDescriptor c : topology.channels()) {
-            if (c.kind() == ChannelKind.ENTRY) {
-                entry = c;
-                break;
-            }
-        }
-        if (entry == null) {
-            throw new WorkflowOperativeConfigurationException("workflow operative `" + factoryId
-                    + "` declares tasklets but no entry channel; a structured workflow must declare one input "
-                    + "channel (c.input(...)) to seed its first tasklet");
-        }
-        if (entry.consumers().isEmpty()) {
-            throw new WorkflowOperativeConfigurationException(
-                    "workflow operative `" + factoryId + "` declares an entry channel with no consumer");
-        }
-        for (ChannelDescriptor ch : topology.channels()) {
-            if (ch.kind() != ChannelKind.ENTRY) {
+            if (c.kind() != ChannelKind.ENTRY) {
                 continue;
             }
-            for (ConsumerEdge edge : ch.consumers()) {
-                if (edge.transform().isPresent() || edge.key().isPresent()) {
-                    throw new WorkflowOperativeConfigurationException("MergeFromEntryChannel: workflow operative `"
-                            + factoryId + "` merges entry channel `" + ch.name() + "` into tasklet `"
-                            + topology.tasklets().get(edge.tasklet()).name()
-                            + "`; a workflow operative is seeded from its spawn args (and, for a PER_INPUT loop, its"
-                            + " inbox items) through ONE entry channel, and neither carries the channel a payload"
-                            + " arrived on — so an entry channel cannot be one merge source among several. Merge the"
-                            + " output streams of two or more of this operative's tasklets instead");
+            if (c.consumers().isEmpty()) {
+                throw new WorkflowOperativeConfigurationException(
+                        "workflow operative `" + factoryId + "` declares an entry channel with no consumer");
+            }
+            for (int consumer : c.consumerIds()) {
+                if (!roots.contains(consumer)) {
+                    roots.add(consumer);
                 }
             }
         }
-        return entry;
+        if (roots.isEmpty()) {
+            throw new WorkflowOperativeConfigurationException("workflow operative `" + factoryId
+                    + "` declares tasklets but no entry channel; a structured workflow must declare an input "
+                    + "channel (c.input(...)) its messages arrive on");
+        }
+        return roots;
     }
 
     /**
@@ -251,8 +237,7 @@ public final class WorkflowSpec {
      * downstream tasklet ids.
      */
     @Nonnull
-    private static List<Integer> chainOrder(
-            String factoryId, StreamOperativeTopology topology, ChannelDescriptor entry) {
+    private static List<Integer> chainOrder(String factoryId, StreamOperativeTopology topology, List<Integer> roots) {
         List<int[]> edges = new ArrayList<>();
         for (ChannelDescriptor ch : topology.channels()) {
             if (ch.producer().isPresent()) {
@@ -261,12 +246,12 @@ public final class WorkflowSpec {
                 }
             }
         }
-        GraphShape.Order shape = GraphShape.order(topology.tasklets().size(), edges, entry.consumerIds());
+        GraphShape.Order shape = GraphShape.order(topology.tasklets().size(), edges, roots);
         if (shape.unreachable() >= 0 && shape.onCycle() < 0) {
             throw new WorkflowOperativeConfigurationException("workflow operative `" + factoryId
                     + "` declares tasklet `"
                     + topology.tasklets().get(shape.unreachable()).name()
-                    + "` that is not reachable from the entry channel");
+                    + "` that is not reachable from any entry channel");
         }
         if (shape.onCycle() >= 0) {
             throw new WorkflowOperativeConfigurationException("workflow operative `" + factoryId

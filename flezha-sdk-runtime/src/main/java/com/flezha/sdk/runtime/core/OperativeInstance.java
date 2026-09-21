@@ -1,6 +1,8 @@
 package com.flezha.sdk.runtime.core;
 
+import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.internal.RuntimeBridge;
+import com.flezha.sdk.runtime.operative.ChannelDescriptor;
 import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
 import com.flezha.sdk.runtime.operative.StreamOperativeTopology;
 import com.flezha.sdk.runtime.operative.TaskletDescriptor;
@@ -165,17 +167,33 @@ public final class OperativeInstance {
         StateHandle<Object, Change> handle = handleOver(cell, buffer);
 
         AtomicReference<List<TimerOp>> timerOps = new AtomicReference<>(List.of());
-        Verdict verdict = runUserCode(() -> {
-            if (item instanceof WorkItem.Timer timer) {
-                tasklet.onTimer(timer.scheduledAt(), timer.kind(), handle, ctx);
-            } else {
-                WorkItem.Input in = (WorkItem.Input) item;
-                for (Object value : routing.valuesForCell(cell, in.channel(), in.payload())) {
-                    tasklet.run(value, handle, ctx);
+        // An entry payload is decoded and mapped before any user code runs, so
+        // a message the entry cannot read is told apart from a tasklet failing
+        // on one it could: the core parks the former and keeps the run going.
+        List<Object> entryValues = null;
+        Verdict verdict = null;
+        try {
+            entryValues = entryValues(cell, item);
+        } catch (Throwable t) {
+            verdict = new Verdict.Unreadable(t.toString());
+        }
+        if (verdict == null) {
+            List<Object> mapped = entryValues;
+            verdict = runUserCode(() -> {
+                if (item instanceof WorkItem.Timer timer) {
+                    tasklet.onTimer(timer.scheduledAt(), timer.kind(), handle, ctx);
+                } else {
+                    WorkItem.Input in = (WorkItem.Input) item;
+                    List<Object> values = mapped != null
+                            ? routing.routedToCell(cell, in.channel(), mapped)
+                            : routing.valuesForCell(cell, in.channel(), in.payload());
+                    for (Object value : values) {
+                        tasklet.run(value, handle, ctx);
+                    }
                 }
-            }
-            timerOps.set(session.commit(new PendingTimers()));
-        });
+                timerOps.set(session.commit(new PendingTimers()));
+            });
+        }
 
         if (!(verdict instanceof Verdict.Ok)) {
             return new ItemEffect(
@@ -201,10 +219,29 @@ public final class OperativeInstance {
     }
 
     /**
-     * The ONE verdict authority: run user code and classify its outcome.
-     * {@code NonRetryable} is the author's word; everything else —
+     * The values an input on an entry channel becomes through the entry
+     * decoder and the entry edge's transforms, before keying, or {@code null}
+     * for anything else, which decodes inside the invocation. Throws what the
+     * decoder or a transform threw; the caller classifies that as unreadable.
+     */
+    private List<Object> entryValues(Cell cell, WorkItem item) {
+        if (!(item instanceof WorkItem.Input in)) {
+            return null;
+        }
+        ChannelDescriptor channel = topology.channel(in.channel());
+        if (channel == null || channel.kind() != ChannelKind.ENTRY) {
+            return null;
+        }
+        return routing.mappedValues(cell, in.channel(), in.payload());
+    }
+
+    /**
+     * The ONE verdict authority for user code: run it and classify its
+     * outcome. {@code NonRetryable} is the author's word; everything else —
      * including an unclassified throwable, panic parity with the Rust
-     * host — stays retryable.
+     * host — stays retryable. An entry payload's decode is classified before
+     * this, at {@link #entryValues}, as the one failure that is not the
+     * tasklet's.
      */
     private static Verdict runUserCode(UserCode body) {
         try {

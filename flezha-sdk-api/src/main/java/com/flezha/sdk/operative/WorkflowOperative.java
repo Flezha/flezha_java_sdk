@@ -15,8 +15,8 @@ import javax.annotation.Nonnull;
  * continuously through tasklets, use {@link StreamOperative} instead; this is the heavier
  * mechanism and costs a journal write per step.
  *
- * <p>A workflow is started with the values that seed its entry channel, runs until an exit
- * trigger, and is then torn down. It reuses the same building blocks a stream operative uses
+ * <p>A workflow is started with its tasklets' initial state, runs on the messages that arrive on
+ * its entry channels until an exit trigger, and is then torn down. It reuses the same building blocks a stream operative uses
  * (tasklets, channels, cells, per-cell state, {@code ctx.emit}) under a different
  * lifecycle:
  *
@@ -25,17 +25,20 @@ import javax.annotation.Nonnull;
  *       Tasklets/Channels/Cells on the same {@link ChannelBuilder} a
  *       stream operative uses; the workflow driver runs the static DAG in
  *       topological order with a per-tasklet count-based barrier (cells
- *       within one tasklet still run in parallel); fan-out branches are
+ *       within one tasklet still run in parallel); a message runs only the
+ *       chain of the entry channel it arrived on, fan-out branches are
  *       independent, and a fan-in node runs once, after every producer
- *       feeding it committed, with the accumulated batch.</li>
+ *       feeding it in that chain committed, with the accumulated batch.</li>
  *   <li><strong>Exit triggers</strong>: the operative terminates on the first
  *       of: the chain running to quiescence, a tasklet calling
  *       {@link com.flezha.sdk.tasklet.TaskletCtx#complete(byte[])}, a chained
  *       loop releasing an empty batch, a declared {@link #maxDuration}, or
  *       external {@code flz operative stop}. Every trigger converges on the
  *       single {@code WorkflowCompleted} teardown.</li>
- *   <li><strong>Inbox</strong>: a {@link LoopMode#PER_INPUT} loop runs one
- *       iteration per input delivered after the start, and parks between them.</li>
+ *   <li><strong>Inbox</strong>: every loop mode takes its input as messages;
+ *       {@link LoopMode#ONCE} runs one pass on its first message, a
+ *       {@link LoopMode#PER_INPUT} loop one iteration per message, and a durable
+ *       instance parks while it waits for one.</li>
  * </ul>
  *
  * <p>A workflow declares its chain in {@link #tasklets}, on the same builder a stream operative
@@ -67,10 +70,11 @@ public interface WorkflowOperative extends Operative {
     /**
      * Declare a static <strong>DAG</strong> of Tasklets / Channels / Cells
      * on the same graph builder a stream operative uses. The workflow driver
-     * runs the declaration in topological order: a tasklet becomes runnable
-     * only after <strong>every</strong> producer feeding it has committed;
-     * fan-out branches are independent, and a fan-in node is dispatched once,
-     * with the accumulated batch of all its producers' outputs. Cycles are
+     * runs the declaration in topological order: a message runs the chain of
+     * the entry channel it arrived on, and a tasklet becomes runnable only
+     * after <strong>every</strong> producer feeding it in that chain has
+     * committed; fan-out branches are independent, and a fan-in node is
+     * dispatched once, with the accumulated batch of those producers' outputs. Cycles are
      * rejected at registration, and so is a class that declares no tasklet.
      */
     default void tasklets(ChannelBuilder c) {}

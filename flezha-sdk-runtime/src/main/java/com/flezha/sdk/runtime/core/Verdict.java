@@ -16,4 +16,13 @@ public sealed interface Verdict {
 
     /** Discriminant 2 — the item failed and must not be re-attempted. */
     record NonRetryableError(@Nonnull String message) implements Verdict {}
+
+    /**
+     * Discriminant 3: the entry channel's decoder, or a transform on its edge,
+     * rejected the payload before any tasklet ran. A stream parks the item as
+     * a non-retryable error would; a workflow parks the message under the entry
+     * channel once the stage's ladder exhausts, and goes on waiting instead of
+     * ending.
+     */
+    record Unreadable(@Nonnull String message) implements Verdict {}
 }

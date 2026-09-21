@@ -243,6 +243,7 @@ public final class ActivationCodec {
             case Verdict.Ok ignored -> w.varint(0);
             case Verdict.RetryableError error -> w.varint(1).string(error.message());
             case Verdict.NonRetryableError error -> w.varint(2).string(error.message());
+            case Verdict.Unreadable error -> w.varint(3).string(error.message());
         }
     }
 
@@ -252,6 +253,7 @@ public final class ActivationCodec {
             case 0 -> new Verdict.Ok();
             case 1 -> new Verdict.RetryableError(r.string());
             case 2 -> new Verdict.NonRetryableError(r.string());
+            case 3 -> new Verdict.Unreadable(r.string());
             default -> throw new IllegalArgumentException("postcard: unknown Verdict discriminant " + discriminant);
         };
     }

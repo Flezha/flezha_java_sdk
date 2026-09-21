@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.flezha.sdk.channel.ChannelBuilder;
+import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.operative.LoopMode;
 import com.flezha.sdk.operative.WorkflowOperative;
 import com.flezha.sdk.operative.WorkflowOperativeConfigurationException;
+import com.flezha.sdk.runtime.operative.ChannelDescriptor;
 import com.flezha.sdk.runtime.operative.StatelessTestTasklet;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.StateHandle;
@@ -54,11 +56,18 @@ class WorkflowSpecValidationTest {
     }
 
     @Test
-    @DisplayName("an entry-channel edge closure is refused — the workflow seed names no channel")
-    void entryEdgeClosureIsRefused() {
-        assertThatThrownBy(() -> WorkflowSpec.build(EntryClosureWorkflow.class))
-                .isInstanceOf(WorkflowOperativeConfigurationException.class)
-                .hasMessageContaining("MergeFromEntryChannel");
+    @DisplayName("an entry-channel edge transform is accepted: every message names its channel")
+    void entryEdgeClosureIsAccepted() {
+        WorkflowSpec spec = WorkflowSpec.build(EntryClosureWorkflow.class);
+        ChannelDescriptor entry = spec.topology().channels().stream()
+                .filter(c -> c.kind() == ChannelKind.ENTRY)
+                .findFirst()
+                .orElseThrow();
+        assertThat(entry.name()).isEqualTo("seed");
+        assertThat(entry.consumers()).hasSize(1);
+        assertThat(entry.consumers().get(0).transform())
+                .as("the transform declared on the entry edge is kept, not refused")
+                .isPresent();
     }
 
     @Test

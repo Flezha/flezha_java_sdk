@@ -55,21 +55,32 @@ final class CellRouting {
      * producer evaluated the edge when its activation completed, so applying
      * it again would compose the chain with itself.
      */
-    @SuppressWarnings("unchecked")
     List<Object> valuesForCell(Cell cell, int channelId, byte[] payload) {
-        ChannelDescriptor channel = topology.channel(channelId);
-        if (channel == null) {
-            throw new IllegalStateException("input names unknown channel id " + channelId);
-        }
+        return routedToCell(cell, channelId, mappedValues(cell, channelId, payload));
+    }
+
+    /**
+     * The payload decoded and, when it reached here untransformed, through
+     * the consumer edge's transforms: every value the edge yields, before
+     * keying decides which of them are this Cell's.
+     */
+    List<Object> mappedValues(Cell cell, int channelId, byte[] payload) {
+        ChannelDescriptor channel = channelOf(channelId);
         Object base = decodePayload(channel, payload);
         ConsumerEdge edge = edgeInto(channel, cell.taskletId);
         if (edge == null) {
             return List.of(base);
         }
-        List<Object> values = channel.kind() == ChannelKind.ENTRY || structuredWorkflow
+        return channel.kind() == ChannelKind.ENTRY || structuredWorkflow
                 ? EdgeTransforms.valuesOf(edge, base)
                 : List.of(base);
-        if (values.isEmpty()) {
+    }
+
+    /** Of the edge's values, those that route to this Cell by key. */
+    @SuppressWarnings("unchecked")
+    List<Object> routedToCell(Cell cell, int channelId, List<Object> values) {
+        ConsumerEdge edge = edgeInto(channelOf(channelId), cell.taskletId);
+        if (edge == null || values.isEmpty()) {
             return values;
         }
         TaskletDescriptor desc = topology.tasklet(cell.taskletId);
@@ -117,6 +128,14 @@ final class CellRouting {
             }
         }
         return results;
+    }
+
+    private ChannelDescriptor channelOf(int channelId) {
+        ChannelDescriptor channel = topology.channel(channelId);
+        if (channel == null) {
+            throw new IllegalStateException("input names unknown channel id " + channelId);
+        }
+        return channel;
     }
 
     private Object decodePayload(ChannelDescriptor channel, byte[] payload) {

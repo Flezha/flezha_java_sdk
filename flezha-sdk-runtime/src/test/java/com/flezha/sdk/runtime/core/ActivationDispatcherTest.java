@@ -39,6 +39,26 @@ class ActivationDispatcherTest extends DispatchTestBase {
     }
 
     @Test
+    @DisplayName("a payload the entry decoder rejects is Unreadable; a tasklet throwing on a readable one is retryable")
+    void unreadableEntryPayloadIsToldApartFromATaskletFailure() {
+        StreamOperativeClassRegistry.registerClass(TypedEntryOperative.class);
+
+        ItemEffect unreadable = soleEffect(work("typed_entry_op", 0, Optional.empty(), 0, input(0, "not json", 1)));
+        assertThat(unreadable.verdict()).isInstanceOf(Verdict.Unreadable.class);
+        assertThat(((Verdict.Unreadable) unreadable.verdict()).message()).contains("entry channel");
+        assertThat(unreadable.consumedOffset()).isEmpty();
+        assertThat(RECORDED).as("no tasklet ran on an unreadable payload").isEmpty();
+
+        ItemEffect thrown =
+                soleEffect(work("typed_entry_op", 0, Optional.empty(), 0, input(0, "{\"text\":\"boom\"}", 2)));
+        assertThat(thrown.verdict()).isInstanceOf(Verdict.RetryableError.class);
+
+        ItemEffect fine = soleEffect(work("typed_entry_op", 0, Optional.empty(), 0, input(0, "{\"text\":\"ok\"}", 3)));
+        assertThat(fine.verdict()).isInstanceOf(Verdict.Ok.class);
+        assertThat(RECORDED).containsExactly("ok");
+    }
+
+    @Test
     @DisplayName("an unknown factory fails the whole activation as structural")
     void unknownFactoryIsStructural() {
         ActivationOutcome out = outcome(work("no_such_factory", 0, Optional.empty(), 0, input(0, "x", 1)));

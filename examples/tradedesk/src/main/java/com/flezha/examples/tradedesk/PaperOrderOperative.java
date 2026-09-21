@@ -21,8 +21,8 @@ import javax.annotation.Nonnull;
 public final class PaperOrderOperative implements WorkflowOperative {
 
     /**
-     * The order an instance is started with. The entry channel declares this type, so the start
-     * values are decoded into it: {@code --init-values '{"symbol": "AAPL", "quantity": 10}'}.
+     * The order an instance is started with. The entry channel declares this type, so the first
+     * message is decoded into it: {@code --text '{"symbol": "AAPL", "quantity": 10}' --channel order}.
      */
     public record OrderTicket(String symbol, int quantity) {}
 

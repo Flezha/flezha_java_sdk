@@ -41,12 +41,13 @@ flz runner list --namespace trading
 
 ## Start the workflow
 
-One instance is one order. `--init-values` carries the order, and the file sink
-attached at the start writes down everything the instance emits:
+One instance is one order. `--text` carries the order on the `order` channel;
+`--init-values` would set a tasklet's starting state. The file sink attached at
+the start writes down everything the instance emits:
 
 ```sh
 flz operative start paper_order --id order_1 --kind workflow --namespace trading \
-  --init-values '{"symbol": "AAPL", "quantity": 10}' \
+  --text '{"symbol": "AAPL", "quantity": 10}' --channel order \
   --plugins '[{"id":"order_1_writer","provider":"operative_file_sink","operative_id":"order_1","opts":{"path":"order_1.txt"},"hooks":[["on_output",{}]]}]'
 ```
 
@@ -72,7 +73,7 @@ step. Start one the same way, with a quantity above the limit:
 
 ```sh
 flz operative start paper_order --id order_2 --kind workflow --namespace trading \
-  --init-values '{"symbol": "AAPL", "quantity": 500}' \
+  --text '{"symbol": "AAPL", "quantity": 500}' --channel order \
   --plugins '[{"id":"order_2_writer","provider":"operative_file_sink","operative_id":"order_2","opts":{"path":"order_2.txt"},"hooks":[["on_output",{}]]}]'
 ```
 

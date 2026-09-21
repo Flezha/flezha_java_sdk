@@ -55,12 +55,14 @@ class FactoryIdsTest {
             "partition_relay",
             "persistence_off_counter",
             "poison_probe",
+            "reply_block_loop_workflow",
             "resume_probe",
             "retry_workflow",
             "saga_block_workflow",
             "schema_evolution_v1",
             "schema_evolution_v2",
             "session_timeout",
+            "spawn_once_requester",
             "spawn_requester",
             "stateful_counter",
             "stateless_loop_workflow",
@@ -76,6 +78,7 @@ class FactoryIdsTest {
             "tier_commit_block_workflow",
             "tier_store",
             "transform_chain",
+            "typed_once_workflow",
             "undo_outbox_workflow",
             "wedge_probe");
 

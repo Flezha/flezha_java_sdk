@@ -58,7 +58,8 @@ public final class SpawnRequesterStreamOperative implements StreamOperative {
             print("named", named);
         }
 
-        private static void print(String label, SpawnHandle handle) {
+        /** The handle's answer on stdout as {@code spawn_result <label> <id> <outcome>}. */
+        static void print(String label, SpawnHandle handle) {
             String answer;
             try {
                 SpawnResult result = handle.await();

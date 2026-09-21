@@ -9,8 +9,9 @@ import com.flezha.sdk.state.StateHandle;
 
 /**
  * Run-once workflow operative mirroring {@code rust_runner}'s
- * {@code echo_workflow}: its one tasklet emits {@code echo:<args>} to the sink
- * once, the pass ends, and the controller deregisters it.
+ * {@code echo_workflow}: its one tasklet emits {@code echo:<message>} to the
+ * sink once for the first message the instance receives, the pass ends, and
+ * the controller deregisters it.
  */
 public final class EchoWorkflowOperative implements WorkflowOperative {
 
@@ -24,7 +25,7 @@ public final class EchoWorkflowOperative implements WorkflowOperative {
         c.input(String.class, "in").into(Echo.class).sink("out");
     }
 
-    /** Echoes the spawn args, which a {@code ONCE} workflow's single pass is seeded with. */
+    /** Echoes the message a {@code ONCE} workflow's single pass runs over. */
     public static final class Echo extends StatelessStep {
         @Override
         public String name() {

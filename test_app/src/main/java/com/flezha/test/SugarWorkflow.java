@@ -4,8 +4,8 @@ import com.flezha.sdk.authoring.WorkflowOperative;
 import java.nio.charset.StandardCharsets;
 
 /**
- * The workflow short form: one declaration is a whole {@code once} workflow, seeded on
- * {@code order} from its start values and completing after one run.
+ * The workflow short form: one declaration is a whole {@code once} workflow, run on its
+ * first message on {@code order} and completing after one run.
  */
 @WorkflowOperative(id = "sugar_workflow", sink = "sugar_workflow_placed", input = "order")
 public class SugarWorkflow {

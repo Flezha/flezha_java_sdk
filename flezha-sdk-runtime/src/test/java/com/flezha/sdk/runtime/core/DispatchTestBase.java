@@ -519,6 +519,35 @@ abstract class DispatchTestBase {
         }
     }
 
+    /** A JSON-typed entry: what the default entry decoder rejects is the seam's to classify. */
+    public record Ticket(String text) {}
+
+    public static final class TypedEntryOperative extends Op {
+        public TypedEntryOperative() {
+            super("typed_entry_op", c -> c.input(Ticket.class, "in").into(TypedEntryTask.class));
+        }
+    }
+
+    public static final class TypedEntryTask implements Tasklet<Ticket, Object, Void, NoChange, WallClock, Void> {
+        @Override
+        public String name() {
+            return "typed_entry_task";
+        }
+
+        @Override
+        public Object initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
+            return new Object();
+        }
+
+        @Override
+        public void run(Ticket input, StateHandle<Object, NoChange> state, TaskletCtx ctx) throws TaskletException {
+            if (input.text().equals("boom")) {
+                throw new IllegalStateException("the tasklet failed on a readable ticket");
+            }
+            RECORDED.add(input.text());
+        }
+    }
+
     public static final class TimerOperative extends Op {
         public TimerOperative() {
             super("timer_op", c -> c.input(String.class, "in").into(TimerTask.class));
