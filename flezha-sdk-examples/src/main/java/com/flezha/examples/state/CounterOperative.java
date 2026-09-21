@@ -5,11 +5,11 @@ import com.flezha.sdk.operative.StreamOperative;
 import javax.annotation.Nonnull;
 
 /**
- * Identical in shape to the echo example's operative, which is the point: making a procedure
- * durable altered the procedure and left the declared graph unchanged.
+ * Identical in shape to the echo example's operative, which is the point: making a tasklet
+ * durable altered the tasklet and left the declared graph unchanged.
  *
- * <p>No key is declared, so every message is routed to a single entity and there is one count for
- * the whole operative. The {@code keyed} example covers partitioning into one entity per key.
+ * <p>No key is declared, so every message is routed to a single cell and there is one count for
+ * the whole operative. The {@code keyed} example covers partitioning into one cell per key.
  */
 public final class CounterOperative implements StreamOperative {
 
@@ -21,6 +21,6 @@ public final class CounterOperative implements StreamOperative {
 
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
-        c.input(String.class, "in").into(CountProcedure.class).sink("out");
+        c.input(String.class, "in").into(CountTasklet.class).sink("out");
     }
 }

@@ -7,10 +7,10 @@ import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.operative.StreamOperative;
 import com.flezha.sdk.operative.StreamOperativeConfigurationException;
-import com.flezha.sdk.procedure.ProcedureCtx;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.StateHandle;
+import com.flezha.sdk.tasklet.TaskletCtx;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Topology-level tests for the bounded-mailbox surface added by the
  * Rust→Java parity port: {@code OverflowPolicy} + {@code .onFull(...)} +
- * {@code Procedure.mailboxCapacity()} + {@code FLEZHA_MAILBOX_CAPACITY} env
+ * {@code Tasklet.mailboxCapacity()} + {@code FLEZHA_MAILBOX_CAPACITY} env
  * resolution + the two range refusals the core names off the resolved value.
  */
 class BoundedMailboxTopologyTest {
@@ -30,20 +30,20 @@ class BoundedMailboxTopologyTest {
     }
 
     @Test
-    @DisplayName("default policy: DROP_NOTHING on entry and inter-procedure channels alike")
+    @DisplayName("default policy: DROP_NOTHING on entry and inter-tasklet channels alike")
     void defaultPoliciesByKind() {
         StreamOperativeTopology topology = StreamOperativeTopologyBuilder.build(new TwoStageStreamOperative());
         // Channel index 0 is the entry channel "input"; index 1 is the
-        // inter-procedure channel "mid".
+        // inter-tasklet channel "mid".
         assertThat(topology.channels().get(0).overflowPolicy()).isEqualTo(OverflowPolicy.DROP_NOTHING);
         assertThat(topology.channels().get(1).overflowPolicy()).isEqualTo(OverflowPolicy.DROP_NOTHING);
     }
 
     @Test
-    @DisplayName("onFull(DROP_OLDEST) overrides the per-kind default on an inter-procedure channel")
+    @DisplayName("onFull(DROP_OLDEST) overrides the per-kind default on an inter-tasklet channel")
     void onFullOverridesDefault() {
         StreamOperativeTopology topology =
-                StreamOperativeTopologyBuilder.build(new InterProcedureDropOldestStreamOperative());
+                StreamOperativeTopologyBuilder.build(new InterTaskletDropOldestStreamOperative());
         assertThat(topology.channels().get(1).overflowPolicy()).isEqualTo(OverflowPolicy.DROP_OLDEST);
     }
 
@@ -55,12 +55,12 @@ class BoundedMailboxTopologyTest {
     }
 
     @Test
-    @DisplayName("Procedure.mailboxCapacity() override flows into the descriptor when overridden flag is set")
-    void procedureOverrideHonored() {
+    @DisplayName("Tasklet.mailboxCapacity() override flows into the descriptor when overridden flag is set")
+    void taskletOverrideHonored() {
         StreamOperativeTopology topology = StreamOperativeTopologyBuilder.build(new BigMailboxStreamOperative());
-        int procedureId = topology.procedureNameToId().get("big_mailbox_procedure");
-        assertThat(topology.procedures().get(procedureId).mailboxCapacity()).isEqualTo(8192);
-        assertThat(topology.procedures().get(procedureId).mailboxCapacityOverridden())
+        int taskletId = topology.taskletNameToId().get("big_mailbox_tasklet");
+        assertThat(topology.tasklets().get(taskletId).mailboxCapacity()).isEqualTo(8192);
+        assertThat(topology.tasklets().get(taskletId).mailboxCapacityOverridden())
                 .isTrue();
     }
 
@@ -68,7 +68,7 @@ class BoundedMailboxTopologyTest {
     @DisplayName("default mailbox capacity is 1024 when no override and no env var present")
     void defaultMailboxCapacity() {
         StreamOperativeTopology topology = StreamOperativeTopologyBuilder.build(new TwoStageStreamOperative());
-        for (ProcedureDescriptor desc : topology.procedures()) {
+        for (TaskletDescriptor desc : topology.tasklets()) {
             assertThat(desc.mailboxCapacity()).isEqualTo(1024);
             assertThat(desc.mailboxCapacityOverridden()).isFalse();
         }
@@ -80,7 +80,7 @@ class BoundedMailboxTopologyTest {
         assertThatThrownBy(() -> StreamOperativeTopologyBuilder.build(new ZeroCapacityStreamOperative()))
                 .isInstanceOf(StreamOperativeConfigurationException.class)
                 .hasMessageContaining("MailboxCapacityZero")
-                .hasMessageContaining("procedure `zero_capacity_procedure` declared mailbox_capacity = 0");
+                .hasMessageContaining("tasklet `zero_capacity_tasklet` declared mailbox_capacity = 0");
     }
 
     @Test
@@ -89,40 +89,40 @@ class BoundedMailboxTopologyTest {
         assertThatThrownBy(() -> StreamOperativeTopologyBuilder.build(new HugeCapacityStreamOperative()))
                 .isInstanceOf(StreamOperativeConfigurationException.class)
                 .hasMessageContaining("MailboxCapacityTooLarge")
-                .hasMessageContaining("huge_capacity_procedure")
+                .hasMessageContaining("huge_capacity_tasklet")
                 .hasMessageContaining("9999999");
     }
 
-    // ---- Test procedures / operatives ----------------------------------------------------
+    // ---- Test tasklets / operatives ----------------------------------------------------
 
-    public static final class A extends StatelessTestProcedure<String, Object, Integer> {
+    public static final class A extends StatelessTestTasklet<String, Object, Integer> {
         @Override
         public String name() {
             return "a";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
-    public static final class B extends StatelessTestProcedure<Integer, Object, Void> {
+    public static final class B extends StatelessTestTasklet<Integer, Object, Void> {
         @Override
         public String name() {
             return "b";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(Integer input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(Integer input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
     public static final class TwoStageStreamOperative implements StreamOperative {
@@ -138,7 +138,7 @@ class BoundedMailboxTopologyTest {
         }
     }
 
-    public static final class InterProcedureDropOldestStreamOperative implements StreamOperative {
+    public static final class InterTaskletDropOldestStreamOperative implements StreamOperative {
         @Override
         public String factoryId() {
             return "interprocedure_drop_oldest";
@@ -206,15 +206,15 @@ class BoundedMailboxTopologyTest {
         }
     }
 
-    // Custom Procedure with an explicit mailboxCapacity() override.
-    public static final class BigMailboxProcedure extends StatelessTestProcedure<String, Object, Integer> {
+    // Custom Tasklet with an explicit mailboxCapacity() override.
+    public static final class BigMailboxTasklet extends StatelessTestTasklet<String, Object, Integer> {
         @Override
         public String name() {
-            return "big_mailbox_procedure";
+            return "big_mailbox_tasklet";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
@@ -229,7 +229,7 @@ class BoundedMailboxTopologyTest {
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
     public static final class BigMailboxStreamOperative implements StreamOperative {
@@ -240,18 +240,18 @@ class BoundedMailboxTopologyTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(BigMailboxProcedure.class);
+            c.input(String.class, "input").into(BigMailboxTasklet.class);
         }
     }
 
-    public static final class ZeroCapacityProcedure extends StatelessTestProcedure<String, Object, Integer> {
+    public static final class ZeroCapacityTasklet extends StatelessTestTasklet<String, Object, Integer> {
         @Override
         public String name() {
-            return "zero_capacity_procedure";
+            return "zero_capacity_tasklet";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
@@ -266,7 +266,7 @@ class BoundedMailboxTopologyTest {
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
     public static final class ZeroCapacityStreamOperative implements StreamOperative {
@@ -277,18 +277,18 @@ class BoundedMailboxTopologyTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(ZeroCapacityProcedure.class);
+            c.input(String.class, "input").into(ZeroCapacityTasklet.class);
         }
     }
 
-    public static final class HugeCapacityProcedure extends StatelessTestProcedure<String, Object, Integer> {
+    public static final class HugeCapacityTasklet extends StatelessTestTasklet<String, Object, Integer> {
         @Override
         public String name() {
-            return "huge_capacity_procedure";
+            return "huge_capacity_tasklet";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
@@ -303,7 +303,7 @@ class BoundedMailboxTopologyTest {
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
     public static final class HugeCapacityStreamOperative implements StreamOperative {
@@ -314,7 +314,7 @@ class BoundedMailboxTopologyTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(HugeCapacityProcedure.class);
+            c.input(String.class, "input").into(HugeCapacityTasklet.class);
         }
     }
 }

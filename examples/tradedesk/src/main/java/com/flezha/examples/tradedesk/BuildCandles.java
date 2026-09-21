@@ -2,9 +2,9 @@ package com.flezha.examples.tradedesk;
 
 import com.flezha.examples.tradedesk.CandlesOperative.Candle;
 import com.flezha.examples.tradedesk.CandlesOperative.Trade;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
@@ -16,17 +16,17 @@ import java.util.Optional;
  * Collects one symbol's trades into a candle, and emits the candle when a trade from a later
  * minute arrives.
  *
- * <p>One entity per symbol, because the operative keys the channel by symbol, and the candle it is
- * collecting is that entity's state. Every change to it is recorded, so a restart brings back the
+ * <p>One cell per symbol, because the operative keys the channel by symbol, and the candle it is
+ * collecting is that cell's state. Every change to it is recorded, so a restart brings back the
  * half-built candle rather than an empty one.
  *
  * <p>The changes it records are its own type, because opening a candle and adding to one write
  * different fields, and a change that is conditional or spans several fields has to be written
- * rather than derived. That is also why this stage implements {@link Procedure} directly instead
- * of taking the {@code @Procedure} short form the desk's stateless stages use.
+ * rather than derived. That is also why this stage implements {@link Tasklet} directly instead
+ * of taking the {@code @Tasklet} short form the desk's stateless stages use.
  */
 public final class BuildCandles
-        implements Procedure<Trade, BuildCandles.Building, Candle, BuildCandles.Fold, WallClock, Void> {
+        implements Tasklet<Trade, BuildCandles.Building, Candle, BuildCandles.Fold, WallClock, Void> {
 
     /** The candle this symbol is collecting, and where the one before it closed. */
     public static final class Building {
@@ -57,7 +57,7 @@ public final class BuildCandles
     }
 
     @Override
-    public Building initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+    public Building initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
         return new Building();
     }
 
@@ -78,7 +78,7 @@ public final class BuildCandles
     }
 
     @Override
-    public void run(Trade trade, StateHandle<Building, Fold> state, ProcedureCtx ctx) throws ProcedureException {
+    public void run(Trade trade, StateHandle<Building, Fold> state, TaskletCtx ctx) throws TaskletException {
         long minute = trade.ts() / 60_000;
         Building candle = state.get();
 
@@ -89,7 +89,7 @@ public final class BuildCandles
 
         if (candle.minute >= 0) {
             // The trade belongs to a later minute, so the candle before it is final. It carries the
-            // close before it, which the next stage needs and only this entity knows.
+            // close before it, which the next stage needs and only this cell knows.
             ctx.emit(new Candle(
                     trade.symbol(), candle.minute, candle.trades, candle.last, candle.previousClose));
         }

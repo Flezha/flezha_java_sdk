@@ -6,7 +6,7 @@ import java.util.function.Function;
 import javax.annotation.Nonnull;
 
 /**
- * A procedure's output stream handle, returned by {@code .into(Proc.class)}:
+ * A tasklet's output stream handle, returned by {@code .into(Task.class)}:
  * a lightweight reference into the operative's topology builder.
  *
  * <ul>
@@ -29,34 +29,34 @@ import javax.annotation.Nonnull;
  *
  * <pre>{@code
  * c.input(String.class, "in")
- *         .into(NormalizeProcedure.class)
+ *         .into(NormalizeTasklet.class)
  *         .named("normalized")
- *         .into(ShoutProcedure.class)
+ *         .into(ShoutTasklet.class)
  *         .sink("shouted");
  * }</pre>
  *
  * <p>Fan-out is the same handle used twice, so both consumers receive every value:
  *
  * <pre>{@code
- * Stream<Trade> trades = c.input(Trade.class, "trades").into(ParseProcedure.class);
- * trades.into(RiskProcedure.class);
- * trades.into(AuditProcedure.class);
+ * Stream<Trade> trades = c.input(Trade.class, "trades").into(ParseTasklet.class);
+ * trades.into(RiskTasklet.class);
+ * trades.into(AuditTasklet.class);
  * }</pre>
  *
  * <p>Fan-in is two different streams naming the same consumer class, which unify into one node
  * receiving both producers' values:
  *
  * <pre>{@code
- * c.input(Trade.class, "eu").into(ParseProcedure.class).into(LedgerProcedure.class);
- * c.input(Trade.class, "us").into(ParseProcedure.class).into(LedgerProcedure.class);
+ * c.input(Trade.class, "eu").into(ParseTasklet.class).into(LedgerTasklet.class);
+ * c.input(Trade.class, "us").into(ParseTasklet.class).into(LedgerTasklet.class);
  * }</pre>
  *
  * <p>The channel out of a node is created lazily on first use of the handle
- * and named by the node's identity string (the procedure's {@code name()}, or
+ * and named by the node's identity string (the tasklet's {@code name()}, or
  * the explicit node name given at wiring time) unless a {@link #sink(String)}
  * name or a {@link #named(String)} override supplies one.
  *
- * <p>Handles are only usable inside {@code channels()} / {@code procedures()}:
+ * <p>Handles are only usable inside {@code channels()} / {@code tasklets()}:
  * the topology freezes at registration and a retained handle used afterwards
  * throws {@link IllegalStateException} naming the operative.
  *

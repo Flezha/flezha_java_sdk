@@ -5,7 +5,7 @@ import com.flezha.sdk.operative.StreamOperative;
 
 /**
  * Mirror of the Rust SDK's {@code StoreInputStreamOperative}: appends each input
- * to the Procedure's State and passes it on to the {@code store_input_sink}
+ * to the Tasklet's State and passes it on to the {@code store_input_sink}
  * plugin.
  */
 public final class StoreInputStreamOperative implements StreamOperative {
@@ -17,6 +17,6 @@ public final class StoreInputStreamOperative implements StreamOperative {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "input").into(StoreInputProcedure.class).sink("sink");
+        c.input(String.class, "input").into(StoreInputTasklet.class).sink("sink");
     }
 }

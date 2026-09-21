@@ -2,12 +2,12 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operative.StreamOperative;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.SpawnException;
-import com.flezha.sdk.procedure.SpawnHandle;
-import com.flezha.sdk.procedure.SpawnOptions;
-import com.flezha.sdk.procedure.SpawnResult;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.SpawnException;
+import com.flezha.sdk.tasklet.SpawnHandle;
+import com.flezha.sdk.tasklet.SpawnOptions;
+import com.flezha.sdk.tasklet.SpawnResult;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
@@ -20,7 +20,7 @@ import java.util.Optional;
 /**
  * Mirror of the Rust test app's {@code SpawnRequesterOperative}: on each input it spawns
  * {@code stateless_loop_workflow} once with no id and once under the input as its id, and prints
- * both results, because a handle's answer is observable nowhere but in the procedure that read it.
+ * both results, because a handle's answer is observable nowhere but in the tasklet that read it.
  */
 public final class SpawnRequesterStreamOperative implements StreamOperative {
 
@@ -31,11 +31,11 @@ public final class SpawnRequesterStreamOperative implements StreamOperative {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "in").into(SpawnRequesterProcedure.class).sink("out");
+        c.input(String.class, "in").into(SpawnRequesterTasklet.class).sink("out");
     }
 
-    public static final class SpawnRequesterProcedure
-            implements Procedure<String, Stateless, String, NoChange, WallClock, Void> {
+    public static final class SpawnRequesterTasklet
+            implements Tasklet<String, Stateless, String, NoChange, WallClock, Void> {
 
         private static final String WORKFLOW = "stateless_loop_workflow";
 
@@ -45,12 +45,12 @@ public final class SpawnRequesterStreamOperative implements StreamOperative {
         }
 
         @Override
-        public Stateless initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public Stateless initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new Stateless();
         }
 
         @Override
-        public void run(String input, StateHandle<Stateless, NoChange> state, ProcedureCtx ctx) {
+        public void run(String input, StateHandle<Stateless, NoChange> state, TaskletCtx ctx) {
             byte[] payload = input.getBytes(StandardCharsets.UTF_8);
             SpawnHandle unnamed = ctx.spawnWorkflow(WORKFLOW, payload);
             SpawnHandle named = ctx.spawnWorkflow(WORKFLOW, payload, SpawnOptions.id(input));

@@ -55,12 +55,12 @@ public final class PaperOrderOperative implements WorkflowOperative {
      * {@code named(...)} overrides that where a stable name of your own matters more.
      */
     @Override
-    public void procedures(@Nonnull ChannelBuilder c) {
+    public void tasklets(@Nonnull ChannelBuilder c) {
         c.input(OrderTicket.class, "order")
                 .into(ReserveFunds.class)
                 .into(PlaceOrder.class)
                 .branch(
-                        fill -> fill.into(ConfirmFillProcedure.class),
-                        book -> book.into(RecordOrderProcedure.class));
+                        fill -> fill.into(ConfirmFillTasklet.class),
+                        book -> book.into(RecordOrderTasklet.class));
     }
 }

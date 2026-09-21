@@ -8,13 +8,13 @@ package com.flezha.sdk.operative;
  */
 public enum RollbackMode {
     /**
-     * Any failure undoes <strong>all</strong> completed procedures in reverse,
+     * Any failure undoes <strong>all</strong> completed tasklets in reverse,
      * back to the start (the classic saga). The default.
      */
     ALL_OR_NOTHING,
     /**
      * Each finished loop iteration commits (is kept); a failure undoes only the
-     * in-flight iteration's completed procedures. Within a single iteration — or
+     * in-flight iteration's completed tasklets. Within a single iteration — or
      * a no-loop pass — rollback is all-or-nothing.
      */
     KEEP_PROGRESS

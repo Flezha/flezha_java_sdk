@@ -26,7 +26,7 @@ public final class ActivationCodec {
     @Nonnull
     public static Activation decodeActivation(@Nonnull byte[] bytes) {
         Postcard.Reader r = new Postcard.Reader(bytes);
-        Activation a = new Activation(r.varint(), decodeEntityRef(r), decodeKind(r), r.varint(), r.string());
+        Activation a = new Activation(r.varint(), decodeCellRef(r), decodeKind(r), r.varint(), r.string());
         if (!r.exhausted()) {
             throw new IllegalArgumentException("postcard: trailing bytes after Activation at " + r.pos());
         }
@@ -37,7 +37,7 @@ public final class ActivationCodec {
     public static byte[] encodeActivation(@Nonnull Activation a) {
         Postcard.Writer w = new Postcard.Writer();
         w.varint(a.token());
-        encodeEntityRef(w, a.target());
+        encodeCellRef(w, a.target());
         encodeKind(w, a.kind());
         w.varint(a.changeSeq()).string(a.factory());
         return w.toBytes();
@@ -84,9 +84,9 @@ public final class ActivationCodec {
     // Activation internals
     // ------------------------------------------------------------------
 
-    private static void encodeEntityRef(Postcard.Writer w, EntityRef ref) {
-        w.string(ref.operative()).varint(Integer.toUnsignedLong(ref.procedure()));
-        w.optional(ref.entityKey(), Postcard.Writer::string);
+    private static void encodeCellRef(Postcard.Writer w, CellRef ref) {
+        w.string(ref.operative()).varint(Integer.toUnsignedLong(ref.tasklet()));
+        w.optional(ref.cellKey(), Postcard.Writer::string);
     }
 
     private static void encodeRestoreBody(Postcard.Writer w, ActivationKind.RestoreBody body) {
@@ -104,8 +104,8 @@ public final class ActivationCodec {
                 bytes, from.isPresent() ? OptionalInt.of(Math.toIntExact(from.getAsLong())) : OptionalInt.empty());
     }
 
-    private static EntityRef decodeEntityRef(Postcard.Reader r) {
-        return new EntityRef(r.string(), Math.toIntExact(r.varint()), optionalString(r));
+    private static CellRef decodeCellRef(Postcard.Reader r) {
+        return new CellRef(r.string(), Math.toIntExact(r.varint()), optionalString(r));
     }
 
     private static void encodeKind(Postcard.Writer w, ActivationKind kind) {

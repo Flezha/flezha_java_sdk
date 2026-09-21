@@ -2,9 +2,9 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operative.StreamOperative;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.state.WallClock;
@@ -29,11 +29,11 @@ public final class ResumeProbeStreamOperative implements StreamOperative {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "input").into(ResumeProbeProcedure.class).sink("total");
+        c.input(String.class, "input").into(ResumeProbeTasklet.class).sink("total");
     }
 
-    public static final class ResumeProbeProcedure
-            implements Procedure<String, ResumeProbeProcedure.State, byte[], CounterChange, WallClock, Void> {
+    public static final class ResumeProbeTasklet
+            implements Tasklet<String, ResumeProbeTasklet.State, byte[], CounterChange, WallClock, Void> {
 
         public static final class State {
             public long total;
@@ -41,11 +41,11 @@ public final class ResumeProbeStreamOperative implements StreamOperative {
 
         @Override
         public String name() {
-            return "resume_probe_procedure";
+            return "resume_probe_tasklet";
         }
 
         @Override
-        public State initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public State initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             // Default + change replay rebuilds the total on restore (same
             // pattern as stateful_counter); no snapshot fast-path needed.
             return new State();
@@ -62,8 +62,8 @@ public final class ResumeProbeStreamOperative implements StreamOperative {
         }
 
         @Override
-        public void run(String input, StateHandle<State, CounterChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<State, CounterChange> state, TaskletCtx ctx)
+                throws TaskletException {
             long delta;
             try {
                 delta = Long.parseLong(input);

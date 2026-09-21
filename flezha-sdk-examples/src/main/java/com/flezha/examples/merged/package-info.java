@@ -1,10 +1,10 @@
 /**
- * One procedure consuming two entry channels through a merged subscription.
+ * One tasklet consuming two entry channels through a merged subscription.
  *
  * <p>A temperature detector reads sensor values on one channel and its alert threshold on another,
  * so the threshold can be changed while the operative is running rather than fixed at deployment.
  *
- * <p>A procedure declares a single input type, so two channels must be reconciled into one before
+ * <p>A tasklet declares a single input type, so two channels must be reconciled into one before
  * they can reach it. Java has no sum types, so
  * {@link com.flezha.examples.merged.DetectorInput} fills that role: one record with a slot per
  * source, exactly one populated on any given message, and a static factory per variant. Those
@@ -12,7 +12,7 @@
  * {@code DetectorInput::ofReading}, and they are the whole of the technique.
  *
  * <p>{@link com.flezha.examples.merged.ThermostatOperative} declares both sources against one
- * consumer. Either source could equally be another procedure's output stream rather than an entry
+ * consumer. Either source could equally be another tasklet's output stream rather than an entry
  * channel; {@code from} accepts both.
  *
  * <p>The configuration message is an ordinary input and is recorded in the same durable state as

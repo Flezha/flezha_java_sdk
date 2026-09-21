@@ -1,10 +1,10 @@
 package com.flezha.test;
 
-import com.flezha.sdk.authoring.Procedure;
+import com.flezha.sdk.authoring.Tasklet;
 import java.nio.charset.StandardCharsets;
 
-/** Stateless downstream procedure of the 2-procedure reference operative. */
-@Procedure(id = "macro_static_downstream_procedure")
+/** Stateless downstream tasklet of the 2-tasklet reference operative. */
+@Tasklet(id = "macro_static_downstream_tasklet")
 public class SugarDownstream {
     public byte[] run(String input) {
         return input.getBytes(StandardCharsets.UTF_8);

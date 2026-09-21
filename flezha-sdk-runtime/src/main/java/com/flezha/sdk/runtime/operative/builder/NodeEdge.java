@@ -14,7 +14,7 @@ final class NodeEdge<T> extends EdgeStreamImpl<T> {
     private final int node;
 
     NodeEdge(StreamOperativeTopologyBuilder owner, int node, Integer pending, Class<?> payloadType) {
-        super(owner, pending, payloadType != null ? payloadType : owner.procedure(node).outputType);
+        super(owner, pending, payloadType != null ? payloadType : owner.tasklet(node).outputType);
         this.node = node;
     }
 

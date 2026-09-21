@@ -1,8 +1,8 @@
 package com.flezha.test;
 
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.RestoreInitPayload;
@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The procedures the durable chat loops share ({@code chat_loop_workflow},
+ * The tasklets the durable chat loops share ({@code chat_loop_workflow},
  * {@code stateless_loop_workflow}, {@code chat_rewind_workflow} and the bench
  * loop), mirroring the Rust test app's {@code ChatTurn} / {@code ChatReply} /
  * {@code ChatReplyUndoable}.
@@ -29,7 +29,7 @@ public final class ChatSteps {
     private ChatSteps() {}
 
     /**
-     * Commits the turn to Entity state and passes it on. The change is keyed by
+     * Commits the turn to Cell state and passes it on. The change is keyed by
      * the TURN, so the WAL record count is the number of DISTINCT turns that ran
      * — a re-run of a committed iteration would show up.
      *
@@ -44,8 +44,8 @@ public final class ChatSteps {
         }
 
         @Override
-        public void run(String input, StateHandle<SeenState, Insert> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
+                throws TaskletException {
             if (CLOSING_TURN.equals(input)) {
                 ctx.emit(input);
                 ctx.complete(Integer.toString(state.get().items.size()));
@@ -68,8 +68,8 @@ public final class ChatSteps {
         }
 
         @Override
-        public void run(String input, StateHandle<State, NoChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
+                throws TaskletException {
             ctx.emit("reply:" + input);
         }
     }
@@ -92,13 +92,13 @@ public final class ChatSteps {
     }
 
     /**
-     * The replying procedure a rewind can undo. A rewind's compensation is
+     * The replying tasklet a rewind can undo. A rewind's compensation is
      * rebuilt from the journal and is handed NO retained outputs, so the hook
-     * reads the last thing it said out of Entity State, retracts it, and pops it
+     * reads the last thing it said out of Cell State, retracts it, and pops it
      * — unwinding in reverse iteration order retracts the turns in reverse.
      */
     public static final class ReplyUndoable
-            implements Procedure<String, ReplyLog, String, ReplyChange, WallClock, Void> {
+            implements Tasklet<String, ReplyLog, String, ReplyChange, WallClock, Void> {
 
         @Override
         public String name() {
@@ -106,7 +106,7 @@ public final class ChatSteps {
         }
 
         @Override
-        public ReplyLog initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public ReplyLog initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new ReplyLog();
         }
 
@@ -127,8 +127,8 @@ public final class ChatSteps {
         }
 
         @Override
-        public void run(String input, StateHandle<ReplyLog, ReplyChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<ReplyLog, ReplyChange> state, TaskletCtx ctx)
+                throws TaskletException {
             state.apply(ReplyChange.said(input));
             ctx.emit("reply:" + input);
         }
@@ -140,8 +140,8 @@ public final class ChatSteps {
 
         @Override
         public void compensate(
-                List<String> completedOutput, StateHandle<ReplyLog, ReplyChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+                List<String> completedOutput, StateHandle<ReplyLog, ReplyChange> state, TaskletCtx ctx)
+                throws TaskletException {
             List<String> said = state.get().said;
             if (said.isEmpty()) {
                 return;

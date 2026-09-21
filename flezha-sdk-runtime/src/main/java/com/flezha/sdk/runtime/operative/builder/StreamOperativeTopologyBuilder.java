@@ -13,8 +13,6 @@ import com.flezha.sdk.channel.Stream;
 import com.flezha.sdk.internal.RuntimeBridge;
 import com.flezha.sdk.operative.StreamOperative;
 import com.flezha.sdk.operative.StreamOperativeConfigurationException;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.core.HostLink;
 import com.flezha.sdk.runtime.operative.EdgeYield;
@@ -26,6 +24,8 @@ import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -46,7 +46,7 @@ import javax.annotation.Nonnull;
  * <p>Mirror of the Rust SDK's {@code channel/builder.rs} +
  * {@code operative/builder.rs}:
  * <ul>
- *   <li>A node is identified by its Procedure class unless an explicit node
+ *   <li>A node is identified by its Tasklet class unless an explicit node
  *       name is given at wiring time; two unnamed mentions of one class are
  *       the same node (fan-in), a named mention is its own node, and an
  *       identity claimed by two distinct nodes is a collision.</li>
@@ -68,7 +68,7 @@ import javax.annotation.Nonnull;
  * which answers the derived declaration or the verdict. What it still refuses
  * itself is only what erasure makes and no record could carry — a payload type
  * that does not reach its consumer's input, a type argument left generic at the
- * procedure class, a missing {@code eventTime} extractor, a procedure class
+ * tasklet class, a missing {@code eventTime} extractor, a tasklet class
  * with no public no-arg constructor. After {@link #build(String)} the topology
  * is frozen: a retained handle used afterwards throws
  * {@link IllegalStateException} naming the operative.
@@ -76,7 +76,7 @@ import javax.annotation.Nonnull;
 public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
 
     private final List<ChannelEntry> channels = new ArrayList<>();
-    private final List<ProcedureEntry> procedures = new ArrayList<>();
+    private final List<TaskletEntry> tasklets = new ArrayList<>();
     /**
      * Every chain declared on a handle, indexed by the id the stream handles
      * carry. Each link pushes a NEW entry superseding the previous one, so a
@@ -84,7 +84,7 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
      */
     private final List<PendingEdge> pending = new ArrayList<>();
 
-    private final Map<String, Integer> procedureNameToId = new LinkedHashMap<>();
+    private final Map<String, Integer> taskletNameToId = new LinkedHashMap<>();
     private final List<String> errors = new ArrayList<>();
     /** Ties the sources of one merge together across the channels they sit on. */
     private int mergeGroups;
@@ -125,8 +125,8 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
      * Run an authoring lambda against a fresh builder, validate, and freeze the
      * result into a {@link StreamOperativeTopology}. Shared by stream
      * {@link StreamOperative#channels} authoring and workflow
-     * {@code procedures(...)} authoring — both declare Procedures / Channels /
-     * Entities on the same {@link ChannelBuilder}.
+     * {@code tasklets(...)} authoring — both declare Tasklets / Channels /
+     * Cells on the same {@link ChannelBuilder}.
      *
      * @throws StreamOperativeConfigurationException if any validation rule fails.
      */
@@ -195,7 +195,7 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
      * The expansion both {@code routeLatest} spellings share: the key function
      * is an edge transform on the traffic stream (so the traffic payload is
      * replaced by its key and never reaches the router), and the two streams are
-     * one merge into the packaged procedure.
+     * one merge into the packaged tasklet.
      */
     @SuppressWarnings("unchecked")
     private <D, T> Stream<RoutedDocument<D>> wireRouteLatest(
@@ -219,7 +219,7 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
     }
 
     private void registerRouterDocumentType(int node, Class<?> documentType) {
-        ProcedureEntry entry = procedures.get(node);
+        TaskletEntry entry = tasklets.get(node);
         if (entry.kryoTypes.contains(documentType)) {
             return;
         }
@@ -282,11 +282,11 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
                 channels.get(chain.channel).chains.add(chain);
             }
         }
-        int[] capacities = new int[procedures.size()];
-        for (int i = 0; i < procedures.size(); i++) {
-            ProcedureEntry procedure = procedures.get(i);
-            capacities[i] = MailboxCapacityResolver.resolve(
-                    procedure.mailboxCapacityDeclared, procedure.mailboxCapacityOverridden);
+        int[] capacities = new int[tasklets.size()];
+        for (int i = 0; i < tasklets.size(); i++) {
+            TaskletEntry tasklet = tasklets.get(i);
+            capacities[i] =
+                    MailboxCapacityResolver.resolve(tasklet.mailboxCapacityDeclared, tasklet.mailboxCapacityOverridden);
         }
         markKeyedTargetsDynamic();
 
@@ -300,16 +300,16 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
                         correctionWindowMs,
                         beyondWindowPolicy),
                 channels,
-                procedures,
+                tasklets,
                 capacities);
         return TopologyMaterializer.materialize(
-                factoryId, channels, procedures, capacities, record, HostClassDeclaration.check(record));
+                factoryId, channels, tasklets, capacities, record, HostClassDeclaration.check(record));
     }
 
     /**
-     * Entity mode is read off the WIRING, and the record states it: a
-     * procedure that names its own keys is static, one a keyed chain closes
-     * onto is dynamic. A procedure declaring both is NOT re-stated as dynamic
+     * Cell mode is read off the WIRING, and the record states it: a
+     * tasklet that names its own keys is static, one a keyed chain closes
+     * onto is dynamic. A tasklet declaring both is NOT re-stated as dynamic
      * — its keys are its declaration, and the contradiction with the keyed
      * edge is the core's to name. Reading the builder's own record back is not
      * a judgement — what an unkeyed sibling edge into one MEANS is the core's
@@ -322,8 +322,8 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
             }
             for (HostLink link : chain.links) {
                 Integer target = link.target();
-                if (target != null && procedures.get(target).entityKeys.isEmpty()) {
-                    procedures.get(target).dynamic = true;
+                if (target != null && tasklets.get(target).cellKeys.isEmpty()) {
+                    tasklets.get(target).dynamic = true;
                 }
             }
         }
@@ -359,7 +359,7 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
     void checkMutable() {
         if (frozen) {
             throw new IllegalStateException("operative `" + frozenFactoryId
-                    + "`: the topology is frozen; stream handles are only usable inside channels()/procedures()");
+                    + "`: the topology is frozen; stream handles are only usable inside channels()/tasklets()");
         }
     }
 
@@ -369,8 +369,8 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
     }
 
     /** The staging entry for a registered node, by id. */
-    ProcedureEntry procedure(int procedureId) {
-        return procedures.get(procedureId);
+    TaskletEntry tasklet(int taskletId) {
+        return tasklets.get(taskletId);
     }
 
     private int declareChannel(Class<?> payloadType, String name, ChannelKind kind) {
@@ -386,26 +386,26 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
     }
 
     /**
-     * Resolve or create the node for {@code procedureClass} under the
+     * Resolve or create the node for {@code taskletClass} under the
      * node-identity rule: two unnamed mentions of one class are the same
      * node; an explicit node name creates/refers to a distinct node whose
-     * identity string replaces the procedure's {@code name()}. An identity
+     * identity string replaces the tasklet's {@code name()}. An identity
      * claimed by a <i>different</i> declaration is a collision.
      */
-    int registerNode(Class<? extends Procedure<?, ?, ?, ?, ?, ?>> procedureClass, String nodeName) {
-        Procedure<?, ?, ?, ?, ?, ?> probe = instantiate(procedureClass);
+    int registerNode(Class<? extends Tasklet<?, ?, ?, ?, ?, ?>> taskletClass, String nodeName) {
+        Tasklet<?, ?, ?, ?, ?, ?> probe = instantiate(taskletClass);
         String identity = nodeName != null ? nodeName : probe.name();
-        Integer existing = resolveIdentity(identity, procedureClass, nodeName != null);
+        Integer existing = resolveIdentity(identity, taskletClass, nodeName != null);
         if (existing != null) {
             return existing;
         }
-        ProcedureEntry entry = probeDeclarations(probe, identity);
-        entry.procedureClass = procedureClass;
+        TaskletEntry entry = probeDeclarations(probe, identity);
+        entry.taskletClass = taskletClass;
         entry.name = identity;
         entry.named = nodeName != null;
-        int id = procedures.size();
-        procedures.add(entry);
-        procedureNameToId.put(identity, id);
+        int id = tasklets.size();
+        tasklets.add(entry);
+        taskletNameToId.put(identity, id);
         return id;
     }
 
@@ -415,32 +415,32 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
      * named/unnamed spellings, is the collision.
      */
     private Integer resolveIdentity(
-            String identity, Class<? extends Procedure<?, ?, ?, ?, ?, ?>> procedureClass, boolean named) {
-        Integer existing = procedureNameToId.get(identity);
+            String identity, Class<? extends Tasklet<?, ?, ?, ?, ?, ?>> taskletClass, boolean named) {
+        Integer existing = taskletNameToId.get(identity);
         if (existing == null) {
             return null;
         }
-        ProcedureEntry existingEntry = procedures.get(existing);
+        TaskletEntry existingEntry = tasklets.get(existing);
         // A claim by a different class, or by the other of the named/unnamed
         // spellings, is a SECOND node under one identity: it is recorded as
         // one, and the core answers NodeIdentityCollision off the record.
-        boolean sameNode = existingEntry.procedureClass.equals(procedureClass) && existingEntry.named == named;
+        boolean sameNode = existingEntry.taskletClass.equals(taskletClass) && existingEntry.named == named;
         return sameNode ? existing : null;
     }
 
     /**
      * Everything a fresh node records off one probe instance: the type tokens,
-     * the Entity-mode and durability declarations, and the two clock refusals.
+     * the Cell-mode and durability declarations, and the two clock refusals.
      *
      * <p>Every clock in the sealed hierarchy is wired. The missing
      * {@code eventTime(Input)} extractor is refused here because the record
      * carries no such fact: Rust states it as a {@code TimeExtractor<Input>}
      * bound at compile time, and erasure precludes that form.
      */
-    private ProcedureEntry probeDeclarations(Procedure<?, ?, ?, ?, ?, ?> probe, String identity) {
-        ProcedureEntry entry = new ProcedureEntry();
-        entry.entityKeys = List.copyOf(probe.entityKeys());
-        entry.entitiesForOverridden = probe.entitiesForOverridden();
+    private TaskletEntry probeDeclarations(Tasklet<?, ?, ?, ?, ?, ?> probe, String identity) {
+        TaskletEntry entry = new TaskletEntry();
+        entry.cellKeys = List.copyOf(probe.cellKeys());
+        entry.cellsForOverridden = probe.cellsForOverridden();
         entry.inputType = probe.inputType();
         entry.outputType = probe.outputType();
         entry.changeType = probe.changeType();
@@ -453,8 +453,8 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
         entry.mailboxCapacityDeclared = probe.mailboxCapacity();
         entry.mailboxCapacityOverridden = probe.mailboxCapacityOverridden();
         entry.compensateOverridden = probe.compensateOverridden();
-        entry.entityIdleTtl = probe.entityIdleTtl();
-        entry.maxEntities = probe.maxEntitiesOverridden() ? OptionalLong.of(probe.maxEntities()) : OptionalLong.empty();
+        entry.cellIdleTtl = probe.cellIdleTtl();
+        entry.maxCells = probe.maxCellsOverridden() ? OptionalLong.of(probe.maxCells()) : OptionalLong.empty();
         if (entry.clockType == EventTimeFrom.class && !probe.eventTimeOverridden()) {
             errors.add(StreamOperativeConfigurationException.eventTimeExtractorMissing(identity)
                     .getMessage());
@@ -462,62 +462,61 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
         return entry;
     }
 
-    private Procedure<?, ?, ?, ?, ?, ?> instantiate(Class<? extends Procedure<?, ?, ?, ?, ?, ?>> procedureClass) {
+    private Tasklet<?, ?, ?, ?, ?, ?> instantiate(Class<? extends Tasklet<?, ?, ?, ?, ?, ?>> taskletClass) {
         String refusal;
         try {
-            return RuntimeBridge.construct(procedureClass);
+            return RuntimeBridge.construct(taskletClass);
         } catch (ReflectiveOperationException e) {
             refusal = "must have a public no-arg constructor: " + e;
         } catch (RuntimeException e) {
             refusal = "constructor threw " + e;
         }
-        errors.add("procedure class `" + procedureClass.getName() + "` " + refusal);
+        errors.add("tasklet class `" + taskletClass.getName() + "` " + refusal);
         // A placeholder lets the build collect more errors; build() throws them all.
         return UNINSTANTIABLE;
     }
 
-    private static final Procedure<Object, Object, Object, NoChange, WallClock, Void> UNINSTANTIABLE =
-            new Procedure<>() {
-                @Override
-                public String name() {
-                    return "<uninstantiable>";
-                }
+    private static final Tasklet<Object, Object, Object, NoChange, WallClock, Void> UNINSTANTIABLE = new Tasklet<>() {
+        @Override
+        public String name() {
+            return "<uninstantiable>";
+        }
 
-                @Override
-                public Class<Object> inputType() {
-                    return Object.class;
-                }
+        @Override
+        public Class<Object> inputType() {
+            return Object.class;
+        }
 
-                @Override
-                public Class<Object> outputType() {
-                    return Object.class;
-                }
+        @Override
+        public Class<Object> outputType() {
+            return Object.class;
+        }
 
-                @Override
-                public Class<NoChange> changeType() {
-                    return NoChange.class;
-                }
+        @Override
+        public Class<NoChange> changeType() {
+            return NoChange.class;
+        }
 
-                @Override
-                public Class<WallClock> clockType() {
-                    return WallClock.class;
-                }
+        @Override
+        public Class<WallClock> clockType() {
+            return WallClock.class;
+        }
 
-                @Override
-                public Class<Void> configType() {
-                    return Void.class;
-                }
+        @Override
+        public Class<Void> configType() {
+            return Void.class;
+        }
 
-                @Override
-                public Object initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
-                    throw new UnsupportedOperationException("uninstantiable procedure");
-                }
+        @Override
+        public Object initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
+            throw new UnsupportedOperationException("uninstantiable tasklet");
+        }
 
-                @Override
-                public void run(Object input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {
-                    throw new UnsupportedOperationException("uninstantiable procedure");
-                }
-            };
+        @Override
+        public void run(Object input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {
+            throw new UnsupportedOperationException("uninstantiable tasklet");
+        }
+    };
 
     /**
      * Record {@code channelId}'s chain as closing onto a consumer node
@@ -526,10 +525,10 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
      */
     int wireConsumer(
             int channelId,
-            Class<? extends Procedure<?, ?, ?, ?, ?, ?>> procedureClass,
+            Class<? extends Tasklet<?, ?, ?, ?, ?, ?>> taskletClass,
             String nodeName,
             Integer pendingChain) {
-        return wireConsumer(channelId, procedureClass, nodeName, null, pendingChain, null);
+        return wireConsumer(channelId, taskletClass, nodeName, null, pendingChain, null);
     }
 
     /**
@@ -651,27 +650,27 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
      * Record {@code channelId}'s chain as closing onto a consumer node. A merge
      * subscription passes the declared merged input type, the mapping that
      * lifts this channel's payload into it, and the group tying its sources
-     * together; what Rust checks at the {@code .into::<Proc>()} call site with
+     * together; what Rust checks at the {@code .into::<Task>()} call site with
      * an {@code Input = I} bound is checked here instead — erasure precludes
      * the compile-time form, so the same defect is caught at registration.
      */
     int wireConsumer(
             int channelId,
-            Class<? extends Procedure<?, ?, ?, ?, ?, ?>> procedureClass,
+            Class<? extends Tasklet<?, ?, ?, ?, ?, ?>> taskletClass,
             String nodeName,
             Class<?> deliveredTypeOverride,
             Integer pendingChain,
             Integer mergeGroup) {
-        int procedureId = registerNode(procedureClass, nodeName);
-        ProcedureEntry procedure = procedures.get(procedureId);
+        int taskletId = registerNode(taskletClass, nodeName);
+        TaskletEntry tasklet = tasklets.get(taskletId);
         ChannelEntry channel = channels.get(channelId);
         Class<?> chainType = pendingChain == null ? null : pending.get(pendingChain).payloadType;
-        refuseTypeMismatch(channel, procedure, deliveredTypeOverride, chainType);
+        refuseTypeMismatch(channel, tasklet, deliveredTypeOverride, chainType);
         closeChain(
                 channelId,
                 pendingChain,
-                mergeGroup == null ? HostLink.into(procedureId) : HostLink.merge(procedureId, mergeGroup));
-        return procedureId;
+                mergeGroup == null ? HostLink.into(taskletId) : HostLink.merge(taskletId, mergeGroup));
+        return taskletId;
     }
 
     /**
@@ -680,10 +679,10 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
      * same thing here, and both reshape what the consumer observes.
      */
     private void refuseTypeMismatch(
-            ChannelEntry channel, ProcedureEntry procedure, Class<?> deliveredTypeOverride, Class<?> chainType) {
+            ChannelEntry channel, TaskletEntry tasklet, Class<?> deliveredTypeOverride, Class<?> chainType) {
         Class<?> declared = deliveredTypeOverride != null ? deliveredTypeOverride : chainType;
         Class<?> deliveredType = declared != null ? declared : channel.payloadType;
-        if (deliveredType.equals(procedure.inputType)) {
+        if (deliveredType.equals(tasklet.inputType)) {
             return;
         }
         String producedBy = deliveredTypeOverride != null
@@ -692,11 +691,11 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
                         ? "edge transforms produce"
                         : channel.producer == null
                                 ? "payload type"
-                                : "producer procedure `" + procedures.get(channel.producer).name + "` outputType() =";
+                                : "producer tasklet `" + tasklets.get(channel.producer).name + "` outputType() =";
         errors.add("channel `" + channel.name + "`: " + producedBy + " "
                 + describe(deliveredType)
-                + " does not match consumer procedure `" + procedure.name
-                + "` inputType() = " + describe(procedure.inputType));
+                + " does not match consumer tasklet `" + tasklet.name
+                + "` inputType() = " + describe(tasklet.inputType));
     }
 
     /**
@@ -705,14 +704,14 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
      * {@code .named(...)} override; payload type = the node's declared
      * {@code outputType()}.
      */
-    int ensureOutputChannel(int procedureId) {
-        ProcedureEntry procedure = procedures.get(procedureId);
-        if (procedure.outputChannelId != null) {
-            return procedure.outputChannelId;
+    int ensureOutputChannel(int taskletId) {
+        TaskletEntry tasklet = tasklets.get(taskletId);
+        if (tasklet.outputChannelId != null) {
+            return tasklet.outputChannelId;
         }
-        int id = declareChannel(procedure.outputType, procedure.name, ChannelKind.INTER_PROCEDURE);
-        channels.get(id).producer = procedureId;
-        procedure.outputChannelId = id;
+        int id = declareChannel(tasklet.outputType, tasklet.name, ChannelKind.INTER_TASKLET);
+        channels.get(id).producer = taskletId;
+        tasklet.outputChannelId = id;
         return id;
     }
 
@@ -753,9 +752,9 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
     }
 
     /** Mutable internal record for a node registration. */
-    public static final class ProcedureEntry {
+    public static final class TaskletEntry {
         /**
-         * Node identity: the procedure's {@code name()}, or the explicit node
+         * Node identity: the tasklet's {@code name()}, or the explicit node
          * name given at wiring time. Feeds everything {@code name()} feeds —
          * state directories, journal entries, the derived channel name,
          * diagnostics.
@@ -765,12 +764,12 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
         /** Whether this node was created with an explicit node name. */
         boolean named;
 
-        Class<? extends Procedure<?, ?, ?, ?, ?, ?>> procedureClass;
-        public List<String> entityKeys;
-        public boolean entitiesForOverridden;
+        Class<? extends Tasklet<?, ?, ?, ?, ?, ?>> taskletClass;
+        public List<String> cellKeys;
+        public boolean cellsForOverridden;
         /**
          * Set when some chain closing onto this node carries a key function —
-         * Entity mode is read off the WIRING, not off the procedure, and the
+         * Cell mode is read off the WIRING, not off the tasklet, and the
          * record states it so the core can judge the sibling edges.
          */
         public boolean dynamic;
@@ -788,7 +787,7 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
         int mailboxCapacityDeclared;
         boolean mailboxCapacityOverridden;
         public boolean compensateOverridden;
-        public Optional<Duration> entityIdleTtl = Optional.empty();
-        public OptionalLong maxEntities = OptionalLong.empty();
+        public Optional<Duration> cellIdleTtl = Optional.empty();
+        public OptionalLong maxCells = OptionalLong.empty();
     }
 }

@@ -4,7 +4,7 @@ import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operative.StreamOperative;
 
 /**
- * Demonstrates the per-Entity flusher's coalescing path: {@link TickChange}
+ * Demonstrates the per-Cell flusher's coalescing path: {@link TickChange}
  * carries a {@link com.flezha.sdk.state.CoalesceKey} so Changes with equal
  * {@code (interval, ts)} collapse to the latest within a flush window.
  */
@@ -17,6 +17,6 @@ public final class CoalescingCounterStreamOperative implements StreamOperative {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "input").into(TickEntryProcedure.class).named("ticks").into(TickProcedure.class);
+        c.input(String.class, "input").into(TickEntryTasklet.class).named("ticks").into(TickTasklet.class);
     }
 }

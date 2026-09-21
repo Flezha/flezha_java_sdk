@@ -1,8 +1,8 @@
 package com.flezha.examples.workflow;
 
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
 import com.flezha.sdk.state.StateHandle;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import javax.annotation.Nonnull;
 
 /** The last step. Nothing after it, so it needs no undo. */
@@ -15,8 +15,8 @@ public final class Ship extends Step {
     }
 
     @Override
-    public void run(@Nonnull String charged, @Nonnull StateHandle<Handle, Reserved> state, @Nonnull ProcedureCtx ctx)
-            throws ProcedureException {
+    public void run(@Nonnull String charged, @Nonnull StateHandle<Handle, Reserved> state, @Nonnull TaskletCtx ctx)
+            throws TaskletException {
         ctx.emit(charged + "|shipped");
     }
 }

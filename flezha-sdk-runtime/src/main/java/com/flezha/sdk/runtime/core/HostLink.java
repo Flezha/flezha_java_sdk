@@ -19,7 +19,7 @@ import javax.annotation.Nullable;
 public record HostLink(
         @Nonnull String link,
         @Nullable String name,
-        @Nullable Integer procedure,
+        @Nullable Integer tasklet,
         @Nullable Integer group,
         @Nullable Integer arms) {
 
@@ -50,16 +50,16 @@ public record HostLink(
         return new HostLink("sink", name, null, null, null);
     }
 
-    /** Closes the chain onto an edge into a procedure index. */
+    /** Closes the chain onto an edge into a tasklet index. */
     @Nonnull
-    public static HostLink into(int procedure) {
-        return new HostLink("into", null, procedure, null, null);
+    public static HostLink into(int tasklet) {
+        return new HostLink("into", null, tasklet, null, null);
     }
 
-    /** Closes the chain as one source of merge {@code group} into a procedure. */
+    /** Closes the chain as one source of merge {@code group} into a tasklet. */
     @Nonnull
-    public static HostLink merge(int procedure, int group) {
-        return new HostLink("merge", null, procedure, group, null);
+    public static HostLink merge(int tasklet, int group) {
+        return new HostLink("merge", null, tasklet, group, null);
     }
 
     /** The {@code branch(...)} sugar's declared arity. */
@@ -68,10 +68,10 @@ public record HostLink(
         return new HostLink("branch", null, null, null, arms);
     }
 
-    /** The procedure this link wires its chain into, or {@code null}. */
+    /** The tasklet this link wires its chain into, or {@code null}. */
     @Nullable
     public Integer target() {
-        return link.equals("into") || link.equals("merge") ? procedure : null;
+        return link.equals("into") || link.equals("merge") ? tasklet : null;
     }
 
     /** This link as the record's JSON object. */
@@ -82,8 +82,8 @@ public record HostLink(
         if (name != null) {
             out.put("name", name);
         }
-        if (procedure != null) {
-            out.put("procedure", procedure);
+        if (tasklet != null) {
+            out.put("tasklet", tasklet);
         }
         if (group != null) {
             out.put("group", group);

@@ -1,15 +1,15 @@
 package com.flezha.test;
 
-import com.flezha.sdk.authoring.Procedure;
-import com.flezha.sdk.authoring.EntitiesFor;
+import com.flezha.sdk.authoring.Tasklet;
+import com.flezha.sdk.authoring.CellsFor;
 import java.util.List;
 
-/** Static-entity entry procedure of the 2-procedure reference operative. */
-@Procedure(id = "macro_static_entry_procedure", keys = {"a", "b", "c", "d"})
+/** Static-cell entry tasklet of the 2-tasklet reference operative. */
+@Tasklet(id = "macro_static_entry_tasklet", keys = {"a", "b", "c", "d"})
 public class SugarEntry {
 
-    @EntitiesFor
-    public List<String> entitiesFor(String input) {
+    @CellsFor
+    public List<String> cellsFor(String input) {
         char c = input.isEmpty() ? ' ' : input.charAt(0);
         return switch (c) {
             case 'a' -> List.of("a");

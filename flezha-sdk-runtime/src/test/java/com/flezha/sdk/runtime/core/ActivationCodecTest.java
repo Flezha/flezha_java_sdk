@@ -24,7 +24,7 @@ class ActivationCodecTest {
     private static Activation workActivation() {
         return new Activation(
                 42,
-                new EntityRef("op-1", 3, Optional.of("k")),
+                new CellRef("op-1", 3, Optional.of("k")),
                 new ActivationKind.Work(List.of(
                         new WorkItem.Input(
                                 1,
@@ -120,7 +120,7 @@ class ActivationCodecTest {
                         "06020101700100000166"),
                 Map.entry(new ActivationKind.CompensateRun(List.of(new byte[] {0x0A})), "0701010a000166"));
         for (Map.Entry<ActivationKind, String> entry : kinds) {
-            Activation act = new Activation(1, new EntityRef("o", 0, Optional.empty()), entry.getKey(), 0, "f");
+            Activation act = new Activation(1, new CellRef("o", 0, Optional.empty()), entry.getKey(), 0, "f");
             byte[] bytes = ActivationCodec.encodeActivation(act);
             // Envelope prefix (token 1, target o/0/None) is 5 bytes.
             assertThat(hex(bytes).substring(0, 10)).isEqualTo("01016f0000");

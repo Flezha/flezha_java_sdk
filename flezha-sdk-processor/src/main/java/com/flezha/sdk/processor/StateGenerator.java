@@ -95,7 +95,7 @@ final class StateGenerator {
             return journalVariants(f, journal.value(), kv, variants);
         }
         // A map field without @Journal is an unsupported mutation: there is
-        // no single per-entry proc to record. Direct to a hand-written Change.
+        // no single per-entry task to record. Direct to a hand-written Change.
         if (kv != null) {
             out.error(
                     f,
@@ -121,8 +121,8 @@ final class StateGenerator {
         }
 
         // PushBack<Field>(E) + PopFront<Field>(int) for Deque<E> — the same
-        // deltas MAP_DEQUE records, for a window whose entity key already is
-        // what the map would have keyed by. Without them a per-entity window
+        // deltas MAP_DEQUE records, for a window whose cell key already is
+        // what the map would have keyed by. Without them a per-cell window
         // could only journal whole-collection sets.
         TypeMirror dequeElem = mirrors.dequeElement(f.asType());
         if (dequeElem != null) {

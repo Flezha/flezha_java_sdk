@@ -15,13 +15,13 @@ import org.junit.jupiter.api.Test;
 class MailboxCapacityResolverTest {
 
     @Test
-    @DisplayName("explicit override on the Procedure wins over env value")
-    void overrideOnProcedureTakesPrecedence() {
+    @DisplayName("explicit override on the Tasklet wins over env value")
+    void overrideOnTaskletTakesPrecedence() {
         assertThat(MailboxCapacityResolver.resolveInner(4096, true, "2048")).isEqualTo(4096);
     }
 
     @Test
-    @DisplayName("env value is used when the Procedure does not override")
+    @DisplayName("env value is used when the Tasklet does not override")
     void envWinsOverDefault() {
         assertThat(MailboxCapacityResolver.resolveInner(1024, false, "2048")).isEqualTo(2048);
     }

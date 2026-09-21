@@ -15,6 +15,6 @@ public final class AlertDetectorOperative implements StreamOperative {
 
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
-        c.input(String.class, "events").into(DetectProcedure.class).sink("alerts");
+        c.input(String.class, "events").into(DetectTasklet.class).sink("alerts");
     }
 }

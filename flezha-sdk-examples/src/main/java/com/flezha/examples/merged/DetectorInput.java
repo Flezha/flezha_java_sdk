@@ -5,7 +5,7 @@ import java.util.Optional;
 /**
  * Everything the detector consumes, as a single type.
  *
- * <p>A procedure has one input type, so two channels have to become one. Java has no sum types, so
+ * <p>A tasklet has one input type, so two channels have to become one. Java has no sum types, so
  * this record plays that role: one slot per source, exactly one of them populated, and a factory
  * method per variant.
  *

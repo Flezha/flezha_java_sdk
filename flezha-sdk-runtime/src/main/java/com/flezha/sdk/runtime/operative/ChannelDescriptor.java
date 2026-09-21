@@ -83,12 +83,12 @@ public final class ChannelDescriptor {
     }
 
     /**
-     * The consuming procedure ids, mappings stripped — what the graph-shape
+     * The consuming tasklet ids, mappings stripped — what the graph-shape
      * walk and the workflow DAG builder need.
      */
     @Nonnull
     public List<Integer> consumerIds() {
-        return consumers.stream().map(ConsumerEdge::procedure).toList();
+        return consumers.stream().map(ConsumerEdge::tasklet).toList();
     }
 
     @Nonnull
@@ -129,7 +129,7 @@ public final class ChannelDescriptor {
 
     /**
      * Per-channel backpressure policy applied at the producer-side push
-     * site when a consumer Entity's bounded mailbox is full.
+     * site when a consumer Cell's bounded mailbox is full.
      */
     @Nonnull
     public OverflowPolicy overflowPolicy() {

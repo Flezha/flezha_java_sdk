@@ -3,8 +3,8 @@ package com.flezha.sdk.runtime.operative.builder;
 import com.flezha.sdk.channel.EdgeStream;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.Stream;
-import com.flezha.sdk.procedure.Procedure;
 import com.flezha.sdk.runtime.operative.EdgeYield;
+import com.flezha.sdk.tasklet.Tasklet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
@@ -13,7 +13,7 @@ import javax.annotation.Nonnull;
 
 /**
  * The transform / keying / consumer-side-configuration surface, implemented
- * ONCE. The entry handle and a procedure's output handle differ only in how
+ * ONCE. The entry handle and a tasklet's output handle differ only in how
  * they resolve their channel ({@link #siteChannelId}) — everything else is
  * shared, which is what keeps the two from drifting.
  */
@@ -84,20 +84,20 @@ abstract class EdgeStreamImpl<T> implements EdgeStream<T>, EdgeSite {
 
     @Override
     @Nonnull
-    public <O> Stream<O> into(@Nonnull Class<? extends Procedure<T, ?, O, ?, ?, ?>> procedureClass) {
-        return wireInto(procedureClass, null);
+    public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<T, ?, O, ?, ?, ?>> taskletClass) {
+        return wireInto(taskletClass, null);
     }
 
     @Override
     @Nonnull
     public <O> Stream<O> into(
-            @Nonnull Class<? extends Procedure<T, ?, O, ?, ?, ?>> procedureClass, @Nonnull String nodeName) {
-        return wireInto(procedureClass, nodeName);
+            @Nonnull Class<? extends Tasklet<T, ?, O, ?, ?, ?>> taskletClass, @Nonnull String nodeName) {
+        return wireInto(taskletClass, nodeName);
     }
 
-    <O> Stream<O> wireInto(Class<? extends Procedure<T, ?, O, ?, ?, ?>> procedureClass, String nodeName) {
+    <O> Stream<O> wireInto(Class<? extends Tasklet<T, ?, O, ?, ?, ?>> taskletClass, String nodeName) {
         owner.checkMutable();
-        return new StreamImpl<>(owner, owner.wireConsumer(siteChannelId(), procedureClass, nodeName, pending));
+        return new StreamImpl<>(owner, owner.wireConsumer(siteChannelId(), taskletClass, nodeName, pending));
     }
 
     @Override

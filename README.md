@@ -2,12 +2,12 @@
 
 Java 21 SDK for authoring Flezha compute engines.
 
-You write procedures that handle one message at a time, and operatives that
-declare how those procedures are connected. A controller then owns everything
-around them: placing each operative on a host, persisting per-entity state,
+You write tasklets that handle one message at a time, and operatives that
+declare how those tasklets are connected. A controller then owns everything
+around them: placing each operative on a host, persisting per-cell state,
 enforcing the delivery guarantee you declared, retrying failures, relocating work
 when a host is withdrawn, and reconnecting when a connection drops. Recovery
-resumes an entity at the point it reached rather than restarting it, which is the
+resumes a cell at the point it reached rather than restarting it, which is the
 property the rest of this document keeps returning to.
 
 Functionally at parity with the Rust SDK: every operative shape, durability tier
@@ -24,7 +24,7 @@ and delivery guarantee available there is available here.
 ```
 
 Java 21 or later. `flezha-sdk-testing` is a separate artifact, with `<scope>test</scope>`.
-The annotation processor generates the procedure classes an operative wires, so it
+The annotation processor generates the tasklet classes an operative wires, so it
 goes on the compiler's processor path:
 
 ```xml
@@ -47,19 +47,19 @@ goes on the compiler's processor path:
 
 Three files, and this structure holds however large the application becomes.
 
-**The procedure** contains the code invoked once per message. Invocation is
-serialised per entity, so two messages for the same key are never handled
-concurrently and a procedure needs no internal locking around its own state;
+**The tasklet** contains the code invoked once per message. Invocation is
+serialised per cell, so two messages for the same key are never handled
+concurrently and a tasklet needs no internal locking around its own state;
 messages for different keys are handled concurrently, possibly on different
-hosts. This procedure declares no state, so it is a pure function of its input.
+hosts. This tasklet declares no state, so it is a pure function of its input.
 
 ```java
 package com.example.echo;
 
-import com.flezha.sdk.authoring.Procedure;
+import com.flezha.sdk.authoring.Tasklet;
 
-/** The id is durable: it names this procedure in saved state. Choose it once. */
-@Procedure(id = "echo")
+/** The id is durable: it names this tasklet in saved state. Choose it once. */
+@Tasklet(id = "echo")
 public final class Echo {
 
     public String run(String input) {
@@ -68,14 +68,14 @@ public final class Echo {
 }
 ```
 
-The annotation processor generates `EchoProcedure` from this class at compile
+The annotation processor generates `EchoTasklet` from this class at compile
 time, reading the input and output types from the `run` signature, and what `run`
 returns is emitted. The operative names that generated class. `run` takes no state
 parameter, so nothing is kept between messages and nothing is journaled. A second
-parameter, the handle a `@State` class generates, makes the procedure durable, and
-a trailing `ProcedureCtx` parameter lets the body read the clock and emit for itself.
+parameter, the handle a `@State` class generates, makes the tasklet durable, and
+a trailing `TaskletCtx` parameter lets the body read the clock and emit for itself.
 
-**The operative** declares the graph and holds no logic of its own. A procedure
+**The operative** declares the graph and holds no logic of its own. A tasklet
 cannot be deployed alone, because nothing in the system knows where its messages
 originate or where its output belongs. The operative supplies that binding, which
 makes it the unit the controller schedules onto a host, restarts after a failure,
@@ -97,13 +97,13 @@ public final class EchoOperative implements StreamOperative {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "in").into(EchoProcedure.class).sink("out");
+        c.input(String.class, "in").into(EchoTasklet.class).sink("out");
     }
 }
 ```
 
 The wiring expression reads left to right: declare an entry channel named `in`
-carrying strings, route it to the echo procedure, and terminate that procedure's
+carrying strings, route it to the echo tasklet, and terminate that tasklet's
 output on the plugin layer under the name `out`. Every call returns the next
 handle in the chain, so a graph of any size is expressed as one fluent
 expression, and the whole declaration is validated at registration rather than
@@ -112,7 +112,7 @@ failing later during processing.
 The name a `sink` carries is an identity rather than documentation: it is the
 channel's name, what a plugin filter matches and what a test feeds or reads.
 The no-argument `sink()` leaves the channel named after its producing
-procedure, and `named(...)` renames a channel that has no sink to name it.
+tasklet, and `named(...)` renames a channel that has no sink to name it.
 Naming one channel both ways is refused.
 
 **The main** starts a runner: the process that connects to a controller and serves
@@ -174,14 +174,14 @@ controller are refused at startup with the responsible declaration named.
 | Durable state | `@State` class, or a `Change` type + `state.apply(...)` | State survives restart, rebuilt from a change log. |
 | Effectively-once output | `c.effectivelyOnce()` + `.keyed()` channels | State, output and consumed offset become durable in ONE record. A crash cannot advance the offset while losing the output. |
 | Checkpointed intervals | `c.checkpointAck()` + `ctx.checkpoint()` | The offset is withheld until the state is coherent, so a half-built window is never persisted. |
-| Late-input correction | `c.correctionWindow(ms)` | A late input rewinds the Entity and replays the slice in event-time order, repairing the earlier result. |
+| Late-input correction | `c.correctionWindow(ms)` | A late input rewinds the Cell and replays the slice in event-time order, repairing the earlier result. |
 | Dead-letter queue | `.retryMax(n)` on the channel | A poison payload is retried, then parked durably, never silently dropped. |
-| Edge transforms | `.map(T.class, f)` / `.filter(p)` / `.flatMap(T.class, f)` on the wiring | Reshape, drop or fan out values without a Procedure, with no entity, no mailbox and no dispatch hop. |
-| Dynamic entity mode | `.keyBy(f)` on the wiring | One Entity per key the stream actually carries, created on first sight, and visible where the graph is declared. |
-| Operative-wide document | `c.routeLatest(Doc.class, documents, traffic, keyFn)` | Every key seen on the traffic stream receives each distinct document exactly once, on that key's own next traffic item, the one delivery a keyed procedure cannot get from a broadcast. One tick of latency per key is the price of only ever emitting keys this member owns. |
-| Workflow transaction | `implements WorkflowOperative` + `procedures(...)` | Resumable chain: a committed step is skipped on resume, not re-run. Failure unwinds via `compensate`. |
+| Edge transforms | `.map(T.class, f)` / `.filter(p)` / `.flatMap(T.class, f)` on the wiring | Reshape, drop or fan out values without a Tasklet, with no cell, no mailbox and no dispatch hop. |
+| Dynamic cell mode | `.keyBy(f)` on the wiring | One Cell per key the stream actually carries, created on first sight, and visible where the graph is declared. |
+| Operative-wide document | `c.routeLatest(Doc.class, documents, traffic, keyFn)` | Every key seen on the traffic stream receives each distinct document exactly once, on that key's own next traffic item, the one delivery a keyed tasklet cannot get from a broadcast. One tick of latency per key is the price of only ever emitting keys this member owns. |
+| Workflow transaction | `implements WorkflowOperative` + `tasklets(...)` | Resumable chain: a committed step is skipped on resume, not re-run. Failure unwinds via `compensate`. |
 | Durable loop / suspension | `loopMode()` + `wakeAfter()` | One durable iteration per message; parks when idle, holding its journal. |
-| Entity retry | `retryAttempts()` / `retryBackoff()` | Only the failing entity re-runs; a failed attempt's output is dropped, not double-emitted. |
+| Cell retry | `retryAttempts()` / `retryBackoff()` | Only the failing cell re-runs; a failed attempt's output is dropped, not double-emitted. |
 
 Each is a declaration the controller must honour, so declare what you need rather
 than what sounds reassuring: a `correctionWindow` sizes the controller's input-log
@@ -191,11 +191,11 @@ retention, and a tier without keyed sinks is refused at registration.
 
 | Module | Purpose |
 |---|---|
-| `flezha-sdk-api` | Public API: `Flezha`, `StreamOperative`, `WorkflowOperative`, `Procedure`, `ProcedureCtx`, `StableId`, channel builders, clocks. No native dependency. |
-| `flezha-sdk-processor` | Annotation processor: `<Class>Procedure` from `@Procedure`, the change type and handle from `@State`, the short-form operatives. Goes on the compiler's processor path. |
+| `flezha-sdk-api` | Public API: `Flezha`, `StreamOperative`, `WorkflowOperative`, `Tasklet`, `TaskletCtx`, `StableId`, channel builders, clocks. No native dependency. |
+| `flezha-sdk-processor` | Annotation processor: `<Class>Tasklet` from `@Tasklet`, the change type and handle from `@State`, the short-form operatives. Goes on the compiler's processor path. |
 | `flezha-sdk-runtime` | Control plane, data plane, framing, worker pool, reconnect, state persistence, workflow driver. |
 | `flezha-sdk-native` | JNI bindings + bundled per-OS `libflz_core_ffi`. |
-| `flezha-sdk-testing` | `ProcedureTestHarness`, added with `<scope>test</scope>`. |
+| `flezha-sdk-testing` | `TaskletTestHarness`, added with `<scope>test</scope>`. |
 | `flezha-sdk-examples` | Worked examples. Compiled by the build, so they cannot rot. |
 | `flezha-sdk` | Fat-jar aggregator, the published artifact. |
 
@@ -229,7 +229,7 @@ FLEZHA_E2E_RUNTIME=java mix test --include system   # from repo root: the shared
 | `FLEZHA_SERVER_KEY_PATH` | `app_data/certs/key.pem` | Server mode only. |
 | `FLEZHA_SOCKET_FILES_PATH` | resolved by the socket ladder | UDS only. Set, it wins outright; unset, the ladder walks `$XDG_RUNTIME_DIR/flezha`, `/run/flezha`, `app_data/sockets`. |
 | `FLEZHA_RUNNER_ID_PATH` | `/var/lib/flezha-runner/id` | Durable stable identity. Unwritable means a fresh id per boot and lost bindings. |
-| `FLEZHA_WORKER_POOL_SIZE` | `availableProcessors()` | Shared runner draining every Entity mailbox. |
+| `FLEZHA_WORKER_POOL_SIZE` | `availableProcessors()` | Shared runner draining every Cell mailbox. |
 | `FLEZHA_LOG_LEVEL` | `warn` | `debug`, `info`, `warn` or `error` for the default logger. Unset, blank and unrecognised all mean `warn`. |
 | `FLEZHA_NATIVE_LIB_DIR` | `$TMPDIR` | Where `libflz_core_ffi` is extracted. Set it on containers where `/tmp` is `noexec`. |
 | `FLEZHA_WORKFLOW_PARK_IDLE_MS` | `5000` | Idle hysteresis before a looping workflow operative parks. |

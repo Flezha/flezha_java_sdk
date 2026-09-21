@@ -6,12 +6,12 @@ import java.util.TreeSet;
 import javax.annotation.Nonnull;
 
 /**
- * An Entity's pending timers: one ordered set per kind, rebuilt by the ordinary
+ * A Cell's pending timers: one ordered set per kind, rebuilt by the ordinary
  * change-log fold on restore rather than held in a store of its own.
  *
  * <p>Pending timers are a <b>set</b>, so registering the same kind and timestamp
  * twice is idempotent. Not thread-safe: every mutation happens under the owning
- * {@code EntitySlot}'s state lock, the same exclusion {@code run} holds.
+ * {@code CellSlot}'s state lock, the same exclusion {@code run} holds.
  */
 public final class PendingTimers {
 

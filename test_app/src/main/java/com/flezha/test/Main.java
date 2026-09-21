@@ -68,8 +68,8 @@ public final class Main {
         runner.registerFactory(DoNothingStreamOperative.class)
                 .registerFactory(StoreInputStreamOperative.class)
                 .registerFactory(CompareFilterStreamOperative.class)
-                .registerFactory(StaticEntityStreamOperative.class)
-                .registerFactory(EntityStressStreamOperative.class)
+                .registerFactory(StaticCellStreamOperative.class)
+                .registerFactory(CellStressStreamOperative.class)
                 .registerFactory(BoundedMailboxDropNothingStreamOperative.class)
                 .registerFactory(BoundedMailboxDropNewestStreamOperative.class)
                 .registerFactory(BoundedMailboxDropOldestStreamOperative.class)
@@ -82,7 +82,7 @@ public final class Main {
                 .registerFactory(ResumeProbeStreamOperative.class)
                 .registerFactory(SchemaEvolutionStreamOperatives.V1.class)
                 .registerFactory(SchemaEvolutionStreamOperatives.V2.class)
-                .registerFactory(DynamicEntityStreamOperative.class)
+                .registerFactory(DynamicCellStreamOperative.class)
                 .registerFactory(PartitionRelayStreamOperative.class)
                 .registerFactory(SessionTimeoutStreamOperative.class)
                 .registerFactory(MixedStreamOperative.class)
@@ -123,7 +123,7 @@ public final class Main {
                 .registerFactory(SugarNamedInput.class)
                 .registerFactory(SugarWorkflow.class)
                 .registerFactory(SugarStateOnly.class)
-                .registerFactory(SugarStaticEntityStreamOperative.class);
+                .registerFactory(SugarStaticCellStreamOperative.class);
         return runner;
     }
 

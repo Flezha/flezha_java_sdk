@@ -1,14 +1,14 @@
 /**
- * Durable per-entity state, and the reason a procedure never assigns to its own fields.
+ * Durable per-cell state, and the reason a tasklet never assigns to its own fields.
  *
- * <p>The procedure here counts the messages an entity has seen, and the count survives a restart.
- * Compared with the {@code echo} example, the procedure declares a change type, and implements
- * {@link com.flezha.sdk.procedure.Procedure} directly so that the change machinery is in plain
- * view. Declaring a change type is the whole of what makes a procedure durable, and the wiring is
+ * <p>The tasklet here counts the messages a cell has seen, and the count survives a restart.
+ * Compared with the {@code echo} example, the tasklet declares a change type, and implements
+ * {@link com.flezha.sdk.tasklet.Tasklet} directly so that the change machinery is in plain
+ * view. Declaring a change type is the whole of what makes a tasklet durable, and the wiring is
  * untouched.
  *
  * <p>The mechanism is a change log rather than object serialisation. Flezha records the ordered
- * list of changes the procedure applied and reconstructs the state object after a restart by
+ * list of changes the tasklet applied and reconstructs the state object after a restart by
  * replaying that list, on top of the most recent snapshot where one exists. A field assigned
  * directly from {@code run} never enters the log and is therefore absent from the reconstructed
  * object. This is the single most common mistake against the SDK, and it is silent: a direct
@@ -16,7 +16,7 @@
  * moment recovery matters.
  *
  * <p>Three members carry the pattern in
- * {@link com.flezha.examples.state.CountProcedure}. The nested {@code Increment} record is the
+ * {@link com.flezha.examples.state.CountTasklet}. The nested {@code Increment} record is the
  * change, and must carry everything needed to redo the mutation later, which is why its timestamp
  * is a field rather than something read during replay. {@code applyChange} is the only method
  * permitted to write state, and is called both when a change is applied and again for each logged
@@ -25,11 +25,11 @@
  * during recovery and must produce the same result.
  *
  * <p>Where each change sets one field, none of this is written by hand: a {@code @State} class
- * generates the change type and a handle with one recorder per field, and a {@code @Procedure}
+ * generates the change type and a handle with one recorder per field, and a {@code @Tasklet}
  * class takes that handle in {@code run}. The {@code keyed} example is written that way.
  *
- * <p>Declaring a change type also makes an entity readable from outside the pipeline. Nothing
- * further is required: {@code flz state get} returns the current value of any entity of a running
+ * <p>Declaring a change type also makes a cell readable from outside the pipeline. Nothing
+ * further is required: {@code flz state get} returns the current value of any cell of a running
  * operative, which is how a dashboard or an operational query reads a value without waiting for it
  * to reach a sink.
  */

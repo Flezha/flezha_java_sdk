@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
  *
  * <p>A stream operative runs for as long as the desk does. The exchange delivers several trades in
  * one frame, so the wiring splits the frame before anything else sees it, drops what the desk does
- * not trade on, and routes the rest to an entity per symbol.
+ * not trade on, and routes the rest to a cell per symbol.
  */
 public final class CandlesOperative implements StreamOperative {
 
@@ -35,17 +35,17 @@ public final class CandlesOperative implements StreamOperative {
     }
 
     /**
-     * Three transforms on the wiring, then two procedures, and two places output leaves the desk.
+     * Three transforms on the wiring, then two tasklets, and two places output leaves the desk.
      *
      * <p>{@code flatMap} turns one frame into its trades, each routed on its own. {@code filter}
-     * drops the feed's zero-quantity frames. {@code keyBy} names the entity each trade belongs to,
+     * drops the feed's zero-quantity frames. {@code keyBy} names the cell each trade belongs to,
      * which is what gives every symbol its own state and its own order of arrival; it has to be
      * the last link before {@code into}, because it is evaluated on whatever the transforms above
-     * it produced. The three run at the routing seam rather than as procedures of their own: no
-     * entity, no mailbox, no dispatch hop, which is why they must stay cheap and free of side
+     * it produced. The three run at the routing seam rather than as tasklets of their own: no
+     * cell, no mailbox, no dispatch hop, which is why they must stay cheap and free of side
      * effects.
      *
-     * <p>A procedure's output is an ordinary channel, so each stage is wired onto the one before it
+     * <p>A tasklet's output is an ordinary channel, so each stage is wired onto the one before it
      * with the same {@code into} the entry channel used, and the expression reads in flow order.
      *
      * <p>{@code sink("candles")} sits in the middle of that chain, which is the point: a sink is an
@@ -53,9 +53,9 @@ public final class CandlesOperative implements StreamOperative {
      * there for whatever is listening, and the same value carries on to the next stage.
      *
      * <p>Only the first stage is keyed, because keying is declared per edge rather than inherited:
-     * a plain {@code into} leaves its consumer single-entity. That is the right shape here, since
+     * a plain {@code into} leaves its consumer single-cell. That is the right shape here, since
      * the second stage keeps nothing per symbol. A stage that did would need its own
-     * {@code keyBy}, or one entity would hold every symbol at once.
+     * {@code keyBy}, or one cell would hold every symbol at once.
      *
      * <p>{@code sealed()} states that the signals channel is where the desk's output ends. It
      * is purely type-level: the declared topology is the same without it, but a later
@@ -69,7 +69,7 @@ public final class CandlesOperative implements StreamOperative {
                 .keyBy(Trade::symbol)
                 .into(BuildCandles.class)
                 .sink("candles")
-                .into(MeasureMoveProcedure.class)
+                .into(MeasureMoveTasklet.class)
                 .sink("signals")
                 .sealed();
     }

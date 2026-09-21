@@ -1,9 +1,9 @@
 package com.flezha.examples.tradedesk;
 
 import com.flezha.examples.tradedesk.PaperOrderOperative.OrderTicket;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
@@ -14,14 +14,14 @@ import java.util.Optional;
 /**
  * Step one: put the money for the order aside.
  *
- * <p>A step that keeps state or has something to undo implements {@link Procedure} directly, and
+ * <p>A step that keeps state or has something to undo implements {@link Tasklet} directly, and
  * this one does both. The six type arguments are, in order, the input, the state, the output, the
  * change, the clock and the configuration. The desk's stateless steps take the
- * {@code @Procedure} short form instead, which is why the operative wires some classes by their
+ * {@code @Tasklet} short form instead, which is why the operative wires some classes by their
  * own name and others by a generated one.
  */
 public final class ReserveFunds
-        implements Procedure<OrderTicket, ReserveFunds.Reservation, ReserveFunds.Reserved, ReserveFunds.Taken, WallClock, Void> {
+        implements Tasklet<OrderTicket, ReserveFunds.Reservation, ReserveFunds.Reserved, ReserveFunds.Taken, WallClock, Void> {
 
     /** What this step remembers. The undo handle belongs here: state survives a restart, output does not. */
     public static final class Reservation {
@@ -46,7 +46,7 @@ public final class ReserveFunds
     }
 
     @Override
-    public Reservation initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+    public Reservation initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
         return new Reservation();
     }
 
@@ -56,8 +56,8 @@ public final class ReserveFunds
     }
 
     @Override
-    public void run(OrderTicket order, StateHandle<Reservation, Taken> state, ProcedureCtx ctx)
-            throws ProcedureException {
+    public void run(OrderTicket order, StateHandle<Reservation, Taken> state, TaskletCtx ctx)
+            throws TaskletException {
         // ctx.stableId(), not a random id: a re-executed step derives the same one, so the ledger
         // sees a retry rather than a second sum put aside.
         String reservationId = "res-" + ctx.stableId();
@@ -79,8 +79,8 @@ public final class ReserveFunds
      * resume and emitted output is not, so after a crash-resumed rollback that list can be empty.
      */
     @Override
-    public void compensate(List<Reserved> completedOutput, StateHandle<Reservation, Taken> state, ProcedureCtx ctx)
-            throws ProcedureException {
+    public void compensate(List<Reserved> completedOutput, StateHandle<Reservation, Taken> state, TaskletCtx ctx)
+            throws TaskletException {
         System.out.println("[undo] released " + state.get().id);
     }
 }

@@ -16,14 +16,14 @@ public final class BoundedMailboxDropOldestStreamOperative implements StreamOper
     public void channels(ChannelBuilder c) {
         c.input(String.class, "drop_oldest_input")
                 .onFull(OverflowPolicy.DROP_OLDEST)
-                .into(DropOldestTestProcedure.class)
+                .into(DropOldestTestTasklet.class)
                 .sink("drop_oldest_echo");
     }
 
-    public static final class DropOldestTestProcedure extends BoundedMailboxProcedure {
+    public static final class DropOldestTestTasklet extends BoundedMailboxTasklet {
         @Override
         public String name() {
-            return "drop_oldest_test_procedure";
+            return "drop_oldest_test_tasklet";
         }
     }
 }

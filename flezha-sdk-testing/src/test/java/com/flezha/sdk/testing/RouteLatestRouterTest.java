@@ -11,19 +11,19 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * The delivery contract of the procedure {@code ChannelBuilder.routeLatest}
+ * The delivery contract of the tasklet {@code ChannelBuilder.routeLatest}
  * expands to — the Java mirror of the Rust SDK's {@code route_latest} cases.
  *
  * <p>The documents here are opaque {@code String}s, which is both what the block
  * promises (the document is retained and compared, never parsed) and what keeps
- * the harness's own state codec — built from {@code Procedure.kryoTypes()} alone,
+ * the harness's own state codec — built from {@code Tasklet.kryoTypes()} alone,
  * with no wiring to register a document class — able to serialize the retained
  * state.
  */
 final class RouteLatestRouterTest {
 
-    private static ProcedureTestHarness<Input, RouterState, RoutedDocument<Object>, RouterChange> harness() {
-        return ProcedureTestHarness.of(new LatestDocumentRouter());
+    private static TaskletTestHarness<Input, RouterState, RoutedDocument<Object>, RouterChange> harness() {
+        return TaskletTestHarness.of(new LatestDocumentRouter());
     }
 
     private static Input document(String body) {
@@ -89,7 +89,7 @@ final class RouteLatestRouterTest {
 
     /**
      * fails when: a key first seen after the document was retained never receives
-     * it (a late-born Entity starts up config-less) or receives it repeatedly.
+     * it (a late-born Cell starts up config-less) or receives it repeatedly.
      */
     @Test
     void aFirstSeenKeyReceivesTheCurrentDocumentOnce() {

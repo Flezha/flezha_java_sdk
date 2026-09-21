@@ -8,7 +8,7 @@ import com.flezha.sdk.runtime.core.ActivationCodec;
 import com.flezha.sdk.runtime.core.ActivationKind;
 import com.flezha.sdk.runtime.core.ActivationOutcome;
 import com.flezha.sdk.runtime.core.ActivationResult;
-import com.flezha.sdk.runtime.core.EntityRef;
+import com.flezha.sdk.runtime.core.CellRef;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -115,13 +115,9 @@ class PollHostTest {
         }
     }
 
-    private static Activation activation(long token, String entityKey) {
+    private static Activation activation(long token, String cellKey) {
         return new Activation(
-                token,
-                new EntityRef("op-1", 0, Optional.of(entityKey)),
-                new ActivationKind.Work(List.of()),
-                0,
-                "factory");
+                token, new CellRef("op-1", 0, Optional.of(cellKey)), new ActivationKind.Work(List.of()), 0, "factory");
     }
 
     private static ActivationResult ok(Activation activation) {
@@ -162,7 +158,7 @@ class PollHostTest {
         CountDownLatch gate = new CountDownLatch(1);
         CountDownLatch unblockedDispatched = new CountDownLatch(4);
         Function<Activation, ActivationResult> dispatch = activation -> {
-            if (activation.target().entityKey().orElseThrow().startsWith("blocked")) {
+            if (activation.target().cellKey().orElseThrow().startsWith("blocked")) {
                 try {
                     gate.await(10, TimeUnit.SECONDS);
                 } catch (InterruptedException e) {
@@ -185,7 +181,7 @@ class PollHostTest {
             }
 
             assertThat(unblockedDispatched.await(10, TimeUnit.SECONDS))
-                    .as("work for unblocked entities was served while two activations blocked")
+                    .as("work for unblocked cells was served while two activations blocked")
                     .isTrue();
             assertThat(gate.getCount())
                     .as("the blocked activations really were still blocked")
@@ -195,15 +191,15 @@ class PollHostTest {
     }
 
     /**
-     * Per-Entity exclusivity is the core's guarantee — it hands out the next
-     * activation for an Entity only once the previous one completes. The host
+     * Per-Cell exclusivity is the core's guarantee — it hands out the next
+     * activation for a Cell only once the previous one completes. The host
      * keeps that true by completing only after the dispatch returns; a host
-     * that completed early would let two activations for one Entity overlap.
+     * that completed early would let two activations for one Cell overlap.
      */
     @Test
-    @DisplayName("per-entity order holds across successive activations")
+    @DisplayName("per-cell order holds across successive activations")
     @SuppressWarnings("try")
-    void perEntityOrderHoldsAcrossSuccessiveActivations() throws Exception {
+    void perCellOrderHoldsAcrossSuccessiveActivations() throws Exception {
         FakeCore core = new FakeCore();
         List<String> trace = new CopyOnWriteArrayList<>();
         AtomicInteger handedOut = new AtomicInteger();
@@ -218,10 +214,10 @@ class PollHostTest {
             }
             trace.add("exit-" + activation.token());
             // The core's exclusivity, reproduced: the next activation for this
-            // Entity becomes available only now.
+            // Cell becomes available only now.
             int next = handedOut.incrementAndGet() + 1;
             if (next <= 3) {
-                core.handOut(activation(next, "same-entity"));
+                core.handOut(activation(next, "same-cell"));
             } else {
                 done.countDown();
             }
@@ -229,7 +225,7 @@ class PollHostTest {
         };
 
         try (PollHost ignored = start(core, dispatch, 2)) {
-            core.handOut(activation(1, "same-entity"));
+            core.handOut(activation(1, "same-cell"));
             assertThat(insideFirst.await(10, TimeUnit.SECONDS))
                     .as("the first activation is held inside the dispatch")
                     .isTrue();
@@ -245,8 +241,8 @@ class PollHostTest {
     }
 
     /**
-     * Per-entity exclusivity IS the handout, so an activation that returns
-     * without an answer retires its Entity for the life of the process. Every
+     * Per-cell exclusivity IS the handout, so an activation that returns
+     * without an answer retires its Cell for the life of the process. Every
      * way the answer can be missed — the dispatch throwing, the result failing
      * to encode, `complete` itself throwing — must abandon instead.
      */

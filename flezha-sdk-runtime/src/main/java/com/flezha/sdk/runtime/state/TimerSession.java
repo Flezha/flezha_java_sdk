@@ -1,8 +1,8 @@
 package com.flezha.sdk.runtime.state;
 
-import com.flezha.sdk.procedure.ProcedureException;
-import com.flezha.sdk.runtime.entity.TimerCounters;
+import com.flezha.sdk.runtime.cell.TimerCounters;
 import com.flezha.sdk.state.TimerKind;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,16 +10,16 @@ import javax.annotation.Nonnull;
 
 /**
  * The timer surface for ONE invocation, held by the dispatcher's
- * {@code ProcedureCtx}.
+ * {@code TaskletCtx}.
  *
- * <p>It works on a <b>copy</b> of the Entity's pending set: the retry ladder
+ * <p>It works on a <b>copy</b> of the Cell's pending set: the retry ladder
  * re-runs a failed attempt, and a registration that attempt made must not
  * survive it. The dispatcher calls {@link #commit} only on the attempt that
  * completed — which is also where the counters move, so a refused-then-retried
  * invocation is counted once.
  *
  * <p>Opened through {@link TimerPolicy#session} / {@link TimerPolicy#firingSession},
- * which resolve everything a Procedure declares about its timers once.
+ * which resolve everything a Tasklet declares about its timers once.
  */
 public final class TimerSession {
 
@@ -49,23 +49,23 @@ public final class TimerSession {
     }
 
     /** Register an event-time timer at an absolute timestamp. */
-    public long registerAtEventTime(long scheduledAt) throws ProcedureException {
+    public long registerAtEventTime(long scheduledAt) throws TaskletException {
         if (!policy.eventTimeClock()) {
             policy.counters().refused().incrementAndGet();
-            throw new ProcedureException.EventTimeTimerWithoutEventTimeClock(policy.procedure(), policy.clock());
+            throw new TaskletException.EventTimeTimerWithoutEventTimeClock(policy.tasklet(), policy.clock());
         }
         return register(TimerKind.EVENT_TIME, scheduledAt);
     }
 
     /** Register a processing-time timer {@code delay} after {@code ctx.now()}. */
-    public long registerAfter(@Nonnull Duration delay) throws ProcedureException {
+    public long registerAfter(@Nonnull Duration delay) throws TaskletException {
         return register(TimerKind.PROCESSING_TIME, now + delay.toMillis());
     }
 
-    private long register(TimerKind kind, long scheduledAt) throws ProcedureException {
-        if (!pending.contains(kind, scheduledAt) && pending.size() >= policy.maxPerEntity()) {
+    private long register(TimerKind kind, long scheduledAt) throws TaskletException {
+        if (!pending.contains(kind, scheduledAt) && pending.size() >= policy.maxPerCell()) {
             policy.counters().refused().incrementAndGet();
-            throw new ProcedureException.TimerCapExceeded(policy.procedure(), policy.maxPerEntity());
+            throw new TaskletException.TimerCapExceeded(policy.tasklet(), policy.maxPerCell());
         }
         TimerOp op = TimerOp.register(kind, scheduledAt);
         if (pending.apply(op)) {
@@ -88,7 +88,7 @@ public final class TimerSession {
     }
 
     /**
-     * Publish the session onto the Entity's live pending set and return the ops
+     * Publish the session onto the Cell's live pending set and return the ops
      * to make durable (and to arm or disarm on the wheel).
      */
     @Nonnull

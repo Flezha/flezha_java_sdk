@@ -1,7 +1,7 @@
 package com.flezha.sdk.channel;
 
 /**
- * What a channel discards when the consumer Entity's bounded mailbox is full,
+ * What a channel discards when the consumer Cell's bounded mailbox is full,
  * applied at the producer-side push site. Declared via {@code .onFull(...)} on
  * the channel builder. The default is {@link #DROP_NOTHING} for every kind, so
  * nothing is discarded unless declared. Plugin-bound channels carry no

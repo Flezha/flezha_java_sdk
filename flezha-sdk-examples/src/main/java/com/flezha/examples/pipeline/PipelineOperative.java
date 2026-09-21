@@ -5,11 +5,11 @@ import com.flezha.sdk.operative.StreamOperative;
 import javax.annotation.Nonnull;
 
 /**
- * A two-stage graph: one procedure's output is the next procedure's input.
+ * A two-stage graph: one tasklet's output is the next tasklet's input.
  *
- * <p>The preceding examples each declare a single procedure, which can suggest that chaining is a
- * distinct feature. It is not. A procedure's output travels on an ordinary channel, and a channel
- * can be routed to another procedure as readily as to a sink.
+ * <p>The preceding examples each declare a single tasklet, which can suggest that chaining is a
+ * distinct feature. It is not. A tasklet's output travels on an ordinary channel, and a channel
+ * can be routed to another tasklet as readily as to a sink.
  */
 public final class PipelineOperative implements StreamOperative {
 
@@ -25,7 +25,7 @@ public final class PipelineOperative implements StreamOperative {
         // it, Normalize's output travels on a channel labelled "normalized", Shout consumes that,
         // and Shout's output reaches a plugin sink.
         //
-        // Each stage is an independent procedure with its own state, scheduled and restarted
+        // Each stage is an independent tasklet with its own state, scheduled and restarted
         // separately, so a slow or failing stage does not halt the others. The chain extends to any
         // number of stages; the only coupling is the type, since a stage's output type must match
         // the next stage's input type.
@@ -33,9 +33,9 @@ public final class PipelineOperative implements StreamOperative {
         // The labels are identities rather than documentation: "normalized" and "shouted" are what
         // a sink registers against and what a test feeds or reads.
         c.input(String.class, "in")
-                .into(NormalizeProcedure.class)
+                .into(NormalizeTasklet.class)
                 .named("normalized")
-                .into(ShoutProcedure.class)
+                .into(ShoutTasklet.class)
                 .sink("shouted");
     }
 }

@@ -5,11 +5,11 @@ import com.flezha.sdk.operative.StreamOperative;
 
 /**
  * Mirror of the Rust test app's {@code CheckpointBatchedOperative}: the same
- * procedure as {@link CheckpointStoreStreamOperative} declaring
+ * tasklet as {@link CheckpointStoreStreamOperative} declaring
  * {@code outputsAtCheckpoint}, so the interval's outputs ship inside its
  * checkpoint record. No {@code checkpointEvery} — the test drives the close
  * itself, with {@code commit:} for the batch case and the delay alone for the
- * quiet-Entity case.
+ * quiet-Cell case.
  */
 public final class CheckpointBatchedStoreStreamOperative implements StreamOperative {
 
@@ -24,7 +24,7 @@ public final class CheckpointBatchedStoreStreamOperative implements StreamOperat
         c.checkpointAck();
         c.outputsAtCheckpoint(1_500);
         c.input(String.class, "input")
-                .into(CheckpointStoreProcedure.class)
+                .into(CheckpointStoreTasklet.class)
                 .keyed()
                 .sink("sink");
     }

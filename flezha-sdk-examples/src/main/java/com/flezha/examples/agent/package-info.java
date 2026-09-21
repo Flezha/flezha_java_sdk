@@ -1,7 +1,7 @@
 /**
  * A long-lived agent: one durable iteration per message, holding its history across restarts.
  *
- * <p>The conversation is kept in entity state, so the agent resumes mid-thread after a crash, a
+ * <p>The conversation is kept in cell state, so the agent resumes mid-thread after a crash, a
  * redeployment, or an arbitrary period of silence. Nothing runs between messages; the instance
  * parks holding its journal and is resumed when addressed.
  *

@@ -1,8 +1,8 @@
 package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.operative.WorkflowOperative;
@@ -10,14 +10,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
- * Mirror of the Rust test app's {@code branch_workflow}: the procedure TREE.
+ * Mirror of the Rust test app's {@code branch_workflow}: the tasklet TREE.
  *
  * <pre>
  *     BranchA ─┬─▶ BranchB ─▶ BranchD
  *              └─▶ BranchC
  * </pre>
  *
- * Every procedure commits durable state and compensates by emitting an undo
+ * Every tasklet commits durable state and compensates by emitting an undo
  * record, so both tree behaviours are observable at one sink: crash-resume
  * (BranchD blocks, so the respawn re-runs D alone and the sibling's {@code c:}
  * marker appears exactly once) and compensation (with {@code FLEZHA_BRANCH_FAIL}
@@ -43,7 +43,7 @@ public final class BranchWorkflowOperative implements WorkflowOperative {
     }
 
     @Override
-    public void procedures(ChannelBuilder c) {
+    public void tasklets(ChannelBuilder c) {
         // One channel, two consumers: THE fan-out. Both branches read exactly
         // what BranchA released on it (held handle, wired twice).
         var mid = c.input(String.class, "in")
@@ -70,8 +70,8 @@ public final class BranchWorkflowOperative implements WorkflowOperative {
         }
 
         @Override
-        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
+                throws TaskletException {
             ctx.emit("undo-a");
         }
     }
@@ -90,8 +90,8 @@ public final class BranchWorkflowOperative implements WorkflowOperative {
         }
 
         @Override
-        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
+                throws TaskletException {
             ctx.emit("undo-b");
         }
     }
@@ -105,8 +105,8 @@ public final class BranchWorkflowOperative implements WorkflowOperative {
         }
 
         @Override
-        public void run(String input, StateHandle<SeenState, Insert> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
+                throws TaskletException {
             state.apply(new Insert(name()));
             ctx.emit("c:" + input);
         }
@@ -117,8 +117,8 @@ public final class BranchWorkflowOperative implements WorkflowOperative {
         }
 
         @Override
-        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
+                throws TaskletException {
             ctx.emit("undo-c");
         }
     }
@@ -132,10 +132,10 @@ public final class BranchWorkflowOperative implements WorkflowOperative {
         }
 
         @Override
-        public void run(String input, StateHandle<State, NoChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
+                throws TaskletException {
             if (System.getenv(BRANCH_FAIL_ENV) != null) {
-                throw new ProcedureException("branch_d failed");
+                throw new TaskletException("branch_d failed");
             }
             WorkflowE2eGate.blockUntilReleased();
             ctx.emit("d:" + input);

@@ -4,9 +4,9 @@ import com.flezha.sdk.channel.Channel;
 import com.flezha.sdk.channel.EdgeStream;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.Stream;
-import com.flezha.sdk.procedure.Procedure;
 import com.flezha.sdk.runtime.core.HostLink;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.ChannelEntry;
+import com.flezha.sdk.tasklet.Tasklet;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -15,7 +15,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * The procedure's output stream handle: a node id into the enclosing builder.
+ * The tasklet's output stream handle: a node id into the enclosing builder.
  * The channel out of the node is created lazily on first use.
  */
 final class StreamImpl<T> extends Stream<T> implements EdgeSite {
@@ -57,15 +57,15 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
 
     @Override
     @Nonnull
-    public <O> Stream<O> into(@Nonnull Class<? extends Procedure<T, ?, O, ?, ?, ?>> procedureClass) {
-        return edge.into(procedureClass);
+    public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<T, ?, O, ?, ?, ?>> taskletClass) {
+        return edge.into(taskletClass);
     }
 
     @Override
     @Nonnull
     public <O> Stream<O> into(
-            @Nonnull Class<? extends Procedure<T, ?, O, ?, ?, ?>> procedureClass, @Nonnull String nodeName) {
-        return edge.into(procedureClass, nodeName);
+            @Nonnull Class<? extends Tasklet<T, ?, O, ?, ?, ?>> taskletClass, @Nonnull String nodeName) {
+        return edge.into(taskletClass, nodeName);
     }
 
     @Override
@@ -195,7 +195,7 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
     /** The producer node's declared output type: this stream's payload type. */
     @SuppressWarnings("unchecked")
     private Class<T> payloadType() {
-        return (Class<T>) owner.procedure(node).outputType;
+        return (Class<T>) owner.tasklet(node).outputType;
     }
 
     @SuppressWarnings("unchecked")

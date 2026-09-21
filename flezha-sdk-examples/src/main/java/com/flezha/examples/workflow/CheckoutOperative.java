@@ -35,7 +35,7 @@ public final class CheckoutOperative implements WorkflowOperative {
     }
 
     @Override
-    public void procedures(@Nonnull ChannelBuilder c) {
+    public void tasklets(@Nonnull ChannelBuilder c) {
         // The value between two steps is written down at that boundary, which is what lets a
         // workflow that died after charging resume at shipping instead of starting over. Nothing
         // here declares how it is written: the runtime derives that from the channel.

@@ -6,11 +6,11 @@ import com.flezha.sdk.runtime.core.DerivedDeclaration;
 import com.flezha.sdk.runtime.operative.ChannelDescriptor;
 import com.flezha.sdk.runtime.operative.ConsumerEdge;
 import com.flezha.sdk.runtime.operative.PluginSink;
-import com.flezha.sdk.runtime.operative.ProcedureDescriptor;
 import com.flezha.sdk.runtime.operative.StreamOperativeTopology;
+import com.flezha.sdk.runtime.operative.TaskletDescriptor;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.ChannelEntry;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.PendingEdge;
-import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.ProcedureEntry;
+import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.TaskletEntry;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,25 +32,25 @@ final class TopologyMaterializer {
     static StreamOperativeTopology materialize(
             String factoryId,
             List<ChannelEntry> channels,
-            List<ProcedureEntry> procedures,
+            List<TaskletEntry> tasklets,
             int[] capacities,
             Map<String, Object> declaration,
             DerivedDeclaration derived) {
         List<ChannelDescriptor> descriptors = channelDescriptors(channels, derived);
         Map<String, Integer> nameToId = new LinkedHashMap<>();
-        Map<String, Integer> procedureNameToId = new LinkedHashMap<>();
+        Map<String, Integer> taskletNameToId = new LinkedHashMap<>();
         for (int id = 0; id < descriptors.size(); id++) {
             nameToId.put(descriptors.get(id).name(), id);
         }
-        for (int id = 0; id < procedures.size(); id++) {
-            procedureNameToId.put(procedures.get(id).name, id);
+        for (int id = 0; id < tasklets.size(); id++) {
+            taskletNameToId.put(tasklets.get(id).name, id);
         }
         return new StreamOperativeTopology(
                 factoryId,
                 descriptors,
                 nameToId,
-                procedureDescriptors(procedures, descriptors, capacities),
-                procedureNameToId,
+                taskletDescriptors(tasklets, descriptors, capacities),
+                taskletNameToId,
                 Boolean.TRUE.equals(declaration.get("effectively_once")),
                 declaration);
     }
@@ -89,7 +89,7 @@ final class TopologyMaterializer {
         for (DerivedDeclaration.Edge edge : answer.consumers()) {
             PendingEdge chain = entry.chains.get(edge.chain());
             out.add(new ConsumerEdge(
-                    edge.procedure(), Optional.ofNullable(chain.transform()), Optional.ofNullable(chain.key())));
+                    edge.tasklet(), Optional.ofNullable(chain.transform()), Optional.ofNullable(chain.key())));
         }
         return out;
     }
@@ -98,20 +98,20 @@ final class TopologyMaterializer {
         return switch (derived) {
             case "entry" -> ChannelKind.ENTRY;
             case "plugin" -> ChannelKind.PLUGIN_BOUND;
-            default -> ChannelKind.INTER_PROCEDURE;
+            default -> ChannelKind.INTER_TASKLET;
         };
     }
 
-    private static List<ProcedureDescriptor> procedureDescriptors(
-            List<ProcedureEntry> procedures, List<ChannelDescriptor> channels, int[] capacities) {
-        List<ProcedureDescriptor> descriptors = new ArrayList<>(procedures.size());
-        for (int i = 0; i < procedures.size(); i++) {
-            ProcedureEntry entry = procedures.get(i);
-            descriptors.add(new ProcedureDescriptor(
+    private static List<TaskletDescriptor> taskletDescriptors(
+            List<TaskletEntry> tasklets, List<ChannelDescriptor> channels, int[] capacities) {
+        List<TaskletDescriptor> descriptors = new ArrayList<>(tasklets.size());
+        for (int i = 0; i < tasklets.size(); i++) {
+            TaskletEntry entry = tasklets.get(i);
+            descriptors.add(new TaskletDescriptor(
                     entry.name,
-                    entry.procedureClass,
-                    entry.entityKeys,
-                    entry.entitiesForOverridden,
+                    entry.taskletClass,
+                    entry.cellKeys,
+                    entry.cellsForOverridden,
                     entry.dynamic,
                     inputChannel(channels, i),
                     entry.outputChannelId == null ? OptionalInt.empty() : OptionalInt.of(entry.outputChannelId),
@@ -127,20 +127,20 @@ final class TopologyMaterializer {
                     capacities[i],
                     entry.mailboxCapacityOverridden,
                     entry.compensateOverridden,
-                    entry.entityIdleTtl,
-                    entry.maxEntities));
+                    entry.cellIdleTtl,
+                    entry.maxCells));
         }
         return descriptors;
     }
 
     /**
-     * A fan-in procedure keeps its lowest-id input channel here; every
+     * A fan-in tasklet keeps its lowest-id input channel here; every
      * incoming channel stays reachable via the channel descriptors, and the
      * dispatcher routes via the channel-side mapping.
      */
-    private static OptionalInt inputChannel(List<ChannelDescriptor> channels, int procedure) {
+    private static OptionalInt inputChannel(List<ChannelDescriptor> channels, int tasklet) {
         for (int id = 0; id < channels.size(); id++) {
-            if (channels.get(id).consumerIds().contains(procedure)) {
+            if (channels.get(id).consumerIds().contains(tasklet)) {
                 return OptionalInt.of(id);
             }
         }

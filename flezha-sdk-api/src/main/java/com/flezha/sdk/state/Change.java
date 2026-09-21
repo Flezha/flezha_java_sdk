@@ -3,10 +3,10 @@ package com.flezha.sdk.state;
 import java.util.Optional;
 
 /**
- * One recorded mutation of an entity's state, the unit that makes state durable.
+ * One recorded mutation of a cell's state, the unit that makes state durable.
  *
  * <p>A change is passed to {@link StateHandle#apply(Change)} and applied to the state by the
- * procedure's {@code applyChange}. The runtime records it, and rebuilds the state after a restart
+ * tasklet's {@code applyChange}. The runtime records it, and rebuilds the state after a restart
  * by applying the recorded changes again, which is why a change must carry everything needed to
  * reapply it later:
  *
@@ -16,7 +16,7 @@ import java.util.Optional;
  *
  * <p>The timestamp is a component rather than something read during replay, when the original value
  * would no longer be available. Implementations are typically records: small, immutable and
- * Kryo-serialisable. A procedure with several kinds of mutation declares one type per kind,
+ * Kryo-serialisable. A tasklet with several kinds of mutation declares one type per kind,
  * commonly as a sealed hierarchy:
  *
  * <pre>{@code
@@ -29,7 +29,7 @@ import java.util.Optional;
  * <p>{@link com.flezha.sdk.authoring.State @State} derives exactly this shape from a state
  * class, so a derived change and a hand-written one read the same at every call site.
  *
- * <p>A procedure that persists nothing declares {@link NoChange} instead, which removes the change
+ * <p>A tasklet that persists nothing declares {@link NoChange} instead, which removes the change
  * machinery entirely.
  */
 public interface Change {

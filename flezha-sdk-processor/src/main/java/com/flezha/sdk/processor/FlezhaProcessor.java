@@ -17,13 +17,13 @@ import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 
 /**
- * Generates {@code Procedure} and short-form operative implementations from the
- * {@code @Procedure} / {@code @StreamOperative} / {@code @WorkflowOperative} / {@code @State}
+ * Generates {@code Tasklet} and short-form operative implementations from the
+ * {@code @Tasklet} / {@code @StreamOperative} / {@code @WorkflowOperative} / {@code @State}
  * authoring annotations, mirroring the Rust SDK macros. See {@code docs/sdk/authoring_contract.md}.
  *
  * <p>Per round: {@code @State} classes generate a {@code <Name>Change}
- * (field-granular variants + {@code apply} + {@code kryoTypes}); {@code @Procedure}
- * classes generate a {@code <Name>Procedure}, and {@code @StreamOperative} /
+ * (field-granular variants + {@code apply} + {@code kryoTypes}); {@code @Tasklet}
+ * classes generate a {@code <Name>Tasklet}, and {@code @StreamOperative} /
  * {@code @WorkflowOperative} classes generate it beside the §5 short form's
  * {@code <Name>StreamOperative} or {@code <Name>WorkflowOperative}.
  *
@@ -32,10 +32,10 @@ import javax.tools.Diagnostic;
  *
  * <p>This class owns the rounds and the two sinks every generator writes through
  * ({@link #write} and {@link #error}); {@link StateGenerator} and
- * {@link ProcedureGenerator} own what is generated.
+ * {@link TaskletGenerator} own what is generated.
  */
 @SupportedAnnotationTypes({
-    "com.flezha.sdk.authoring.Procedure",
+    "com.flezha.sdk.authoring.Tasklet",
     "com.flezha.sdk.authoring.StreamOperative",
     "com.flezha.sdk.authoring.WorkflowOperative",
     "com.flezha.sdk.authoring.State"
@@ -45,7 +45,7 @@ public final class FlezhaProcessor extends AbstractProcessor {
 
     private Filer filer;
     private StateGenerator states;
-    private ProcedureGenerator procedures;
+    private TaskletGenerator tasklets;
 
     @Override
     public synchronized void init(ProcessingEnvironment env) {
@@ -53,7 +53,7 @@ public final class FlezhaProcessor extends AbstractProcessor {
         this.filer = env.getFiler();
         TypeMirrors mirrors = new TypeMirrors(env.getElementUtils(), env.getTypeUtils());
         this.states = new StateGenerator(this, mirrors);
-        this.procedures = new ProcedureGenerator(this, mirrors, sourceTrees(env));
+        this.tasklets = new TaskletGenerator(this, mirrors, sourceTrees(env));
     }
 
     /** The compiler's source trees, which only javac exposes; {@code null} elsewhere. */
@@ -70,8 +70,8 @@ public final class FlezhaProcessor extends AbstractProcessor {
         for (Element e : roundEnv.getElementsAnnotatedWith(State.class)) {
             states.generate((TypeElement) e);
         }
-        for (Element e : roundEnv.getElementsAnnotatedWithAny(ProcedureGenerator.DECLARATIONS)) {
-            procedures.generate((TypeElement) e);
+        for (Element e : roundEnv.getElementsAnnotatedWithAny(TaskletGenerator.DECLARATIONS)) {
+            tasklets.generate((TypeElement) e);
         }
         return false;
     }

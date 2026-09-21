@@ -13,7 +13,7 @@ import javax.annotation.Nonnull;
  * Administering the namespace this runner's connection proved, from ordinary
  * application code.
  *
- * <p>No procedure has to be running and the application holds no credential of
+ * <p>No tasklet has to be running and the application holds no credential of
  * its own: the controller judges every call as the identity the connection
  * already established, so nothing an unattended process holds expires. An
  * operator grants a namespace's applications the authority once and revokes it
@@ -88,10 +88,10 @@ public final class Admin {
         return call("PluginManager.list");
     }
 
-    /** One entity's live state, and the change sequence it was read at. */
+    /** One cell's live state, and the change sequence it was read at. */
     @Nonnull
-    public JsonNode entityState(String operativeId, String entityKey) {
-        return call("Operative.entity_state", operativeId, entityKey);
+    public JsonNode cellState(String operativeId, String cellKey) {
+        return call("Operative.cell_state", operativeId, cellKey);
     }
 
     /**

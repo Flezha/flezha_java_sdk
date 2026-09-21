@@ -18,7 +18,7 @@ import java.util.function.BiFunction;
  */
 final class StateExchange {
 
-    /** Sorted-key, non-pretty JSON — the Decision-10 per-Entity state shape. */
+    /** Sorted-key, non-pretty JSON — the Decision-10 per-Cell state shape. */
     private static final ObjectMapper JSON = JsonMapper.builder()
             .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
             .build();
@@ -27,14 +27,14 @@ final class StateExchange {
 
     /** Snapshot then changes, in order, onto a cell the caller has just made. */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    static void foldInto(EntityCell cell, ActivationKind.RestoreFold fold) {
+    static void foldInto(Cell cell, ActivationKind.RestoreFold fold) {
         if (fold.snapshot().isPresent()) {
             ActivationKind.RestoreBody body = fold.snapshot().get();
-            cell.state = read(body, cell, Object.class, cell.procedure::migrateState);
+            cell.state = read(body, cell, Object.class, cell.tasklet::migrateState);
         }
         for (ActivationKind.RestoreBody body : fold.changes()) {
-            Change change = read(body, cell, Change.class, cell.procedure::migrateChange);
-            cell.procedure.applyChange(cell.state, change);
+            Change change = read(body, cell, Change.class, cell.tasklet::migrateChange);
+            cell.tasklet.applyChange(cell.state, change);
         }
     }
 
@@ -45,14 +45,14 @@ final class StateExchange {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <T> T read(
-            ActivationKind.RestoreBody body, EntityCell cell, Class<T> type, BiFunction<Integer, byte[], ?> migrate) {
+            ActivationKind.RestoreBody body, Cell cell, Class<T> type, BiFunction<Integer, byte[], ?> migrate) {
         return body.fromVersion().isPresent()
                 ? (T) migrate.apply(body.fromVersion().getAsInt(), body.bytes())
                 : cell.codec.deserialize(body.bytes(), type);
     }
 
-    static byte[] stateJson(EntityCell cell) {
-        // A stateless procedure has nothing to ship. Jackson refuses an
+    static byte[] stateJson(Cell cell) {
+        // A stateless tasklet has nothing to ship. Jackson refuses an
         // empty bean, and that refusal is RIGHT for a user state class with
         // no readable properties — an author mistake worth surfacing — but
         // `Stateless` is the SDK's own marker for "there is no state", so it
@@ -69,7 +69,7 @@ final class StateExchange {
         }
     }
 
-    static void applyState(EntityCell cell, byte[] json) {
+    static void applyState(Cell cell, byte[] json) {
         try {
             Class<?> targetClass = cell.state == null ? Object.class : cell.state.getClass();
             cell.state = JSON.readValue(json, targetClass);
@@ -78,7 +78,7 @@ final class StateExchange {
         }
     }
 
-    static List<byte[]> serializeChanges(EntityCell cell, List<Change> buffer) {
+    static List<byte[]> serializeChanges(Cell cell, List<Change> buffer) {
         List<byte[]> changeBytes = new ArrayList<>(buffer.size());
         for (Change change : buffer) {
             changeBytes.add(cell.codec.serialize(change));

@@ -9,8 +9,8 @@ import java.util.Optional;
 /**
  * Mirror of the Rust test app's {@code stateless_loop_workflow}: the same durable
  * PER_INPUT loop as {@link ChatLoopWorkflowOperative} minus its stateful first
- * procedure. Nothing writes an Entity WAL, so the controller ships no
- * {@code RestoreInitState} on a rehydrating bind — the instance's proc-journal
+ * tasklet. Nothing writes a Cell WAL, so the controller ships no
+ * {@code RestoreInitState} on a rehydrating bind — the instance's task-journal
  * reaches the driver only if it rides the bind itself.
  */
 public final class StatelessLoopWorkflowOperative implements WorkflowOperative {
@@ -36,7 +36,7 @@ public final class StatelessLoopWorkflowOperative implements WorkflowOperative {
     }
 
     @Override
-    public void procedures(ChannelBuilder c) {
+    public void tasklets(ChannelBuilder c) {
         c.input(String.class, "in").into(ChatSteps.Reply.class).sink("out");
     }
 }

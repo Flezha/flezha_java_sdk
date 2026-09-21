@@ -1,14 +1,14 @@
 package com.flezha.examples.local;
 
-import com.flezha.sdk.authoring.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
+import com.flezha.sdk.authoring.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 
 /** One line in, one emit per word out. */
-@Procedure(id = "split", emits = String.class)
+@Tasklet(id = "split", emits = String.class)
 public final class Split {
 
-    public void run(String line, ProcedureCtx ctx) throws ProcedureException {
+    public void run(String line, TaskletCtx ctx) throws TaskletException {
         for (String word : line.split("\\s+")) {
             if (!word.isEmpty()) {
                 ctx.emit(word.toLowerCase());

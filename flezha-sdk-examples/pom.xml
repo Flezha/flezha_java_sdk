@@ -38,7 +38,7 @@
             <artifactId>flezha-sdk-runtime</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- Generates <Name>Procedure from each @Procedure class and <Name>Handle from each @State
+        <!-- Generates <Name>Tasklet from each @Tasklet class and <Name>Handle from each @State
              class. A standalone project lists it under annotationProcessorPaths instead (see
              examples/echo); a dependency here lets the reactor build it before this module. -->
         <dependency>

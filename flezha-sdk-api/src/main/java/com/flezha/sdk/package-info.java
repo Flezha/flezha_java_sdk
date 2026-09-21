@@ -2,10 +2,10 @@
  * Entry points for declaring and running a Flezha application.
  *
  * <p>An application is built from two authoring types and started by a runner. A
- * {@link com.flezha.sdk.procedure.Procedure} contains the code that handles a single message. A
+ * {@link com.flezha.sdk.tasklet.Tasklet} contains the code that handles a single message. A
  * {@link com.flezha.sdk.operative.StreamOperative} or
  * {@link com.flezha.sdk.operative.WorkflowOperative} declares the graph that connects entry
- * channels, procedures and sinks, and is the unit the cluster schedules, restarts and relocates.
+ * channels, tasklets and sinks, and is the unit the cluster schedules, restarts and relocates.
  * {@link com.flezha.sdk.Flezha#createRunner(String)} returns a {@link com.flezha.sdk.FlezhaRunner}
  * builder on which every operative class is declared before the runner is started.
  *

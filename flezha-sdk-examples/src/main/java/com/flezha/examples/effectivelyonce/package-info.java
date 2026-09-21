@@ -12,13 +12,13 @@
  *
  * <p>The second is the checkpoint interval. Until {@code ctx.checkpoint()} is called the consumed
  * offset is withheld and the applied changes remain staged, so a crash replays the whole open
- * interval rather than leaving a partially constructed window on disk. The procedure here closes an
+ * interval rather than leaving a partially constructed window on disk. The tasklet here closes an
  * interval every hundred ticks.
  *
  * <p>{@link com.flezha.examples.effectivelyonce.RollupOperative} declares both
  * {@code effectivelyOnce()} and {@code checkpointAck()}. The first makes state, output and consumed
  * offset durable together in a single record, so a crash cannot advance the offset while losing the
- * output. The second is what withholds the offset until the procedure declares the state coherent.
+ * output. The second is what withholds the offset until the tasklet declares the state coherent.
  * Registration refuses this combination without keyed sinks, because without a key the sink has no
  * means of recognising a repeat.
  */

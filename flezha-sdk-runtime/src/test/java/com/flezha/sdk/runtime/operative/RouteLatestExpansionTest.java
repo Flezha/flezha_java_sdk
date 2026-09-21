@@ -9,12 +9,12 @@ import com.flezha.sdk.channel.RoutedDocument;
 import com.flezha.sdk.channel.Stream;
 import com.flezha.sdk.operative.StreamOperative;
 import com.flezha.sdk.operative.StreamOperativeConfigurationException;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
 import com.flezha.sdk.runtime.operative.builder.LatestDocumentRouter;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.StateHandle;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 /**
  * What {@code ChannelBuilder.routeLatest} declares on the topology. Every
  * guarantee the block carries rests on this shape, so it is asserted rather than
- * assumed: one single-entity node fed by both streams, the key function on the
+ * assumed: one single-cell node fed by both streams, the key function on the
  * traffic edge, and the routed pair keyed into a dynamic consumer.
  */
 class RouteLatestExpansionTest {
@@ -36,7 +36,7 @@ class RouteLatestExpansionTest {
      * exactly as an author declares one: its {@code Input} is the routed pair
      * over its own document type.
      */
-    public static final class Detector extends StatelessTestProcedure<RoutedDocument<Thresholds>, String, Void> {
+    public static final class Detector extends StatelessTestTasklet<RoutedDocument<Thresholds>, String, Void> {
 
         @Override
         public String name() {
@@ -50,13 +50,13 @@ class RouteLatestExpansionTest {
         }
 
         @Override
-        protected String initState(Optional<String> entityKey) {
+        protected String initState(Optional<String> cellKey) {
             return "";
         }
 
         @Override
-        public void run(RoutedDocument<Thresholds> input, StateHandle<String, NoChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(RoutedDocument<Thresholds> input, StateHandle<String, NoChange> state, TaskletCtx ctx)
+                throws TaskletException {
             // The expansion is what is under test; the consumer only has to exist.
         }
     }
@@ -79,35 +79,35 @@ class RouteLatestExpansionTest {
     }
 
     @Test
-    @DisplayName("the block expands to one single-entity node fed by both streams")
-    void expandsToOneSingleEntityNode() {
+    @DisplayName("the block expands to one single-cell node fed by both streams")
+    void expandsToOneSingleCellNode() {
         StreamOperativeTopology topology = StreamOperativeTopologyBuilder.build(new RoutedOperative());
 
-        int routerId = topology.procedureNameToId().get(LatestDocumentRouter.NODE_NAME);
-        ProcedureDescriptor router = topology.procedures().get(routerId);
-        assertThat(router.entityKeys()).isEmpty();
+        int routerId = topology.taskletNameToId().get(LatestDocumentRouter.NODE_NAME);
+        TaskletDescriptor router = topology.tasklets().get(routerId);
+        assertThat(router.cellKeys()).isEmpty();
         assertThat(router.dynamic()).isFalse();
 
         for (String source : new String[] {"thresholds", "trades"}) {
             ChannelDescriptor channel =
                     topology.channels().get(topology.nameToId().get(source));
             ConsumerEdge edge = channel.consumers().stream()
-                    .filter(e -> e.procedure() == routerId)
+                    .filter(e -> e.tasklet() == routerId)
                     .findFirst()
                     .orElseThrow(() -> new AssertionError(source + " does not feed the router"));
             // The merge mapping (and, on traffic, the key function fused into it)
             // is one closure on the edge — no extra node, no extra hop.
             assertThat(edge.transform()).isPresent();
-            assertThat(edge.key()).as("the router is single-entity").isEmpty();
+            assertThat(edge.key()).as("the router is single-cell").isEmpty();
         }
 
         // The routed pair carries its own key, which is what lets the consumer be
         // dynamically keyed off it.
         ChannelDescriptor out = topology.channels().get(router.outputChannelId().orElseThrow());
         ConsumerEdge detector = out.consumers().get(0);
-        assertThat(topology.procedures().get(detector.procedure()).name()).isEqualTo("detector");
+        assertThat(topology.tasklets().get(detector.tasklet()).name()).isEqualTo("detector");
         assertThat(detector.key()).isPresent();
-        assertThat(topology.procedures().get(detector.procedure()).dynamic()).isTrue();
+        assertThat(topology.tasklets().get(detector.tasklet()).dynamic()).isTrue();
     }
 
     @Test
@@ -117,8 +117,8 @@ class RouteLatestExpansionTest {
         // its type, so only the wiring can name it. Without this registration the
         // first snapshot of a router holding a typed document fails to serialize.
         StreamOperativeTopology topology = StreamOperativeTopologyBuilder.build(new RoutedOperative());
-        int routerId = topology.procedureNameToId().get(LatestDocumentRouter.NODE_NAME);
-        assertThat(topology.procedures().get(routerId).kryoTypes())
+        int routerId = topology.taskletNameToId().get(LatestDocumentRouter.NODE_NAME);
+        assertThat(topology.tasklets().get(routerId).kryoTypes())
                 .containsAll(new LatestDocumentRouter().kryoTypes())
                 .contains(Thresholds.class);
     }
@@ -156,7 +156,7 @@ class RouteLatestExpansionTest {
                     c.routeLatest(Thresholds.class, thresholds, trades, Trade::symbol, "primary");
             // Sealed leaves, unnamed: `.named(...)` would conjure the output
             // channel these routers never produce onto, which is an
-            // inter-procedure channel with no consumer.
+            // inter-tasklet channel with no consumer.
             primary.sealed();
             c.routeLatest(Thresholds.class, alt, trades, Trade::symbol, "secondary")
                     .sealed();
@@ -175,8 +175,8 @@ class RouteLatestExpansionTest {
                 .hasMessageContaining(LatestDocumentRouter.NODE_NAME);
 
         StreamOperativeTopology topology = StreamOperativeTopologyBuilder.build(new TwoNamedRoutersOperative());
-        assertThat(topology.procedureNameToId()).containsKeys("primary", "secondary");
-        assertThat(topology.procedureNameToId()).doesNotContainKey(LatestDocumentRouter.NODE_NAME);
+        assertThat(topology.taskletNameToId()).containsKeys("primary", "secondary");
+        assertThat(topology.taskletNameToId()).doesNotContainKey(LatestDocumentRouter.NODE_NAME);
     }
 
     /** One channel as both streams: the document stream is the traffic stream. */

@@ -19,9 +19,9 @@ import java.util.TreeSet;
 import javax.annotation.Nonnull;
 
 /**
- * Kryo-backed serializer for per-Entity state and per-Entity Change
+ * Kryo-backed serializer for per-Cell state and per-Cell Change
  * payloads. Constructed once per {@code StreamOperativeInstance}; the {@code userTypes}
- * list aggregates the {@code Procedure.kryoTypes()} returns across every Procedure in
+ * list aggregates the {@code Tasklet.kryoTypes()} returns across every Tasklet in
  * the StreamOperative class.
  *
  * <p>Stable type IDs are essential for cross-version compatibility under
@@ -98,7 +98,7 @@ public final class KryoCodec {
 
     /**
      * Built-in registrations. Stable IDs occupy the low IDs (0-N); user types
-     * land at N+1, N+2, ... in the order returned by {@code Procedure.kryoTypes()}.
+     * land at N+1, N+2, ... in the order returned by {@code Tasklet.kryoTypes()}.
      */
     private static void registerBuiltins(Kryo kryo) {
         // Common containers and primitives. Kryo's defaults handle primitives

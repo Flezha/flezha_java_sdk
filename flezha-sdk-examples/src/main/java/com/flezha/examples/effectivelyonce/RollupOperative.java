@@ -27,6 +27,6 @@ public final class RollupOperative implements StreamOperative {
         c.effectivelyOnce();
         c.checkpointAck();
 
-        c.input(String.class, "ticks").into(RollupProcedure.class).keyed().sink("rollups");
+        c.input(String.class, "ticks").into(RollupTasklet.class).keyed().sink("rollups");
     }
 }

@@ -3,9 +3,9 @@ package com.flezha.sdk.runtime.core;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.flezha.sdk.procedure.SpawnOptions;
-import com.flezha.sdk.procedure.SpawnRequests;
 import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
+import com.flezha.sdk.tasklet.SpawnOptions;
+import com.flezha.sdk.tasklet.SpawnRequests;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -77,7 +77,7 @@ class ActivationDispatcherTest extends DispatchTestBase {
             for (boolean replay : new boolean[] {false, true}) {
                 outcome(new Activation(
                         42,
-                        new EntityRef(OP, 0, Optional.empty()),
+                        new CellRef(OP, 0, Optional.empty()),
                         new ActivationKind.Work(List.of(input(0, "w1", 1, OptionalLong.empty(), replay))),
                         0,
                         "spawn_probe"));
@@ -90,8 +90,8 @@ class ActivationDispatcherTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("a procedure constructor that throws at materialization surfaces the author's error")
-    void throwingProcedureConstructorAtMaterializationIsTheAuthorsError() {
+    @DisplayName("a tasklet constructor that throws at materialization surfaces the author's error")
+    void throwingTaskletConstructorAtMaterializationIsTheAuthorsError() {
         StreamOperativeClassRegistry.registerClass(RefusingOperative.class);
         REFUSE.set(true);
 
@@ -102,14 +102,14 @@ class ActivationDispatcherTest extends DispatchTestBase {
 
     public static final class SpawnProbeOperative extends Op {
         public SpawnProbeOperative() {
-            super("spawn_probe", c -> c.input(String.class, "in").into(SpawnProbeProc.class));
+            super("spawn_probe", c -> c.input(String.class, "in").into(SpawnProbeTask.class));
         }
     }
 
     /** Spawns once without an id and once under its input. */
-    public static final class SpawnProbeProc extends Proc<Void> {
-        public SpawnProbeProc() {
-            super("spawn_probe_proc", (input, ctx) -> {
+    public static final class SpawnProbeTask extends Task<Void> {
+        public SpawnProbeTask() {
+            super("spawn_probe_task", (input, ctx) -> {
                 ctx.spawnWorkflow("worker", new byte[0]);
                 ctx.spawnWorkflow("worker", new byte[0], SpawnOptions.id(input));
             });
@@ -118,14 +118,14 @@ class ActivationDispatcherTest extends DispatchTestBase {
 
     public static final class RefusingOperative extends Op {
         public RefusingOperative() {
-            super("refusing_op", c -> c.input(String.class, "in").into(RefusingProc.class));
+            super("refusing_op", c -> c.input(String.class, "in").into(RefusingTask.class));
         }
     }
 
     /** Constructs at definition, then refuses once armed, as a resource gone by start time would. */
-    public static final class RefusingProc extends Proc<Void> {
-        public RefusingProc() {
-            super("refusing_proc", (input, ctx) -> {});
+    public static final class RefusingTask extends Task<Void> {
+        public RefusingTask() {
+            super("refusing_task", (input, ctx) -> {});
             if (REFUSE.get()) {
                 throw new IllegalStateException(REFUSAL);
             }

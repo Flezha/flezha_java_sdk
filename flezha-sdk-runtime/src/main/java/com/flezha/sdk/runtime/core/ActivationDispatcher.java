@@ -11,13 +11,13 @@ import javax.annotation.Nonnull;
  * {@link Activation} into one {@link ActivationResult} by running user code —
  * no native calls, which is what makes the whole typed layer unit-testable
  * without the core. The only impurity is the api-side {@code SpawnRequests}
- * static, reached through {@code ProcedureCtx}'s default
+ * static, reached through {@code TaskletCtx}'s default
  * {@code spawnWorkflow}.
  *
- * <p>The core guarantees per-Entity exclusivity — it never hands out a second
- * activation for the same Entity until the first completes — so there is no
- * Java-side Entity locking; the maps are merely concurrent-safe across
- * different Entities.
+ * <p>The core guarantees per-Cell exclusivity — it never hands out a second
+ * activation for the same Cell until the first completes — so there is no
+ * Java-side Cell locking; the maps are merely concurrent-safe across
+ * different Cells.
  */
 public final class ActivationDispatcher {
 

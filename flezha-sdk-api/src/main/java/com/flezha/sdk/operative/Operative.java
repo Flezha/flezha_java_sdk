@@ -5,8 +5,8 @@ import javax.annotation.Nonnull;
 /**
  * The shared base of both operative kinds.
  *
- * <p>{@link StreamOperative} declares a graph of procedures that runs continuously over a stream,
- * holding per-entity state. {@link WorkflowOperative} declares ordered steps that run to completion
+ * <p>{@link StreamOperative} declares a graph of tasklets that runs continuously over a stream,
+ * holding per-cell state. {@link WorkflowOperative} declares ordered steps that run to completion
  * and resume at the step they reached. Both are operatives, both are declared on a runner, and both
  * are scheduled, restarted and relocated by the controller in the same way.
  *

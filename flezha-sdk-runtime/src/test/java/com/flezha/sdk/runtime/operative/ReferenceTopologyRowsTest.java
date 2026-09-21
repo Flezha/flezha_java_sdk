@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
  * fluent calls its {@code steps} column spells, and the expected refusal name and the expected
  * derived lines are read out of the file, so a row it renames or drops fails here rather than
  * passing on a stale literal. {@code StreamOperativeTopologyBuilderTest.CoreRefusals} is the other
- * half, pinning the SENTENCES for the shapes this SDK used to judge in its own words; its procedures
+ * half, pinning the SENTENCES for the shapes this SDK used to judge in its own words; its tasklets
  * and its verdict catcher are reused here rather than declared a second time.
  *
  * <p>What makes the refusal case a statement about the core rather than about a string:
@@ -50,9 +50,9 @@ class ReferenceTopologyRowsTest {
 
     /**
      * The malformed rows authored here, chosen from the reference names no {@code sdk/java} test
-     * asserted. The fixture's palette roles bind to procedures the builder test already declares:
-     * {@code plain} is {@code SingleProcedure}, {@code second} {@code GraphStage1}, {@code routed}
-     * {@code StaticProcedure}, and {@code dynamic} {@code DynamicModeOnlyProcedure}, whose keyed
+     * asserted. The fixture's palette roles bind to tasklets the builder test already declares:
+     * {@code plain} is {@code SingleTasklet}, {@code second} {@code GraphStage1}, {@code routed}
+     * {@code StaticTasklet}, and {@code dynamic} {@code DynamicModeOnlyTasklet}, whose keyed
      * edge is what makes it dynamic.
      */
     private List<Row> malformed() {
@@ -61,51 +61,51 @@ class ReferenceTopologyRowsTest {
                 new Row("dup_key_by", c -> c.input(String.class, "in")
                         .keyBy(value -> value)
                         .keyBy(value -> value)
-                        .into(StreamOperativeTopologyBuilderTest.SingleProcedure.class)),
+                        .into(StreamOperativeTopologyBuilderTest.SingleTasklet.class)),
                 // entry(in); in.key.map.into(plain)
                 new Row("map_after_key", c -> c.input(String.class, "in")
                         .keyBy(value -> value)
                         .map(String.class, value -> value)
-                        .into(StreamOperativeTopologyBuilderTest.SingleProcedure.class)),
+                        .into(StreamOperativeTopologyBuilderTest.SingleTasklet.class)),
                 // entry(in); in.into(plain); plain.sink(out); plain.map.into(second)
                 new Row("map_after_sink", c -> {
                     var plain =
-                            c.input(String.class, "in").into(StreamOperativeTopologyBuilderTest.SingleProcedure.class);
+                            c.input(String.class, "in").into(StreamOperativeTopologyBuilderTest.SingleTasklet.class);
                     plain.sink("out");
                     plain.map(String.class, value -> value).into(StreamOperativeTopologyBuilderTest.GraphStage1.class);
                 }),
                 // entry(in); in.into(plain); in.map
                 new Row("dangling_chain", c -> {
                     var in = c.input(String.class, "in");
-                    in.into(StreamOperativeTopologyBuilderTest.SingleProcedure.class);
+                    in.into(StreamOperativeTopologyBuilderTest.SingleTasklet.class);
                     in.map(String.class, value -> value);
                 }),
                 // entry(in); in.map.into(plain); in.into(plain)
                 new Row("edge_rewired", c -> {
                     var in = c.input(String.class, "in");
-                    in.map(String.class, value -> value).into(StreamOperativeTopologyBuilderTest.SingleProcedure.class);
-                    in.into(StreamOperativeTopologyBuilderTest.SingleProcedure.class);
+                    in.map(String.class, value -> value).into(StreamOperativeTopologyBuilderTest.SingleTasklet.class);
+                    in.into(StreamOperativeTopologyBuilderTest.SingleTasklet.class);
                 }),
                 // entry(in); in.key.into(routed)
                 new Row("key_on_static", c -> c.input(String.class, "in")
                         .keyBy(value -> value)
-                        .into(StreamOperativeTopologyBuilderTest.StaticProcedure.class)),
+                        .into(StreamOperativeTopologyBuilderTest.StaticTasklet.class)),
                 // entry(in); entry(other); in.key.into(dynamic); other.into(dynamic)
                 new Row("unkeyed_dynamic", c -> {
                     var in = c.input(String.class, "in");
                     var other = c.input(String.class, "other");
-                    in.keyBy(value -> value).into(StreamOperativeTopologyBuilderTest.DynamicModeOnlyProcedure.class);
-                    other.into(StreamOperativeTopologyBuilderTest.DynamicModeOnlyProcedure.class);
+                    in.keyBy(value -> value).into(StreamOperativeTopologyBuilderTest.DynamicModeOnlyTasklet.class);
+                    other.into(StreamOperativeTopologyBuilderTest.DynamicModeOnlyTasklet.class);
                 }),
                 // entry(in); in.into(plain); plain.named(a); plain.sink(b)
                 new Row("named_twice", c -> c.input(String.class, "in")
-                        .into(StreamOperativeTopologyBuilderTest.SingleProcedure.class)
+                        .into(StreamOperativeTopologyBuilderTest.SingleTasklet.class)
                         .named("a")
                         .sink("b")),
                 // entry(in); in.into(plain); in.into(second); plain.sink(out); second.sink(out)
                 new Row("two_channels_one_sink", c -> {
                     var in = c.input(String.class, "in");
-                    in.into(StreamOperativeTopologyBuilderTest.SingleProcedure.class)
+                    in.into(StreamOperativeTopologyBuilderTest.SingleTasklet.class)
                             .sink("out");
                     in.into(StreamOperativeTopologyBuilderTest.GraphStage1.class)
                             .sink("out");
@@ -118,19 +118,19 @@ class ReferenceTopologyRowsTest {
                 // entry(in); in.into(plain); in.into(plain)
                 new Row("fan_in_noop", c -> {
                     var in = c.input(String.class, "in");
-                    in.into(StreamOperativeTopologyBuilderTest.SingleProcedure.class);
-                    in.into(StreamOperativeTopologyBuilderTest.SingleProcedure.class);
+                    in.into(StreamOperativeTopologyBuilderTest.SingleTasklet.class);
+                    in.into(StreamOperativeTopologyBuilderTest.SingleTasklet.class);
                 }),
                 // entry(in); in.into(plain); plain.named(renamed); plain.sink
                 new Row("named_sink", c -> {
                     var plain =
-                            c.input(String.class, "in").into(StreamOperativeTopologyBuilderTest.SingleProcedure.class);
+                            c.input(String.class, "in").into(StreamOperativeTopologyBuilderTest.SingleTasklet.class);
                     plain.named("renamed");
                     plain.sink();
                 }),
                 // entry(in); in.into(plain); plain.sink(items_output)
                 new Row("sink_names_channel", c -> c.input(String.class, "in")
-                        .into(StreamOperativeTopologyBuilderTest.SingleProcedure.class)
+                        .into(StreamOperativeTopologyBuilderTest.SingleTasklet.class)
                         .sink("items_output")));
     }
 
@@ -214,7 +214,7 @@ class ReferenceTopologyRowsTest {
                     channel.consumers().isEmpty()
                             ? "-"
                             : channel.consumers().stream()
-                                    .map(edge -> String.valueOf(edge.procedure()))
+                                    .map(edge -> String.valueOf(edge.tasklet()))
                                     .collect(Collectors.joining(",")),
                     absent(channel.sink())));
         }

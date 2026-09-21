@@ -5,7 +5,7 @@ import com.flezha.sdk.operative.StreamOperative;
 
 /**
  * Mirror of the Rust SDK's {@code CompareFilterStreamOperative}: filters by
- * comparing the input against a stored value held in the Procedure's State.
+ * comparing the input against a stored value held in the Tasklet's State.
  */
 public final class CompareFilterStreamOperative implements StreamOperative {
 
@@ -16,6 +16,6 @@ public final class CompareFilterStreamOperative implements StreamOperative {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "input").into(CompareFilterProcedure.class).sink("sink");
+        c.input(String.class, "input").into(CompareFilterTasklet.class).sink("sink");
     }
 }

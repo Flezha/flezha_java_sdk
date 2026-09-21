@@ -12,15 +12,15 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Workflow activations: a procedure's completion request, the one edge output a
+ * Workflow activations: a tasklet's completion request, the one edge output a
  * stage releases, the transform each consumer applies at delivery, and
  * compensation.
  */
 class WorkflowDispatchTest extends DispatchTestBase {
 
     @Test
-    @DisplayName("a workflow procedure's complete rides its effect, the later call winning")
-    void aWorkflowProceduresCompleteRidesItsEffect() {
+    @DisplayName("a workflow tasklet's complete rides its effect, the later call winning")
+    void aWorkflowTaskletsCompleteRidesItsEffect() {
         WorkflowOperativeClassRegistry.registerClass(CompletingWorkflow.class);
         ItemEffect effect = soleEffect(work("completing_workflow", 0, Optional.empty(), 0, input(0, "bob", 1)));
 
@@ -68,7 +68,7 @@ class WorkflowDispatchTest extends DispatchTestBase {
         byte[] released = stage.outputs().get(0).payload();
 
         // The one released value reaches BOTH children — the driver's fan-out —
-        // and each evaluates its own edge in valuesForEntity.
+        // and each evaluates its own edge in valuesForCell.
         soleEffect(work(
                 "fanout_workflow",
                 1,
@@ -91,7 +91,7 @@ class WorkflowDispatchTest extends DispatchTestBase {
     @DisplayName("A handoff is journaled with nothing declared")
     void aHandoffIsJournaledWithNothingDeclared() {
         // Durable, and the chain says nothing about how the value between two
-        // procedures is encoded: the core derives the journal codec from the
+        // tasklets is encoded: the core derives the journal codec from the
         // channel's kind, and this SDK hands it bytes either way.
         WorkflowOperativeClassRegistry.registerClass(DurableHandoffWorkflow.class);
         ItemEffect effect = soleEffect(work("durable_handoff_workflow", 0, Optional.empty(), 0, input(0, "v", 1)));
@@ -100,7 +100,7 @@ class WorkflowDispatchTest extends DispatchTestBase {
         Output released = effect.outputs().get(0);
         assertThat(released.target()).isInstanceOf(OutputTarget.Edge.class);
         assertThat(new KryoCodec(List.of(), false).deserialize(released.payload(), Object.class))
-                .as("the handoff carried into the proc-commit barrier")
+                .as("the handoff carried into the task-commit barrier")
                 .isEqualTo("mid:v");
     }
 
@@ -112,9 +112,9 @@ class WorkflowDispatchTest extends DispatchTestBase {
         }
 
         @Override
-        public void procedures(com.flezha.sdk.channel.ChannelBuilder c) {
+        public void tasklets(com.flezha.sdk.channel.ChannelBuilder c) {
             c.input(String.class, "seed")
-                    .into(MidProc.class)
+                    .into(MidTask.class)
                     .named("wf_durable")
                     .into(KeyRecorder.class);
         }

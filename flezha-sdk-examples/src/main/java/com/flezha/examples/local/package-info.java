@@ -8,7 +8,7 @@
  *
  * <p>{@code feed} places a message on a named entry channel and blocks while the consumer's mailbox
  * is full. {@code onSink} registers a callback against a channel name, which is the producing
- * procedure's name unless the declaration supplied one through {@code named}.
+ * tasklet's name unless the declaration supplied one through {@code named}.
  * {@code runUntilIdle} drives the graph until it drains or the supplied timeout elapses; the
  * calling thread is the poll loop, so the graph makes no progress without it.
  *
@@ -21,6 +21,6 @@
  * placement and migration, observability export and multi-runner scale, are refused at startup, and
  * the refusal names the declaration responsible.
  * {@link com.flezha.examples.local.WordCountOperative} declares a two-stage graph, splitting lines
- * into words and counting each word in its own entity, so the run also demonstrates keying.
+ * into words and counting each word in its own cell, so the run also demonstrates keying.
  */
 package com.flezha.examples.local;

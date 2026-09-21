@@ -14,8 +14,8 @@ import javax.annotation.Nonnull;
  * <p>{@link #start} takes the operative class you deploy and runs the
  * {@code channels()} graph it already declares — no local-mode member on the
  * class, no second declaration. What runs is the deployed machinery: entry
- * decode, edge transforms and keying, one Entity per resolved key with its
- * own mailbox, the retry ladder, and inter-procedure delivery performed by
+ * decode, edge transforms and keying, one Cell per resolved key with its
+ * own mailbox, the retry ladder, and inter-tasklet delivery performed by
  * the runtime.
  *
  * <pre>{@code
@@ -56,7 +56,7 @@ public final class LocalOperative implements AutoCloseable {
     /**
      * Deliver every value released on the sink {@code channel} to
      * {@code callback}, in release order. A sink channel takes the producing
-     * procedure's name unless the declaration {@code named} it.
+     * tasklet's name unless the declaration {@code named} it.
      */
     @Nonnull
     public LocalOperative onSink(String channel, Consumer<SinkOutput> callback) {

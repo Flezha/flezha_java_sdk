@@ -60,7 +60,7 @@ class EmitContextTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("a keyed plugin emit carries flz.entity / flz.seq / flz.key and the schema key")
+    @DisplayName("a keyed plugin emit carries flz.cell / flz.seq / flz.key and the schema key")
     void keyedEmitCarriesIdentityStamps() {
         StreamOperativeClassRegistry.registerClass(KeyedEmitOperative.class);
         ItemEffect effect = soleEffect(work("keyed_op", 0, Optional.empty(), 5, input(0, "v", 1_000)));
@@ -70,15 +70,15 @@ class EmitContextTest extends DispatchTestBase {
         assertThat(output.key()).contains("k-v");
         Map<String, String> meta = metaMap(output);
         assertThat(meta)
-                .containsEntry("flz.entity", OP + "/keyed_proc/")
+                .containsEntry("flz.cell", OP + "/keyed_task/")
                 .containsEntry("flz.seq", "5.0")
                 .containsEntry("flz.key", "k-v")
                 .containsEntry("user", "meta");
     }
 
     @Test
-    @DisplayName("a key-less emit in a keyed Entity carries that Entity's own key, stamped like emitKeyed")
-    void keyLessEmitInAKeyedEntityCarriesTheEntityKey() {
+    @DisplayName("a key-less emit in a keyed Cell carries that Cell's own key, stamped like emitKeyed")
+    void keyLessEmitInAKeyedCellCarriesTheCellKey() {
         StreamOperativeClassRegistry.registerClass(KeyedEmitOperative.class);
         ItemEffect effect = soleEffect(work("keyed_op", 0, Optional.of("BTC/USD"), 5, input(0, "plain:v", 1_000)));
 
@@ -87,24 +87,24 @@ class EmitContextTest extends DispatchTestBase {
         Output output = effect.outputs().get(0);
         assertThat(output.key()).contains("BTC/USD");
         assertThat(metaMap(output))
-                .containsEntry("flz.entity", OP + "/keyed_proc/BTC/USD")
+                .containsEntry("flz.cell", OP + "/keyed_task/BTC/USD")
                 .containsEntry("flz.seq", "5.0")
                 .containsEntry("flz.key", "BTC/USD");
     }
 
     @Test
-    @DisplayName("a key-less emit on a keyed channel is refused where the Entity has no key")
-    void keyLessEmitOnAKeyedChannelIsRefusedWithoutAnEntityKey() {
+    @DisplayName("a key-less emit on a keyed channel is refused where the Cell has no key")
+    void keyLessEmitOnAKeyedChannelIsRefusedWithoutAnCellKey() {
         StreamOperativeClassRegistry.registerClass(KeyedEmitOperative.class);
         ItemEffect effect = soleEffect(work("keyed_op", 0, Optional.empty(), 5, input(0, "plain:v", 1_000)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
-        assertThat(((Verdict.RetryableError) effect.verdict()).message()).contains("single-entity");
+        assertThat(((Verdict.RetryableError) effect.verdict()).message()).contains("single-cell");
         assertThat(effect.outputs()).as("nothing may be emitted").isEmpty();
     }
 
     @Test
-    @DisplayName("emitKeyed on a non-keyed channel is refused, entity key or not")
+    @DisplayName("emitKeyed on a non-keyed channel is refused, cell key or not")
     void keyedEmitOnANonKeyedChannelIsRefused() {
         StreamOperativeClassRegistry.registerClass(CounterOperative.class);
         ItemEffect effect = soleEffect(work("counter_op", 0, Optional.of("BTC/USD"), 7, input(0, "key:x", 1_000)));
@@ -152,7 +152,7 @@ class EmitContextTest extends DispatchTestBase {
         assertThat(open.outputs()).hasSize(1);
         assertThat(metaMap(open.outputs().get(0)))
                 .as("under the tier the controller derives the stamps at flush")
-                .doesNotContainKeys("flz.entity", "flz.seq", "flz.key");
+                .doesNotContainKeys("flz.cell", "flz.seq", "flz.key");
         assertThat(open.outputs().get(0).key()).contains("ck");
 
         ItemEffect closing = soleEffect(work("ckpt_op", 0, Optional.empty(), 0, input(0, "commit", 2)));
@@ -160,8 +160,8 @@ class EmitContextTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("a stream procedure's complete rides its effect the same way, for the core to refuse")
-    void aStreamProceduresCompleteRidesItsEffect() {
+    @DisplayName("a stream tasklet's complete rides its effect the same way, for the core to refuse")
+    void aStreamTaskletsCompleteRidesItsEffect() {
         StreamOperativeClassRegistry.registerClass(CompletingStreamOperative.class);
         ItemEffect effect = soleEffect(work("completing_stream", 0, Optional.empty(), 0, input(0, "x", 1)));
 

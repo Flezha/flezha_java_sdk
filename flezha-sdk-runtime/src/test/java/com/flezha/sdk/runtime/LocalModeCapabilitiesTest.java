@@ -10,16 +10,16 @@ import com.flezha.sdk.SinkOutput;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.operative.StreamOperative;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
-import com.flezha.sdk.runtime.operative.StatelessTestProcedure;
+import com.flezha.sdk.runtime.operative.StatelessTestTasklet;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -57,7 +57,7 @@ import org.junit.jupiter.api.Test;
  * whose declaration the core refuses without it.
  *
  * <p>Release order is asserted per key, not across keys. Java dispatches activations on a worker
- * pool and keeps one Entity on one worker at a time, so the order two keys reach the sink in is not
+ * pool and keeps one Cell on one worker at a time, so the order two keys reach the sink in is not
  * something the language layer promises.
  */
 class LocalModeCapabilitiesTest {
@@ -97,24 +97,24 @@ class LocalModeCapabilitiesTest {
         assertThat(released)
                 .as("each release carries the key its own value resolved to")
                 .allSatisfy(output -> assertThat(output.metadata()).containsEntry("flz.key", key(payload(output))));
-        assertThat(released.get(0).metadata()).containsKeys("flz.entity", "flz.seq");
+        assertThat(released.get(0).metadata()).containsKeys("flz.cell", "flz.seq");
     }
 
     @Test
-    @DisplayName("dynamic_entity: the declared filter runs before keying and nothing else is lost")
+    @DisplayName("dynamic_cell: the declared filter runs before keying and nothing else is lost")
     void theDeclaredFilterRunsBeforeKeyingAndNothingElseIsLost() {
-        // The class's sink is not keyed, so a released value carries no entity stamp and the per-key
+        // The class's sink is not keyed, so a released value carries no cell stamp and the per-key
         // minting is not visible on this channel. It is asserted above, on `partition_relay`, whose
-        // procedure is dynamic too and whose sink IS keyed. What this class shows that that one does
+        // tasklet is dynamic too and whose sink IS keyed. What this class shows that that one does
         // not is the declared filter: a value it rejects answers no key, so the core is never asked
-        // to mint an Entity for it.
-        declares("dynamic_entity", "dynamic_entity");
+        // to mint a Cell for it.
+        declares("dynamic_cell", "dynamic_cell");
 
         List<SinkOutput> released =
-                release(DynamicEntityStreamOperative.class, "input", "kafka", List.of("a:1", "b:1", "drop", "a:2"));
+                release(DynamicCellStreamOperative.class, "input", "kafka", List.of("a:1", "b:1", "drop", "a:2"));
 
         assertThat(payloads(released))
-                .as("the filter dropped `drop` before it was keyed, and every other value reached its Entity")
+                .as("the filter dropped `drop` before it was keyed, and every other value reached its Cell")
                 .containsExactlyInAnyOrder("a:1", "b:1", "a:2");
         assertThat(payloadsOfKey(released, "a")).containsExactly("a:1", "a:2");
         assertThat(released)
@@ -141,9 +141,9 @@ class LocalModeCapabilitiesTest {
     }
 
     @Test
-    @DisplayName("entity_timers: a declared timer fires locally with its scheduled time")
+    @DisplayName("cell_timers: a declared timer fires locally with its scheduled time")
     void aDeclaredTimerFiresLocallyWithItsScheduledTime() {
-        declares("entity_timers", "session_timeout");
+        declares("cell_timers", "session_timeout");
 
         List<SinkOutput> released = release(SessionTimeoutStreamOperative.class, "input", "kafka", List.of("open"));
 
@@ -208,7 +208,7 @@ class LocalModeCapabilitiesTest {
         return released.stream().map(LocalModeCapabilitiesTest::payload).toList();
     }
 
-    /** What one key released, in release order: the order a single Entity does promise. */
+    /** What one key released, in release order: the order a single Cell does promise. */
     private static List<String> payloadsOfKey(List<SinkOutput> released, String key) {
         return payloads(released).stream()
                 .filter(value -> key(value).equals(key))
@@ -226,20 +226,20 @@ class LocalModeCapabilitiesTest {
     }
 
     /** Releases the input's bytes on the operative's sink. */
-    abstract static class EchoProcedure extends StatelessTestProcedure<String, Object, byte[]> {
+    abstract static class EchoTasklet extends StatelessTestTasklet<String, Object, byte[]> {
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) throws ProcedureException {
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) throws TaskletException {
             ctx.emit(input.getBytes(StandardCharsets.UTF_8));
         }
     }
 
-    public static final class SugarDoNothingProcedure extends EchoProcedure {
+    public static final class SugarDoNothingTasklet extends EchoTasklet {
         @Override
         public String name() {
             return "sugar_do_nothing";
@@ -255,24 +255,24 @@ class LocalModeCapabilitiesTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(SugarDoNothingProcedure.class).sink("sugar_do_nothing_echo");
+            c.input(String.class, "input").into(SugarDoNothingTasklet.class).sink("sugar_do_nothing_echo");
         }
     }
 
     /** Releases the input under the key it resolves to, on the class's keyed sink. */
-    public static final class PartitionRelayProcedure extends StatelessTestProcedure<String, Object, String> {
+    public static final class PartitionRelayTasklet extends StatelessTestTasklet<String, Object, String> {
         @Override
         public String name() {
-            return "partition_relay_procedure";
+            return "partition_relay_tasklet";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) throws ProcedureException {
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) throws TaskletException {
             ctx.emitKeyed(key(input), input);
         }
     }
@@ -289,23 +289,23 @@ class LocalModeCapabilitiesTest {
             // producing channel's name, and that is what selects the receiving operative's channel.
             c.input(String.class, "in")
                     .keyBy(LocalModeCapabilitiesTest::key)
-                    .into(PartitionRelayProcedure.class)
+                    .into(PartitionRelayTasklet.class)
                     .keyed()
                     .sink("input");
         }
     }
 
-    public static final class DynamicEntityProcedure extends EchoProcedure {
+    public static final class DynamicCellTasklet extends EchoTasklet {
         @Override
         public String name() {
-            return "dynamic_entity_procedure";
+            return "dynamic_cell_tasklet";
         }
     }
 
-    public static final class DynamicEntityStreamOperative implements StreamOperative {
+    public static final class DynamicCellStreamOperative implements StreamOperative {
         @Override
         public String factoryId() {
-            return "dynamic_entity";
+            return "dynamic_cell";
         }
 
         @Override
@@ -314,15 +314,15 @@ class LocalModeCapabilitiesTest {
                     .onFull(OverflowPolicy.DROP_NOTHING)
                     .filter(input -> !input.equals("drop"))
                     .keyBy(LocalModeCapabilitiesTest::key)
-                    .into(DynamicEntityProcedure.class)
+                    .into(DynamicCellTasklet.class)
                     .sink("kafka");
         }
     }
 
-    public static final class DropNothingProcedure extends EchoProcedure {
+    public static final class DropNothingTasklet extends EchoTasklet {
         @Override
         public String name() {
-            return "drop_nothing_test_procedure";
+            return "drop_nothing_test_tasklet";
         }
 
         @Override
@@ -346,7 +346,7 @@ class LocalModeCapabilitiesTest {
         public void channels(ChannelBuilder c) {
             c.input(String.class, "drop_nothing_input")
                     .onFull(OverflowPolicy.DROP_NOTHING)
-                    .into(DropNothingProcedure.class)
+                    .into(DropNothingTasklet.class)
                     .sink("drop_nothing_echo");
         }
     }
@@ -356,25 +356,25 @@ class LocalModeCapabilitiesTest {
      * one. The test app reads the deadline from {@code TIMER_TEST_TIMEOUT_MS} so its e2e can shorten
      * it; a class declared here names the short one outright.
      */
-    public static final class SessionTimeoutProcedure extends StatelessTestProcedure<String, Object, byte[]> {
+    public static final class SessionTimeoutTasklet extends StatelessTestTasklet<String, Object, byte[]> {
         @Override
         public String name() {
-            return "session_timeout_procedure";
+            return "session_timeout_tasklet";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) throws ProcedureException {
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) throws TaskletException {
             ctx.timerAfter(SESSION_TIMEOUT);
         }
 
         @Override
-        public void onTimer(long firedAt, TimerKind kind, StateHandle<Object, NoChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void onTimer(long firedAt, TimerKind kind, StateHandle<Object, NoChange> state, TaskletCtx ctx)
+                throws TaskletException {
             ctx.emit(("closed@" + firedAt).getBytes(StandardCharsets.UTF_8));
         }
     }
@@ -387,17 +387,17 @@ class LocalModeCapabilitiesTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(SessionTimeoutProcedure.class).sink("kafka");
+            c.input(String.class, "input").into(SessionTimeoutTasklet.class).sink("kafka");
         }
     }
 
     /**
-     * The tier IS durable state, so a class whose every procedure declares {@code NoChange} is
+     * The tier IS durable state, so a class whose every tasklet declares {@code NoChange} is
      * refused at registration before the local run reaches the capability. This one journals a
      * Change so the refusal under test is the one local mode owns.
      */
-    public static final class TierStoreProcedure
-            implements Procedure<String, TierStoreProcedure.Stored, String, TierStoreProcedure.Store, WallClock, Void> {
+    public static final class TierStoreTasklet
+            implements Tasklet<String, TierStoreTasklet.Stored, String, TierStoreTasklet.Store, WallClock, Void> {
 
         public static final class Stored {
             public String value = "";
@@ -407,11 +407,11 @@ class LocalModeCapabilitiesTest {
 
         @Override
         public String name() {
-            return "tier_store_procedure";
+            return "tier_store_tasklet";
         }
 
         @Override
-        public Stored initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public Stored initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new Stored();
         }
 
@@ -421,7 +421,7 @@ class LocalModeCapabilitiesTest {
         }
 
         @Override
-        public void run(String input, StateHandle<Stored, Store> state, ProcedureCtx ctx) throws ProcedureException {
+        public void run(String input, StateHandle<Stored, Store> state, TaskletCtx ctx) throws TaskletException {
             state.apply(new Store(input));
             ctx.emitKeyed(key(input), input);
         }
@@ -438,7 +438,7 @@ class LocalModeCapabilitiesTest {
             c.effectivelyOnce();
             c.input(String.class, "input")
                     .onFull(OverflowPolicy.DROP_NOTHING)
-                    .into(TierStoreProcedure.class)
+                    .into(TierStoreTasklet.class)
                     .keyed()
                     .sink("sink");
         }

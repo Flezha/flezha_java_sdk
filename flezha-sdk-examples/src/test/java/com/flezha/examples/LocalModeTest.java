@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The Java SDK's local mode, driven exactly as {@link com.flezha.examples.local.Main#main} does
- * it: the user's own operative class, its declared two-procedure graph, and no
+ * it: the user's own operative class, its declared two-tasklet graph, and no
  * controller anywhere.
  *
  * <p>The lines to feed and the output to release are read from
@@ -51,7 +51,7 @@ class LocalModeTest {
 
         SinkOutput first = released.peek();
         assertThat(first.channel()).isEqualTo("totals");
-        assertThat(first.metadata()).containsKeys("flz.entity", "flz.seq", "flz.key");
+        assertThat(first.metadata()).containsKeys("flz.cell", "flz.seq", "flz.key");
     }
 
     @Test

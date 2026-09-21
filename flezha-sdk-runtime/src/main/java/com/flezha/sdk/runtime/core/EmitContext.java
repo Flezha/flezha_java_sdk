@@ -1,17 +1,17 @@
 package com.flezha.sdk.runtime.core;
 
 import com.flezha.sdk.channel.ChannelKind;
-import com.flezha.sdk.procedure.EmitKeys;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
-import com.flezha.sdk.procedure.StableId;
 import com.flezha.sdk.runtime.operative.ChannelDescriptor;
 import com.flezha.sdk.runtime.operative.ConsumerEdge;
-import com.flezha.sdk.runtime.operative.ProcedureDescriptor;
+import com.flezha.sdk.runtime.operative.TaskletDescriptor;
 import com.flezha.sdk.runtime.state.TimerSession;
 import com.flezha.sdk.state.EventTimeFrom;
 import com.flezha.sdk.state.TimerKind;
+import com.flezha.sdk.tasklet.EmitKeys;
+import com.flezha.sdk.tasklet.StableId;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,15 +23,15 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Per-invocation {@link ProcedureCtx}: serves the item's core-evaluated
+ * Per-invocation {@link TaskletCtx}: serves the item's core-evaluated
  * clock, the replay-stable id, and evaluates emits producer-side into
  * schema {@link Output}s — edge transforms, keys and the consumer's
  * event-time extractor run here, so live delivery and replay cannot drift.
  */
-final class EmitContext implements ProcedureCtx {
+final class EmitContext implements TaskletCtx {
 
     private final OperativeInstance instance;
-    private final EntityCell cell;
+    private final Cell cell;
     private final long token;
     private final long invocationSeq;
     private final long now;
@@ -48,7 +48,7 @@ final class EmitContext implements ProcedureCtx {
     private int stableIdOrdinal;
     private int emitOrdinal;
 
-    EmitContext(OperativeInstance instance, EntityCell cell, long token, long invocationSeq, long now, boolean replay) {
+    EmitContext(OperativeInstance instance, Cell cell, long token, long invocationSeq, long now, boolean replay) {
         this.instance = instance;
         this.cell = cell;
         this.token = token;
@@ -93,83 +93,83 @@ final class EmitContext implements ProcedureCtx {
 
     @Override
     @Nonnull
-    public Optional<String> entityKey() {
-        // The cell stores a single-entity Procedure's absent key as "";
+    public Optional<String> cellKey() {
+        // The cell stores a single-cell Tasklet's absent key as "";
         // that is not a key to emit under.
-        return cell.entityKey.isEmpty() ? Optional.empty() : Optional.of(cell.entityKey);
+        return cell.cellKey.isEmpty() ? Optional.empty() : Optional.of(cell.cellKey);
     }
 
-    private TimerSession session() throws ProcedureException {
+    private TimerSession session() throws TaskletException {
         if (timers == null) {
-            throw new ProcedureException.TimersUnavailable();
+            throw new TaskletException.TimersUnavailable();
         }
         return timers;
     }
 
     @Override
-    public long timerAtEventTime(long scheduledAt) throws ProcedureException {
+    public long timerAtEventTime(long scheduledAt) throws TaskletException {
         return session().registerAtEventTime(scheduledAt);
     }
 
     @Override
-    public long timerAfter(@Nonnull Duration delay) throws ProcedureException {
+    public long timerAfter(@Nonnull Duration delay) throws TaskletException {
         return session().registerAfter(delay);
     }
 
     @Override
-    public boolean cancelEventTimeTimer(long scheduledAt) throws ProcedureException {
+    public boolean cancelEventTimeTimer(long scheduledAt) throws TaskletException {
         return session().cancel(TimerKind.EVENT_TIME, scheduledAt);
     }
 
     @Override
-    public boolean cancelProcessingTimeTimer(long scheduledAt) throws ProcedureException {
+    public boolean cancelProcessingTimeTimer(long scheduledAt) throws TaskletException {
         return session().cancel(TimerKind.PROCESSING_TIME, scheduledAt);
     }
 
     @Override
-    public <C> void emit(@Nonnull C value) throws ProcedureException {
+    public <C> void emit(@Nonnull C value) throws TaskletException {
         doEmit(defaultOutputChannel(), value, null, null);
     }
 
     @Override
-    public <C> void emit(@Nonnull String channelName, @Nonnull C value) throws ProcedureException {
+    public <C> void emit(@Nonnull String channelName, @Nonnull C value) throws TaskletException {
         doEmit(resolveChannel(channelName), value, null, null);
     }
 
     @Override
-    public <C> void emitWithMeta(@Nonnull C value, @Nonnull Map<String, String> meta) throws ProcedureException {
+    public <C> void emitWithMeta(@Nonnull C value, @Nonnull Map<String, String> meta) throws TaskletException {
         doEmit(defaultOutputChannel(), value, meta, null);
     }
 
     @Override
     public <C> void emitWithMeta(@Nonnull String channelName, @Nonnull C value, @Nonnull Map<String, String> meta)
-            throws ProcedureException {
+            throws TaskletException {
         doEmit(resolveChannel(channelName), value, meta, null);
     }
 
     @Override
-    public <C> void emitKeyed(@Nonnull String key, @Nonnull C value) throws ProcedureException {
+    public <C> void emitKeyed(@Nonnull String key, @Nonnull C value) throws TaskletException {
         doEmit(defaultOutputChannel(), value, null, key);
     }
 
     @Override
     public <C> void emitKeyedWithMeta(@Nonnull String key, @Nonnull C value, @Nonnull Map<String, String> meta)
-            throws ProcedureException {
+            throws TaskletException {
         doEmit(defaultOutputChannel(), value, meta, key);
     }
 
-    private int defaultOutputChannel() throws ProcedureException {
-        ProcedureDescriptor desc = instance.topology.procedure(cell.procedureId);
+    private int defaultOutputChannel() throws TaskletException {
+        TaskletDescriptor desc = instance.topology.tasklet(cell.taskletId);
         if (desc == null || desc.outputChannelId().isEmpty()) {
-            throw new ProcedureException.UnknownChannel("<no output channel declared on this procedure>");
+            throw new TaskletException.UnknownChannel("<no output channel declared on this tasklet>");
         }
         return desc.outputChannelId().getAsInt();
     }
 
-    private int resolveChannel(String name) throws ProcedureException {
+    private int resolveChannel(String name) throws TaskletException {
         Integer id = instance.topology.lookupChannelId(name);
         if (id == null) {
-            throw new ProcedureException.UnknownChannel(name);
+            throw new TaskletException.UnknownChannel(name);
         }
         return id;
     }
@@ -177,28 +177,28 @@ final class EmitContext implements ProcedureCtx {
     /**
      * The single emit funnel: keyed-channel contract, reserved-metadata
      * refusal, then producer-side routing into schema outputs. Supplying no
-     * key on a keyed channel resolves to this Entity's own key here, so the
+     * key on a keyed channel resolves to this Cell's own key here, so the
      * defaulted emit and an explicit {@code emitKeyed} are one path from
      * this point on and their stamping cannot diverge.
      */
     private void doEmit(int channelId, Object value, @Nullable Map<String, String> meta, @Nullable String key)
-            throws ProcedureException {
+            throws TaskletException {
         ChannelDescriptor descriptor = instance.topology.channel(channelId);
         if (descriptor == null) {
-            throw new ProcedureException.UnknownChannel("<channel " + channelId + ">");
+            throw new TaskletException.UnknownChannel("<channel " + channelId + ">");
         }
         if (descriptor.kind() == ChannelKind.ENTRY) {
-            throw new ProcedureException("cannot emit on entry channel `" + descriptor.name() + "` from a procedure");
+            throw new TaskletException("cannot emit on entry channel `" + descriptor.name() + "` from a tasklet");
         }
-        key = EmitKeys.resolve(descriptor.name(), descriptor.keyed(), key, entityKey());
+        key = EmitKeys.resolve(descriptor.name(), descriptor.keyed(), key, cellKey());
         if (meta != null) {
             for (String k : meta.keySet()) {
-                if (k.startsWith(ProcedureCtx.RESERVED_METADATA_PREFIX)) {
-                    throw new ProcedureException.ReservedMetadataKey(k);
+                if (k.startsWith(TaskletCtx.RESERVED_METADATA_PREFIX)) {
+                    throw new TaskletException.ReservedMetadataKey(k);
                 }
             }
             if (descriptor.pluginSink().isEmpty()) {
-                throw new ProcedureException.MetadataNotAllowedOnInterProcedureChannel(descriptor.name());
+                throw new TaskletException.MetadataNotAllowedOnInterTaskletChannel(descriptor.name());
             }
         }
         // Fan out to the consumer edges, then to the plugin sink if the
@@ -212,11 +212,11 @@ final class EmitContext implements ProcedureCtx {
     }
 
     private static byte[] serializeOrThrow(Function<Object, byte[]> serializer, Object value, String channel)
-            throws ProcedureException {
+            throws TaskletException {
         try {
             return serializer.apply(value);
         } catch (RuntimeException | Error e) {
-            throw new ProcedureException.PluginSerializerFailure(channel, e.toString(), e);
+            throw new TaskletException.PluginSerializerFailure(channel, e.toString(), e);
         }
     }
 
@@ -232,7 +232,7 @@ final class EmitContext implements ProcedureCtx {
      * the stage's released batch — and every downstream node's work — by
      * the channel's consumer count. So a structured workflow releases the
      * value once, untransformed and unkeyed; each consumer applies its own
-     * edge on delivery in {@link EntityRouting#valuesForEntity}, which is the
+     * edge on delivery in {@link CellRouting#valuesForCell}, which is the
      * seam a live run and a journal re-seed both cross. Mirrors the Rust
      * SDK's {@code WorkflowCollectAdapter::emit}.
      */
@@ -249,7 +249,7 @@ final class EmitContext implements ProcedureCtx {
                     // The consumer the fold discards; naming the channel's
                     // first keeps the target a well-formed Edge.
                     new OutputTarget.Edge(
-                            channelId, descriptor.consumers().get(0).procedure()),
+                            channelId, descriptor.consumers().get(0).tasklet()),
                     Optional.empty(),
                     OptionalLong.empty(),
                     List.of(),
@@ -258,16 +258,16 @@ final class EmitContext implements ProcedureCtx {
         }
         for (ConsumerEdge edge : descriptor.consumers()) {
             List<Object> values = EdgeTransforms.valuesOf(edge, value);
-            ProcedureDescriptor consumer = instance.topology.procedure(edge.procedure());
+            TaskletDescriptor consumer = instance.topology.tasklet(edge.tasklet());
             boolean eventTimeClocked = consumer != null && consumer.clockType() == EventTimeFrom.class;
             for (Object v : values) {
                 OptionalLong eventTime = OptionalLong.empty();
                 if (eventTimeClocked) {
-                    Procedure router = instance.routers.get(edge.procedure());
+                    Tasklet router = instance.routers.get(edge.tasklet());
                     eventTime = OptionalLong.of(router.eventTime(v));
                 }
                 outputs.add(new Output(
-                        new OutputTarget.Edge(channelId, edge.procedure()),
+                        new OutputTarget.Edge(channelId, edge.tasklet()),
                         Optional.ofNullable(edge.keyOf(v)),
                         eventTime,
                         List.of(),
@@ -293,7 +293,7 @@ final class EmitContext implements ProcedureCtx {
             }
         }
         if (descriptor.keyed() && !instance.topology.effectivelyOnce()) {
-            metadata.add(Map.entry("flz.entity", cell.id.encoded()));
+            metadata.add(Map.entry("flz.cell", cell.id.encoded()));
             metadata.add(Map.entry("flz.seq", invocationSeq + "." + emitOrdinal));
             metadata.add(Map.entry("flz.key", key));
         }

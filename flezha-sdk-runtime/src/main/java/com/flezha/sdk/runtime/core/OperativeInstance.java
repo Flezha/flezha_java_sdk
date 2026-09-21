@@ -1,12 +1,10 @@
 package com.flezha.sdk.runtime.core;
 
 import com.flezha.sdk.internal.RuntimeBridge;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureException;
-import com.flezha.sdk.runtime.operative.ProcedureDescriptor;
 import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
 import com.flezha.sdk.runtime.operative.StreamOperativeTopology;
-import com.flezha.sdk.runtime.state.EntityId;
+import com.flezha.sdk.runtime.operative.TaskletDescriptor;
+import com.flezha.sdk.runtime.state.CellId;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.runtime.state.PendingTimers;
 import com.flezha.sdk.runtime.state.TimerOp;
@@ -16,6 +14,8 @@ import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
 import com.flezha.sdk.runtime.workflow.WorkflowSpec;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.StateHandle;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -26,12 +26,12 @@ import javax.annotation.Nonnull;
 
 /**
  * One live operative instance: the registered class resolved from the
- * activation's factory id, plus its per-Entity cells. Materialized on the
+ * activation's factory id, plus its per-Cell cells. Materialized on the
  * first activation naming an unknown operative id.
  *
  * <p>This is the mutable half of the host — the cell map and the user state
  * inside it. Its two collaborators read the topology and mutate nothing that
- * outlives a call: {@link EntityRouting} answers where a payload goes,
+ * outlives a call: {@link CellRouting} answers where a payload goes,
  * {@link StateExchange} moves state across the boundary. Each is built once
  * here, never per activation.
  */
@@ -42,11 +42,11 @@ public final class OperativeInstance {
 
     final StreamOperativeTopology topology;
 
-    /** Per-Procedure routing instances — {@code entitiesFor} / {@code eventTime} only. */
+    /** Per-Tasklet routing instances — {@code cellsFor} / {@code eventTime} only. */
     @SuppressWarnings("rawtypes")
-    final List<Procedure> routers = new ArrayList<>();
+    final List<Tasklet> routers = new ArrayList<>();
 
-    /** Per-Procedure change/state codec (stable declared type ids). */
+    /** Per-Tasklet change/state codec (stable declared type ids). */
     private final List<KryoCodec> codecs = new ArrayList<>();
 
     private final List<TimerPolicy> timerPolicies = new ArrayList<>();
@@ -61,11 +61,11 @@ public final class OperativeInstance {
     /** A workflow class, whose stages the core folds into the driver's collect sink instead of routing them. */
     final boolean workflow;
 
-    private final EntityRouting routing;
+    private final CellRouting routing;
 
-    private final ConcurrentHashMap<CellKey, EntityCell> cells = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<CellAddress, Cell> cells = new ConcurrentHashMap<>();
 
-    private record CellKey(int procedure, String entityKey) {}
+    private record CellAddress(int tasklet, String cellKey) {}
 
     private OperativeInstance(
             String operativeId, String factoryId, StreamOperativeTopology topology, boolean workflow) {
@@ -73,16 +73,16 @@ public final class OperativeInstance {
         this.factoryId = factoryId;
         this.topology = topology;
         this.workflow = workflow;
-        for (ProcedureDescriptor desc : topology.procedures()) {
-            Procedure<?, ?, ?, ?, ?, ?> instance = instantiate(desc);
+        for (TaskletDescriptor desc : topology.tasklets()) {
+            Tasklet<?, ?, ?, ?, ?, ?> instance = instantiate(desc);
             routers.add(instance);
             // The descriptor's list, not the instance's: it starts as a
             // copy of `kryoTypes()` and is where the wiring adds a type
             // only the wiring knows (a `routeLatest` document class).
             codecs.add(new KryoCodec(desc.kryoTypes()));
-            timerPolicies.add(TimerPolicy.of(instance.maxTimersPerEntity(), desc.name(), desc.clockType()));
+            timerPolicies.add(TimerPolicy.of(instance.maxTimersPerCell(), desc.name(), desc.clockType()));
         }
-        this.routing = new EntityRouting(topology, routers, edgeCodec, workflow);
+        this.routing = new CellRouting(topology, routers, edgeCodec, workflow);
     }
 
     static OperativeInstance materialize(String operativeId, String factoryId) {
@@ -102,12 +102,11 @@ public final class OperativeInstance {
         return factoryId;
     }
 
-    private static Procedure<?, ?, ?, ?, ?, ?> instantiate(ProcedureDescriptor desc) {
+    private static Tasklet<?, ?, ?, ?, ?, ?> instantiate(TaskletDescriptor desc) {
         try {
-            return RuntimeBridge.construct(desc.procedureClass());
+            return RuntimeBridge.construct(desc.taskletClass());
         } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException(
-                    "procedure `" + desc.name() + "` has no public no-arg constructor: " + e, e);
+            throw new IllegalStateException("tasklet `" + desc.name() + "` has no public no-arg constructor: " + e, e);
         }
     }
 
@@ -116,7 +115,7 @@ public final class OperativeInstance {
             case ActivationKind.Work work -> dispatchWork(activation, work.items());
             case ActivationKind.RestoreFold fold -> restoreFold(activation, fold);
             case ActivationKind.SnapshotRequest ignored -> {
-                EntityCell cell = cellFor(activation.target());
+                Cell cell = cellFor(activation.target());
                 yield new ActivationOutcome.Snapshot(cell.codec.serialize(cell.state));
             }
             case ActivationKind.LiveStateRead ignored -> new ActivationOutcome.StateJson(
@@ -137,7 +136,7 @@ public final class OperativeInstance {
     // ------------------------------------------------------------------
 
     private ActivationOutcome dispatchWork(Activation activation, List<WorkItem> items) {
-        EntityCell cell = cellFor(activation.target());
+        Cell cell = cellFor(activation.target());
         List<ItemEffect> effects = new ArrayList<>(items.size());
         for (WorkItem item : items) {
             ItemEffect effect = runItem(activation, cell, item);
@@ -151,7 +150,7 @@ public final class OperativeInstance {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private ItemEffect runItem(Activation activation, EntityCell cell, WorkItem item) {
+    private ItemEffect runItem(Activation activation, Cell cell, WorkItem item) {
         long now = item instanceof WorkItem.Input in ? in.now() : ((WorkItem.Timer) item).scheduledAt();
         OptionalLong offset = item instanceof WorkItem.Input in ? in.consumedOffset() : OptionalLong.empty();
         boolean replay = item instanceof WorkItem.Input in && in.replay();
@@ -162,17 +161,17 @@ public final class OperativeInstance {
                 : cell.timerPolicy.session(new PendingTimers(), now);
         ctx.timers = session;
         List<Change> buffer = new ArrayList<>();
-        Procedure procedure = cell.procedure;
+        Tasklet tasklet = cell.tasklet;
         StateHandle<Object, Change> handle = handleOver(cell, buffer);
 
         AtomicReference<List<TimerOp>> timerOps = new AtomicReference<>(List.of());
         Verdict verdict = runUserCode(() -> {
             if (item instanceof WorkItem.Timer timer) {
-                procedure.onTimer(timer.scheduledAt(), timer.kind(), handle, ctx);
+                tasklet.onTimer(timer.scheduledAt(), timer.kind(), handle, ctx);
             } else {
                 WorkItem.Input in = (WorkItem.Input) item;
-                for (Object value : routing.valuesForEntity(cell, in.channel(), in.payload())) {
-                    procedure.run(value, handle, ctx);
+                for (Object value : routing.valuesForCell(cell, in.channel(), in.payload())) {
+                    tasklet.run(value, handle, ctx);
                 }
             }
             timerOps.set(session.commit(new PendingTimers()));
@@ -196,9 +195,9 @@ public final class OperativeInstance {
 
     /** The state handle every user-code invocation writes through. */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static StateHandle<Object, Change> handleOver(EntityCell cell, List<Change> buffer) {
-        Procedure procedure = cell.procedure;
-        return StateHandle.create(cell.state, (List) buffer, (s, c) -> procedure.applyChange(s, c));
+    private static StateHandle<Object, Change> handleOver(Cell cell, List<Change> buffer) {
+        Tasklet tasklet = cell.tasklet;
+        return StateHandle.create(cell.state, (List) buffer, (s, c) -> tasklet.applyChange(s, c));
     }
 
     /**
@@ -211,9 +210,9 @@ public final class OperativeInstance {
         try {
             body.invoke();
             return new Verdict.Ok();
-        } catch (ProcedureException e) {
+        } catch (TaskletException e) {
             String message = e.getMessage() == null ? e.toString() : e.getMessage();
-            return e instanceof ProcedureException.NonRetryable
+            return e instanceof TaskletException.NonRetryable
                     ? new Verdict.NonRetryableError(message)
                     : new Verdict.RetryableError(message);
         } catch (Throwable t) {
@@ -233,7 +232,7 @@ public final class OperativeInstance {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private ActivationOutcome compensateRun(Activation activation, List<byte[]> outputBytes) {
-        EntityCell cell = cellFor(activation.target());
+        Cell cell = cellFor(activation.target());
         List<Object> outputs = new ArrayList<>(outputBytes.size());
         for (byte[] bytes : outputBytes) {
             outputs.add(edgeCodec.deserialize(bytes, Object.class));
@@ -244,9 +243,9 @@ public final class OperativeInstance {
         EmitContext ctx = new EmitContext(
                 this, cell, activation.token(), activation.changeSeq(), System.currentTimeMillis(), false);
         List<Change> buffer = new ArrayList<>();
-        Procedure procedure = cell.procedure;
+        Tasklet tasklet = cell.tasklet;
         StateHandle<Object, Change> handle = handleOver(cell, buffer);
-        Verdict verdict = runUserCode(() -> procedure.compensate(outputs, handle, ctx));
+        Verdict verdict = runUserCode(() -> tasklet.compensate(outputs, handle, ctx));
         return new ActivationOutcome.Work(List.of(new ItemEffect(
                 verdict,
                 StateExchange.serializeChanges(cell, buffer),
@@ -264,39 +263,39 @@ public final class OperativeInstance {
     // ------------------------------------------------------------------
 
     private ActivationOutcome restoreFold(Activation activation, ActivationKind.RestoreFold fold) {
-        EntityRef target = activation.target();
-        EntityCell cell = freshCell(target.procedure(), target.entityKey());
+        CellRef target = activation.target();
+        Cell cell = freshCell(target.tasklet(), target.cellKey());
         StateExchange.foldInto(cell, fold);
-        cells.put(new CellKey(target.procedure(), target.entityKey().orElse("")), cell);
+        cells.put(new CellAddress(target.tasklet(), target.cellKey().orElse("")), cell);
         return new ActivationOutcome.Restored();
     }
 
-    private EntityCell cellFor(EntityRef target) {
-        return cellFor(target.procedure(), target.entityKey());
+    private Cell cellFor(CellRef target) {
+        return cellFor(target.tasklet(), target.cellKey());
     }
 
-    private EntityCell cellFor(int procedureId, Optional<String> entityKey) {
+    private Cell cellFor(int taskletId, Optional<String> cellKey) {
         return cells.computeIfAbsent(
-                new CellKey(procedureId, entityKey.orElse("")), k -> freshCell(procedureId, entityKey));
+                new CellAddress(taskletId, cellKey.orElse("")), k -> freshCell(taskletId, cellKey));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private EntityCell freshCell(int procedureId, Optional<String> entityKey) {
-        ProcedureDescriptor desc = topology.procedure(procedureId);
+    private Cell freshCell(int taskletId, Optional<String> cellKey) {
+        TaskletDescriptor desc = topology.tasklet(taskletId);
         if (desc == null) {
-            throw new IllegalStateException("activation names unknown procedure id " + procedureId);
+            throw new IllegalStateException("activation names unknown tasklet id " + taskletId);
         }
-        // One Procedure instance per Entity: a mutable field on a user's
-        // Procedure is per-Entity scratch, never shared across keys.
-        Procedure procedure = instantiate(desc);
-        Object state = procedure.initState(entityKey, Optional.empty());
-        return new EntityCell(
-                procedureId,
-                entityKey.orElse(""),
-                procedure,
+        // One Tasklet instance per Cell: a mutable field on a user's
+        // Tasklet is per-Cell scratch, never shared across keys.
+        Tasklet tasklet = instantiate(desc);
+        Object state = tasklet.initState(cellKey, Optional.empty());
+        return new Cell(
+                taskletId,
+                cellKey.orElse(""),
+                tasklet,
                 state,
-                codecs.get(procedureId),
-                timerPolicies.get(procedureId),
-                EntityId.of(operativeId, desc.name(), entityKey));
+                codecs.get(taskletId),
+                timerPolicies.get(taskletId),
+                CellId.of(operativeId, desc.name(), cellKey));
     }
 }

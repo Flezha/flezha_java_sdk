@@ -26,7 +26,7 @@ public final class BenchCheckpointStreamOperative implements StreamOperative {
         }
         c.input(String.class, "input")
                 .onFull(OverflowPolicy.DROP_NOTHING)
-                .into(BenchCheckpointProcedure.class)
+                .into(BenchCheckpointTasklet.class)
                 .keyed()
                 .sink("sink");
     }

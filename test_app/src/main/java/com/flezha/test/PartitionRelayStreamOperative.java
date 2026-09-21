@@ -2,9 +2,9 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operative.StreamOperative;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.state.WallClock;
@@ -33,24 +33,24 @@ public final class PartitionRelayStreamOperative implements StreamOperative {
         // channel. The entry channel here is `in` so the two names cannot
         // collide inside this class.
         c.input(String.class, "in")
-                .keyBy(DynamicEntityStreamOperative::key)
-                .into(PartitionRelayProcedure.class)
+                .keyBy(DynamicCellStreamOperative::key)
+                .into(PartitionRelayTasklet.class)
                 .keyed()
                 .sink("input");
     }
 
-    public static final class PartitionRelayProcedure
-            implements Procedure<String, PartitionRelayProcedure.State, String, StoreInputChange, WallClock, Void> {
+    public static final class PartitionRelayTasklet
+            implements Tasklet<String, PartitionRelayTasklet.State, String, StoreInputChange, WallClock, Void> {
 
         public record State(List<String> seen) {}
 
         @Override
         public String name() {
-            return "partition_relay_procedure";
+            return "partition_relay_tasklet";
         }
 
         @Override
-        public State initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public State initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new State(new ArrayList<>());
         }
 
@@ -65,10 +65,10 @@ public final class PartitionRelayStreamOperative implements StreamOperative {
         }
 
         @Override
-        public void run(String input, StateHandle<State, StoreInputChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<State, StoreInputChange> state, TaskletCtx ctx)
+                throws TaskletException {
             state.apply(new StoreInputChange(input));
-            ctx.emitKeyed(DynamicEntityStreamOperative.key(input), input);
+            ctx.emitKeyed(DynamicCellStreamOperative.key(input), input);
         }
     }
 }

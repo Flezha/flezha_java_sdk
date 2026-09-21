@@ -29,12 +29,12 @@ public record DerivedDeclaration(@Nonnull List<Channel> channels) {
             @Nullable String sink) {}
 
     /**
-     * One consumer edge as the core derived it: the procedure it feeds, and
+     * One consumer edge as the core derived it: the tasklet it feeds, and
      * the index of the chain that produced it. Which chain survives a
      * re-declaration is the core's answer — the builder attaches that chain's
      * closures and decides nothing.
      */
-    public record Edge(int procedure, int chain) {}
+    public record Edge(int tasklet, int chain) {}
 
     /** The answer for the channel declared at {@code index}. */
     @Nonnull
@@ -55,7 +55,7 @@ public record DerivedDeclaration(@Nonnull List<Channel> channels) {
             List<Edge> consumers = new ArrayList<>();
             node.get("consumers")
                     .forEach(edge -> consumers.add(new Edge(
-                            edge.get("procedure").asInt(), edge.get("chain").asInt())));
+                            edge.get("tasklet").asInt(), edge.get("chain").asInt())));
             JsonNode producer = node.get("producer");
             JsonNode sink = node.get("sink");
             channels.add(new Channel(

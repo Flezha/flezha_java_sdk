@@ -1,15 +1,15 @@
 package com.flezha.sdk.state;
 
 /**
- * Which clock a per-Entity timer is scheduled against. Serialized as a postcard
+ * Which clock a per-Cell timer is scheduled against. Serialized as a postcard
  * unit enum ({@code 0} / {@code 1}) inside every durable timer op, so the
  * ordinal order here is a wire contract shared with the Rust SDK's
  * {@code TimerKind}.
  */
 public enum TimerKind {
     /**
-     * Fires when the Entity's event-time high-water reaches the scheduled
-     * timestamp. An Entity that stops receiving input never fires one — nothing
+     * Fires when the Cell's event-time high-water reaches the scheduled
+     * timestamp. A Cell that stops receiving input never fires one — nothing
      * advances its clock. That is inherent to event time, and why
      * {@link #PROCESSING_TIME} exists.
      */

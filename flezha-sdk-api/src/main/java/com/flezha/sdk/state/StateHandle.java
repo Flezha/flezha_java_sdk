@@ -4,14 +4,14 @@ import java.util.List;
 import java.util.function.BiConsumer;
 
 /**
- * The handle through which a procedure reads and mutates its entity's state.
+ * The handle through which a tasklet reads and mutates its cell's state.
  *
  * <p>Read with {@link #get()}. Mutate only with {@link #apply(Change)}, which records the change so
  * it can be replayed:
  *
  * <pre>{@code
  * @Override
- * public void run(String input, StateHandle<Counter, Increment> state, ProcedureCtx ctx) {
+ * public void run(String input, StateHandle<Counter, Increment> state, TaskletCtx ctx) {
  *     state.apply(new Increment(ctx.now()));      // recorded, survives a restart
  *     ctx.emit("count=" + state.get().count);     // reads the value just applied
  * }
@@ -37,7 +37,7 @@ import java.util.function.BiConsumer;
  *
  * <p>The failure is silent under normal operation, because a direct assignment behaves correctly
  * for as long as the process survives. What catches it instead is
- * {@code ProcedureTestHarness.replayEquals()}, which replays the recorded changes and compares the
+ * {@code TaskletTestHarness.replayEquals()}, which replays the recorded changes and compares the
  * result against the observed state. It is opt-in and belongs in CI.
  */
 public final class StateHandle<State, ChangeT extends Change> {
@@ -70,7 +70,7 @@ public final class StateHandle<State, ChangeT extends Change> {
      * compiles and runs. Do not: such a write is not recorded and does not survive a restart.
      * Mutate through {@link #apply} instead.
      *
-     * @return this entity's current state
+     * @return this cell's current state
      */
     public State get() {
         return state;
@@ -80,8 +80,8 @@ public final class StateHandle<State, ChangeT extends Change> {
      * Records a change and applies it to the state. This is the only mutation that survives a
      * restart.
      *
-     * <p>The change is handed to the procedure's {@code applyChange} to update the state, and is
-     * also written to this entity's change log, from which the state is rebuilt after a crash. A
+     * <p>The change is handed to the tasklet's {@code applyChange} to update the state, and is
+     * also written to this cell's change log, from which the state is rebuilt after a crash. A
      * read through {@link #get()} immediately afterwards reflects it.
      *
      * @param change the mutation to record and apply

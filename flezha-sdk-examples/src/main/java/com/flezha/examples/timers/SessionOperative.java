@@ -4,7 +4,7 @@ import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operative.StreamOperative;
 import javax.annotation.Nonnull;
 
-/** One entity per user, so every session owns its own idle deadline. */
+/** One cell per user, so every session owns its own idle deadline. */
 public final class SessionOperative implements StreamOperative {
 
     @Override

@@ -1,12 +1,12 @@
 package com.flezha.sdk.runtime.state;
 
-import com.flezha.sdk.runtime.entity.TimerCounters;
+import com.flezha.sdk.runtime.cell.TimerCounters;
 import com.flezha.sdk.state.EventTimeFrom;
 import com.flezha.sdk.state.TimerKind;
 import javax.annotation.Nonnull;
 
 /**
- * What a Procedure declares about its timers, resolved once per Procedure
+ * What a Tasklet declares about its timers, resolved once per Tasklet
  * rather than at every invocation: the bound, the names a refusal reports, and
  * whether its Clock can serve an event-time deadline at all. Carries the
  * counter set too, so opening a session costs no registry lookup.
@@ -14,20 +14,20 @@ import javax.annotation.Nonnull;
  * <p>Mirrors the Rust SDK's {@code TimerPolicy}.
  */
 public record TimerPolicy(
-        int maxPerEntity,
-        @Nonnull String procedure,
+        int maxPerCell,
+        @Nonnull String tasklet,
         boolean eventTimeClock,
         @Nonnull String clock,
         @Nonnull TimerCounters counters) {
 
     @Nonnull
-    public static TimerPolicy of(int maxPerEntity, @Nonnull String procedure, @Nonnull Class<?> clockType) {
+    public static TimerPolicy of(int maxPerCell, @Nonnull String tasklet, @Nonnull Class<?> clockType) {
         return new TimerPolicy(
-                maxPerEntity,
-                procedure,
+                maxPerCell,
+                tasklet,
                 clockType == EventTimeFrom.class,
                 clockType.getSimpleName(),
-                TimerCounters.of(procedure));
+                TimerCounters.of(tasklet));
     }
 
     /** Open a session over a COPY of {@code pending}. */

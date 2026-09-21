@@ -3,8 +3,8 @@ package com.flezha.sdk.runtime.operative.builder;
 import com.flezha.sdk.channel.EdgeStream;
 import com.flezha.sdk.channel.Merge;
 import com.flezha.sdk.channel.Stream;
-import com.flezha.sdk.procedure.Procedure;
 import com.flezha.sdk.runtime.operative.EdgeYield;
+import com.flezha.sdk.tasklet.Tasklet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
@@ -70,15 +70,14 @@ final class MergeImpl<I> implements Merge<I> {
 
     @Override
     @Nonnull
-    public <O> Stream<O> into(@Nonnull Class<? extends Procedure<I, ?, O, ?, ?, ?>> procedure) {
-        return wire(procedure, null);
+    public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<I, ?, O, ?, ?, ?>> tasklet) {
+        return wire(tasklet, null);
     }
 
     @Override
     @Nonnull
-    public <O> Stream<O> into(
-            @Nonnull Class<? extends Procedure<I, ?, O, ?, ?, ?>> procedure, @Nonnull String nodeName) {
-        return wire(procedure, nodeName);
+    public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<I, ?, O, ?, ?, ?>> tasklet, @Nonnull String nodeName) {
+        return wire(tasklet, nodeName);
     }
 
     /**
@@ -87,13 +86,13 @@ final class MergeImpl<I> implements Merge<I> {
      * ({@code routeLatest}) closes its own merge with instead of re-deriving
      * the named/unnamed dispatch.
      */
-    <O> Stream<O> wire(Class<? extends Procedure<I, ?, O, ?, ?, ?>> procedureClass, String nodeName) {
+    <O> Stream<O> wire(Class<? extends Tasklet<I, ?, O, ?, ?, ?>> taskletClass, String nodeName) {
         owner.checkMutable();
         // Register the consumer before its sources — as Rust's `Merge::wire`
-        // does — so a merge that declared none still records a procedure the
+        // does — so a merge that declared none still records a tasklet the
         // core can name. `registerNode` resolves by identity, so wiring below
         // returns this same node.
-        int node = owner.registerNode(procedureClass, nodeName);
+        int node = owner.registerNode(taskletClass, nodeName);
         int group = owner.nextMergeGroup();
         for (MergeSourceEntry source : sources) {
             // The key rides each source's chain, so it is evaluated on the
@@ -102,7 +101,7 @@ final class MergeImpl<I> implements Merge<I> {
             for (int i = 0; i < keyDeclarations; i++) {
                 chain = owner.extendPending(source.channelId(), chain, mergedType, null, key);
             }
-            owner.wireConsumer(source.channelId(), procedureClass, nodeName, mergedType, chain, group);
+            owner.wireConsumer(source.channelId(), taskletClass, nodeName, mergedType, chain, group);
         }
         return new StreamImpl<>(owner, node);
     }

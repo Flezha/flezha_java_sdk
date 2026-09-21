@@ -11,7 +11,7 @@ import com.flezha.sdk.runtime.operative.StreamOperativeTopology;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.ChannelEntry;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.ClassFacts;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.PendingEdge;
-import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.ProcedureEntry;
+import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.TaskletEntry;
 import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
 import com.flezha.sdk.runtime.workflow.WorkflowSpec;
 import com.flezha.sdk.state.EventTimeFrom;
@@ -34,7 +34,7 @@ import javax.annotation.Nullable;
  * omitted entirely.
  *
  * <p><b>Id order is the contract:</b> {@code channels} is emitted in Java's
- * channel-id order and {@code procedures} in procedure-id order, so the core's
+ * channel-id order and {@code tasklets} in tasklet-id order, so the core's
  * indices equal Java's — {@code InputItem.channel} and
  * {@code Output.target.channel} are these indexes.
  */
@@ -98,7 +98,7 @@ public final class HostClassDeclaration {
 
     /**
      * The record a stream builder submits: the class facts as declared, one
-     * entry per channel and procedure in id order, and per channel the chains
+     * entry per channel and tasklet in id order, and per channel the chains
      * its handles were given. Consumers, channel kinds, sink names and the
      * acknowledgement granularity are NOT here — they are the core's answer.
      */
@@ -107,12 +107,12 @@ public final class HostClassDeclaration {
             @Nonnull String factoryId,
             @Nonnull ClassFacts facts,
             @Nonnull List<ChannelEntry> channels,
-            @Nonnull List<ProcedureEntry> procedures,
+            @Nonnull List<TaskletEntry> tasklets,
             @Nonnull int[] capacities) {
         Map<String, Object> decl = base(factoryId);
         // Persistence is what the class's Changes imply: a class whose every
-        // Procedure declares NoChange has nothing to flush.
-        if (procedures.stream().anyMatch(p -> p.changeType != NoChange.class)) {
+        // Tasklet declares NoChange has nothing to flush.
+        if (tasklets.stream().anyMatch(p -> p.changeType != NoChange.class)) {
             decl.put("persistent", true);
         }
         if (facts.effectivelyOnce()) {
@@ -135,12 +135,12 @@ public final class HostClassDeclaration {
             decl.put("beyond_window_policy", facts.beyondWindowPolicy().wireName());
         }
         long compactAfterBytes =
-                procedures.stream().mapToLong(p -> p.compactAfterBytes).min().orElse(DEFAULT_COMPACT_AFTER_BYTES);
+                tasklets.stream().mapToLong(p -> p.compactAfterBytes).min().orElse(DEFAULT_COMPACT_AFTER_BYTES);
         if (compactAfterBytes != DEFAULT_COMPACT_AFTER_BYTES) {
             decl.put("compact_after_bytes", compactAfterBytes);
         }
         decl.put("channels", channels(channels));
-        decl.put("procedures", procedures(procedures, capacities));
+        decl.put("tasklets", tasklets(tasklets, capacities));
         return decl;
     }
 
@@ -188,7 +188,7 @@ public final class HostClassDeclaration {
     public static byte[] forWorkflow(@Nonnull WorkflowSpec spec) {
         Map<String, Object> decl = new LinkedHashMap<>(spec.topology().declaration());
         // Durability is the workflow's own declaration, not what its
-        // procedures' Change types imply.
+        // tasklets' Change types imply.
         decl.remove("persistent");
         // The tier, checkpoint and correction keys are a stream class's to put
         // on the wire. The core refuses effectively_once and
@@ -275,34 +275,34 @@ public final class HostClassDeclaration {
         return out;
     }
 
-    private static List<Map<String, Object>> procedures(List<ProcedureEntry> procedures, int[] capacities) {
-        List<Map<String, Object>> out = new ArrayList<>(procedures.size());
-        for (int i = 0; i < procedures.size(); i++) {
-            ProcedureEntry desc = procedures.get(i);
+    private static List<Map<String, Object>> tasklets(List<TaskletEntry> tasklets, int[] capacities) {
+        List<Map<String, Object>> out = new ArrayList<>(tasklets.size());
+        for (int i = 0; i < tasklets.size(); i++) {
+            TaskletEntry desc = tasklets.get(i);
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("name", desc.name);
             if (desc.dynamic) {
-                p.put("entity_mode", "dynamic");
-                desc.entityIdleTtl.ifPresent(ttl -> p.put("idle_ttl_ms", ttl.toMillis()));
-                desc.maxEntities.ifPresent(cap -> p.put("max_entities", cap));
-            } else if (!desc.entityKeys.isEmpty()) {
-                p.put("entity_mode", "static");
-                p.put("entity_keys", desc.entityKeys);
+                p.put("cell_mode", "dynamic");
+                desc.cellIdleTtl.ifPresent(ttl -> p.put("idle_ttl_ms", ttl.toMillis()));
+                desc.maxCells.ifPresent(cap -> p.put("max_cells", cap));
+            } else if (!desc.cellKeys.isEmpty()) {
+                p.put("cell_mode", "static");
+                p.put("cell_keys", desc.cellKeys);
             }
-            if (desc.entitiesForOverridden) {
-                p.put("entities_for_overridden", true);
+            if (desc.cellsForOverridden) {
+                p.put("cells_for_overridden", true);
             }
             if (desc.compensateOverridden) {
                 p.put("compensate_overridden", true);
             }
             p.put("clock", clockOf(desc.clockType));
             p.put("mailbox_capacity", capacities[i]);
-            // A procedure whose Change is the empty one journals nothing, so a
+            // A tasklet whose Change is the empty one journals nothing, so a
             // logical clock over it never advances; the core names that.
             if (desc.changeType == NoChange.class) {
                 p.put("change_is_nochange", true);
             }
-            // Per Procedure, never a class-wide maximum: one Procedure's bump
+            // Per Tasklet, never a class-wide maximum: one Tasklet's bump
             // would otherwise re-stamp its siblings' records with a version
             // they never declared.
             p.put("schema_version", desc.schemaVersion);
@@ -315,7 +315,7 @@ public final class HostClassDeclaration {
     private static String kindOf(ChannelKind kind) {
         return switch (kind) {
             case ENTRY -> "entry";
-            case INTER_PROCEDURE -> "inter_proc";
+            case INTER_TASKLET -> "inter_task";
             case PLUGIN_BOUND -> "plugin";
         };
     }

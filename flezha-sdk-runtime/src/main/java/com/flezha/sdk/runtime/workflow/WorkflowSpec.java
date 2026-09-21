@@ -10,8 +10,8 @@ import com.flezha.sdk.operative.WorkflowOperative;
 import com.flezha.sdk.operative.WorkflowOperativeConfigurationException;
 import com.flezha.sdk.runtime.operative.ChannelDescriptor;
 import com.flezha.sdk.runtime.operative.ConsumerEdge;
-import com.flezha.sdk.runtime.operative.ProcedureDescriptor;
 import com.flezha.sdk.runtime.operative.StreamOperativeTopology;
+import com.flezha.sdk.runtime.operative.TaskletDescriptor;
 import com.flezha.sdk.runtime.operative.builder.GraphShape;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder;
 import java.time.Duration;
@@ -64,7 +64,7 @@ public final class WorkflowSpec {
         return topology;
     }
 
-    /** Procedures in execution order (entry consumer → … → terminal). */
+    /** Tasklets in execution order (entry consumer → … → terminal). */
     @Nonnull
     public List<Integer> chain() {
         return chain;
@@ -82,7 +82,7 @@ public final class WorkflowSpec {
     }
 
     /**
-     * The failing-entity retry ladder. Resolved onto the SAME
+     * The failing-cell retry ladder. Resolved onto the SAME
      * {@link RetryPolicy} the stream dead-letter ladder uses, so both share one
      * backoff implementation.
      */
@@ -124,18 +124,18 @@ public final class WorkflowSpec {
 
     /**
      * Build and validate the spec for a workflow class: its
-     * {@link WorkflowOperative#procedures} declaration, validated as a single
+     * {@link WorkflowOperative#tasklets} declaration, validated as a single
      * entry-rooted DAG. Nothing about the handoffs is judged here: the journal
      * codec is the core's to derive, and the one rule a durable CHAINED loop
-     * still owes (a terminal procedure releasing an inter-procedure channel,
+     * still owes (a terminal tasklet releasing an inter-tasklet channel,
      * the only kind the journal carries) is refused once in `flz_core`'s
      * `register_structured_workflow`, which every host reaches through
      * `declareClass`. Restating it here would be a second implementation of a
      * core rule, which is how `BranchingChainedLoop` is already handled.
      *
      * @throws WorkflowOperativeConfigurationException on invalid authoring
-     *     (external-stop-only, no procedure, branching, cycle, dynamic entity
-     *     mode, disconnected procedure, or no entry channel).
+     *     (external-stop-only, no tasklet, branching, cycle, dynamic cell
+     *     mode, disconnected tasklet, or no entry channel).
      */
     @Nonnull
     public static WorkflowSpec build(@Nonnull Class<? extends WorkflowOperative> operativeClass) {
@@ -144,10 +144,10 @@ public final class WorkflowSpec {
 
         StreamOperativeTopology topology;
         try {
-            topology = StreamOperativeTopologyBuilder.build(factoryId, probe::procedures);
+            topology = StreamOperativeTopologyBuilder.build(factoryId, probe::tasklets);
         } catch (StreamOperativeConfigurationException e) {
             // A workflow reuses the unbounded topology builder, which rejects
-            // an empty declaration, dynamic-entity procedures and unwired
+            // an empty declaration, dynamic-cell tasklets and unwired
             // channels.
             throw new WorkflowOperativeConfigurationException(
                     "workflow operative `" + factoryId + "` has an invalid topology: " + e.getMessage());
@@ -178,7 +178,7 @@ public final class WorkflowSpec {
         if (!probe.selfTerminating() && probe.maxDuration().isEmpty()) {
             throw new WorkflowOperativeConfigurationException("workflow operative `" + factoryId
                     + "` is not terminable: its only possible exit is an external stop. Add a terminal condition: "
-                    + "let the chain complete, have a procedure call ctx.complete, or declare maxDuration().");
+                    + "let the chain complete, have a tasklet call ctx.complete, or declare maxDuration().");
         }
         return probe;
     }
@@ -194,7 +194,7 @@ public final class WorkflowSpec {
     }
 
     /**
-     * The entry channel that seeds the first procedure(s) from the spawn args.
+     * The entry channel that seeds the first tasklet(s) from the spawn args.
      * The seed is a bare payload naming no channel — the spawn args, or a
      * PER_INPUT loop's inbox item — and it bypasses the routing seam entirely,
      * so no edge closure declared there could ever be selected: a merge mapping
@@ -213,8 +213,8 @@ public final class WorkflowSpec {
         }
         if (entry == null) {
             throw new WorkflowOperativeConfigurationException("workflow operative `" + factoryId
-                    + "` declares procedures but no entry channel; a structured workflow must declare one input "
-                    + "channel (c.input(...)) to seed its first procedure");
+                    + "` declares tasklets but no entry channel; a structured workflow must declare one input "
+                    + "channel (c.input(...)) to seed its first tasklet");
         }
         if (entry.consumers().isEmpty()) {
             throw new WorkflowOperativeConfigurationException(
@@ -227,12 +227,12 @@ public final class WorkflowSpec {
             for (ConsumerEdge edge : ch.consumers()) {
                 if (edge.transform().isPresent() || edge.key().isPresent()) {
                     throw new WorkflowOperativeConfigurationException("MergeFromEntryChannel: workflow operative `"
-                            + factoryId + "` merges entry channel `" + ch.name() + "` into procedure `"
-                            + topology.procedures().get(edge.procedure()).name()
+                            + factoryId + "` merges entry channel `" + ch.name() + "` into tasklet `"
+                            + topology.tasklets().get(edge.tasklet()).name()
                             + "`; a workflow operative is seeded from its spawn args (and, for a PER_INPUT loop, its"
                             + " inbox items) through ONE entry channel, and neither carries the channel a payload"
                             + " arrived on — so an entry channel cannot be one merge source among several. Merge the"
-                            + " output streams of two or more of this operative's procedures instead");
+                            + " output streams of two or more of this operative's tasklets instead");
                 }
             }
         }
@@ -244,11 +244,11 @@ public final class WorkflowSpec {
      * GraphShape} walk the stream validation also runs: Kahn order makes the
      * driver's sequential walk dispatch a join only after ALL its producers,
      * with the accumulated batch. Kahn-FIFO equals BFS numbering for a tree, so
-     * journaled {@code proc_idx} values keep their meaning. Reachability is
-     * named before the cycle so a genuinely disconnected procedure is not
-     * reported as a cycle symptom. Procedure ids are indices into
-     * {@code topology.procedures()}; a channel's {@code consumerIds()} are
-     * downstream procedure ids.
+     * journaled {@code task_idx} values keep their meaning. Reachability is
+     * named before the cycle so a genuinely disconnected tasklet is not
+     * reported as a cycle symptom. Tasklet ids are indices into
+     * {@code topology.tasklets()}; a channel's {@code consumerIds()} are
+     * downstream tasklet ids.
      */
     @Nonnull
     private static List<Integer> chainOrder(
@@ -261,26 +261,26 @@ public final class WorkflowSpec {
                 }
             }
         }
-        GraphShape.Order shape = GraphShape.order(topology.procedures().size(), edges, entry.consumerIds());
+        GraphShape.Order shape = GraphShape.order(topology.tasklets().size(), edges, entry.consumerIds());
         if (shape.unreachable() >= 0 && shape.onCycle() < 0) {
             throw new WorkflowOperativeConfigurationException("workflow operative `" + factoryId
-                    + "` declares procedure `"
-                    + topology.procedures().get(shape.unreachable()).name()
+                    + "` declares tasklet `"
+                    + topology.tasklets().get(shape.unreachable()).name()
                     + "` that is not reachable from the entry channel");
         }
         if (shape.onCycle() >= 0) {
             throw new WorkflowOperativeConfigurationException("workflow operative `" + factoryId
-                    + "` declares procedure `"
-                    + topology.procedures().get(shape.onCycle()).name()
-                    + "` on a cycle; a bounded topology is a DAG — a procedure's output may never"
+                    + "` declares tasklet `"
+                    + topology.tasklets().get(shape.onCycle()).name()
+                    + "` on a cycle; a bounded topology is a DAG — a tasklet's output may never"
                     + " reach its own input");
         }
-        for (ProcedureDescriptor proc : topology.procedures()) {
-            // Workflow has no dynamic-entities capability.
-            if (proc.dynamic()) {
+        for (TaskletDescriptor task : topology.tasklets()) {
+            // Workflow has no dynamic-cells capability.
+            if (task.dynamic()) {
                 throw new WorkflowOperativeConfigurationException("workflow operative `" + factoryId
-                        + "` declares a dynamic-entity procedure `" + proc.name()
-                        + "`; workflow operatives do not support dynamic entity mode");
+                        + "` declares a dynamic-cell tasklet `" + task.name()
+                        + "`; workflow operatives do not support dynamic cell mode");
             }
         }
         return shape.order();

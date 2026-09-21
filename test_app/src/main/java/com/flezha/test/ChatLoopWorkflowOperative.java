@@ -8,8 +8,8 @@ import java.util.Optional;
 
 /**
  * Mirror of the Rust test app's {@code chat_loop_workflow}: the durable-loop +
- * suspension shape. One iteration per inbox item — proc TURN commits the turn to
- * Entity state and emits it, proc REPLY emits the answer to the sink. Between
+ * suspension shape. One iteration per inbox item — task TURN commits the turn to
+ * Cell state and emits it, task REPLY emits the answer to the sink. Between
  * turns the loop finds an empty inbox at a committed boundary and PARKS. The
  * turn {@code bye} ends the session.
  */
@@ -32,7 +32,7 @@ public final class ChatLoopWorkflowOperative implements WorkflowOperative {
     }
 
     @Override
-    public void procedures(ChannelBuilder c) {
+    public void tasklets(ChannelBuilder c) {
         c.input(String.class, "in")
                 .into(ChatSteps.Turn.class)
                 .named("mid")

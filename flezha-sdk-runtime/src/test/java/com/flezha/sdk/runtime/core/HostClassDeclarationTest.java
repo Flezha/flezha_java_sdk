@@ -11,15 +11,15 @@ import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.operative.LoopMode;
 import com.flezha.sdk.operative.StreamOperative;
 import com.flezha.sdk.operative.WorkflowOperative;
-import com.flezha.sdk.procedure.ProcedureCtx;
 import com.flezha.sdk.runtime.RepositoryFixture;
-import com.flezha.sdk.runtime.operative.StatelessTestProcedure;
+import com.flezha.sdk.runtime.operative.StatelessTestTasklet;
 import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
 import com.flezha.sdk.runtime.operative.StreamOperativeTopology;
 import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
 import com.flezha.sdk.runtime.workflow.WorkflowSpec;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.StateHandle;
+import com.flezha.sdk.tasklet.TaskletCtx;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -49,7 +49,7 @@ class HostClassDeclarationTest {
     }
 
     @Test
-    @DisplayName("a stream declaration emits channels and procedures in id order with tier facts")
+    @DisplayName("a stream declaration emits channels and tasklets in id order with tier facts")
     void streamDeclaration() throws Exception {
         StreamOperativeClassRegistry.registerClass(TierOperative.class);
         StreamOperativeTopology topology = StreamOperativeClassRegistry.getTopology("decl_tier_op");
@@ -84,14 +84,14 @@ class HostClassDeclarationTest {
                 .as("consumers are derived from the chains, never declared")
                 .isFalse();
         // The chain the entry handle was given: one `into` closing onto
-        // procedure 0. What it MEANS is the core's answer.
+        // tasklet 0. What it MEANS is the core's answer.
         JsonNode entryChain = channels.get(0).get("chains").get(0);
         assertThat(entryChain.get(0).get("link").asText()).isEqualTo("into");
-        assertThat(entryChain.get(0).get("procedure").asInt()).isZero();
+        assertThat(entryChain.get(0).get("tasklet").asInt()).isZero();
         assertThat(channels.get(0).has("producer")).isFalse();
         assertThat(channels.get(1).get("kind").asText())
                 .as("the plugin kind is derived; the record states what was declared")
-                .isEqualTo("inter_proc");
+                .isEqualTo("inter_task");
         assertThat(channels.get(1).get("chains").get(0).get(0).get("link").asText())
                 .isEqualTo("sink");
         assertThat(channels.get(1).get("producer").asInt()).isEqualTo(0);
@@ -100,50 +100,50 @@ class HostClassDeclarationTest {
                 .as("nothing drops by default: an entry channel discards nothing")
                 .isEqualTo("drop_nothing");
 
-        JsonNode procedures = decl.get("procedures");
-        assertThat(procedures).hasSize(1);
-        assertThat(procedures.get(0).get("name").asText()).isEqualTo("decl_proc");
-        assertThat(procedures.get(0).has("entity_mode"))
+        JsonNode tasklets = decl.get("tasklets");
+        assertThat(tasklets).hasSize(1);
+        assertThat(tasklets.get(0).get("name").asText()).isEqualTo("decl_task");
+        assertThat(tasklets.get(0).has("cell_mode"))
                 .as("single mode is the default")
                 .isFalse();
-        assertThat(procedures.get(0).get("clock").asText()).isEqualTo("wall");
-        assertThat(procedures.get(0).has("change_is_nochange"))
-                .as("this procedure journals a Change, so a logical clock over it would advance")
+        assertThat(tasklets.get(0).get("clock").asText()).isEqualTo("wall");
+        assertThat(tasklets.get(0).has("change_is_nochange"))
+                .as("this tasklet journals a Change, so a logical clock over it would advance")
                 .isFalse();
-        assertThat(procedures.get(0).get("mailbox_capacity").asInt()).isPositive();
+        assertThat(tasklets.get(0).get("mailbox_capacity").asInt()).isPositive();
     }
 
     @Test
-    @DisplayName("each Procedure declares its own schema version, never the class maximum")
-    void perProcedureSchemaVersions() throws Exception {
+    @DisplayName("each Tasklet declares its own schema version, never the class maximum")
+    void perTaskletSchemaVersions() throws Exception {
         StreamOperativeClassRegistry.registerClass(MixedVersionOperative.class);
         JsonNode decl = JSON.readTree(
                 HostClassDeclaration.forStream(StreamOperativeClassRegistry.getTopology("decl_mixed_version_op")));
 
         assertThat(decl.has("schema_version"))
-                .as("a class-wide version would re-stamp a Procedure with a version it never declared")
+                .as("a class-wide version would re-stamp a Tasklet with a version it never declared")
                 .isFalse();
 
-        JsonNode procedures = decl.get("procedures");
-        assertThat(procedures).hasSize(2);
+        JsonNode tasklets = decl.get("tasklets");
+        assertThat(tasklets).hasSize(2);
         Map<String, JsonNode> byName = new LinkedHashMap<>();
-        procedures.forEach(p -> byName.put(p.get("name").asText(), p));
+        tasklets.forEach(p -> byName.put(p.get("name").asText(), p));
 
-        assertThat(byName.get("v2_proc").get("schema_version").asInt()).isEqualTo(2);
-        assertThat(byName.get("v2_proc").get("min_readable_schema_version").asInt())
+        assertThat(byName.get("v2_task").get("schema_version").asInt()).isEqualTo(2);
+        assertThat(byName.get("v2_task").get("min_readable_schema_version").asInt())
                 .isEqualTo(1);
-        assertThat(byName.get("v1_proc").get("schema_version").asInt())
-                .as("the sibling keeps its own version when v2_proc is bumped")
+        assertThat(byName.get("v1_task").get("schema_version").asInt())
+                .as("the sibling keeps its own version when v2_task is bumped")
                 .isEqualTo(1);
-        assertThat(byName.get("v1_proc").get("min_readable_schema_version").asInt())
+        assertThat(byName.get("v1_task").get("min_readable_schema_version").asInt())
                 .isEqualTo(1);
-        assertThat(byName.get("v1_proc").get("change_is_nochange").asBoolean())
-                .as("a NoChange procedure states it, so the core can refuse a logical clock over it")
+        assertThat(byName.get("v1_task").get("change_is_nochange").asBoolean())
+                .as("a NoChange tasklet states it, so the core can refuse a logical clock over it")
                 .isTrue();
     }
 
     @Test
-    @DisplayName("a workflow declaration carries its procedures with the workflow block")
+    @DisplayName("a workflow declaration carries its tasklets with the workflow block")
     void workflowDeclaration() throws Exception {
         WorkflowOperativeClassRegistry.registerClass(DeclWorkflow.class);
         WorkflowSpec spec = WorkflowOperativeClassRegistry.getSpec("decl_workflow");
@@ -151,8 +151,8 @@ class HostClassDeclarationTest {
 
         assertThat(decl.get("factory_id").asText()).isEqualTo("decl_workflow");
         assertThat(decl.get("channels")).isNotEmpty();
-        assertThat(decl.get("procedures")).hasSize(1);
-        assertThat(decl.get("procedures").get(0).get("name").asText()).isEqualTo("v1_proc");
+        assertThat(decl.get("tasklets")).hasSize(1);
+        assertThat(decl.get("tasklets").get(0).get("name").asText()).isEqualTo("v1_task");
         assertThat(decl.get("persistent").asBoolean()).isTrue();
 
         JsonNode workflow = decl.get("workflow");
@@ -226,12 +226,12 @@ class HostClassDeclarationTest {
         // `producer`, the plugin-bound one has the `keyed` flag.
         assertEverySpellingExists("class", List.of(stream), Set.of("sync_durability", "workflow"));
         assertEverySpellingExists("channel", nodes(stream.get("channels")), Set.of());
-        // Entity mode splits the procedure keys: a static procedure declares its
+        // Cell mode splits the tasklet keys: a static tasklet declares its
         // key set, a dynamic one its TTL and cap. Both modes together are the
         // section.
-        List<JsonNode> procedures = new ArrayList<>(nodes(stream.get("procedures")));
-        procedures.addAll(nodes(dynamic.get("procedures")));
-        assertEverySpellingExists("procedure", procedures, Set.of());
+        List<JsonNode> tasklets = new ArrayList<>(nodes(stream.get("tasklets")));
+        tasklets.addAll(nodes(dynamic.get("tasklets")));
+        assertEverySpellingExists("tasklet", tasklets, Set.of());
         assertEverySpellingExists("workflow", List.of(workflow.get("workflow")), Set.of("wake_after_ms"));
         assertThat(workflow.has("sync_durability")).isTrue();
     }
@@ -245,7 +245,7 @@ class HostClassDeclarationTest {
     /**
      * Every key the fixture pins for {@code section} that no node of that
      * section carries, minus the ones this declaration legitimately omits (a
-     * static procedure has no {@code idle_ttl_ms}, a stream class no
+     * static tasklet has no {@code idle_ttl_ms}, a stream class no
      * {@code sync_durability}). A key with no Java spelling at all shows up
      * here and nowhere else.
      */
@@ -296,13 +296,13 @@ class HostClassDeclarationTest {
                     .onFull(com.flezha.sdk.channel.OverflowPolicy.DROP_NOTHING)
                     .retryMax(3)
                     .retryBackoffMs(300)
-                    .into(FullyDeclaredProc.class)
+                    .into(FullyDeclaredTask.class)
                     .keyed()
                     .sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
-    /** The dynamic half of the procedure surface: a lazy Entity with a TTL and a cap. */
+    /** The dynamic half of the tasklet surface: a lazy Cell with a TTL and a cap. */
     public static final class FullyDeclaredDynamicOperative implements StreamOperative {
         @Override
         public String factoryId() {
@@ -313,48 +313,48 @@ class HostClassDeclarationTest {
         public void channels(ChannelBuilder c) {
             c.input(String.class, "in")
                     .keyBy(input -> input.split(":")[0])
-                    .into(FullyDeclaredDynamicProc.class)
+                    .into(FullyDeclaredDynamicTask.class)
                     .sink("out", s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
-    public static final class FullyDeclaredDynamicProc extends StatelessTestProcedure<String, Object, String> {
+    public static final class FullyDeclaredDynamicTask extends StatelessTestTasklet<String, Object, String> {
         @Override
         public String name() {
-            return "decl_full_dynamic_proc";
+            return "decl_full_dynamic_task";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public Optional<Duration> entityIdleTtl() {
+        public Optional<Duration> cellIdleTtl() {
             return Optional.of(Duration.ofMillis(200));
         }
 
         @Override
-        public long maxEntities() {
+        public long maxCells() {
             return 4096;
         }
 
         @Override
-        public boolean maxEntitiesOverridden() {
+        public boolean maxCellsOverridden() {
             return true;
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx)
-                throws com.flezha.sdk.procedure.ProcedureException {
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx)
+                throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emit(input);
         }
     }
 
-    /** A static, compensating, persistent procedure: the widest procedure declaration. */
-    public static final class FullyDeclaredProc
-            implements com.flezha.sdk.procedure.Procedure<
-                    String, FullyDeclaredProc.State, String, DeclChange, com.flezha.sdk.state.EventTimeFrom, Void> {
+    /** A static, compensating, persistent tasklet: the widest tasklet declaration. */
+    public static final class FullyDeclaredTask
+            implements com.flezha.sdk.tasklet.Tasklet<
+                    String, FullyDeclaredTask.State, String, DeclChange, com.flezha.sdk.state.EventTimeFrom, Void> {
 
         public static final class State {
             public int seen;
@@ -362,12 +362,12 @@ class HostClassDeclarationTest {
 
         @Override
         public String name() {
-            return "decl_full_proc";
+            return "decl_full_task";
         }
 
         @Override
         public State initState(
-                Optional<String> entityKey, Optional<com.flezha.sdk.state.RestoreInitPayload> initPayload) {
+                Optional<String> cellKey, Optional<com.flezha.sdk.state.RestoreInitPayload> initPayload) {
             return new State();
         }
 
@@ -382,17 +382,17 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public List<String> entityKeys() {
+        public List<String> cellKeys() {
             return List.of("a", "b");
         }
 
         @Override
-        public List<String> entitiesFor(String input) {
+        public List<String> cellsFor(String input) {
             return List.of("a");
         }
 
         @Override
-        public boolean entitiesForOverridden() {
+        public boolean cellsForOverridden() {
             return true;
         }
 
@@ -424,8 +424,8 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public void run(String input, StateHandle<State, DeclChange> state, ProcedureCtx ctx)
-                throws com.flezha.sdk.procedure.ProcedureException {
+        public void run(String input, StateHandle<State, DeclChange> state, TaskletCtx ctx)
+                throws com.flezha.sdk.tasklet.TaskletException {
             state.apply(new DeclChange(input));
             ctx.emitKeyed("a", input);
         }
@@ -451,8 +451,8 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public void procedures(ChannelBuilder c) {
-            c.input(String.class, "in").into(VersionOneProc.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
+        public void tasklets(ChannelBuilder c) {
+            c.input(String.class, "in").into(VersionOneTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -491,11 +491,11 @@ class HostClassDeclarationTest {
     }
 
     @Test
-    @DisplayName("A durable chained loop whose terminal proc releases nothing is refused")
+    @DisplayName("A durable chained loop whose terminal task releases nothing is refused")
     void chainedLoopTerminalWithoutHandoffIsRefusedByTheCore() {
         // The refusal is the core's, raised where every host reaches it —
         // declareClass — and is not restated in this SDK, exactly as the
-        // branching-chained-loop refusal already is. Only an inter-procedure
+        // branching-chained-loop refusal already is. Only an inter-tasklet
         // channel carries a journal codec, so a terminal whose only wiring is a
         // plugin sink ships an empty handoff and the crash-resumed loop reads
         // that as convergence.
@@ -507,14 +507,14 @@ class HostClassDeclarationTest {
         try {
             assertThatThrownBy(() -> FlzCore.declareClass(ctx, declaration))
                     .isInstanceOf(FlezhaNativeException.class)
-                    .hasMessageContaining("releases no inter-procedure handoff")
-                    .hasMessageContaining("decl_chained_sink_proc");
+                    .hasMessageContaining("releases no inter-tasklet handoff")
+                    .hasMessageContaining("decl_chained_sink_task");
         } finally {
             FlzCore.contextFree(ctx);
         }
     }
 
-    /** A durable CHAINED loop whose terminal proc's only output is a plugin sink. */
+    /** A durable CHAINED loop whose terminal task's only output is a plugin sink. */
     public static final class ChainedTerminalIntoSinkWorkflow implements WorkflowOperative {
         @Override
         public String factoryId() {
@@ -527,25 +527,25 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public void procedures(ChannelBuilder c) {
-            c.input(String.class, "in").into(ChainedSinkProc.class).sink("out");
+        public void tasklets(ChannelBuilder c) {
+            c.input(String.class, "in").into(ChainedSinkTask.class).sink("out");
         }
     }
 
-    public static final class ChainedSinkProc extends StatelessTestProcedure<String, Object, String> {
+    public static final class ChainedSinkTask extends StatelessTestTasklet<String, Object, String> {
         @Override
         public String name() {
-            return "decl_chained_sink_proc";
+            return "decl_chained_sink_task";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx)
-                throws com.flezha.sdk.procedure.ProcedureException {
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx)
+                throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emit(input);
         }
     }
@@ -561,7 +561,7 @@ class HostClassDeclarationTest {
             c.effectivelyOnce();
             c.checkpointEvery(500);
             c.outputsAtCheckpoint(50);
-            c.input(String.class, "in").into(DeclProc.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -574,7 +574,7 @@ class HostClassDeclarationTest {
         @Override
         public void channels(ChannelBuilder c) {
             c.outputsAtCheckpoint(50);
-            c.input(String.class, "in").into(DeclProc.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -588,11 +588,11 @@ class HostClassDeclarationTest {
         public void channels(ChannelBuilder c) {
             c.effectivelyOnce();
             c.checkpointAck();
-            c.input(String.class, "in").into(DeclProc.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
-    /** Two procedures in one class, each at its own schema version. */
+    /** Two tasklets in one class, each at its own schema version. */
     public static final class MixedVersionOperative implements StreamOperative {
         @Override
         public String factoryId() {
@@ -602,17 +602,17 @@ class HostClassDeclarationTest {
         @Override
         public void channels(ChannelBuilder c) {
             c.input(String.class, "in")
-                    .into(VersionTwoProc.class)
+                    .into(VersionTwoTask.class)
                     .named("mid")
-                    .into(VersionOneProc.class)
+                    .into(VersionOneTask.class)
                     .sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
-    public static final class VersionTwoProc extends StatelessTestProcedure<String, Object, String> {
+    public static final class VersionTwoTask extends StatelessTestTasklet<String, Object, String> {
         @Override
         public String name() {
-            return "v2_proc";
+            return "v2_task";
         }
 
         @Override
@@ -626,31 +626,31 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx)
-                throws com.flezha.sdk.procedure.ProcedureException {
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx)
+                throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emit(input);
         }
     }
 
-    public static final class VersionOneProc extends StatelessTestProcedure<String, Object, String> {
+    public static final class VersionOneTask extends StatelessTestTasklet<String, Object, String> {
         @Override
         public String name() {
-            return "v1_proc";
+            return "v1_task";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx)
-                throws com.flezha.sdk.procedure.ProcedureException {
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx)
+                throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emit(input);
         }
     }
@@ -667,26 +667,26 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public void procedures(ChannelBuilder c) {
-            c.input(String.class, "in").into(VersionOneProc.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
+        public void tasklets(ChannelBuilder c) {
+            c.input(String.class, "in").into(VersionOneTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
     /**
-     * The tier fixtures' procedure. It journals a Change because
+     * The tier fixtures' tasklet. It journals a Change because
      * {@code effectivelyOnce()} requires it: the tier IS durable state.
      */
-    public static final class DeclProc
-            implements com.flezha.sdk.procedure.Procedure<
+    public static final class DeclTask
+            implements com.flezha.sdk.tasklet.Tasklet<
                     String, Object, String, DeclChange, com.flezha.sdk.state.WallClock, Void> {
         @Override
         public String name() {
-            return "decl_proc";
+            return "decl_task";
         }
 
         @Override
         public Object initState(
-                Optional<String> entityKey, Optional<com.flezha.sdk.state.RestoreInitPayload> initPayload) {
+                Optional<String> cellKey, Optional<com.flezha.sdk.state.RestoreInitPayload> initPayload) {
             return new Object();
         }
 
@@ -694,8 +694,8 @@ class HostClassDeclarationTest {
         public void applyChange(Object state, DeclChange change) {}
 
         @Override
-        public void run(String input, StateHandle<Object, DeclChange> state, ProcedureCtx ctx)
-                throws com.flezha.sdk.procedure.ProcedureException {
+        public void run(String input, StateHandle<Object, DeclChange> state, TaskletCtx ctx)
+                throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emitKeyed("k", input);
         }
     }
@@ -708,10 +708,10 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public void procedures(ChannelBuilder c) {
+        public void tasklets(ChannelBuilder c) {
             c.effectivelyOnce();
             c.checkpointAck();
-            c.input(String.class, "in").into(DeclProc.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -727,8 +727,8 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public void procedures(ChannelBuilder c) {
-            c.input(String.class, "in").into(VersionOneProc.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
+        public void tasklets(ChannelBuilder c) {
+            c.input(String.class, "in").into(VersionOneTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 }

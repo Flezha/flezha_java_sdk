@@ -2,11 +2,11 @@ package com.flezha.sdk.channel;
 
 /**
  * Per-channel retry policy applied by the consumer-side dispatcher when an
- * procedure invocation fails (thrown {@code ProcedureException} or
+ * tasklet invocation fails (thrown {@code TaskletException} or
  * {@code RuntimeException}). After {@code maxAttempts} total attempts — or
- * immediately on an {@link com.flezha.sdk.procedure.ProcedureException.NonRetryable}
+ * immediately on an {@link com.flezha.sdk.tasklet.TaskletException.NonRetryable}
  * — the payload is parked to the controller's dead-letter queue and the
- * entity advances. Declared via {@code .retryMax(...)} /
+ * cell advances. Declared via {@code .retryMax(...)} /
  * {@code .retryBackoffMs(...)} on the channel builder. Mirrors the Rust
  * SDK's {@code RetryPolicy}.
  *

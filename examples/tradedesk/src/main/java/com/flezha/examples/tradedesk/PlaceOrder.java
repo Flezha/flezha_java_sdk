@@ -2,9 +2,9 @@ package com.flezha.examples.tradedesk;
 
 import com.flezha.examples.tradedesk.PaperOrderOperative.OrderTicket;
 import com.flezha.examples.tradedesk.ReserveFunds.Reserved;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
@@ -16,10 +16,10 @@ import java.util.Optional;
  * Step two: place the order with the paper exchange, keeping the id it answers with.
  *
  * <p>It sits on the arm of the fan-out that does the work, beside the risk desk's arm, and like
- * step one it implements {@link Procedure} directly because it has something to undo.
+ * step one it implements {@link Tasklet} directly because it has something to undo.
  */
 public final class PlaceOrder
-        implements Procedure<Reserved, PlaceOrder.Placement, PlaceOrder.PlacedOrder, PlaceOrder.Placed, WallClock, Void> {
+        implements Tasklet<Reserved, PlaceOrder.Placement, PlaceOrder.PlacedOrder, PlaceOrder.Placed, WallClock, Void> {
 
     /** What this step remembers: the id cancelling the order needs. */
     public static final class Placement {
@@ -43,7 +43,7 @@ public final class PlaceOrder
     }
 
     @Override
-    public Placement initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+    public Placement initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
         return new Placement();
     }
 
@@ -53,8 +53,8 @@ public final class PlaceOrder
     }
 
     @Override
-    public void run(Reserved reserved, StateHandle<Placement, Placed> state, ProcedureCtx ctx)
-            throws ProcedureException {
+    public void run(Reserved reserved, StateHandle<Placement, Placed> state, TaskletCtx ctx)
+            throws TaskletException {
         String orderId = "ord-" + ctx.stableId();
         state.apply(new Placed(orderId));
         ctx.emit(new PlacedOrder(reserved.order(), orderId));
@@ -67,8 +67,8 @@ public final class PlaceOrder
 
     /** The undo: the order is cancelled at the exchange, by the id this step wrote down. */
     @Override
-    public void compensate(List<PlacedOrder> completedOutput, StateHandle<Placement, Placed> state, ProcedureCtx ctx)
-            throws ProcedureException {
+    public void compensate(List<PlacedOrder> completedOutput, StateHandle<Placement, Placed> state, TaskletCtx ctx)
+            throws TaskletException {
         System.out.println("[undo] cancelled " + state.get().orderId);
     }
 }

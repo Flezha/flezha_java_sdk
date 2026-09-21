@@ -7,7 +7,7 @@ import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.WallClock;
-import com.flezha.sdk.testing.ProcedureTestHarness;
+import com.flezha.sdk.testing.TaskletTestHarness;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,9 +16,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Asserts the {@code @StreamOperative} / {@code @WorkflowOperative} / {@code @Procedure} /
+ * Asserts the {@code @StreamOperative} / {@code @WorkflowOperative} / {@code @Tasklet} /
  * {@code @State}-generated operatives register and process input identically to the hand-written
- * equivalents, and that the 2-procedure reference operative matches the cross-SDK authoring contract
+ * equivalents, and that the 2-tasklet reference operative matches the cross-SDK authoring contract
  * (see {@code docs/sdk/authoring_contract.md} §6).
  */
 class SugarTwinTest {
@@ -31,7 +31,7 @@ class SugarTwinTest {
 
     @Test
     void sugarDoNothingEmitsBytesLikeHandWritten() {
-        var sugar = ProcedureTestHarness.of(new SugarDoNothingProcedure());
+        var sugar = TaskletTestHarness.of(new SugarDoNothingTasklet());
         sugar.applyInputs(List.of("alpha", "beta"));
         var emits = sugar.recordedEmits();
         assertThat(emits).hasSize(2);
@@ -41,7 +41,7 @@ class SugarTwinTest {
 
     @Test
     void sugarStoreJournalsAndEmits() {
-        var h = ProcedureTestHarness.of(new SugarStoreProcedure());
+        var h = TaskletTestHarness.of(new SugarStoreTasklet());
         h.applyInputs(List.of("one", "two"));
         h.expectEmits(String.class, List.of("one", "two"));
         assertThat(h.state().text_inputs).containsExactly("one", "two");
@@ -49,14 +49,14 @@ class SugarTwinTest {
     }
 
     @Test
-    void sugarEntryEntitiesAndJournals() {
-        var procedure = new SugarEntryProcedure();
-        assertThat(procedure.entitiesFor("apple")).containsExactly("a");
-        assertThat(procedure.entitiesFor("zebra")).containsExactly("d");
-        assertThat(procedure.entitiesForOverridden()).isTrue();
-        assertThat(procedure.entityKeys()).containsExactly("a", "b", "c", "d");
+    void sugarEntryCellsAndJournals() {
+        var tasklet = new SugarEntryTasklet();
+        assertThat(tasklet.cellsFor("apple")).containsExactly("a");
+        assertThat(tasklet.cellsFor("zebra")).containsExactly("d");
+        assertThat(tasklet.cellsForOverridden()).isTrue();
+        assertThat(tasklet.cellKeys()).containsExactly("a", "b", "c", "d");
 
-        var h = ProcedureTestHarness.of(procedure);
+        var h = TaskletTestHarness.of(tasklet);
         h.applyInputs(List.of("apple", "avocado"));
         h.expectEmits(String.class, List.of("apple", "avocado"));
         assertThat(h.state().seen).containsExactly("apple", "avocado");
@@ -77,7 +77,7 @@ class SugarTwinTest {
                 .registerFactory(SugarStore.class)
                 .registerFactory(SugarNamedInput.class)
                 .registerFactory(SugarStateOnly.class)
-                .registerFactory(SugarStaticEntityStreamOperative.class);
+                .registerFactory(SugarStaticCellStreamOperative.class);
 
         assertThat(StreamOperativeClassRegistry.factoryIds())
                 .contains(
@@ -85,7 +85,7 @@ class SugarTwinTest {
                         "sugar_store_input",
                         "sugar_named_input",
                         "sugar_state_only",
-                        "sugar_static_entity");
+                        "sugar_static_cell");
 
         runner.unregisterFactory(SugarStateOnly.class);
         assertThat(StreamOperativeClassRegistry.factoryIds()).doesNotContain("sugar_state_only");
@@ -100,8 +100,8 @@ class SugarTwinTest {
     }
 
     /**
-     * fails when: a short form with no sink stops declaring its entry channel and procedure alone, or
-     * stops keeping what it is sent in the state its procedure, named after the factory id, owns.
+     * fails when: a short form with no sink stops declaring its entry channel and tasklet alone, or
+     * stops keeping what it is sent in the state its tasklet, named after the factory id, owns.
      */
     @Test
     void aShortFormWithNoSinkDeclaresNoPluginChannelAndKeepsState() {
@@ -110,9 +110,9 @@ class SugarTwinTest {
         assertThat(topology.channels().get(0).name()).isEqualTo("ticks");
         assertThat(topology.channels().get(0).pluginSink()).isEmpty();
 
-        var procedure = new SugarStateOnlyProcedure();
-        assertThat(procedure.name()).isEqualTo("sugar_state_only");
-        var h = ProcedureTestHarness.of(procedure);
+        var tasklet = new SugarStateOnlyTasklet();
+        assertThat(tasklet.name()).isEqualTo("sugar_state_only");
+        var h = TaskletTestHarness.of(tasklet);
         h.applyInputs(List.of("one", "two"));
         assertThat(h.recordedEmits()).isEmpty();
         assertThat(h.state().seen).containsExactly("one", "two");
@@ -126,10 +126,10 @@ class SugarTwinTest {
         assertThat(topology.channels().get(0).name()).isEqualTo("prices");
     }
 
-    /** fails when: a written id stops naming the procedure, so its state is saved elsewhere. */
+    /** fails when: a written id stops naming the tasklet, so its state is saved elsewhere. */
     @Test
-    void aWrittenIdNamesTheProcedure() {
-        assertThat(new SugarStoreProcedure().name()).isEqualTo("sugar_store_input");
+    void aWrittenIdNamesTheTasklet() {
+        assertThat(new SugarStoreTasklet().name()).isEqualTo("sugar_store_input");
     }
 
     /**
@@ -167,23 +167,23 @@ class SugarTwinTest {
      */
     @Test
     void referenceOperativeMatchesContract() {
-        var entry = new SugarEntryProcedure();
+        var entry = new SugarEntryTasklet();
         assertThat(entry.inputType()).isEqualTo(String.class);
         assertThat(entry.outputType()).isEqualTo(String.class);
         assertThat(entry.changeType()).isEqualTo(SugarEntryStateChange.class);
         assertThat(entry.clockType()).isEqualTo(WallClock.class);
         assertThat(entry.configType()).isEqualTo(Void.class);
-        assertThat(entry.entityKeys()).containsExactly("a", "b", "c", "d");
+        assertThat(entry.cellKeys()).containsExactly("a", "b", "c", "d");
 
-        var down = new SugarDownstreamProcedure();
+        var down = new SugarDownstreamTasklet();
         assertThat(down.inputType()).isEqualTo(String.class);
         assertThat(down.outputType()).isEqualTo(byte[].class);
         assertThat(down.changeType()).isEqualTo(NoChange.class);
-        assertThat(down.entityKeys()).isEmpty();
+        assertThat(down.cellKeys()).isEmpty();
     }
 
     /**
-     * Canonical keyed-collection reference procedure (`expressive-state-journaling`):
+     * Canonical keyed-collection reference tasklet (`expressive-state-journaling`):
      * the `@Journal(MAP_DEQUE)` + `Optional<Output>` sugar processes input
      * identically to the hand-written twin and survives `replayEquals`.
      */
@@ -198,10 +198,10 @@ class SugarTwinTest {
                 new WindowInput("b", 20.0),
                 new WindowInput("b", 30.0));
 
-        var sugar = ProcedureTestHarness.of(new RollingWindowProcedure());
+        var sugar = TaskletTestHarness.of(new RollingWindowTasklet());
         sugar.applyInputs(inputs);
 
-        var twin = ProcedureTestHarness.of(new RollingWindowTwin());
+        var twin = TaskletTestHarness.of(new RollingWindowTwin());
         twin.applyInputs(inputs);
 
         // Same emits (warmup gate via Optional<Output>).
@@ -230,7 +230,7 @@ class SugarTwinTest {
                 new WindowInput("x", 4.0),
                 new WindowInput("y", 9.0));
 
-        var h = ProcedureTestHarness.of(new KeyedCollectionsProcedure());
+        var h = TaskletTestHarness.of(new KeyedCollectionsTasklet());
         h.applyInputs(inputs);
 
         assertThat(h.state().last.get("x")).isEqualTo(4.0);
@@ -243,30 +243,30 @@ class SugarTwinTest {
     }
 
     /**
-     * {@code @InitState} maps the static entity key to per-entity state
+     * {@code @InitState} maps the static cell key to per-cell state
      * the default {@code new State()} cannot derive (window length from the
-     * entity key). Each entity then behaves per its own window, and replay
+     * cell key). Each cell then behaves per its own window, and replay
      * stays deterministic against the captured initial snapshot.
      */
     @Test
-    void procedureInitMapsEntityKeyToState() {
-        var procedure = new WindowedProcedure();
-        assertThat(procedure.initState(Optional.of("win_2"), Optional.empty()).window).isEqualTo(2);
-        assertThat(procedure.initState(Optional.of("win_3"), Optional.empty()).window).isEqualTo(3);
+    void taskletInitMapsCellKeyToState() {
+        var tasklet = new WindowedTasklet();
+        assertThat(tasklet.initState(Optional.of("win_2"), Optional.empty()).window).isEqualTo(2);
+        assertThat(tasklet.initState(Optional.of("win_3"), Optional.empty()).window).isEqualTo(3);
         // Cold-start / harness default (key absent) falls through to the else arm.
-        assertThat(procedure.initState(Optional.empty(), Optional.empty()).window).isEqualTo(3);
+        assertThat(tasklet.initState(Optional.empty(), Optional.empty()).window).isEqualTo(3);
 
         List<WindowInput> inputs =
                 List.of(new WindowInput("a", 2.0), new WindowInput("a", 4.0), new WindowInput("a", 6.0));
 
-        var w2 = ProcedureTestHarness.of(procedure)
-                .withInitialState(procedure.initState(Optional.of("win_2"), Optional.empty()));
+        var w2 = TaskletTestHarness.of(tasklet)
+                .withInitialState(tasklet.initState(Optional.of("win_2"), Optional.empty()));
         w2.applyInputs(inputs);
         w2.expectEmits(Double.class, List.of(3.0, 5.0)); // means of [2,4] then [4,6]
         assertThat(w2.replayEquals()).isEmpty();
 
-        var w3 = ProcedureTestHarness.of(procedure)
-                .withInitialState(procedure.initState(Optional.of("win_3"), Optional.empty()));
+        var w3 = TaskletTestHarness.of(tasklet)
+                .withInitialState(tasklet.initState(Optional.of("win_3"), Optional.empty()));
         w3.applyInputs(inputs);
         w3.expectEmits(Double.class, List.of(4.0)); // single mean of [2,4,6]
         assertThat(w3.replayEquals()).isEmpty();

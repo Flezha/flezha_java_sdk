@@ -45,7 +45,7 @@ class StateExchangeTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("a Procedure declaring no migration refuses an older body rather than decoding it")
+    @DisplayName("a Tasklet declaring no migration refuses an older body rather than decoding it")
     void restoreFoldWithoutAMigrationRefuses() {
         StreamOperativeClassRegistry.registerClass(CounterOperative.class);
         ActivationDispatcher dispatcher = new ActivationDispatcher();
@@ -63,8 +63,8 @@ class StateExchangeTest extends DispatchTestBase {
 
         assertThat(outcome).isInstanceOf(ActivationOutcome.Failed.class);
         assertThat(((ActivationOutcome.Failed) outcome).error().message())
-                .as("the failure names the procedure and the version it was asked for")
-                .contains("count_proc")
+                .as("the failure names the tasklet and the version it was asked for")
+                .contains("count_task")
                 .contains("no state migration")
                 .contains("1");
     }
@@ -153,7 +153,7 @@ class StateExchangeTest extends DispatchTestBase {
                 .isEqualTo("{\"n\":42}");
     }
 
-    // A stateless procedure has nothing to ship, and Jackson refuses an empty
+    // A stateless tasklet has nothing to ship, and Jackson refuses an empty
     // bean: the marker is what the migration serialize and the graceful
     // shutdown's state ship carry for a stateless Java operative.
     @Test

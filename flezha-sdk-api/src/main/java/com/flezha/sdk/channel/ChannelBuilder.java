@@ -6,17 +6,17 @@ import javax.annotation.Nonnull;
 /**
  * Producer-first fluent graph builder consumed by
  * {@link com.flezha.sdk.operative.StreamOperative#channels(ChannelBuilder)}
- * (and by workflow {@code procedures(...)} authoring).
+ * (and by workflow {@code tasklets(...)} authoring).
  *
  * <p>{@code c.input(T.class, "name").into(A.class).into(B.class).sink("plugin")}
- * — {@code .into} wires a consumer and returns that procedure's <b>output
+ * — {@code .into} wires a consumer and returns that tasklet's <b>output
  * stream handle</b> ({@link Stream}), so a linear pipeline is one chained
  * expression. Branching is handle reuse (hold the handle in a variable and
  * wire it twice) or the equivalent {@link Stream#branch} sugar. Fan-in is two
  * streams naming the same consumer class.
  *
  * <p>Entry channel names stay explicit and mandatory — they are the
- * operative's external input address. Inter-procedure channel names
+ * operative's external input address. Inter-tasklet channel names
  * auto-derive from the producer node's identity, with {@link Stream#named}
  * as the override. Declarations land in a per-operative topology the runtime
  * freezes at registration.
@@ -49,7 +49,7 @@ public interface ChannelBuilder {
     <T> EntryChannel<T> input(Class<T> type, String name, Function<byte[], T> parser);
 
     /**
-     * Open a <b>merged</b> subscription: one procedure whose {@code Input} is
+     * Open a <b>merged</b> subscription: one tasklet whose {@code Input} is
      * the sum type {@code type}, fed by two or more source channels that each
      * supply a mapping into it. See {@link Merge}.
      */
@@ -72,10 +72,10 @@ public interface ChannelBuilder {
      *     .from(trades, DetectorInput::ofTrade)
      *     .from(routed, DetectorInput::ofThresholds)
      *     .keyBy(DetectorInput::key)
-     *     .into(DetectorProcedure.class);
+     *     .into(DetectorTasklet.class);
      * }</pre>
      *
-     * <p>Why this shape rather than a broadcast: a dynamically-keyed procedure
+     * <p>Why this shape rather than a broadcast: a dynamically-keyed tasklet
      * cannot receive one — every key function is total, and inside a partitioned
      * member a computed key is admitted against that member's key-group range.
      * Delivering by fanning out over a <i>remembered</i> key set would emit keys
@@ -105,10 +105,10 @@ public interface ChannelBuilder {
      * {@code equals} on it accordingly: a document type without value equality
      * makes every arrival a new version.
      *
-     * <p>The block expands to a merge into ONE SDK-packaged single-entity
-     * procedure whose {@code {document, version, delivered}} state rides the
+     * <p>The block expands to a merge into ONE SDK-packaged single-cell
+     * tasklet whose {@code {document, version, delivered}} state rides the
      * standard change journal: authoring sugar over existing primitives, not a
-     * runtime feature. The node is named {@code route_latest} like any procedure
+     * runtime feature. The node is named {@code route_latest} like any tasklet
      * node, so a second router in one operative needs
      * {@link #routeLatest(Class, EdgeStream, EdgeStream, Function, String)} to
      * name it.
@@ -137,7 +137,7 @@ public interface ChannelBuilder {
     /**
      * Opt this Operative into the <b>effectively-once output tier</b>: each
      * invocation's state changes, plugin outputs and consumed input offset ship
-     * as ONE {@code entity_effect_record}, which the controller persists as one
+     * as ONE {@code cell_effect_record}, which the controller persists as one
      * WAL record under one fsync. A crash can then never advance the consumed
      * offset while losing the state or the output it was advanced for.
      *
@@ -153,7 +153,7 @@ public interface ChannelBuilder {
      * {@code ctx.checkpoint()}, rather than after every invocation.
      *
      * <p>The interval between checkpoints is the work a crash replays and the
-     * work the controller's input log must retain. In exchange, an Entity whose
+     * work the controller's input log must retain. In exchange, a Cell whose
      * state is only coherent at a boundary (a closed window, a completed batch)
      * never persists a half-built view of it.
      *
@@ -185,7 +185,7 @@ public interface ChannelBuilder {
      * <p>The trade is output latency: an emit is not visible downstream until
      * its interval closes. {@code maxDelayMs} bounds that — the interval closes
      * that long after the input that opened it even if nothing else arrives, so
-     * a quiet Entity never holds an output indefinitely. It is a parameter
+     * a quiet Cell never holds an output indefinitely. It is a parameter
      * rather than an option because an unbounded hold is not a posture anyone
      * should be able to declare by omission.
      *
@@ -198,9 +198,9 @@ public interface ChannelBuilder {
 
     /**
      * Declare that this Operative corrects itself when an input arrives late:
-     * an input whose event time falls behind the Entity's event-time high-water
+     * an input whose event time falls behind the Cell's event-time high-water
      * mark, but by less than {@code windowMs}, triggers the controller to rewind
-     * the Entity to a baseline before that event time and replay the affected
+     * the Cell to a baseline before that event time and replay the affected
      * slice in event-time order.
      *
      * <p>The window is a promise the controller must be able to keep: it sizes

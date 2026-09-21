@@ -15,7 +15,7 @@ public final class TriageOperative implements WorkflowOperative {
 
     /** The spawn payload, the alert that asked for this worker, seeds the one pass. */
     @Override
-    public void procedures(@Nonnull ChannelBuilder c) {
-        c.input(String.class, "alert").into(TriageProcedure.class).sink("triaged");
+    public void tasklets(@Nonnull ChannelBuilder c) {
+        c.input(String.class, "alert").into(TriageTasklet.class).sink("triaged");
     }
 }

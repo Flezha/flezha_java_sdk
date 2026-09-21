@@ -1,7 +1,7 @@
 /**
  * The two operative kinds and the base they share. An operative is the deployable unit.
  *
- * <p>A procedure cannot be deployed on its own, because nothing in the system knows where its
+ * <p>A tasklet cannot be deployed on its own, because nothing in the system knows where its
  * messages originate or where its output belongs. An operative supplies that binding, which makes
  * it the unit the controller schedules onto a host, restarts after a failure, relocates when a host
  * is withdrawn, and scales across several hosts.
@@ -10,9 +10,9 @@
  * stable {@code factoryId()} that both kinds carry. The two kinds differ in what they declare
  * beyond it.
  *
- * <p>{@link com.flezha.sdk.operative.StreamOperative} declares a graph of channels and procedures
- * that runs continuously, holds per-entity state, and is the right choice when work is expressed as
- * messages flowing through one or more procedures. Its graph is declared in
+ * <p>{@link com.flezha.sdk.operative.StreamOperative} declares a graph of channels and tasklets
+ * that runs continuously, holds per-cell state, and is the right choice when work is expressed as
+ * messages flowing through one or more tasklets. Its graph is declared in
  * {@code channels(ChannelBuilder)}, invoked once at registration and validated as a whole; a
  * declaration that is inconsistent or that requests an unavailable capability raises
  * {@link com.flezha.sdk.operative.StreamOperativeConfigurationException} naming the declaration at

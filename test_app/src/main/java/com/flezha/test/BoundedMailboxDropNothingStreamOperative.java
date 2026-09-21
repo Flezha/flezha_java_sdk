@@ -16,14 +16,14 @@ public final class BoundedMailboxDropNothingStreamOperative implements StreamOpe
     public void channels(ChannelBuilder c) {
         c.input(String.class, "drop_nothing_input")
                 .onFull(OverflowPolicy.DROP_NOTHING)
-                .into(DropNothingTestProcedure.class)
+                .into(DropNothingTestTasklet.class)
                 .sink("drop_nothing_echo");
     }
 
-    public static final class DropNothingTestProcedure extends BoundedMailboxProcedure {
+    public static final class DropNothingTestTasklet extends BoundedMailboxTasklet {
         @Override
         public String name() {
-            return "drop_nothing_test_procedure";
+            return "drop_nothing_test_tasklet";
         }
     }
 }

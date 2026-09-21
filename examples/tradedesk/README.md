@@ -93,7 +93,7 @@ undone, in reverse: the order was cancelled, then the money was released. The
 runner's terminal shows the retries that came first:
 
 ```
-[flezha] workflow order_2 procedure confirm_fill entity - attempt 1/3 failed (retrying in 386 ms): the desk books at most 100 a time, and this is 500
+[flezha] workflow order_2 tasklet confirm_fill cell - attempt 1/3 failed (retrying in 386 ms): the desk books at most 100 a time, and this is 500
 ```
 
 ## Building from a checkout
@@ -113,4 +113,4 @@ above is all you need.
 
 The echo in [`../echo`](../echo/README.md) is the Part 1 project, and
 [`docs/guides/runner_deployment.md`](../../../../docs/guides/runner_deployment.md)
-walks through what a procedure, an operative and a runner each are.
+walks through what a tasklet, an operative and a runner each are.

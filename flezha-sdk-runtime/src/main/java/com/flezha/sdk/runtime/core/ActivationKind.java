@@ -12,12 +12,12 @@ import javax.annotation.Nonnull;
  */
 public sealed interface ActivationKind {
 
-    /** Discriminant 0 — an ordered per-Entity batch of inputs and timer firings. */
+    /** Discriminant 0 — an ordered per-Cell batch of inputs and timer firings. */
     record Work(@Nonnull List<WorkItem> items) implements ActivationKind {}
 
     /**
      * Discriminant 1 — fold a persisted change log into a live state; input
-     * activations for the Entity are gated until this completes.
+     * activations for the Cell are gated until this completes.
      */
     record RestoreFold(@Nonnull Optional<RestoreBody> snapshot, @Nonnull List<RestoreBody> changes)
             implements ActivationKind {}
@@ -54,7 +54,7 @@ public sealed interface ActivationKind {
             implements ActivationKind {}
 
     /**
-     * Discriminant 7: saga compensation for one workflow Entity. The recorded
+     * Discriminant 7: saga compensation for one workflow Cell. The recorded
      * forward outputs cross; the host runs {@code compensate}.
      */
     record CompensateRun(@Nonnull List<byte[]> outputs) implements ActivationKind {}

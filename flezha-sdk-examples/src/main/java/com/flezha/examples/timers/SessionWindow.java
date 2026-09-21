@@ -1,12 +1,12 @@
 package com.flezha.examples.timers;
 
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,11 +16,11 @@ import javax.annotation.Nonnull;
 /**
  * One user's session, closed once it has been quiet for a while.
  *
- * <p>This implements {@link Procedure} directly rather than through {@code @Procedure}, because
+ * <p>This implements {@link Tasklet} directly rather than through {@code @Tasklet}, because
  * {@link #onTimer} is a method of the interface, which an annotated class has no way to supply.
  */
 public final class SessionWindow
-        implements Procedure<String, SessionWindow.SessionState, ClosedSession, SessionChange, WallClock, Void> {
+        implements Tasklet<String, SessionWindow.SessionState, ClosedSession, SessionChange, WallClock, Void> {
 
     /** How long a session may stay quiet before it is closed. */
     private static final Duration IDLE = Duration.ofSeconds(30);
@@ -33,7 +33,7 @@ public final class SessionWindow
 
     /**
      * The deadline currently pending, so each click can retract the last one. A plain field is
-     * fine here: the runtime holds one procedure instance per entity, and a restart re-arms.
+     * fine here: the runtime holds one tasklet instance per cell, and a restart re-arms.
      */
     private long deadline = -1L;
 
@@ -52,9 +52,9 @@ public final class SessionWindow
     @Override
     @Nonnull
     public SessionState initState(
-            @Nonnull Optional<String> entityKey, @Nonnull Optional<RestoreInitPayload> initPayload) {
+            @Nonnull Optional<String> cellKey, @Nonnull Optional<RestoreInitPayload> initPayload) {
         SessionState state = new SessionState();
-        state.user = entityKey.orElse("");
+        state.user = cellKey.orElse("");
         return state;
     }
 
@@ -69,8 +69,8 @@ public final class SessionWindow
 
     @Override
     public void run(
-            @Nonnull String click, @Nonnull StateHandle<SessionState, SessionChange> state, @Nonnull ProcedureCtx ctx)
-            throws ProcedureException {
+            @Nonnull String click, @Nonnull StateHandle<SessionState, SessionChange> state, @Nonnull TaskletCtx ctx)
+            throws TaskletException {
         state.apply(SessionChange.clicked(click));
 
         // The pattern: retract the deadline you set last time, then set a new one. Without the
@@ -86,8 +86,8 @@ public final class SessionWindow
             long firedAt,
             @Nonnull TimerKind kind,
             @Nonnull StateHandle<SessionState, SessionChange> state,
-            @Nonnull ProcedureCtx ctx)
-            throws ProcedureException {
+            @Nonnull TaskletCtx ctx)
+            throws TaskletException {
         deadline = -1L;
         SessionState session = state.get();
         int clicks = session.clicks.size();

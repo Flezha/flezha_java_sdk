@@ -12,25 +12,25 @@ import javax.annotation.Nonnull;
  * after a partial failure: reserve stock, charge the card, dispatch the parcel. Once the card is
  * charged, restarting from the beginning is not a correct recovery, so each completed step is
  * recorded and a crash resumes at the next one. For work expressed as messages flowing
- * continuously through procedures, use {@link StreamOperative} instead; this is the heavier
+ * continuously through tasklets, use {@link StreamOperative} instead; this is the heavier
  * mechanism and costs a journal write per step.
  *
  * <p>A workflow is started with the values that seed its entry channel, runs until an exit
  * trigger, and is then torn down. It reuses the same building blocks a stream operative uses
- * (procedures, channels, entities, per-entity state, {@code ctx.emit}) under a different
+ * (tasklets, channels, cells, per-cell state, {@code ctx.emit}) under a different
  * lifecycle:
  *
  * <ul>
- *   <li><strong>Procedures</strong>: override {@link #procedures} to author
- *       Procedures/Channels/Entities on the same {@link ChannelBuilder} a
+ *   <li><strong>Tasklets</strong>: override {@link #tasklets} to author
+ *       Tasklets/Channels/Cells on the same {@link ChannelBuilder} a
  *       stream operative uses; the workflow driver runs the static DAG in
- *       topological order with a per-procedure count-based barrier (entities
- *       within one procedure still run in parallel); fan-out branches are
+ *       topological order with a per-tasklet count-based barrier (cells
+ *       within one tasklet still run in parallel); fan-out branches are
  *       independent, and a fan-in node runs once, after every producer
  *       feeding it committed, with the accumulated batch.</li>
  *   <li><strong>Exit triggers</strong>: the operative terminates on the first
- *       of: the chain running to quiescence, a procedure calling
- *       {@link com.flezha.sdk.procedure.ProcedureCtx#complete(byte[])}, a chained
+ *       of: the chain running to quiescence, a tasklet calling
+ *       {@link com.flezha.sdk.tasklet.TaskletCtx#complete(byte[])}, a chained
  *       loop releasing an empty batch, a declared {@link #maxDuration}, or
  *       external {@code flz operative stop}. Every trigger converges on the
  *       single {@code WorkflowCompleted} teardown.</li>
@@ -38,7 +38,7 @@ import javax.annotation.Nonnull;
  *       iteration per input delivered after the start, and parks between them.</li>
  * </ul>
  *
- * <p>A workflow declares its chain in {@link #procedures}, on the same builder a stream operative
+ * <p>A workflow declares its chain in {@link #tasklets}, on the same builder a stream operative
  * uses, and is declared with {@link com.flezha.sdk.FlezhaRunner#registerFactory(Class)}. The value
  * passed between two steps is written down at that boundary, which is what allows a resumed
  * workflow to pick up there; the runtime derives how to write it, so the chain declares nothing
@@ -46,7 +46,7 @@ import javax.annotation.Nonnull;
  *
  * <pre>{@code
  * @Override
- * public void procedures(ChannelBuilder c) {
+ * public void tasklets(ChannelBuilder c) {
  *     c.input(String.class, "order")
  *             .into(Reserve.class)
  *             .named("reserved")
@@ -65,15 +65,15 @@ import javax.annotation.Nonnull;
 public interface WorkflowOperative extends Operative {
 
     /**
-     * Declare a static <strong>DAG</strong> of Procedures / Channels / Entities
+     * Declare a static <strong>DAG</strong> of Tasklets / Channels / Cells
      * on the same graph builder a stream operative uses. The workflow driver
-     * runs the declaration in topological order: a procedure becomes runnable
+     * runs the declaration in topological order: a tasklet becomes runnable
      * only after <strong>every</strong> producer feeding it has committed;
      * fan-out branches are independent, and a fan-in node is dispatched once,
      * with the accumulated batch of all its producers' outputs. Cycles are
-     * rejected at registration, and so is a class that declares no procedure.
+     * rejected at registration, and so is a class that declares no tasklet.
      */
-    default void procedures(ChannelBuilder c) {}
+    default void tasklets(ChannelBuilder c) {}
 
     /**
      * Optional wall-clock backstop. {@link Optional#empty()} (the default) means
@@ -87,7 +87,7 @@ public interface WorkflowOperative extends Operative {
 
     /**
      * Self-termination guarantee, validated at registration. Default {@code true}:
-     * the operative ends on its own (a chain that runs to its end, a procedure
+     * the operative ends on its own (a chain that runs to its end, a tasklet
      * calling {@code ctx.complete}, or a loop with exhausted input). An operative whose
      * <strong>only</strong> possible exit is an external stop returns
      * {@code false}; combined with no {@link #maxDuration} it is
@@ -117,11 +117,11 @@ public interface WorkflowOperative extends Operative {
     }
 
     /**
-     * Total attempts for a failing entity's batch, including the first (default
+     * Total attempts for a failing cell's batch, including the first (default
      * 3). {@code 0} or {@code 1} collapses to fail-fast.
      *
-     * <p>Retry is strictly PRE-commit: a journaled proc is never retried. Only the
-     * failing entity re-runs — its siblings stay buffered at the barrier — and
+     * <p>Retry is strictly PRE-commit: a journaled task is never retried. Only the
+     * failing cell re-runs — its siblings stay buffered at the barrier — and
      * each attempt gets a fresh sink, so a failed attempt's staged output is
      * dropped rather than double-emitted.
      */
@@ -139,7 +139,7 @@ public interface WorkflowOperative extends Operative {
     }
 
     /**
-     * Sends of one commit barrier ({@code ProcCommit} / {@code IterCommit}, the
+     * Sends of one commit barrier ({@code TaskCommit} / {@code IterCommit}, the
      * first send included) before an ack that never arrives fails the run
      * (default 3; {@code 0} or {@code 1} is the single wait). A re-send carries
      * the same reference id and the controller journals a barrier once by its
@@ -154,7 +154,7 @@ public interface WorkflowOperative extends Operative {
     /**
      * Saga rollback scope, applied when the operative terminates abnormally
      * after partial progress. Default {@link RollbackMode#ALL_OR_NOTHING} undoes
-     * every completed procedure in reverse, back to the start;
+     * every completed tasklet in reverse, back to the start;
      * {@link RollbackMode#KEEP_PROGRESS} keeps each finished loop iteration and
      * undoes only the in-flight one. The mode is irrelevant for a single-pass
      * chain (where both behave all-or-nothing) and for an operative with no
@@ -167,9 +167,9 @@ public interface WorkflowOperative extends Operative {
     /**
      * Class-level persistence toggle (durable by default, mirroring
      * {@code StreamOperative.persistenceEnabled()}). When {@code true}, a
-     * structured workflow operative's per-Entity Changes are written to the WAL
+     * structured workflow operative's per-Cell Changes are written to the WAL
      * as they apply, so a crash resumes from persisted state. When
-     * {@code false}, the per-Entity flush drains and discards Changes with no
+     * {@code false}, the per-Cell flush drains and discards Changes with no
      * serialization or wire I/O — the operative is in-memory only (a crash
      * re-runs from the top). The controller resolves this durable-by-default
      * with a per-class operator opt-out.
@@ -180,7 +180,7 @@ public interface WorkflowOperative extends Operative {
 
     /**
      * Synchronous remote durability: the controller completes the remote ship
-     * of each commit barrier — the proc-journal suffix and the inbox the
+     * of each commit barrier — the task-journal suffix and the inbox the
      * barrier consumed — before it acknowledges the barrier. The
      * acknowledgement this driver blocks on therefore implies the commit
      * survives losing the controller's disk (RPO 0), at the cost of one remote

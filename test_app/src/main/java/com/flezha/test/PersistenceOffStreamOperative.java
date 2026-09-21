@@ -4,7 +4,7 @@ import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operative.StreamOperative;
 
 /**
- * Same Procedure topology as {@link StatefulCounterStreamOperative} but with
+ * Same Tasklet topology as {@link StatefulCounterStreamOperative} but with
  * persistence disabled at the operative-class level. Used by integration tests
  * to verify the toggle-off drain discards Changes without serialization or
  * wire I/O.
@@ -24,24 +24,24 @@ public final class PersistenceOffStreamOperative implements StreamOperative {
     @Override
     public void channels(ChannelBuilder c) {
         c.input(String.class, "input")
-                .into(PersistenceOffEntryProcedure.class)
+                .into(PersistenceOffEntryTasklet.class)
                 .named("ticks")
-                .into(PersistenceOffCounterProcedure.class);
+                .into(PersistenceOffCounterTasklet.class);
     }
 
-    /** The {@link CounterEntryProcedure} parse under this operative's own node identity. */
-    public static final class PersistenceOffEntryProcedure extends CounterEntryProcedure {
+    /** The {@link CounterEntryTasklet} parse under this operative's own node identity. */
+    public static final class PersistenceOffEntryTasklet extends CounterEntryTasklet {
         @Override
         public String name() {
-            return "persistence_off_entry_procedure";
+            return "persistence_off_entry_tasklet";
         }
     }
 
-    /** The {@link CounterProcedure} fold under this operative's own node identity. */
-    public static final class PersistenceOffCounterProcedure extends CounterProcedure {
+    /** The {@link CounterTasklet} fold under this operative's own node identity. */
+    public static final class PersistenceOffCounterTasklet extends CounterTasklet {
         @Override
         public String name() {
-            return "persistence_off_counter_procedure";
+            return "persistence_off_counter_tasklet";
         }
     }
 }

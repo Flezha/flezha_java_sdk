@@ -7,12 +7,12 @@ import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.operative.StreamOperative;
 import com.flezha.sdk.operative.StreamOperativeConfigurationException;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.StateHandle;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -36,16 +36,16 @@ class StreamOperativeTopologyBuilderTest {
             assertThat(topology.factoryId()).isEqualTo("single_mode");
             assertThat(topology.channels()).hasSize(1);
             assertThat(topology.channels().get(0).kind()).isEqualTo(ChannelKind.ENTRY);
-            assertThat(topology.procedures()).hasSize(1);
-            assertThat(topology.procedures().get(0).entityKeys()).isEmpty();
+            assertThat(topology.tasklets()).hasSize(1);
+            assertThat(topology.tasklets().get(0).cellKeys()).isEmpty();
         }
 
         @Test
-        @DisplayName("static-mode procedure allocates one descriptor with the declared keys")
-        void staticModeAllocatesEntities() {
+        @DisplayName("static-mode tasklet allocates one descriptor with the declared keys")
+        void staticModeAllocatesCells() {
             StreamOperativeTopology topology = StreamOperativeTopologyBuilder.build(new StaticModeStreamOperative());
-            assertThat(topology.procedures().get(0).entityKeys()).containsExactly("a", "b", "c", "d");
-            assertThat(topology.procedures().get(0).entitiesForOverridden()).isTrue();
+            assertThat(topology.tasklets().get(0).cellKeys()).containsExactly("a", "b", "c", "d");
+            assertThat(topology.tasklets().get(0).cellsForOverridden()).isTrue();
         }
 
         @Test
@@ -68,68 +68,68 @@ class StreamOperativeTopologyBuilderTest {
         }
 
         @Test
-        @DisplayName("static-mode procedure without entitiesForOverridden is rejected")
-        void staticWithoutEntitiesForOverriddenRejected() {
-            assertThatThrownBy(() ->
-                            StreamOperativeTopologyBuilder.build(new MissingEntitiesForOverriddenStreamOperative()))
+        @DisplayName("static-mode tasklet without cellsForOverridden is rejected")
+        void staticWithoutCellsForOverriddenRejected() {
+            assertThatThrownBy(
+                            () -> StreamOperativeTopologyBuilder.build(new MissingCellsForOverriddenStreamOperative()))
                     .isInstanceOf(StreamOperativeConfigurationException.class)
-                    .hasMessageContaining("EntitiesForMissing")
-                    .hasMessageContaining("declares non-empty entity_keys() but does not override entities_for");
+                    .hasMessageContaining("CellsForMissing")
+                    .hasMessageContaining("declares non-empty cell_keys() but does not override cells_for");
         }
 
         @Test
-        @DisplayName("a type argument still generic at the procedure class is refused at definition time")
+        @DisplayName("a type argument still generic at the tasklet class is refused at definition time")
         void unresolvedTypeTokenRejected() {
             // The defaults read the implements clause; what they cannot read
             // they refuse by name here, rather than guessing and failing at
             // dispatch with a type mismatch far from this declaration.
             assertThatThrownBy(() -> StreamOperativeTopologyBuilder.build(new UnresolvedTokenStreamOperative()))
                     .isInstanceOf(StreamOperativeConfigurationException.class)
-                    .hasMessageContaining(UnresolvedInputProcedure.class.getName())
+                    .hasMessageContaining(UnresolvedInputTasklet.class.getName())
                     .hasMessageContaining("Input");
         }
 
         @Test
-        @DisplayName("a throwing procedure constructor is collected with the other refusals, naming the author's error")
-        void throwingProcedureConstructorIsCollectedWithTheOtherRefusals() {
-            assertThatThrownBy(() -> StreamOperativeTopologyBuilder.build(new ThrowingProcedureStreamOperative()))
+        @DisplayName("a throwing tasklet constructor is collected with the other refusals, naming the author's error")
+        void throwingTaskletConstructorIsCollectedWithTheOtherRefusals() {
+            assertThatThrownBy(() -> StreamOperativeTopologyBuilder.build(new ThrowingTaskletStreamOperative()))
                     .isInstanceOf(StreamOperativeConfigurationException.class)
                     .hasMessageStartingWith("topology rejected [Declaration, Declaration")
                     .hasMessageContaining("`no_extractor` declares the EventTimeFrom clock")
-                    .hasMessageContaining(ThrowingConstructorProcedure.REFUSAL)
+                    .hasMessageContaining(ThrowingConstructorTasklet.REFUSAL)
                     .hasMessageNotContaining("no-arg constructor");
         }
 
         @Test
-        @DisplayName("a keyed edge builds a dynamic-mode consumer (Entities are created per key at dispatch)")
+        @DisplayName("a keyed edge builds a dynamic-mode consumer (Cells are created per key at dispatch)")
         void dynamicModeOnlyBuilds() {
-            // The keying is on the WIRING: the procedure declares nothing, and
+            // The keying is on the WIRING: the tasklet declares nothing, and
             // the edge's key function is what classifies it as dynamic.
             StreamOperativeTopology topology =
                     StreamOperativeTopologyBuilder.build(new DynamicModeOnlyStreamOperative());
-            assertThat(topology.procedures()).hasSize(1);
-            assertThat(topology.procedures().get(0).dynamic()).isTrue();
-            assertThat(topology.procedures().get(0).entityKeys()).isEmpty();
+            assertThat(topology.tasklets()).hasSize(1);
+            assertThat(topology.tasklets().get(0).dynamic()).isTrue();
+            assertThat(topology.tasklets().get(0).cellKeys()).isEmpty();
             assertThat(topology.channels().get(0).consumers().get(0).key()).isPresent();
         }
     }
 
-    // ---- Test operatives / procedures -----------------------------------------------
+    // ---- Test operatives / tasklets -----------------------------------------------
 
-    /** A concrete procedure class that leaves its own Input open. */
-    public static final class UnresolvedInputProcedure<I> extends StatelessTestProcedure<I, Object, String> {
+    /** A concrete tasklet class that leaves its own Input open. */
+    public static final class UnresolvedInputTasklet<I> extends StatelessTestTasklet<I, Object, String> {
         @Override
         public String name() {
             return "unresolved_input";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(I input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(I input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
     public static final class UnresolvedTokenStreamOperative implements StreamOperative {
@@ -141,18 +141,18 @@ class StreamOperativeTopologyBuilderTest {
         @Override
         @SuppressWarnings("unchecked")
         public void channels(ChannelBuilder c) {
-            // A generic procedure class has a raw class literal, so wiring it
+            // A generic tasklet class has a raw class literal, so wiring it
             // takes a cast — which is the author's first hint that the runtime
             // will have nothing concrete to read either.
-            c.input(String.class, "in").into((Class<? extends Procedure<String, ?, String, ?, ?, ?>>)
-                    (Class<?>) UnresolvedInputProcedure.class);
+            c.input(String.class, "in").into((Class<? extends Tasklet<String, ?, String, ?, ?, ?>>)
+                    (Class<?>) UnresolvedInputTasklet.class);
         }
     }
 
-    public static final class ThrowingConstructorProcedure extends StatelessTestProcedure<String, Object, String> {
+    public static final class ThrowingConstructorTasklet extends StatelessTestTasklet<String, Object, String> {
         static final String REFUSAL = "the author's own refusal";
 
-        public ThrowingConstructorProcedure() throws IOException {
+        public ThrowingConstructorTasklet() throws IOException {
             throw new IOException(REFUSAL);
         }
 
@@ -162,41 +162,41 @@ class StreamOperativeTopologyBuilderTest {
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
-    public static final class ThrowingProcedureStreamOperative implements StreamOperative {
+    public static final class ThrowingTaskletStreamOperative implements StreamOperative {
         @Override
         public String factoryId() {
-            return "throwing_procedure";
+            return "throwing_tasklet";
         }
 
         @Override
         public void channels(ChannelBuilder c) {
             c.input(String.class, "in")
-                    .into(ClockAndKeyedValidationTest.NoExtractorProc.class)
-                    .into(ThrowingConstructorProcedure.class);
+                    .into(ClockAndKeyedValidationTest.NoExtractorTask.class)
+                    .into(ThrowingConstructorTasklet.class);
         }
     }
 
-    public static final class SingleProcedure extends StatelessTestProcedure<String, Object, String> {
+    public static final class SingleTasklet extends StatelessTestTasklet<String, Object, String> {
         @Override
         public String name() {
-            return "single_procedure";
+            return "single_tasklet";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
     public static final class SingleModeStreamOperative implements StreamOperative {
@@ -207,38 +207,38 @@ class StreamOperativeTopologyBuilderTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(SingleProcedure.class);
+            c.input(String.class, "input").into(SingleTasklet.class);
         }
     }
 
-    public static final class StaticProcedure extends StatelessTestProcedure<String, Object, String> {
+    public static final class StaticTasklet extends StatelessTestTasklet<String, Object, String> {
         @Override
         public String name() {
-            return "static_procedure";
+            return "static_tasklet";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public List<String> entityKeys() {
+        public List<String> cellKeys() {
             return List.of("a", "b", "c", "d");
         }
 
         @Override
-        public boolean entitiesForOverridden() {
+        public boolean cellsForOverridden() {
             return true;
         }
 
         @Override
-        public List<String> entitiesFor(String input) {
+        public List<String> cellsFor(String input) {
             return List.of(input.substring(0, 1));
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
     public static final class StaticModeStreamOperative implements StreamOperative {
@@ -249,7 +249,7 @@ class StreamOperativeTopologyBuilderTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(StaticProcedure.class);
+            c.input(String.class, "input").into(StaticTasklet.class);
         }
     }
 
@@ -261,54 +261,53 @@ class StreamOperativeTopologyBuilderTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(Trade.class, "trade.raw").into(TradeProcedure.class);
+            c.input(Trade.class, "trade.raw").into(TradeTasklet.class);
         }
     }
 
-    public static final class TradeProcedure extends StatelessTestProcedure<Trade, Object, String> {
+    public static final class TradeTasklet extends StatelessTestTasklet<Trade, Object, String> {
         @Override
         public String name() {
-            return "trade_procedure";
+            return "trade_tasklet";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(Trade input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(Trade input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
-    public static final class CandleProcedure extends StatelessTestProcedure<Candle, Object, String> {
+    public static final class CandleTasklet extends StatelessTestTasklet<Candle, Object, String> {
         @Override
         public String name() {
-            return "candle_procedure";
+            return "candle_tasklet";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(Candle input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(Candle input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
-    public static final class TradeProducerProcedure extends StatelessTestProcedure<String, Object, Trade> {
+    public static final class TradeProducerTasklet extends StatelessTestTasklet<String, Object, Trade> {
         @Override
         public String name() {
             return "trade_producer";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx)
-                throws ProcedureException {}
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) throws TaskletException {}
     }
 
     public static final class TypeMismatchStreamOperative implements StreamOperative {
@@ -320,7 +319,7 @@ class StreamOperativeTopologyBuilderTest {
         @Override
         public void channels(ChannelBuilder c) {
             ChannelDeclMismatch.declareTradeIntoCandle(
-                    c.input(String.class, "input").into(TradeProducerProcedure.class));
+                    c.input(String.class, "input").into(TradeProducerTasklet.class));
         }
     }
 
@@ -328,32 +327,31 @@ class StreamOperativeTopologyBuilderTest {
     private static final class ChannelDeclMismatch {
         @SuppressWarnings({"unchecked", "rawtypes"})
         static void declareTradeIntoCandle(com.flezha.sdk.channel.Stream<Trade> stream) {
-            ((com.flezha.sdk.channel.Stream) stream.named("trade.parsed")).into((Class) CandleProcedure.class);
+            ((com.flezha.sdk.channel.Stream) stream.named("trade.parsed")).into((Class) CandleTasklet.class);
         }
     }
 
-    public static final class MissingEntitiesForOverriddenProcedure
-            extends StatelessTestProcedure<String, Object, String> {
+    public static final class MissingCellsForOverriddenTasklet extends StatelessTestTasklet<String, Object, String> {
         @Override
         public String name() {
-            return "missing_pfo_procedure";
+            return "missing_pfo_tasklet";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public List<String> entityKeys() {
+        public List<String> cellKeys() {
             return List.of("a", "b");
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
-    public static final class MissingEntitiesForOverriddenStreamOperative implements StreamOperative {
+    public static final class MissingCellsForOverriddenStreamOperative implements StreamOperative {
         @Override
         public String factoryId() {
             return "missing_pfo_operative";
@@ -361,23 +359,23 @@ class StreamOperativeTopologyBuilderTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(MissingEntitiesForOverriddenProcedure.class);
+            c.input(String.class, "input").into(MissingCellsForOverriddenTasklet.class);
         }
     }
 
-    public static final class DynamicModeOnlyProcedure extends StatelessTestProcedure<String, Object, String> {
+    public static final class DynamicModeOnlyTasklet extends StatelessTestTasklet<String, Object, String> {
         @Override
         public String name() {
-            return "dynamic_only_procedure";
+            return "dynamic_only_tasklet";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
     public static final class DynamicModeOnlyStreamOperative implements StreamOperative {
@@ -388,7 +386,7 @@ class StreamOperativeTopologyBuilderTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").keyBy(input -> input).into(DynamicModeOnlyProcedure.class);
+            c.input(String.class, "input").keyBy(input -> input).into(DynamicModeOnlyTasklet.class);
         }
     }
 
@@ -401,12 +399,12 @@ class StreamOperativeTopologyBuilderTest {
         @DisplayName("branch() builds the identical topology to handle reuse")
         void branchBuildsIdenticalTopology() {
             var byHandles = StreamOperativeTopologyBuilder.build("g1", c -> {
-                var validated = c.input(String.class, "in").into(SingleProcedure.class);
+                var validated = c.input(String.class, "in").into(SingleTasklet.class);
                 validated.into(GraphStage1.class);
                 validated.into(GraphStage2.class);
             });
             var byBranch = StreamOperativeTopologyBuilder.build("g2", c -> c.input(String.class, "in")
-                    .into(SingleProcedure.class)
+                    .into(SingleTasklet.class)
                     .branch(b -> b.into(GraphStage1.class), b -> b.into(GraphStage2.class)));
             assertThat(shape(byBranch)).isEqualTo(shape(byHandles));
         }
@@ -415,7 +413,7 @@ class StreamOperativeTopologyBuilderTest {
         @DisplayName("branch() with fewer than two arms is refused")
         void branchWithOneArmRefused() {
             assertThatThrownBy(() -> StreamOperativeTopologyBuilder.build("g3", c -> c.input(String.class, "in")
-                            .into(SingleProcedure.class)
+                            .into(SingleTasklet.class)
                             .branch(b -> b.into(GraphStage1.class))))
                     .isInstanceOf(StreamOperativeConfigurationException.class)
                     .hasMessageContaining("BranchTooFewArms")
@@ -426,15 +424,15 @@ class StreamOperativeTopologyBuilderTest {
         @DisplayName("named nodes reuse one class at two positions; unnamed mentions unify into a fan-in")
         void namedNodesAndFanIn() {
             var t = StreamOperativeTopologyBuilder.build("g4", c -> {
-                var validated = c.input(String.class, "in").into(SingleProcedure.class);
+                var validated = c.input(String.class, "in").into(SingleTasklet.class);
                 validated.into(GraphStage1.class, "fraud_filter").into(GraphMerge.class);
                 validated.into(GraphStage1.class, "spam_filter").into(GraphMerge.class);
             });
-            assertThat(t.procedures().stream().map(o -> o.name()).toList())
-                    .containsExactly("single_procedure", "fraud_filter", "graph_merge", "spam_filter");
+            assertThat(t.tasklets().stream().map(o -> o.name()).toList())
+                    .containsExactly("single_tasklet", "fraud_filter", "graph_merge", "spam_filter");
             // Derived channel names are the node identities; the merge is ONE node.
             assertThat(t.nameToId()).containsKeys("fraud_filter", "spam_filter");
-            long merges = t.procedures().stream()
+            long merges = t.tasklets().stream()
                     .filter(o -> o.name().equals("graph_merge"))
                     .count();
             assertThat(merges).isEqualTo(1);
@@ -444,7 +442,7 @@ class StreamOperativeTopologyBuilderTest {
         @DisplayName("a node identity collision is refused")
         void nodeIdentityCollisionRefused() {
             assertThatThrownBy(() -> StreamOperativeTopologyBuilder.build("g5", c -> {
-                        var validated = c.input(String.class, "in").into(SingleProcedure.class);
+                        var validated = c.input(String.class, "in").into(SingleTasklet.class);
                         validated.into(GraphStage2.class, "graph_stage1");
                         validated.into(GraphStage1.class);
                     }))
@@ -457,19 +455,19 @@ class StreamOperativeTopologyBuilderTest {
         @DisplayName("channel names derive from the producer identity; .named overrides; collisions are refused")
         void derivedNamesAndCollision() {
             var t = StreamOperativeTopologyBuilder.build("g6", c -> c.input(String.class, "in")
-                    .into(SingleProcedure.class)
+                    .into(SingleTasklet.class)
                     .into(GraphStage1.class)
                     .named("orders.validated")
                     .into(GraphStage2.class));
-            assertThat(t.nameToId()).containsKeys("single_procedure", "orders.validated");
+            assertThat(t.nameToId()).containsKeys("single_tasklet", "orders.validated");
 
             assertThatThrownBy(() ->
-                            StreamOperativeTopologyBuilder.build("g7", c -> c.input(String.class, "single_procedure")
-                                    .into(SingleProcedure.class)
+                            StreamOperativeTopologyBuilder.build("g7", c -> c.input(String.class, "single_tasklet")
+                                    .into(SingleTasklet.class)
                                     .into(GraphStage1.class)))
                     .isInstanceOf(StreamOperativeConfigurationException.class)
                     .hasMessageContaining("DuplicateChannel")
-                    .hasMessageContaining("single_procedure");
+                    .hasMessageContaining("single_tasklet");
         }
 
         @Test
@@ -507,7 +505,7 @@ class StreamOperativeTopologyBuilderTest {
         void customParserReplacesDefaultJson() {
             var t = StreamOperativeTopologyBuilder.build(
                     "g10", c -> c.input(Trade.class, "orders", bytes -> new Trade(new String(bytes), 1.0))
-                            .into(TradeProcedure.class));
+                            .into(TradeTasklet.class));
             var entry = t.channels().get(0);
             assertThat(entry.entryParsed()).isTrue();
             Object decoded = entry.entryParser().orElseThrow().apply("BTC".getBytes());
@@ -518,7 +516,7 @@ class StreamOperativeTopologyBuilderTest {
         @DisplayName("byte[] and String entries stay passthrough (not parsers)")
         void bytesAndStringEntriesStayPassthrough() {
             var t = StreamOperativeTopologyBuilder.build(
-                    "g11", c -> c.input(String.class, "in").into(SingleProcedure.class));
+                    "g11", c -> c.input(String.class, "in").into(SingleTasklet.class));
             assertThat(t.channels().get(0).entryParsed()).isFalse();
         }
 
@@ -527,7 +525,7 @@ class StreamOperativeTopologyBuilderTest {
         void handleAfterFreezeThrows() {
             var leaked = new java.util.concurrent.atomic.AtomicReference<com.flezha.sdk.channel.Stream<String>>();
             StreamOperativeTopologyBuilder.build(
-                    "g12", c -> leaked.set(c.input(String.class, "in").into(SingleProcedure.class)));
+                    "g12", c -> leaked.set(c.input(String.class, "in").into(SingleTasklet.class)));
             assertThatThrownBy(() -> leaked.get().into(GraphStage1.class))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("g12");
@@ -538,13 +536,13 @@ class StreamOperativeTopologyBuilderTest {
         void sinkTerminalityIsDerivedFromTheWiring() {
             var terminal = StreamOperativeTopologyBuilder.build(
                     "g13",
-                    c -> c.input(String.class, "in").into(SingleProcedure.class).sink("egress"));
+                    c -> c.input(String.class, "in").into(SingleTasklet.class).sink("egress"));
             var sealed = StreamOperativeTopologyBuilder.build("g14", c -> c.input(String.class, "in")
-                    .into(SingleProcedure.class)
+                    .into(SingleTasklet.class)
                     .sink("egress")
                     .sealed());
             var hybrid = StreamOperativeTopologyBuilder.build("g15", c -> c.input(String.class, "in")
-                    .into(SingleProcedure.class)
+                    .into(SingleTasklet.class)
                     .sink("egress")
                     .into(GraphStage1.class));
 
@@ -552,7 +550,7 @@ class StreamOperativeTopologyBuilderTest {
                     .as("`.sealed()` must add no topology difference")
                     .isEqualTo(shape(terminal));
             assertThat(sinkShape(terminal)).isEqualTo(List.of(ChannelKind.PLUGIN_BOUND.name(), "0", "egress"));
-            assertThat(sinkShape(hybrid)).isEqualTo(List.of(ChannelKind.INTER_PROCEDURE.name(), "1", "egress"));
+            assertThat(sinkShape(hybrid)).isEqualTo(List.of(ChannelKind.INTER_TASKLET.name(), "1", "egress"));
         }
 
         @Test
@@ -560,15 +558,15 @@ class StreamOperativeTopologyBuilderTest {
         void sinkNamesTheChannelAndTheNoArgumentFormDoesNot() {
             var named = StreamOperativeTopologyBuilder.build(
                     "g13a",
-                    c -> c.input(String.class, "in").into(SingleProcedure.class).sink("items_output"));
+                    c -> c.input(String.class, "in").into(SingleTasklet.class).sink("items_output"));
             var derived = StreamOperativeTopologyBuilder.build(
                     "g13b",
-                    c -> c.input(String.class, "in").into(SingleProcedure.class).sink());
+                    c -> c.input(String.class, "in").into(SingleTasklet.class).sink());
 
             assertThat(named.channels().get(1).name()).isEqualTo("items_output");
             assertThat(derived.channels().get(1).name())
                     .as("sink() derives exactly as a channel with no sink does")
-                    .isEqualTo("single_procedure");
+                    .isEqualTo("single_tasklet");
             assertThat(derived.channels().get(1).pluginSink()).isPresent();
         }
 
@@ -580,9 +578,9 @@ class StreamOperativeTopologyBuilderTest {
             // that reached the builder would conjure one.
             var sealed = StreamOperativeTopologyBuilder.build(
                     "g16",
-                    c -> c.input(String.class, "in").into(SingleProcedure.class).sealed());
+                    c -> c.input(String.class, "in").into(SingleTasklet.class).sealed());
             var bare = StreamOperativeTopologyBuilder.build(
-                    "g17", c -> c.input(String.class, "in").into(SingleProcedure.class));
+                    "g17", c -> c.input(String.class, "in").into(SingleTasklet.class));
 
             assertThat(shape(sealed)).isEqualTo(shape(bare));
         }
@@ -603,9 +601,9 @@ class StreamOperativeTopologyBuilderTest {
             var channels = t.channels().stream()
                     .map(ch -> ch.name() + "|" + ch.kind() + "|" + ch.producer() + "|" + ch.consumerIds())
                     .toList();
-            var procs = t.procedures().stream().map(o -> o.name()).toList();
+            var tasks = t.tasklets().stream().map(o -> o.name()).toList();
             var all = new java.util.ArrayList<String>(channels);
-            all.addAll(procs);
+            all.addAll(tasks);
             return all;
         }
     }
@@ -634,7 +632,7 @@ class StreamOperativeTopologyBuilderTest {
             StreamOperativeConfigurationException refused =
                     catchConfigException(() -> StreamOperativeTopologyBuilder.build("r1", c -> {
                         c.correctionWindow(0);
-                        c.input(String.class, "in").into(SingleProcedure.class);
+                        c.input(String.class, "in").into(SingleTasklet.class);
                     }));
             assertThat(refused.refusals())
                     .as("`correctionWindow(0)` is the one shape Java accepted before the core held the rules")
@@ -646,7 +644,7 @@ class StreamOperativeTopologyBuilderTest {
         @DisplayName("a zero retry budget is refused by name")
         void retryMaxZeroRefused() {
             assertThatThrownBy(() -> StreamOperativeTopologyBuilder.build(
-                            "r2", c -> c.input(String.class, "in").retryMax(0).into(SingleProcedure.class)))
+                            "r2", c -> c.input(String.class, "in").retryMax(0).into(SingleTasklet.class)))
                     .isInstanceOf(StreamOperativeConfigurationException.class)
                     .hasMessageContaining("RetryMaxZero")
                     .hasMessageContaining("channel `in` declared retry_max = 0");
@@ -656,7 +654,7 @@ class StreamOperativeTopologyBuilderTest {
         @DisplayName("a second sink on one channel is refused by name; the first still registered")
         void duplicatePluginSinkRefused() {
             assertThatThrownBy(() -> StreamOperativeTopologyBuilder.build("r3", c -> c.input(String.class, "in")
-                            .into(SingleProcedure.class)
+                            .into(SingleTasklet.class)
                             .sink("egress")
                             .sink()))
                     .isInstanceOf(StreamOperativeConfigurationException.class)
@@ -668,7 +666,7 @@ class StreamOperativeTopologyBuilderTest {
         @DisplayName("a channel named by both named() and sink() is refused naming both")
         void channelNamedTwiceRefused() {
             assertThatThrownBy(() -> StreamOperativeTopologyBuilder.build("r3b", c -> c.input(String.class, "in")
-                            .into(SingleProcedure.class)
+                            .into(SingleTasklet.class)
                             .named("a")
                             .sink("b")))
                     .isInstanceOf(StreamOperativeConfigurationException.class)
@@ -681,7 +679,7 @@ class StreamOperativeTopologyBuilderTest {
         void duplicateSinkNameRefused() {
             assertThatThrownBy(() -> StreamOperativeTopologyBuilder.build("r3c", c -> {
                         var in = c.input(String.class, "in");
-                        in.into(SingleProcedure.class).sink("shared");
+                        in.into(SingleTasklet.class).sink("shared");
                         in.into(GraphStage1.class).sink("shared");
                     }))
                     .isInstanceOf(StreamOperativeConfigurationException.class)
@@ -694,7 +692,7 @@ class StreamOperativeTopologyBuilderTest {
         void unkeyedChannelUnderTheTierRefused() {
             assertThatThrownBy(() -> StreamOperativeTopologyBuilder.build("r4", c -> {
                         c.effectivelyOnce();
-                        c.input(String.class, "in").into(SingleProcedure.class).sink("egress");
+                        c.input(String.class, "in").into(SingleTasklet.class).sink("egress");
                     }))
                     .isInstanceOf(StreamOperativeConfigurationException.class)
                     .hasMessageContaining("UnkeyedChannelUnderEffectivelyOnce")
@@ -702,48 +700,48 @@ class StreamOperativeTopologyBuilderTest {
         }
     }
 
-    public static final class GraphStage1 extends StatelessTestProcedure<String, Object, String> {
+    public static final class GraphStage1 extends StatelessTestTasklet<String, Object, String> {
         @Override
         public String name() {
             return "graph_stage1";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
-    public static final class GraphStage2 extends StatelessTestProcedure<String, Object, String> {
+    public static final class GraphStage2 extends StatelessTestTasklet<String, Object, String> {
         @Override
         public String name() {
             return "graph_stage2";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
-    public static final class GraphMerge extends StatelessTestProcedure<String, Object, String> {
+    public static final class GraphMerge extends StatelessTestTasklet<String, Object, String> {
         @Override
         public String name() {
             return "graph_merge";
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 }

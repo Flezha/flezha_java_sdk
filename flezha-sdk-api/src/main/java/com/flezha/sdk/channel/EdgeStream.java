@@ -1,6 +1,6 @@
 package com.flezha.sdk.channel;
 
-import com.flezha.sdk.procedure.Procedure;
+import com.flezha.sdk.tasklet.Tasklet;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import javax.annotation.Nonnull;
@@ -11,8 +11,8 @@ import javax.annotation.Nonnull;
  * drift: wiring a consumer, reshaping and keying the values on the way, and the
  * consumer-side channel configuration.
  *
- * <p><b>Transforms are edge closures, not Procedures.</b> {@link #map},
- * {@link #filter} and {@link #flatMap} add no node, no Entity, no mailbox and
+ * <p><b>Transforms are edge closures, not Tasklets.</b> {@link #map},
+ * {@link #filter} and {@link #flatMap} add no node, no Cell, no mailbox and
  * no dispatch hop — every transform declared before the closing {@code into}
  * is composed into ONE closure stored on that consumer edge and evaluated at
  * the routing seam. Fusion is therefore structural: there is no optimizer to
@@ -25,7 +25,7 @@ import javax.annotation.Nonnull;
  *   <li><b>pure</b> — they re-run on WAL replay, and a closure that read
  *       ambient state would rebuild a state the live run never had;
  *   <li><b>cheap</b> — they run on the routing thread, so real work belongs in
- *       a Procedure behind {@link #keyBy}, which buys per-Entity parallelism.
+ *       a Tasklet behind {@link #keyBy}, which buys per-Cell parallelism.
  * </ul>
  *
  * <p>A closure that throws does not take the routing thread down: the value
@@ -42,10 +42,10 @@ import javax.annotation.Nonnull;
 public interface EdgeStream<T> {
 
     /**
-     * Wire a consumer procedure onto this stream's channel and return
+     * Wire a consumer tasklet onto this stream's channel and return
      * <b>the consumer's</b> output stream handle, so a linear pipeline is one
      * chained expression reading in flow order. The runtime verifies at
-     * registration that the procedure's {@code inputType()} equals this
+     * registration that the tasklet's {@code inputType()} equals this
      * stream's payload type — as reshaped by any transforms declared above —
      * and fails registration naming both sides on a mismatch.
      *
@@ -53,19 +53,19 @@ public interface EdgeStream<T> {
      * fan-out; wiring the same unnamed class from two streams declares fan-in.
      */
     @Nonnull
-    <O> Stream<O> into(Class<? extends Procedure<T, ?, O, ?, ?, ?>> procedure);
+    <O> Stream<O> into(Class<? extends Tasklet<T, ?, O, ?, ?, ?>> tasklet);
 
     /**
      * Like {@link #into(Class)}, but the consumer is a distinct <b>named
      * node</b>: its identity string is {@code nodeName} instead of the
-     * procedure's {@code name()}, for every purpose identity serves — per-entity
+     * tasklet's {@code name()}, for every purpose identity serves — per-cell
      * state directories, journal entries, the derived channel name,
-     * diagnostics. This lets one Procedure class appear at several graph
+     * diagnostics. This lets one Tasklet class appear at several graph
      * positions with independent state. Node identity strings are unique per
      * operative; a collision fails registration.
      */
     @Nonnull
-    <O> Stream<O> into(Class<? extends Procedure<T, ?, O, ?, ?, ?>> procedure, String nodeName);
+    <O> Stream<O> into(Class<? extends Tasklet<T, ?, O, ?, ?, ?>> tasklet, String nodeName);
 
     /** Reshape every value on the way to the next consumer. */
     @Nonnull
@@ -74,7 +74,7 @@ public interface EdgeStream<T> {
     /**
      * Expand one value into zero or more. Each yielded value is keyed and
      * delivered independently, so {@code flatMap} plus {@link #keyBy} is how
-     * one input fans out across several Entities.
+     * one input fans out across several Cells.
      *
      * <p>The yielded values are pushed one at a time under the channel's
      * {@link #onFull} policy, so a drop policy may accept some of a fan-out
@@ -92,16 +92,16 @@ public interface EdgeStream<T> {
     EdgeStream<T> filter(Predicate<T> predicate);
 
     /**
-     * Name the Entity each value is routed to, making the consumer a
-     * dynamic-mode Procedure whose Entities are created on first sight of a
+     * Name the Cell each value is routed to, making the consumer a
+     * dynamic-mode Tasklet whose Cells are created on first sight of a
      * key. This is the only way to declare dynamic keying — the consumer
-     * Procedure carries no keying member at all, so a reader of
+     * Tasklet carries no keying member at all, so a reader of
      * {@code channels()} can see where work fans out.
      *
-     * <p>Total by signature: it names an Entity, it never declines. Discard
+     * <p>Total by signature: it names a Cell, it never declines. Discard
      * inputs with {@link #filter} before it. It is evaluated on the
      * <b>post-transform</b> value, so it must be the last link before
-     * {@code into}. Wiring it onto a Procedure declaring {@code entityKeys()}
+     * {@code into}. Wiring it onto a Tasklet declaring {@code cellKeys()}
      * (static mode) fails registration.
      */
     @Nonnull

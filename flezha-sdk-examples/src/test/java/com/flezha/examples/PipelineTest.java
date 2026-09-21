@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 class PipelineTest {
 
     @Test
-    @DisplayName("what the first procedure emits becomes the second one's input")
+    @DisplayName("what the first tasklet emits becomes the second one's input")
     void twoStagesRunInOrder() throws Exception {
         List<String> out = new ArrayList<>();
 

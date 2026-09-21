@@ -1,6 +1,6 @@
 package com.flezha.examples.pipeline;
 
-import com.flezha.sdk.authoring.Procedure;
+import com.flezha.sdk.authoring.Tasklet;
 
 /**
  * The first stage: normalises the raw line before any later stage observes it.
@@ -9,7 +9,7 @@ import com.flezha.sdk.authoring.Procedure;
  * stage has no knowledge of what follows it, which is what allows one to be reordered or reused in
  * another graph without modification.
  */
-@Procedure(id = "normalize")
+@Tasklet(id = "normalize")
 public final class Normalize {
 
     public String run(String input) {

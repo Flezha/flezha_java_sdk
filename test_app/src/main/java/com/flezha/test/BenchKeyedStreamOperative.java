@@ -20,7 +20,7 @@ public final class BenchKeyedStreamOperative implements StreamOperative {
     public void channels(ChannelBuilder c) {
         c.input(String.class, "input")
                 .onFull(OverflowPolicy.DROP_NOTHING)
-                .into(TierStoreProcedure.class)
+                .into(TierStoreTasklet.class)
                 .keyed()
                 .sink("sink");
     }

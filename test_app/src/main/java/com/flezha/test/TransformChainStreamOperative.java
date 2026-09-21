@@ -2,9 +2,9 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operative.StreamOperative;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
@@ -30,28 +30,28 @@ public final class TransformChainStreamOperative implements StreamOperative {
                 .filter(t -> !t.equals("drop"))
                 .flatMap(String.class, t -> List.of(t.split(",")))
                 .map(String.class, String::toUpperCase)
-                .keyBy(DynamicEntityStreamOperative::key)
-                .into(TransformLabelProcedure.class)
+                .keyBy(DynamicCellStreamOperative::key)
+                .into(TransformLabelTasklet.class)
                 .keyed()
                 .sink("transformed");
     }
 
-    public static final class TransformLabelProcedure
-            implements Procedure<String, TransformLabelProcedure.State, String, NoChange, WallClock, Void> {
+    public static final class TransformLabelTasklet
+            implements Tasklet<String, TransformLabelTasklet.State, String, NoChange, WallClock, Void> {
 
         @Override
         public String name() {
-            return "transform_label_procedure";
+            return "transform_label_tasklet";
         }
 
         @Override
-        public State initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public State initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new State();
         }
 
         @Override
-        public void run(String input, StateHandle<State, NoChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
+                throws TaskletException {
             ctx.emit(input);
         }
 

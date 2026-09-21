@@ -102,7 +102,7 @@ final class PollHost implements AutoCloseable {
         int waitStarvation(long timeoutMs);
 
         /**
-         * Re-hand an activation's untouched items and release its entity, as
+         * Re-hand an activation's untouched items and release its cell, as
          * if it had never been polled. The third and last way to answer a
          * handout; no retry-ladder attempt is consumed.
          */
@@ -311,7 +311,7 @@ final class PollHost implements AutoCloseable {
     private void fetchTurns() {
         // The core says when: a zero-length poll result is the core shutting
         // down, which it reports only once the shutdown sequence has shipped
-        // every Entity's state through these same fetchers. The flag is what a
+        // every Cell's state through these same fetchers. The flag is what a
         // fetcher spawned late reads.
         while (!closing.get()) {
             byte[] bytes;
@@ -358,19 +358,19 @@ final class PollHost implements AutoCloseable {
      * Run one activation and answer it exactly once, on a virtual thread of
      * its own: an activation that blocks for a minute inside user code costs a
      * stack and nothing else — the fetchers keep fetching and the core keeps
-     * handing out work for other Entities. Concurrency is bounded by the
+     * handing out work for other Cells. Concurrency is bounded by the
      * core's jobs-underway limit, never by the fetcher count.
      *
-     * <p>Per-Entity ordering needs no help here: exclusivity is the core's
-     * handout guarantee (one outstanding activation per Entity), and this
+     * <p>Per-Cell ordering needs no help here: exclusivity is the core's
+     * handout guarantee (one outstanding activation per Cell), and this
      * thread completes its activation only after the dispatch returns, so the
-     * next one for that Entity cannot start early.
+     * next one for that Cell cannot start early.
      *
      * <p>The {@code finally} is the contract, not politeness: that same
      * exclusivity means an activation that returns without {@code complete}
-     * retires its entity for the life of the process. A throwable from the
+     * retires its cell for the life of the process. A throwable from the
      * dispatcher, from encoding the result, or from {@code complete} itself
-     * therefore abandons; logging it and returning would retire the entity
+     * therefore abandons; logging it and returning would retire the cell
      * silently.
      */
     private void runActivation(Activation activation) {

@@ -20,7 +20,7 @@ public final class BenchEchoStreamOperative implements StreamOperative {
     public void channels(ChannelBuilder c) {
         c.input(String.class, "input")
                 .onFull(OverflowPolicy.DROP_NOTHING)
-                .into(DoNothingProcedure.class)
+                .into(DoNothingTasklet.class)
                 .sink("echo");
     }
 }

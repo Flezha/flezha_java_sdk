@@ -3,7 +3,7 @@ package com.flezha.test;
 import com.flezha.sdk.operative.WorkflowOperative;
 import com.flezha.sdk.channel.ChannelBuilder;
 
-/** {@code mix bench.workflow --runtime java --procs 1}: a one-proc durable chain. */
+/** {@code mix bench.workflow --runtime java --tasks 1}: a one-task durable chain. */
 public final class BenchChain1WorkflowOperative implements WorkflowOperative {
     @Override
     public String factoryId() {
@@ -11,7 +11,7 @@ public final class BenchChain1WorkflowOperative implements WorkflowOperative {
     }
 
     @Override
-    public void procedures(ChannelBuilder c) {
+    public void tasklets(ChannelBuilder c) {
         BenchSteps.chain(c, 1);
     }
 }

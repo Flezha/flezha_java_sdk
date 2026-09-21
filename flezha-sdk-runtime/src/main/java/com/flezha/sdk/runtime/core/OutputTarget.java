@@ -8,7 +8,7 @@ import javax.annotation.Nonnull;
  */
 public sealed interface OutputTarget {
 
-    /** Discriminant 0 — a consumer edge: the value goes to {@code consumer}'s Entity mailbox. */
+    /** Discriminant 0 — a consumer edge: the value goes to {@code consumer}'s Cell mailbox. */
     record Edge(int channel, int consumer) implements OutputTarget {}
 
     /** Discriminant 1 — a plugin-bound channel: the value ships on the wire under {@code channel}. */

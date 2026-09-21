@@ -34,15 +34,15 @@ class FlezhaProcessorTest {
     Path out;
 
     @Test
-    void rejectsEntityKeyAndNamesItsReplacement() {
+    void rejectsCellKeyAndNamesItsReplacement() {
         String code =
                 """
                 package t;
                 import com.flezha.sdk.authoring.*;
                 import java.util.Optional;
-                @Procedure(id = "bad")
+                @Tasklet(id = "bad")
                 public class Bad {
-                    @EntityKey public Optional<String> s(String in) { return Optional.empty(); }
+                    @CellKey public Optional<String> s(String in) { return Optional.empty(); }
                     public String run(String in) { return in; }
                 }
                 """;
@@ -50,14 +50,14 @@ class FlezhaProcessorTest {
     }
 
     @Test
-    void rejectsInitStateOnStatelessProcedure() {
+    void rejectsInitStateOnStatelessTasklet() {
         String code =
                 """
                 package t;
                 import com.flezha.sdk.authoring.InitState;
-                import com.flezha.sdk.authoring.Procedure;
+                import com.flezha.sdk.authoring.Tasklet;
                 import java.util.Optional;
-                @Procedure(id = "bad_init")
+                @Tasklet(id = "bad_init")
                 public class BadInit {
                     @InitState public String initState(Optional<String> key) { return ""; }
                     public String run(String in) { return in; }
@@ -121,25 +121,25 @@ class FlezhaProcessorTest {
         String code =
                 """
                 package t;
-                import com.flezha.sdk.authoring.Procedure;
-                @Procedure(id = "keyed")
+                import com.flezha.sdk.authoring.Tasklet;
+                @Tasklet(id = "keyed")
                 public class Plain {
                     public String run(String in) { return in; }
                 }
                 """;
-        assertThat(generated("t.Plain", "t.PlainProcedure", code)).contains("ctx.emit(out);");
+        assertThat(generated("t.Plain", "t.PlainTasklet", code)).contains("ctx.emit(out);");
 
         String keyed =
                 """
                 package t;
-                import com.flezha.sdk.authoring.Procedure;
-                @Procedure(id = "keyed", key = "k")
+                import com.flezha.sdk.authoring.Tasklet;
+                @Tasklet(id = "keyed", key = "k")
                 public class Keyed {
                     public static String k(String out) { return out; }
                     public String run(String in) { return in; }
                 }
                 """;
-        assertThat(generated("t.Keyed", "t.KeyedProcedure", keyed)).contains("ctx.emitKeyed(t.Keyed.k(out), out);");
+        assertThat(generated("t.Keyed", "t.KeyedTasklet", keyed)).contains("ctx.emitKeyed(t.Keyed.k(out), out);");
     }
 
     /**
@@ -169,39 +169,39 @@ class FlezhaProcessorTest {
         String stateless =
                 """
                 package t;
-                import com.flezha.sdk.authoring.Procedure;
-                import com.flezha.sdk.procedure.ProcedureCtx;
-                @Procedure(id = "fanout", emits = String.class)
+                import com.flezha.sdk.authoring.Tasklet;
+                import com.flezha.sdk.tasklet.TaskletCtx;
+                @Tasklet(id = "fanout", emits = String.class)
                 public class Fanout {
-                    public void run(String in, ProcedureCtx ctx) { ctx.emit(in); ctx.emit(in); }
+                    public void run(String in, TaskletCtx ctx) { ctx.emit(in); ctx.emit(in); }
                 }
                 """;
-        String generated = generated("t.Fanout", "t.FanoutProcedure", stateless);
+        String generated = generated("t.Fanout", "t.FanoutTasklet", stateless);
         // The body owns every emit: the wrapper passes the context and adds none.
         assertThat(generated).contains("impl.run(input, ctx);");
         assertThat(generated).doesNotContain("ctx.emit(out)");
         // `emits` lands as the Output type argument, which is where the runtime
         // reads it from — the tokens are not restated.
         assertThat(generated)
-                .contains("implements Procedure<java.lang.String, com.flezha.sdk.state.Stateless,"
+                .contains("implements Tasklet<java.lang.String, com.flezha.sdk.state.Stateless,"
                         + " java.lang.String, com.flezha.sdk.state.NoChange, WallClock, Void>");
         assertThat(generated).doesNotContain("outputType()");
 
         String stateful =
                 """
                 package t;
-                import com.flezha.sdk.authoring.Procedure;
-                import com.flezha.sdk.procedure.ProcedureCtx;
+                import com.flezha.sdk.authoring.Tasklet;
+                import com.flezha.sdk.tasklet.TaskletCtx;
                 import com.flezha.sdk.state.NoChange;
                 import com.flezha.sdk.state.StateHandle;
-                @Procedure(id = "fanout2", emits = String.class)
+                @Tasklet(id = "fanout2", emits = String.class)
                 public class Fanout2 {
-                    public void run(String in, StateHandle<String, NoChange> state, ProcedureCtx ctx) {
+                    public void run(String in, StateHandle<String, NoChange> state, TaskletCtx ctx) {
                         ctx.emit(in);
                     }
                 }
                 """;
-        assertThat(generated("t.Fanout2", "t.Fanout2Procedure", stateful)).contains("impl.run(input, state, ctx);");
+        assertThat(generated("t.Fanout2", "t.Fanout2Tasklet", stateful)).contains("impl.run(input, state, ctx);");
     }
 
     @Test
@@ -306,7 +306,7 @@ class FlezhaProcessorTest {
                 }
                 """;
         String source = generated("t.Counter", "t.CounterStreamOperative", code);
-        assertThat(source).contains("c.input(java.lang.String.class, \"ticks\").into(CounterProcedure.class);");
+        assertThat(source).contains("c.input(java.lang.String.class, \"ticks\").into(CounterTasklet.class);");
         assertThat(source).doesNotContain(".sink(");
     }
 
@@ -357,14 +357,14 @@ class FlezhaProcessorTest {
         assertThat(diagnose("t.Drain", code)).anyMatch(m -> m.startsWith("SinkWithoutOutput"));
     }
 
-    @ParameterizedTest(name = "`{0}` on @Procedure is refused")
+    @ParameterizedTest(name = "`{0}` on @Tasklet is refused")
     @ValueSource(strings = {"sink = \"echo\"", "input = \"prices\"", "kind = \"stream\"", "onFull = \"drop_oldest\""})
-    void anOperativeMemberOnAProcedureIsRefused(String member) {
+    void anOperativeMemberOnATaskletIsRefused(String member) {
         String code =
                 """
                 package t;
-                import com.flezha.sdk.authoring.Procedure;
-                @Procedure(id = "do_nothing", %s)
+                import com.flezha.sdk.authoring.Tasklet;
+                @Tasklet(id = "do_nothing", %s)
                 public class DoNothing {
                     public String run(String in) { return in; }
                 }
@@ -377,10 +377,10 @@ class FlezhaProcessorTest {
                         && m.contains("@WorkflowOperative"));
     }
 
-    /** fails when: a short form's entry-channel or procedure setting stops reaching what it describes. */
+    /** fails when: a short form's entry-channel or tasklet setting stops reaching what it describes. */
     @ParameterizedTest(name = "{0} carries capacity and onFull")
     @ValueSource(strings = {"StreamOperative", "WorkflowOperative"})
-    void aShortFormCarriesItsEntryAndProcedureSettings(String kind) {
+    void aShortFormCarriesItsEntryAndTaskletSettings(String kind) {
         String code =
                 """
                 package t;
@@ -392,12 +392,12 @@ class FlezhaProcessorTest {
                 """
                         .formatted(kind);
         assertThat(generated("t.Capped", "t.Capped" + kind, code))
-                .contains(".onFull(com.flezha.sdk.channel.OverflowPolicy.DROP_OLDEST).into(CappedProcedure.class)");
-        assertThat(generated("t.Capped", "t.CappedProcedure", code)).contains("mailboxCapacity() { return 4; }");
+                .contains(".onFull(com.flezha.sdk.channel.OverflowPolicy.DROP_OLDEST).into(CappedTasklet.class)");
+        assertThat(generated("t.Capped", "t.CappedTasklet", code)).contains("mailboxCapacity() { return 4; }");
     }
 
     /**
-     * fails when: a refusal of the {@code run} shape or of a procedure member names an annotation
+     * fails when: a refusal of the {@code run} shape or of a tasklet member names an annotation
      * other than the one the author wrote. {@code %s} in the expected text is that annotation.
      */
     @ParameterizedTest(name = "{0}: {3}")
@@ -407,7 +407,7 @@ class FlezhaProcessorTest {
                 """
                 package t;
                 import com.flezha.sdk.authoring.*;
-                import com.flezha.sdk.procedure.ProcedureCtx;
+                import com.flezha.sdk.tasklet.TaskletCtx;
                 import java.util.List;
                 import java.util.Optional;
                 %s(id = "bad"%s)
@@ -423,7 +423,7 @@ class FlezhaProcessorTest {
         String echo = "public String run(String in) { return in; }";
         String keyOf = "public static String k(String out) { return out; } ";
         List<Arguments> rows = new ArrayList<>();
-        for (String annotation : List.of("@Procedure", "@StreamOperative", "@WorkflowOperative")) {
+        for (String annotation : List.of("@Tasklet", "@StreamOperative", "@WorkflowOperative")) {
             rows.add(Arguments.of(
                     annotation,
                     "",
@@ -447,18 +447,18 @@ class FlezhaProcessorTest {
             rows.add(Arguments.of(
                     annotation,
                     "",
-                    "public String run(String in, ProcedureCtx ctx) { return in; }",
-                    "%s `run` with a `ProcedureCtx` parameter makes the body responsible for every emit"));
+                    "public String run(String in, TaskletCtx ctx) { return in; }",
+                    "%s `run` with a `TaskletCtx` parameter makes the body responsible for every emit"));
             rows.add(Arguments.of(
                     annotation,
                     ", key = \"k\", emits = String.class",
-                    keyOf + "public void run(String in, ProcedureCtx ctx) { ctx.emit(in); }",
-                    "%s(key = ...) conflicts with a `ProcedureCtx` parameter"));
+                    keyOf + "public void run(String in, TaskletCtx ctx) { ctx.emit(in); }",
+                    "%s(key = ...) conflicts with a `TaskletCtx` parameter"));
             rows.add(Arguments.of(
                     annotation,
                     ", emits = String.class",
                     echo,
-                    "%s(emits = ...) declares the output type of a `ProcedureCtx` `run`"));
+                    "%s(emits = ...) declares the output type of a `TaskletCtx` `run`"));
             rows.add(Arguments.of(
                     annotation,
                     ", key = \"k\"",
@@ -467,11 +467,11 @@ class FlezhaProcessorTest {
             rows.add(Arguments.of(
                     annotation,
                     "",
-                    "@EntitiesFor public List<String> route(String in) { return List.of(); } " + echo,
-                    "static entity requires %s(keys = {...}) alongside the @EntitiesFor method"));
-            rows.add(Arguments.of(
-                    annotation, ", keys = {\"a\"}", echo, "%s(keys = {...}) requires a @EntitiesFor method"));
-            if (!annotation.equals("@Procedure")) {
+                    "@CellsFor public List<String> route(String in) { return List.of(); } " + echo,
+                    "static cell requires %s(keys = {...}) alongside the @CellsFor method"));
+            rows.add(
+                    Arguments.of(annotation, ", keys = {\"a\"}", echo, "%s(keys = {...}) requires a @CellsFor method"));
+            if (!annotation.equals("@Tasklet")) {
                 rows.add(Arguments.of(
                         annotation,
                         ", onFull = \"drop_everything\"",
@@ -488,13 +488,13 @@ class FlezhaProcessorTest {
                 """
                 package t;
                 import com.flezha.sdk.authoring.*;
-                @Procedure(id = "twice")
+                @Tasklet(id = "twice")
                 @StreamOperative(id = "twice", sink = "out")
                 public class Twice {
                     public String run(String in) { return in; }
                 }
                 """;
-        assertThat(diagnose("t.Twice", code)).anyMatch(m -> m.contains("@Procedure") && m.contains("@StreamOperative"));
+        assertThat(diagnose("t.Twice", code)).anyMatch(m -> m.contains("@Tasklet") && m.contains("@StreamOperative"));
     }
 
     @Test
@@ -510,9 +510,9 @@ class FlezhaProcessorTest {
                 """;
         String source = generated("t.Place", "t.PlaceWorkflowOperative", code);
         assertThat(source).contains("implements WorkflowOperative");
-        assertThat(source).contains("public void procedures(ChannelBuilder c)");
+        assertThat(source).contains("public void tasklets(ChannelBuilder c)");
         assertThat(source)
-                .contains("c.input(java.lang.String.class, \"order\").into(PlaceProcedure.class).sink(\"placed\");");
+                .contains("c.input(java.lang.String.class, \"order\").into(PlaceTasklet.class).sink(\"placed\");");
     }
 
     @Test
@@ -527,21 +527,21 @@ class FlezhaProcessorTest {
                 }
                 """;
         assertThat(generatedFiles("t.Alone", code))
-                .containsExactlyInAnyOrder("t/AloneProcedure.java", "t/AloneStreamOperative.java");
+                .containsExactlyInAnyOrder("t/AloneTasklet.java", "t/AloneStreamOperative.java");
     }
 
     @Test
-    void aProcedureGeneratesNoOperative() {
+    void aTaskletGeneratesNoOperative() {
         String code =
                 """
                 package t;
-                import com.flezha.sdk.authoring.Procedure;
-                @Procedure(id = "single_mode")
+                import com.flezha.sdk.authoring.Tasklet;
+                @Tasklet(id = "single_mode")
                 public class SingleMode {
                     public String run(String in) { return in; }
                 }
                 """;
-        assertThat(generatedFiles("t.SingleMode", code)).containsExactly("t/SingleModeProcedure.java");
+        assertThat(generatedFiles("t.SingleMode", code)).containsExactly("t/SingleModeTasklet.java");
     }
 
     @Test
@@ -575,31 +575,31 @@ class FlezhaProcessorTest {
     }
 
     @Test
-    void keepsAQuoteAndABackslashInStaticEntityKeysExactly() {
+    void keepsAQuoteAndABackslashInStaticCellKeysExactly() {
         String code =
                 """
                 package t;
-                import com.flezha.sdk.authoring.EntitiesFor;
-                import com.flezha.sdk.authoring.Procedure;
+                import com.flezha.sdk.authoring.CellsFor;
+                import com.flezha.sdk.authoring.Tasklet;
                 import java.util.List;
-                @Procedure(id = "odd_keys", keys = {"k\\"1", "k\\\\n2"})
+                @Tasklet(id = "odd_keys", keys = {"k\\"1", "k\\\\n2"})
                 public class OddKeys {
-                    @EntitiesFor public List<String> route(String in) { return List.of(); }
+                    @CellsFor public List<String> route(String in) { return List.of(); }
                     public String run(String in) { return in; }
                 }
                 """;
-        assertThat(stringLiterals(generated("t.OddKeys", "t.OddKeysProcedure", code)))
+        assertThat(stringLiterals(generated("t.OddKeys", "t.OddKeysTasklet", code)))
                 .contains("k\"1", "k\\n2");
     }
 
-    @ParameterizedTest(name = "{0} names the procedure after the written id")
+    @ParameterizedTest(name = "{0} names the tasklet after the written id")
     @ValueSource(
             strings = {
-                "@Procedure(id = \"sugar_store_input\")",
+                "@Tasklet(id = \"sugar_store_input\")",
                 "@StreamOperative(id = \"sugar_store_input\", sink = \"sugar_store_sink\")",
                 "@WorkflowOperative(id = \"sugar_store_input\")"
             })
-    void namesTheProcedureAfterTheWrittenId(String annotation) {
+    void namesTheTaskletAfterTheWrittenId(String annotation) {
         String code =
                 """
                 package t;
@@ -610,7 +610,7 @@ class FlezhaProcessorTest {
                 }
                 """
                         .formatted(annotation);
-        assertThat(generated("t.SugarStore", "t.SugarStoreProcedure", code))
+        assertThat(generated("t.SugarStore", "t.SugarStoreTasklet", code))
                 .contains("public String name() { return \"sugar_store_input\"; }");
     }
 
@@ -665,7 +665,7 @@ class FlezhaProcessorTest {
         DiagnosticCollector<JavaFileObject> diags = new DiagnosticCollector<>();
         Path gen = out.resolve("gen-" + fqn);
         assertThat(process(fqn, code, gen, diags))
-                .as("processing a well-formed @Procedure should succeed: %s", diags.getDiagnostics())
+                .as("processing a well-formed @Tasklet should succeed: %s", diags.getDiagnostics())
                 .isTrue();
         return gen;
     }

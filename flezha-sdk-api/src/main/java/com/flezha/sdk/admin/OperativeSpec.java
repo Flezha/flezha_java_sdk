@@ -61,7 +61,7 @@ public final class OperativeSpec {
         return new OperativeSpec(id, factoryId, kind, initValues, opts);
     }
 
-    /** The values the factory is seeded with, keyed by procedure. */
+    /** The values the factory is seeded with, keyed by tasklet. */
     @Nonnull
     public OperativeSpec initValues(JsonNode values) {
         return new OperativeSpec(id, factoryId, kind, values, opts);

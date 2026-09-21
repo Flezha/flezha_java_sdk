@@ -2,9 +2,9 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operative.StreamOperative;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.RestoreInitPayload;
@@ -18,7 +18,7 @@ import java.util.Optional;
  * Twin of the Rust test app's schema-evolution fixtures: the same class either
  * side of a deploy that edits its own state type.
  *
- * <p>Both halves declare the SAME procedure name, so an operative started under
+ * <p>Both halves declare the SAME tasklet name, so an operative started under
  * {@code schema_evolution_v1} and restarted under {@code schema_evolution_v2}
  * restores from the very WAL v1 wrote — a deploy, with the two binaries
  * collapsed into one runner for the fixture. Output is {@code total:currency}
@@ -38,7 +38,7 @@ public final class SchemaEvolutionStreamOperatives {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(Proc.class).sink("total");
+            c.input(String.class, "input").into(Task.class).sink("total");
         }
 
         public static final class CartV1 {
@@ -55,8 +55,8 @@ public final class SchemaEvolutionStreamOperatives {
             }
         }
 
-        public static final class Proc
-                implements Procedure<String, CartV1, byte[], AddV1, WallClock, Void> {
+        public static final class Task
+                implements Tasklet<String, CartV1, byte[], AddV1, WallClock, Void> {
 
             @Override
             public String name() {
@@ -69,7 +69,7 @@ public final class SchemaEvolutionStreamOperatives {
             }
 
             @Override
-            public CartV1 initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+            public CartV1 initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
                 return new CartV1();
             }
 
@@ -79,8 +79,8 @@ public final class SchemaEvolutionStreamOperatives {
             }
 
             @Override
-            public void run(String input, StateHandle<CartV1, AddV1> state, ProcedureCtx ctx)
-                    throws ProcedureException {
+            public void run(String input, StateHandle<CartV1, AddV1> state, TaskletCtx ctx)
+                    throws TaskletException {
                 long delta = parse(input);
                 long total = state.get().total + delta;
                 state.apply(new AddV1(delta));
@@ -99,7 +99,7 @@ public final class SchemaEvolutionStreamOperatives {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(Proc.class).sink("total");
+            c.input(String.class, "input").into(Task.class).sink("total");
         }
 
         public static final class CartV2 {
@@ -119,8 +119,8 @@ public final class SchemaEvolutionStreamOperatives {
             }
         }
 
-        public static final class Proc
-                implements Procedure<String, CartV2, byte[], AddV2, WallClock, Void> {
+        public static final class Task
+                implements Tasklet<String, CartV2, byte[], AddV2, WallClock, Void> {
 
             /**
              * The v1 type table, in v1's registration order — Kryo ids are
@@ -151,7 +151,7 @@ public final class SchemaEvolutionStreamOperatives {
             }
 
             @Override
-            public CartV2 initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+            public CartV2 initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
                 return new CartV2();
             }
 
@@ -182,8 +182,8 @@ public final class SchemaEvolutionStreamOperatives {
             }
 
             @Override
-            public void run(String input, StateHandle<CartV2, AddV2> state, ProcedureCtx ctx)
-                    throws ProcedureException {
+            public void run(String input, StateHandle<CartV2, AddV2> state, TaskletCtx ctx)
+                    throws TaskletException {
                 long delta = parse(input);
                 CartV2 current = state.get();
                 long total = current.total + delta;

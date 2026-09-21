@@ -38,7 +38,7 @@ public final class BenchLoopWorkflowOperative implements WorkflowOperative {
     }
 
     @Override
-    public void procedures(ChannelBuilder c) {
+    public void tasklets(ChannelBuilder c) {
         c.input(String.class, "in")
                 .into(BenchSteps.Turn.class)
                 .named("mid")

@@ -14,7 +14,7 @@
     <packaging>jar</packaging>
 
     <name>Flezha echo example</name>
-    <description>One message in, one message out: a procedure, an operative and a runner.</description>
+    <description>One message in, one message out: a tasklet, an operative and a runner.</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -44,7 +44,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
-                <!-- Generates EchoProcedure from the @Procedure class Echo. -->
+                <!-- Generates EchoTasklet from the @Tasklet class Echo. -->
                 <configuration>
                     <annotationProcessorPaths>
                         <path>

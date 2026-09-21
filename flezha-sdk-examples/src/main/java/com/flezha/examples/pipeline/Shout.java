@@ -1,6 +1,6 @@
 package com.flezha.examples.pipeline;
 
-import com.flezha.sdk.authoring.Procedure;
+import com.flezha.sdk.authoring.Tasklet;
 
 /**
  * The second stage. Its input is whatever the first stage emitted, so the declared types must
@@ -9,7 +9,7 @@ import com.flezha.sdk.authoring.Procedure;
  * <p>Nothing here indicates a position in a chain. From this class's perspective messages simply
  * arrive, which is the same contract the first stage has.
  */
-@Procedure(id = "shout")
+@Tasklet(id = "shout")
 public final class Shout {
 
     public String run(String input) {

@@ -2,14 +2,14 @@ package com.flezha.sdk.testing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
@@ -17,12 +17,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * What {@link ProcedureTestHarness} shows an author, in three parts: the key a
+ * What {@link TaskletTestHarness} shows an author, in three parts: the key a
  * record ships under, the determinism gates over state ({@code replayEquals})
  * and over output ({@code replayEmitsEqual}), and the state-mutation bypass
  * only {@code replayEquals} can see.
  *
- * <p>{@code replayEquals} alone is not enough: a Procedure can rebuild
+ * <p>{@code replayEquals} alone is not enough: a Tasklet can rebuild
  * identical state on replay while emitting a different key or timestamp each
  * run — and a keyed sink's idempotence depends on exactly that not happening.
  *
@@ -41,9 +41,9 @@ class HarnessBehaviourTest {
     }
 
     /** Everything three fixtures share; each declares only its name, its output and its run. */
-    abstract static class CounterBase<O> implements Procedure<Long, CounterState, O, CounterChange, WallClock, Void> {
+    abstract static class CounterBase<O> implements Tasklet<Long, CounterState, O, CounterChange, WallClock, Void> {
         @Override
-        public CounterState initState(Optional<String> entityKey, Optional<RestoreInitPayload> payload) {
+        public CounterState initState(Optional<String> cellKey, Optional<RestoreInitPayload> payload) {
             return new CounterState();
         }
 
@@ -58,25 +58,25 @@ class HarnessBehaviourTest {
         }
     }
 
-    /** Deterministic Procedure: applyChange = state.value += delta. */
-    public static final class DeterministicCounterProcedure extends CounterBase<Void> {
+    /** Deterministic Tasklet: applyChange = state.value += delta. */
+    public static final class DeterministicCounterTasklet extends CounterBase<Void> {
         @Override
         public String name() {
             return "counter";
         }
 
         @Override
-        public void run(Long input, StateHandle<CounterState, CounterChange> state, ProcedureCtx ctx) {
+        public void run(Long input, StateHandle<CounterState, CounterChange> state, TaskletCtx ctx) {
             state.apply(new CounterChange(input));
         }
     }
 
     /**
-     * Non-deterministic Procedure: applyChange ignores the change and increments a
+     * Non-deterministic Tasklet: applyChange ignores the change and increments a
      * field that the run path sets from a global counter (which differs across
      * replays). This drives a {@code replayEquals} mismatch.
      */
-    public static final class NonDeterministicCounterProcedure extends CounterBase<Void> {
+    public static final class NonDeterministicCounterTasklet extends CounterBase<Void> {
         private static final AtomicLong GLOBAL = new AtomicLong();
 
         @Override
@@ -90,37 +90,37 @@ class HarnessBehaviourTest {
         }
 
         @Override
-        public void run(Long input, StateHandle<CounterState, CounterChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(Long input, StateHandle<CounterState, CounterChange> state, TaskletCtx ctx)
+                throws TaskletException {
             state.apply(new CounterChange(input));
         }
     }
 
     /** Emits on what the harness may declare keyed, without supplying a key of its own. */
-    public static final class KeyLessEmitProcedure extends CounterBase<String> {
+    public static final class KeyLessEmitTasklet extends CounterBase<String> {
         @Override
         public String name() {
             return "key_less_emit";
         }
 
         @Override
-        public void run(Long input, StateHandle<CounterState, CounterChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(Long input, StateHandle<CounterState, CounterChange> state, TaskletCtx ctx)
+                throws TaskletException {
             ctx.emit("v" + input);
         }
     }
 
     /**
-     * fails when: a key-less emit inside a keyed Entity stops carrying that Entity's own
+     * fails when: a key-less emit inside a keyed Cell stops carrying that Cell's own
      * key — the harness would stop showing authors the key their records actually ship
      * under, which is the drift this default exists to remove.
      */
     @Test
-    void aKeyedEntityRecordsItsOwnKeyOnAKeyLessEmit() {
-        ProcedureTestHarness<Long, CounterState, String, CounterChange> h = ProcedureTestHarness.of(
-                        new KeyLessEmitProcedure())
+    void aKeyedCellRecordsItsOwnKeyOnAKeyLessEmit() {
+        TaskletTestHarness<Long, CounterState, String, CounterChange> h = TaskletTestHarness.of(
+                        new KeyLessEmitTasklet())
                 .withKeyedChannel()
-                .withEntityKey("BTC/USD")
+                .withCellKey("BTC/USD")
                 .applyInputs(List.of(1L));
 
         assertThat(h.emitRecords()).hasSize(1);
@@ -129,13 +129,13 @@ class HarnessBehaviourTest {
     }
 
     /**
-     * fails when: a single-entity Procedure's key-less emit is accepted on a keyed
+     * fails when: a single-cell Tasklet's key-less emit is accepted on a keyed
      * channel — it has no key to default to, so the record would ship keyless.
      */
     @Test
-    void aSingleEntityKeyLessEmitOnAKeyedChannelIsRefused() {
-        ProcedureTestHarness<Long, CounterState, String, CounterChange> h = ProcedureTestHarness.of(
-                        new KeyLessEmitProcedure())
+    void aSingleCellKeyLessEmitOnAKeyedChannelIsRefused() {
+        TaskletTestHarness<Long, CounterState, String, CounterChange> h = TaskletTestHarness.of(
+                        new KeyLessEmitTasklet())
                 .withKeyedChannel()
                 .applyInputs(List.of(1L));
 
@@ -145,9 +145,9 @@ class HarnessBehaviourTest {
     /** A harness that declares no keyed channel is unchanged: no key, no refusal. */
     @Test
     void aNonKeyedChannelRecordsNoKey() {
-        ProcedureTestHarness<Long, CounterState, String, CounterChange> h = ProcedureTestHarness.of(
-                        new KeyLessEmitProcedure())
-                .withEntityKey("BTC/USD")
+        TaskletTestHarness<Long, CounterState, String, CounterChange> h = TaskletTestHarness.of(
+                        new KeyLessEmitTasklet())
+                .withCellKey("BTC/USD")
                 .applyInputs(List.of(1L));
 
         assertThat(h.emitRecords()).hasSize(1);
@@ -155,26 +155,26 @@ class HarnessBehaviourTest {
     }
 
     @Test
-    void deterministicProcedureReplayEqualsPasses() {
-        ProcedureTestHarness<Long, CounterState, Void, CounterChange> h =
-                ProcedureTestHarness.of(new DeterministicCounterProcedure()).applyInputs(List.of(1L, 2L, 3L));
+    void deterministicTaskletReplayEqualsPasses() {
+        TaskletTestHarness<Long, CounterState, Void, CounterChange> h =
+                TaskletTestHarness.of(new DeterministicCounterTasklet()).applyInputs(List.of(1L, 2L, 3L));
         assertThat(h.recordedChanges()).hasSize(3);
         assertThat(h.replayEquals()).isEmpty();
     }
 
     @Test
-    void nonDeterministicProcedureReplayEqualsReportsMismatch() {
-        ProcedureTestHarness<Long, CounterState, Void, CounterChange> h =
-                ProcedureTestHarness.of(new NonDeterministicCounterProcedure()).applyInputs(List.of(1L, 2L, 3L));
+    void nonDeterministicTaskletReplayEqualsReportsMismatch() {
+        TaskletTestHarness<Long, CounterState, Void, CounterChange> h =
+                TaskletTestHarness.of(new NonDeterministicCounterTasklet()).applyInputs(List.of(1L, 2L, 3L));
         assertThat(h.replayEquals()).isPresent();
     }
 
     @Test
-    @DisplayName("a deterministic Procedure replays identical emits")
-    void deterministicProcedureReplaysEqualEmits() {
+    @DisplayName("a deterministic Tasklet replays identical emits")
+    void deterministicTaskletReplaysEqualEmits() {
         List<String> inputs = List.of("a", "b");
-        ProcedureTestHarness<String, Unit, String, NoChange> harness =
-                ProcedureTestHarness.of(new DeterministicProc()).withWallClock(1_700_000_000_000L);
+        TaskletTestHarness<String, Unit, String, NoChange> harness =
+                TaskletTestHarness.of(new DeterministicTask()).withWallClock(1_700_000_000_000L);
 
         harness.applyInputs(inputs);
 
@@ -182,11 +182,11 @@ class HarnessBehaviourTest {
     }
 
     @Test
-    @DisplayName("a Procedure reading ambient time is caught")
-    void ambientTimeProcedureIsCaught() {
+    @DisplayName("a Tasklet reading ambient time is caught")
+    void ambientTimeTaskletIsCaught() {
         List<String> inputs = List.of("a");
-        ProcedureTestHarness<String, Unit, String, NoChange> harness =
-                ProcedureTestHarness.of(new AmbientTimeProc()).withWallClock(1_700_000_000_000L);
+        TaskletTestHarness<String, Unit, String, NoChange> harness =
+                TaskletTestHarness.of(new AmbientTimeTask()).withWallClock(1_700_000_000_000L);
 
         harness.applyInputs(inputs);
 
@@ -198,8 +198,8 @@ class HarnessBehaviourTest {
     @Test
     @DisplayName("a scripted clock serves one value per invocation")
     void scriptedClockAdvancesPerInvocation() {
-        ProcedureTestHarness<String, Unit, String, NoChange> harness =
-                ProcedureTestHarness.of(new DeterministicProc()).withWallClockScript(1000L, 2000L, 3000L);
+        TaskletTestHarness<String, Unit, String, NoChange> harness =
+                TaskletTestHarness.of(new DeterministicTask()).withWallClockScript(1000L, 2000L, 3000L);
 
         harness.applyInputs(List.of("a", "b", "c"));
 
@@ -209,8 +209,8 @@ class HarnessBehaviourTest {
     @Test
     @DisplayName("a keyed emit records its key")
     void keyedEmitRecordsItsKey() {
-        ProcedureTestHarness<String, Unit, String, NoChange> harness =
-                ProcedureTestHarness.of(new KeyedProc()).withKeyedChannel().withWallClock(1L);
+        TaskletTestHarness<String, Unit, String, NoChange> harness =
+                TaskletTestHarness.of(new KeyedTask()).withKeyedChannel().withWallClock(1L);
 
         harness.applyInputs(List.of("BTC"));
 
@@ -220,47 +220,47 @@ class HarnessBehaviourTest {
 
     public record Unit() {}
 
-    abstract static class EmitBase implements Procedure<String, Unit, String, NoChange, WallClock, Void> {
+    abstract static class EmitBase implements Tasklet<String, Unit, String, NoChange, WallClock, Void> {
         @Override
-        public Unit initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public Unit initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new Unit();
         }
     }
 
     /** Reads time via ctx.now() — replayable. */
-    public static final class DeterministicProc extends EmitBase {
+    public static final class DeterministicTask extends EmitBase {
         @Override
         public String name() {
             return "deterministic_op";
         }
 
         @Override
-        public void run(String input, StateHandle<Unit, NoChange> state, ProcedureCtx ctx) throws ProcedureException {
+        public void run(String input, StateHandle<Unit, NoChange> state, TaskletCtx ctx) throws TaskletException {
             ctx.emit(input + "@" + ctx.now());
         }
     }
 
     /** Reads ambient time — NOT replayable. */
-    public static final class AmbientTimeProc extends EmitBase {
+    public static final class AmbientTimeTask extends EmitBase {
         @Override
         public String name() {
             return "ambient_time_op";
         }
 
         @Override
-        public void run(String input, StateHandle<Unit, NoChange> state, ProcedureCtx ctx) throws ProcedureException {
+        public void run(String input, StateHandle<Unit, NoChange> state, TaskletCtx ctx) throws TaskletException {
             ctx.emit(input + "@" + System.nanoTime());
         }
     }
 
-    public static final class KeyedProc extends EmitBase {
+    public static final class KeyedTask extends EmitBase {
         @Override
         public String name() {
             return "keyed_op";
         }
 
         @Override
-        public void run(String input, StateHandle<Unit, NoChange> state, ProcedureCtx ctx) throws ProcedureException {
+        public void run(String input, StateHandle<Unit, NoChange> state, TaskletCtx ctx) throws TaskletException {
             ctx.emitKeyed(input, "payload");
         }
     }
@@ -268,8 +268,8 @@ class HarnessBehaviourTest {
     @Test
     @DisplayName("a direct field write bypasses the change log and is caught only by replayEquals()")
     void directMutationIsDroppedAndOnlyReplayEqualsCatchesIt() {
-        ProcedureTestHarness<String, Counter, String, Bump> harness =
-                ProcedureTestHarness.of(new BypassingProc()).withWallClock(1L);
+        TaskletTestHarness<String, Counter, String, Bump> harness =
+                TaskletTestHarness.of(new BypassingTask()).withWallClock(1L);
 
         harness.applyInputs(List.of("a", "b", "c"));
 
@@ -284,10 +284,10 @@ class HarnessBehaviourTest {
     }
 
     @Test
-    @DisplayName("the same Procedure using state.apply() is journaled and replay-clean")
+    @DisplayName("the same Tasklet using state.apply() is journaled and replay-clean")
     void applyPathIsJournaledAndReplaySafe() {
-        ProcedureTestHarness<String, Counter, String, Bump> harness =
-                ProcedureTestHarness.of(new JournalingProc()).withWallClock(1L);
+        TaskletTestHarness<String, Counter, String, Bump> harness =
+                TaskletTestHarness.of(new JournalingTask()).withWallClock(1L);
 
         harness.applyInputs(List.of("a", "b", "c"));
 
@@ -296,14 +296,14 @@ class HarnessBehaviourTest {
         assertThat(harness.replayEquals()).isEmpty();
     }
 
-    /** Mutable per-Entity state; only {@code applyChange} is meant to write it. */
+    /** Mutable per-Cell state; only {@code applyChange} is meant to write it. */
     public static final class Counter {
         public long count;
     }
 
     public record Bump() implements Change {}
 
-    abstract static class MutationBase implements Procedure<String, Counter, String, Bump, WallClock, Void> {
+    abstract static class MutationBase implements Tasklet<String, Counter, String, Bump, WallClock, Void> {
         @Override
         public List<Class<?>> kryoTypes() {
             return List.of(Bump.class, Counter.class);
@@ -315,33 +315,33 @@ class HarnessBehaviourTest {
         }
 
         @Override
-        public Counter initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public Counter initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new Counter();
         }
     }
 
     /** The defect: writes the field directly, bypassing {@code apply}. */
-    public static final class BypassingProc extends MutationBase {
+    public static final class BypassingTask extends MutationBase {
         @Override
         public String name() {
             return "bypassing_op";
         }
 
         @Override
-        public void run(String input, StateHandle<Counter, Bump> state, ProcedureCtx ctx) throws ProcedureException {
+        public void run(String input, StateHandle<Counter, Bump> state, TaskletCtx ctx) throws TaskletException {
             state.get().count += 1; // compiles, runs, never journaled
         }
     }
 
     /** The correct form, for contrast. */
-    public static final class JournalingProc extends MutationBase {
+    public static final class JournalingTask extends MutationBase {
         @Override
         public String name() {
             return "journaling_op";
         }
 
         @Override
-        public void run(String input, StateHandle<Counter, Bump> state, ProcedureCtx ctx) throws ProcedureException {
+        public void run(String input, StateHandle<Counter, Bump> state, TaskletCtx ctx) throws TaskletException {
             state.apply(new Bump());
         }
     }

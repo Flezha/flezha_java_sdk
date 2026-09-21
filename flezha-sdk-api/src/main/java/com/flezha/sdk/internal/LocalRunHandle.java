@@ -24,6 +24,6 @@ public interface LocalRunHandle {
     /** Block until the graph is idle, or fail when {@code budget} elapses. */
     void runUntilIdle(Duration budget);
 
-    /** End the run and release its Entities; idempotent. */
+    /** End the run and release its Cells; idempotent. */
     void close();
 }

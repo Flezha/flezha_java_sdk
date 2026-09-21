@@ -1,7 +1,7 @@
 package com.flezha.test;
 
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.EventTimeFrom;
 import com.flezha.sdk.state.LogicalClock;
@@ -14,18 +14,18 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The procedure palette {@link ConformanceRun} binds the fixture's roles to —
+ * The tasklet palette {@link ConformanceRun} binds the fixture's roles to —
  * one class per role of {@code test/fixtures/reference_topologies.txt}, each
  * declaring exactly the facts a rule reads.
  *
  * <p>These are not fixtures: no capability lists them, {@code Main} never
  * defines them, and nothing but a row of the refusal table reaches them. They
- * live beside the interpreter because a role IS a procedure declaration, and
+ * live beside the interpreter because a role IS a tasklet declaration, and
  * one written elsewhere would be read as a fixture.
  *
  * <p>Every role but {@code nochange} journals a Change, which is what makes
  * the class persistent in this SDK: Java reads persistence off the Change
- * types its procedures declare rather than off a class flag, so a row's
+ * types its tasklets declare rather than off a class flag, so a row's
  * {@code class.persistent} step is what the palette already says.
  */
 final class Palette {
@@ -38,9 +38,9 @@ final class Palette {
     /**
      * A role with the shared declaration: single mode, wall clock, and a
      * Change the class persists. The role names the fixture row's binding,
-     * which is the procedure's own name everywhere but {@code twin}.
+     * which is the tasklet's own name everywhere but {@code twin}.
      */
-    abstract static class Role implements Procedure<String, Stateless, String, Journalled, WallClock, Void> {
+    abstract static class Role implements Tasklet<String, Stateless, String, Journalled, WallClock, Void> {
 
         abstract String role();
 
@@ -50,12 +50,12 @@ final class Palette {
         }
 
         @Override
-        public Stateless initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public Stateless initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new Stateless();
         }
 
         @Override
-        public void run(String input, StateHandle<Stateless, Journalled> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Stateless, Journalled> state, TaskletCtx ctx) {}
 
         @Override
         public int mailboxCapacity() {
@@ -95,7 +95,7 @@ final class Palette {
         }
     }
 
-    /** Static mode with no router: {@code entitiesFor} is deliberately absent. */
+    /** Static mode with no router: {@code cellsFor} is deliberately absent. */
     public static final class StaticKeys extends Role {
         @Override
         String role() {
@@ -103,7 +103,7 @@ final class Palette {
         }
 
         @Override
-        public List<String> entityKeys() {
+        public List<String> cellKeys() {
             return List.of("a", "b");
         }
     }
@@ -116,23 +116,23 @@ final class Palette {
         }
 
         @Override
-        public List<String> entityKeys() {
+        public List<String> cellKeys() {
             return List.of("a", "b");
         }
 
         @Override
-        public boolean entitiesForOverridden() {
+        public boolean cellsForOverridden() {
             return true;
         }
 
         @Override
-        public List<String> entitiesFor(String input) {
+        public List<String> cellsFor(String input) {
             return List.of("a");
         }
     }
 
     /**
-     * Dynamic mode is read off the WIRING in this SDK — a procedure a keyed
+     * Dynamic mode is read off the WIRING in this SDK — a tasklet a keyed
      * chain closes onto is dynamic — so the role's own declaration is a plain
      * one.
      */
@@ -143,9 +143,9 @@ final class Palette {
         }
     }
 
-    /** A logical clock over a procedure that journals nothing. */
+    /** A logical clock over a tasklet that journals nothing. */
     public static final class NoChangeLogical
-            implements Procedure<String, Stateless, String, NoChange, LogicalClock, Void> {
+            implements Tasklet<String, Stateless, String, NoChange, LogicalClock, Void> {
 
         @Override
         public String name() {
@@ -153,12 +153,12 @@ final class Palette {
         }
 
         @Override
-        public Stateless initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public Stateless initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new Stateless();
         }
 
         @Override
-        public void run(String input, StateHandle<Stateless, NoChange> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Stateless, NoChange> state, TaskletCtx ctx) {}
 
         @Override
         public int mailboxCapacity() {
@@ -173,7 +173,7 @@ final class Palette {
 
     /** An event-time clock, with the extractor erasure makes it declare here. */
     public static final class EventTime
-            implements Procedure<String, Stateless, String, Journalled, EventTimeFrom, Void> {
+            implements Tasklet<String, Stateless, String, Journalled, EventTimeFrom, Void> {
 
         @Override
         public String name() {
@@ -181,12 +181,12 @@ final class Palette {
         }
 
         @Override
-        public Stateless initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public Stateless initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new Stateless();
         }
 
         @Override
-        public void run(String input, StateHandle<Stateless, Journalled> state, ProcedureCtx ctx) {}
+        public void run(String input, StateHandle<Stateless, Journalled> state, TaskletCtx ctx) {}
 
         @Override
         public long eventTime(String input) {

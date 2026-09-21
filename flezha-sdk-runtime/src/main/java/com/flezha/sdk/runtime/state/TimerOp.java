@@ -4,7 +4,7 @@ import com.flezha.sdk.state.TimerKind;
 import javax.annotation.Nonnull;
 
 /**
- * One durable mutation of an Entity's pending-timer set.
+ * One durable mutation of a Cell's pending-timer set.
  *
  * <p>Field order is the wire contract — postcard is field-order sensitive, and
  * this must match the Rust SDK's {@code TimerOp} and the controller's

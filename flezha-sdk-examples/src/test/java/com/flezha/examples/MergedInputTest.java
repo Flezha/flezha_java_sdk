@@ -16,8 +16,8 @@ class MergedInputTest {
     void mergedTopologyRegisters() {
         StreamOperativeTopology topology = StreamOperativeTopologyBuilder.build(new ThermostatOperative());
 
-        assertThat(topology.procedures()).hasSize(1);
-        int detector = topology.procedureNameToId().get("detector");
+        assertThat(topology.tasklets()).hasSize(1);
+        int detector = topology.taskletNameToId().get("detector");
         assertThat(topology.channel(topology.lookupChannelId("readings")).consumerIds())
                 .containsExactly(detector);
         assertThat(topology.channel(topology.lookupChannelId("config")).consumerIds())

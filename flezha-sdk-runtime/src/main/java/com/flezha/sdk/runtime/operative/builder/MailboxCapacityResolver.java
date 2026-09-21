@@ -3,11 +3,11 @@ package com.flezha.sdk.runtime.operative.builder;
 import com.flezha.sdk.runtime.config.FlezhaEnv;
 
 /**
- * Resolves a Procedure's per-Entity mailbox capacity per the Rust SDK's
+ * Resolves a Tasklet's per-Cell mailbox capacity per the Rust SDK's
  * three-tier precedence rule:
  *
  * <ol>
- *   <li>Explicit Procedure override ({@code mailboxCapacityOverridden() == true}).</li>
+ *   <li>Explicit Tasklet override ({@code mailboxCapacityOverridden() == true}).</li>
  *   <li>{@code FLEZHA_MAILBOX_CAPACITY} env var (parsed as a positive int).</li>
  *   <li>Built-in default ({@link #DEFAULT_MAILBOX_CAPACITY}).</li>
  * </ol>

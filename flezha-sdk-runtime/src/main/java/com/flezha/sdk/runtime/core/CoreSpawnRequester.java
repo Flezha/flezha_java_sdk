@@ -1,7 +1,7 @@
 package com.flezha.sdk.runtime.core;
 
 import com.flezha.sdk.native_.FlzCore;
-import com.flezha.sdk.procedure.SpawnRequests;
+import com.flezha.sdk.tasklet.SpawnRequests;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 

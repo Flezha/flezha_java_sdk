@@ -9,13 +9,13 @@ import javax.annotation.Nonnull;
  * arrives on, the steps it passes through, and the channel its result leaves on.
  *
  * <p>The operative is what the controller schedules onto a host, restarts after a failure,
- * relocates when a host is withdrawn, and scales across several hosts. A procedure is one stage
+ * relocates when a host is withdrawn, and scales across several hosts. A tasklet is one stage
  * inside that graph.
  */
 public final class EchoOperative implements StreamOperative {
 
     /**
-     * The operative's stable identity, durable in the same way the procedure's name is. The
+     * The operative's stable identity, durable in the same way the tasklet's name is. The
      * controller's registry and the durable state both key on this value, so changing it declares a
      * new operative rather than renaming an existing one.
      */
@@ -31,12 +31,12 @@ public final class EchoOperative implements StreamOperative {
      * is validated as a whole before any message is processed.
      *
      * <p>The expression below declares an entry channel named {@code in} carrying strings, routes
-     * it to the echo procedure, and terminates that procedure's output on the plugin layer under
+     * it to the echo tasklet, and terminates that tasklet's output on the plugin layer under
      * the name {@code out}. The name a sink carries is the channel's own: an identity rather than
      * documentation, and what a plugin filter matches or a test reads.
      */
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
-        c.input(String.class, "in").into(EchoProcedure.class).sink("out");
+        c.input(String.class, "in").into(EchoTasklet.class).sink("out");
     }
 }

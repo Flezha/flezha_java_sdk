@@ -6,9 +6,9 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * One consumer subscription on a channel. A plain {@code .into(Proc.class)}
+ * One consumer subscription on a channel. A plain {@code .into(Task.class)}
  * carries neither closure — the channel's payload IS the consumer's input, and
- * the consumer's Entity mode is its own; a chain of transforms, a
+ * the consumer's Cell mode is its own; a chain of transforms, a
  * {@code .keyBy(f)}, or a {@code merge(I.class).from(stream, map)} subscription
  * stores them here, each composed into one closure.
  *
@@ -18,7 +18,7 @@ import javax.annotation.Nullable;
  * <p>Mirror of the Rust SDK's {@code channel::ConsumerEdge}.
  */
 public record ConsumerEdge(
-        int procedure,
+        int tasklet,
         @Nonnull Optional<Function<Object, EdgeYield>> transform,
         @Nonnull Optional<Function<Object, String>> key) {
 

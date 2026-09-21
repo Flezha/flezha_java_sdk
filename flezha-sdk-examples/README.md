@@ -23,33 +23,33 @@ new idea, so reading them out of order will leave gaps.
 **1. [`examples/echo`](../examples/echo)** is the minimal complete application,
 and it sits outside this module as a standalone project so it can be opened and
 built on its own. It establishes the three-part structure every Flezha
-application has: a procedure holding the code invoked per message, an operative
+application has: a tasklet holding the code invoked per message, an operative
 declaring the graph, and a main starting a runner. It declares no state, which
 keeps the whole example short enough to hold in mind at once.
 
-**2. [`state/`](src/main/java/com/flezha/examples/state)** makes the procedure
-durable, and introduces the rule that catches almost everyone: a procedure never
+**2. [`state/`](src/main/java/com/flezha/examples/state)** makes the tasklet
+durable, and introduces the rule that catches almost everyone: a tasklet never
 assigns to its own fields. State is persisted as an ordered log of changes and
 reconstructed by replaying that log, so a direct assignment is absent from the
 log and absent from the reconstructed object. The failure is silent, because a
 direct assignment behaves correctly for as long as the process survives.
 
 **3. [`pipeline/`](src/main/java/com/flezha/examples/pipeline)** chains two
-procedures, demonstrating that a procedure's output is an ordinary channel and
+tasklets, demonstrating that a tasklet's output is an ordinary channel and
 that a chain is the normal shape rather than a special case. Each stage keeps its
 own state and is restarted independently, and neither stage knows its position in
 the chain.
 
 **4. [`keyed/`](src/main/java/com/flezha/examples/keyed)** partitions one stream
-into many independent entities, each with its own state, processed in parallel.
+into many independent cells, each with its own state, processed in parallel.
 It also covers the transforms available on the wiring itself, which reshape or
 discard values before any user code is invoked, and the ordering constraint
 between them.
 
-**5. [`merged/`](src/main/java/com/flezha/examples/merged)** feeds one procedure
+**5. [`merged/`](src/main/java/com/flezha/examples/merged)** feeds one tasklet
 from two entry channels, with sensor readings on one and a live configuration
 threshold on the other. It shows how two channels are reconciled into the single
-input type a procedure declares.
+input type a tasklet declares.
 
 **6. [`local/`](src/main/java/com/flezha/examples/local)** executes a complete
 graph inside the calling JVM with no controller, no socket and no container. This
@@ -65,7 +65,7 @@ address specific problems.
 **[`timers/`](src/main/java/com/flezha/examples/timers)** closes a session after
 a period of inactivity, using timers. It introduces `onTimer` as a second entry
 point into user code alongside `run`, and the cancel-then-rearm pattern that
-keeps one live deadline per entity.
+keeps one live deadline per cell.
 
 **[`effectivelyonce/`](src/main/java/com/flezha/examples/effectivelyonce)**
 prevents a retry writing the same result twice, which matters when the sink is a
@@ -76,7 +76,7 @@ sufficient.
 **[`corrections/`](src/main/java/com/flezha/examples/corrections)** repairs an
 already-published result when an input arrives after its interval closed. Rather
 than discarding the message or misattributing it, the runtime replays the
-affected entity with the message in its correct position and re-emits.
+affected cell with the message in its correct position and re-emits.
 
 **[`workflow/`](src/main/java/com/flezha/examples/workflow)** covers ordered
 steps that must not be re-executed as a unit after a partial failure: reserve,
@@ -88,7 +88,7 @@ that holds its conversation in durable state and resumes mid-thread after a
 restart, waking on a message or on a timer. This is the shape to copy for
 anything intended to run for weeks.
 
-**[`spawn/`](src/main/java/com/flezha/examples/spawn)** shows a stream procedure
+**[`spawn/`](src/main/java/com/flezha/examples/spawn)** shows a stream tasklet
 requesting a workflow worker from the controller, so a detector can delegate
 substantial work without becoming a dispatcher itself.
 

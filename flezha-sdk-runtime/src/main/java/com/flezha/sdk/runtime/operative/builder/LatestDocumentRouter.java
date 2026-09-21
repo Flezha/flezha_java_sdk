@@ -2,13 +2,13 @@ package com.flezha.sdk.runtime.operative.builder;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.RoutedDocument;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,14 +18,14 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * The single-entity procedure {@link ChannelBuilder#routeLatest} expands to:
+ * The single-cell tasklet {@link ChannelBuilder#routeLatest} expands to:
  * it retains the latest document, and hands it to a key on that key's own next
  * traffic item — never by fanning out over a remembered key set, because a
  * remembered set outlives key-group ownership (see the builder method for the
  * whole rationale).
  *
  * <p>Not part of the authoring surface. Rust keeps the equivalent type crate-private;
- * Java has no such visibility, and the runtime instantiates a Procedure
+ * Java has no such visibility, and the runtime instantiates a Tasklet
  * reflectively from a public class, so this one is public and says so instead.
  *
  * <p>The document is held as an {@code Object} — the block is generic over the
@@ -38,7 +38,7 @@ import javax.annotation.Nullable;
  * a compaction and a rebind all restore through Kryo and are unaffected.
  */
 public final class LatestDocumentRouter
-        implements Procedure<
+        implements Tasklet<
                 LatestDocumentRouter.Input,
                 LatestDocumentRouter.RouterState,
                 RoutedDocument<Object>,
@@ -51,7 +51,7 @@ public final class LatestDocumentRouter
 
     /**
      * The router's merged input: a document off the document stream, or the
-     * Entity key one traffic item proved this member owns. Java has no sum
+     * Cell key one traffic item proved this member owns. Java has no sum
      * types, so this is the repo's one-populated-slot record with a static
      * factory per variant — and the factories are the merge mappings.
      *
@@ -75,7 +75,7 @@ public final class LatestDocumentRouter
      * identifies it, and the version each key has already received.
      *
      * <p>{@code delivered} grows with the keys this member sees, which is the
-     * Entity count it already pays for — not a new unbounded-growth class.
+     * Cell count it already pays for — not a new unbounded-growth class.
      */
     public static final class RouterState {
         @Nullable
@@ -125,8 +125,7 @@ public final class LatestDocumentRouter
 
     @Override
     @Nonnull
-    public RouterState initState(
-            @Nonnull Optional<String> entityKey, @Nonnull Optional<RestoreInitPayload> initPayload) {
+    public RouterState initState(@Nonnull Optional<String> cellKey, @Nonnull Optional<RestoreInitPayload> initPayload) {
         return new RouterState();
     }
 
@@ -142,8 +141,8 @@ public final class LatestDocumentRouter
 
     @Override
     public void run(
-            @Nonnull Input input, @Nonnull StateHandle<RouterState, RouterChange> state, @Nonnull ProcedureCtx ctx)
-            throws ProcedureException {
+            @Nonnull Input input, @Nonnull StateHandle<RouterState, RouterChange> state, @Nonnull TaskletCtx ctx)
+            throws TaskletException {
         RouterState current = state.get();
         if (input.document().isPresent()) {
             Object document = input.document().get();

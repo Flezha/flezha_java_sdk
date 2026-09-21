@@ -10,10 +10,10 @@ import javax.annotation.Nonnull;
  * {@code FlezhaRunner.registerFactory(Class)}
  * time. Shared across every {@link StreamOperativeInstance} of this StreamOperative class.
  *
- * <p>The hot path (entry-channel input → consumer-procedure entity) reads
+ * <p>The hot path (entry-channel input → consumer-tasklet cell) reads
  * {@link #channels} by index after one {@link #nameToId} lookup; the
- * inter-procedure {@code emit} hot path reads {@link #channels} by the
- * pre-cached {@code outputChannelId} stamped on the {@code ProcedureDispatcher}
+ * inter-tasklet {@code emit} hot path reads {@link #channels} by the
+ * pre-cached {@code outputChannelId} stamped on the {@code TaskletDispatcher}
  * at build time.
  */
 public final class StreamOperativeTopology {
@@ -21,8 +21,8 @@ public final class StreamOperativeTopology {
     private final String factoryId;
     private final List<ChannelDescriptor> channels;
     private final Map<String, Integer> nameToId;
-    private final List<ProcedureDescriptor> procedures;
-    private final Map<String, Integer> procedureNameToId;
+    private final List<TaskletDescriptor> tasklets;
+    private final Map<String, Integer> taskletNameToId;
     private final boolean effectivelyOnce;
     private final Map<String, Object> declaration;
 
@@ -30,8 +30,8 @@ public final class StreamOperativeTopology {
             @Nonnull String factoryId,
             @Nonnull List<ChannelDescriptor> channels,
             @Nonnull Map<String, Integer> nameToId,
-            @Nonnull List<ProcedureDescriptor> procedures,
-            @Nonnull Map<String, Integer> procedureNameToId,
+            @Nonnull List<TaskletDescriptor> tasklets,
+            @Nonnull Map<String, Integer> taskletNameToId,
             boolean effectivelyOnce,
             @Nonnull Map<String, Object> declaration) {
         this.effectivelyOnce = effectivelyOnce;
@@ -39,8 +39,8 @@ public final class StreamOperativeTopology {
         this.factoryId = factoryId;
         this.channels = List.copyOf(channels);
         this.nameToId = Map.copyOf(nameToId);
-        this.procedures = List.copyOf(procedures);
-        this.procedureNameToId = Map.copyOf(procedureNameToId);
+        this.tasklets = List.copyOf(tasklets);
+        this.taskletNameToId = Map.copyOf(taskletNameToId);
     }
 
     /**
@@ -79,13 +79,13 @@ public final class StreamOperativeTopology {
     }
 
     @Nonnull
-    public List<ProcedureDescriptor> procedures() {
-        return procedures;
+    public List<TaskletDescriptor> tasklets() {
+        return tasklets;
     }
 
     @Nonnull
-    public Map<String, Integer> procedureNameToId() {
-        return procedureNameToId;
+    public Map<String, Integer> taskletNameToId() {
+        return taskletNameToId;
     }
 
     public ChannelDescriptor channel(int id) {
@@ -95,11 +95,11 @@ public final class StreamOperativeTopology {
         return channels.get(id);
     }
 
-    public ProcedureDescriptor procedure(int id) {
-        if (id < 0 || id >= procedures.size()) {
+    public TaskletDescriptor tasklet(int id) {
+        if (id < 0 || id >= tasklets.size()) {
             return null;
         }
-        return procedures.get(id);
+        return tasklets.get(id);
     }
 
     public Integer lookupChannelId(@Nonnull String name) {

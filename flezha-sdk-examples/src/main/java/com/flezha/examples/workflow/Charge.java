@@ -1,8 +1,8 @@
 package com.flezha.examples.workflow;
 
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
 import com.flezha.sdk.state.StateHandle;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.util.List;
 import javax.annotation.Nonnull;
 
@@ -16,8 +16,8 @@ public final class Charge extends Step {
     }
 
     @Override
-    public void run(@Nonnull String reserved, @Nonnull StateHandle<Handle, Reserved> state, @Nonnull ProcedureCtx ctx)
-            throws ProcedureException {
+    public void run(@Nonnull String reserved, @Nonnull StateHandle<Handle, Reserved> state, @Nonnull TaskletCtx ctx)
+            throws TaskletException {
         ctx.emit(reserved + "|charged");
     }
 
@@ -30,7 +30,7 @@ public final class Charge extends Step {
     public void compensate(
             @Nonnull List<String> completedOutput,
             @Nonnull StateHandle<Handle, Reserved> state,
-            @Nonnull ProcedureCtx ctx) {
+            @Nonnull TaskletCtx ctx) {
         System.out.println("refunding order");
     }
 }

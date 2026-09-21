@@ -10,7 +10,7 @@ import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.Stream;
 import com.flezha.sdk.operative.StreamOperative;
 import com.flezha.sdk.operative.StreamOperativeConfigurationException;
-import com.flezha.sdk.procedure.Procedure;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.runtime.operative.ChannelDescriptor;
 import com.flezha.sdk.runtime.operative.StreamOperativeTopology;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder;
@@ -49,7 +49,7 @@ import java.util.function.Consumer;
  *       refusal's own name in its output.</li>
  * </ul>
  *
- * <p>The palette procedures below exist only for this run: nothing registers
+ * <p>The palette tasklets below exist only for this run: nothing registers
  * them but a row that names them, and they are in no capability's fixture set.
  *
  * <p>What this builder cannot author, and why the report skips it: the
@@ -84,7 +84,7 @@ public final class ConformanceRun {
     private static final String PROCESSOR_TEST =
             "sdk/java/flezha-sdk-processor/src/test/java/com/flezha/sdk/processor/FlezhaProcessorTest.java";
 
-    /** The capacity a row declared per role, read as the procedure is minted. */
+    /** The capacity a row declared per role, read as the tasklet is minted. */
     private static final Map<String, Integer> MAILBOX = new HashMap<>();
 
     /** The row {@link RowStreamOperative} declares when the runner defines it. */
@@ -234,13 +234,13 @@ public final class ConformanceRun {
             case "into" -> handles.put(call[1], wire(s, call[1]));
             case "retry_max" -> s.retryMax(Integer.parseInt(call[1]));
             case "on_full" -> s.onFull(overflow(call[1]));
-            // Read by the palette's mailboxCapacity() as the procedure was minted.
+            // Read by the palette's mailboxCapacity() as the tasklet was minted.
             case "mailbox" -> {}
             default -> producerLink(s, call);
         }
     }
 
-    /** The producer-side links, which only a procedure's output channel carries. */
+    /** The producer-side links, which only a tasklet's output channel carries. */
     private static void producerLink(EdgeStream<String> s, String[] call) {
         if (!(s instanceof Stream<String> producer)) {
             throw new IllegalStateException("`" + call[0]
@@ -261,14 +261,14 @@ public final class ConformanceRun {
         }
     }
 
-    /** {@code merge(<proc>, <x>, <x>…)} — one merge over the listed sources. */
+    /** {@code merge(<task>, <x>, <x>…)} — one merge over the listed sources. */
     private static void merge(ChannelBuilder c, Map<String, EdgeStream<String>> handles, String arg) {
         String[] parts = arg.split(",");
         var merge = c.merge(String.class);
         for (int i = 1; i < parts.length; i++) {
             merge = merge.from(handle(handles, parts[i].trim()), value -> value);
         }
-        handles.put(parts[0].trim(), merge.into(procedureClass(parts[0].trim())));
+        handles.put(parts[0].trim(), merge.into(taskletClass(parts[0].trim())));
     }
 
     /**
@@ -321,13 +321,13 @@ public final class ConformanceRun {
         };
     }
 
-    /** {@code <x>.into(<role>)} — the palette role bound to its fixture procedure. */
+    /** {@code <x>.into(<role>)} — the palette role bound to its fixture tasklet. */
     private static Stream<String> wire(EdgeStream<String> s, String role) {
-        return s.into(procedureClass(role));
+        return s.into(taskletClass(role));
     }
 
     @SuppressWarnings("unchecked")
-    private static Class<? extends Procedure<String, ?, String, ?, ?, ?>> procedureClass(String role) {
+    private static Class<? extends Tasklet<String, ?, String, ?, ?, ?>> taskletClass(String role) {
         Class<?> bound = switch (role) {
             case "plain" -> Palette.Plain.class;
             case "second" -> Palette.Second.class;
@@ -339,14 +339,14 @@ public final class ConformanceRun {
             case "eventtime" -> Palette.EventTime.class;
             default -> throw new IllegalStateException("the fixture names a palette role that is not one: " + role);
         };
-        return (Class<? extends Procedure<String, ?, String, ?, ?, ?>>) bound;
+        return (Class<? extends Tasklet<String, ?, String, ?, ?, ?>>) bound;
     }
 
     // -----------------------------------------------------------------------
     // Driving a row, and the report.
 
     /**
-     * The capacities a row declares, read BEFORE the steps run: a procedure is
+     * The capacities a row declares, read BEFORE the steps run: a tasklet is
      * minted by the {@code into} that first names it, and its capacity is read
      * then — one step earlier than the {@code mailbox} step that declares it.
      */
@@ -524,7 +524,7 @@ public final class ConformanceRun {
     private static String kindName(ChannelDescriptor channel) {
         return switch (channel.kind()) {
             case ENTRY -> "entry";
-            case INTER_PROCEDURE -> "inter_proc";
+            case INTER_TASKLET -> "inter_task";
             case PLUGIN_BOUND -> "plugin";
         };
     }

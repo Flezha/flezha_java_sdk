@@ -2,8 +2,8 @@ package com.flezha.test;
 
 import com.flezha.sdk.operative.WorkflowOperative;
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.StateHandle;
 import java.nio.charset.StandardCharsets;
@@ -32,7 +32,7 @@ public final class DiamondWorkflowOperative implements WorkflowOperative {
     }
 
     @Override
-    public void procedures(ChannelBuilder c) {
+    public void tasklets(ChannelBuilder c) {
         // Held handle wired twice = fan-out; two streams naming DiamJoin
         // (unnamed, same class) = the fan-in.
         var fan = c.input(String.class, "in")
@@ -77,8 +77,8 @@ public final class DiamondWorkflowOperative implements WorkflowOperative {
         }
 
         @Override
-        public void run(String input, StateHandle<SeenState, Insert> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
+                throws TaskletException {
             WorkflowE2eGate.blockUntilReleased();
             state.apply(new Insert(name()));
             ctx.emit("b:" + input);
@@ -93,8 +93,8 @@ public final class DiamondWorkflowOperative implements WorkflowOperative {
         }
 
         @Override
-        public void run(String input, StateHandle<SeenState, Insert> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
+                throws TaskletException {
             state.apply(new Insert(name()));
             ctx.emit("c:" + input);
         }
@@ -108,8 +108,8 @@ public final class DiamondWorkflowOperative implements WorkflowOperative {
         }
 
         @Override
-        public void run(String input, StateHandle<State, NoChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
+                throws TaskletException {
             ctx.emit("j:" + input);
         }
     }

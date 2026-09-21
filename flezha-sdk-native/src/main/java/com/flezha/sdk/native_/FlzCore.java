@@ -63,7 +63,7 @@ public final class FlzCore {
      * Start the declared class as a local run: no controller, no socket. The
      * alternative to {@link #start}, not an addition to it — the host still
      * drives {@link #poll} / {@link #complete}, which is what runs the
-     * procedures. Throws, naming the capability, when the declaration needs a
+     * tasklets. Throws, naming the capability, when the declaration needs a
      * controller.
      */
     public static native void localStart(long ctx, String factoryId, String operativeId);
@@ -128,13 +128,13 @@ public final class FlzCore {
 
     /**
      * Abandon a polled activation by token: its untouched items are re-handed
-     * and its entity released, exactly as if it had never been polled. No
+     * and its cell released, exactly as if it had never been polled. No
      * retry-ladder attempt is consumed.
      *
      * <p>The third and last way to answer a handout. No unwind crosses the
      * native boundary, so a throwable that escapes the dispatch has no way to
-     * reach {@link #complete}; without this call the activation's entity would
-     * be retired for the life of the process (per-entity exclusivity is the
+     * reach {@link #complete}; without this call the activation's cell would
+     * be retired for the life of the process (per-cell exclusivity is the
      * handout itself). Call it from a {@code finally}, never from a
      * hand-written return site.
      *

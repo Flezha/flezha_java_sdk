@@ -5,10 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operative.StreamOperative;
 import com.flezha.sdk.operative.WorkflowOperative;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
-import com.flezha.sdk.runtime.operative.StatelessTestProcedure;
+import com.flezha.sdk.runtime.operative.StatelessTestTasklet;
 import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
 import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
 import com.flezha.sdk.state.Change;
@@ -19,6 +16,9 @@ import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.state.Stateless;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -35,7 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
  * The pure host layer, driven entirely through
  * {@link ActivationDispatcher#dispatch}: constructed Activations in, asserted
  * ActivationResults out — no native core, no wire. This base owns the driving
- * helpers and the operative / procedure fixtures the behaviour classes below it
+ * helpers and the operative / tasklet fixtures the behaviour classes below it
  * share; each subclass owns one behaviour of the host.
  */
 abstract class DispatchTestBase {
@@ -68,9 +68,9 @@ abstract class DispatchTestBase {
     // helpers
     // ------------------------------------------------------------------
 
-    static Activation work(String factory, int procedure, Optional<String> key, long changeSeq, WorkItem... items) {
+    static Activation work(String factory, int tasklet, Optional<String> key, long changeSeq, WorkItem... items) {
         return new Activation(
-                1, new EntityRef(OP, procedure, key), new ActivationKind.Work(List.of(items)), changeSeq, factory);
+                1, new CellRef(OP, tasklet, key), new ActivationKind.Work(List.of(items)), changeSeq, factory);
     }
 
     static WorkItem.Input input(int channel, String payload, long now) {
@@ -81,8 +81,8 @@ abstract class DispatchTestBase {
         return new WorkItem.Input(channel, payload.getBytes(StandardCharsets.UTF_8), List.of(), offset, replay, now);
     }
 
-    static Activation command(String factory, int procedure, Optional<String> key, ActivationKind kind) {
-        return new Activation(1, new EntityRef(OP, procedure, key), kind, 0, factory);
+    static Activation command(String factory, int tasklet, Optional<String> key, ActivationKind kind) {
+        return new Activation(1, new CellRef(OP, tasklet, key), kind, 0, factory);
     }
 
     ActivationOutcome outcome(Activation activation) {
@@ -134,21 +134,21 @@ abstract class DispatchTestBase {
     }
 
     /**
-     * A stateless fixture Procedure over an {@code Object} state: a name and a
-     * run body, which is all these vary. A fixture that needs the entity key,
+     * A stateless fixture Tasklet over an {@code Object} state: a name and a
+     * run body, which is all these vary. A fixture that needs the cell key,
      * a state type of its own or a Change declares itself in full instead.
      */
-    public abstract static class Proc<O> extends StatelessTestProcedure<String, Object, O> {
+    public abstract static class Task<O> extends StatelessTestTasklet<String, Object, O> {
 
         /** The run body, with the state handle the fixtures never read elided. */
         public interface Body {
-            void run(String input, ProcedureCtx ctx) throws ProcedureException;
+            void run(String input, TaskletCtx ctx) throws TaskletException;
         }
 
         private final String name;
         private final Body body;
 
-        protected Proc(String name, Body body) {
+        protected Task(String name, Body body) {
             this.name = name;
             this.body = body;
         }
@@ -159,12 +159,12 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
+        protected Object initState(Optional<String> cellKey) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) throws ProcedureException {
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) throws TaskletException {
             body.run(input, ctx);
         }
     }
@@ -186,16 +186,15 @@ abstract class DispatchTestBase {
     public static final class CounterOperative extends Op {
         public CounterOperative() {
             super("counter_op", c -> c.input(String.class, "in")
-                    .into(CountProc.class)
+                    .into(CountTask.class)
                     .sink("out", s -> ("seen:" + s).getBytes(StandardCharsets.UTF_8)));
         }
     }
 
-    public static final class CountProc
-            implements Procedure<String, CounterState, String, CountChange, WallClock, Void> {
+    public static final class CountTask implements Tasklet<String, CounterState, String, CountChange, WallClock, Void> {
         @Override
         public String name() {
-            return "count_proc";
+            return "count_task";
         }
 
         @Override
@@ -204,7 +203,7 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        public CounterState initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public CounterState initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new CounterState();
         }
 
@@ -214,8 +213,8 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        public void run(String input, StateHandle<CounterState, CountChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<CounterState, CountChange> state, TaskletCtx ctx)
+                throws TaskletException {
             state.apply(new CountChange(1));
             if (input.startsWith("key:")) {
                 ctx.emitKeyed("k", input);
@@ -234,16 +233,16 @@ abstract class DispatchTestBase {
     public static final class MigratingCounterOperative extends Op {
         public MigratingCounterOperative() {
             super("migrating_counter_op", c -> c.input(String.class, "in")
-                    .into(MigratingCountProc.class)
+                    .into(MigratingCountTask.class)
                     .sink("out", s -> ("seen:" + s).getBytes(StandardCharsets.UTF_8)));
         }
     }
 
-    public static final class MigratingCountProc
-            implements Procedure<String, CounterState, String, CountChange, WallClock, Void> {
+    public static final class MigratingCountTask
+            implements Tasklet<String, CounterState, String, CountChange, WallClock, Void> {
         @Override
         public String name() {
-            return "count_proc";
+            return "count_task";
         }
 
         @Override
@@ -262,7 +261,7 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        public CounterState initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public CounterState initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new CounterState();
         }
 
@@ -290,8 +289,8 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        public void run(String input, StateHandle<CounterState, CountChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<CounterState, CountChange> state, TaskletCtx ctx)
+                throws TaskletException {
             state.apply(new CountChange(1));
             ctx.emit(input);
         }
@@ -304,7 +303,7 @@ abstract class DispatchTestBase {
     public static final class SinkNamesChannelOperative extends Op {
         public SinkNamesChannelOperative() {
             super("sink_names_channel", c -> c.input(String.class, "in")
-                    .into(StatelessStateProc.class)
+                    .into(StatelessStateTask.class)
                     .sink("items_output", s -> s.getBytes(StandardCharsets.UTF_8)));
         }
     }
@@ -312,7 +311,7 @@ abstract class DispatchTestBase {
     public static final class KeyedEmitOperative extends Op {
         public KeyedEmitOperative() {
             super("keyed_op", c -> c.input(String.class, "in")
-                    .into(KeyedProc.class)
+                    .into(KeyedTask.class)
                     .keyed()
                     .sink(s -> s.getBytes(StandardCharsets.UTF_8)));
         }
@@ -321,34 +320,33 @@ abstract class DispatchTestBase {
     public static final class StatelessStateOperative extends Op {
         public StatelessStateOperative() {
             super("stateless_state_op", c -> c.input(String.class, "in")
-                    .into(StatelessStateProc.class)
+                    .into(StatelessStateTask.class)
                     .sink("out", s -> s.getBytes(StandardCharsets.UTF_8)));
         }
     }
 
-    /** The shape the annotation processor generates for a stateless `@Procedure`. */
-    public static final class StatelessStateProc extends StatelessTestProcedure<String, Stateless, String> {
+    /** The shape the annotation processor generates for a stateless `@Tasklet`. */
+    public static final class StatelessStateTask extends StatelessTestTasklet<String, Stateless, String> {
         @Override
         public String name() {
-            return "stateless_state_proc";
+            return "stateless_state_task";
         }
 
         @Override
-        protected Stateless initState(Optional<String> entityKey) {
+        protected Stateless initState(Optional<String> cellKey) {
             return new Stateless();
         }
 
         @Override
-        public void run(String input, StateHandle<Stateless, NoChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<Stateless, NoChange> state, TaskletCtx ctx) throws TaskletException {
             ctx.emit("ok:" + input);
         }
     }
 
-    public static final class KeyedProc extends Proc<String> {
-        public KeyedProc() {
-            super("keyed_proc", (input, ctx) -> {
-                // The plain spelling: on a keyed channel it carries the Entity's own key.
+    public static final class KeyedTask extends Task<String> {
+        public KeyedTask() {
+            super("keyed_task", (input, ctx) -> {
+                // The plain spelling: on a keyed channel it carries the Cell's own key.
                 if (input.startsWith("plain:")) {
                     ctx.emit(input);
                     return;
@@ -380,8 +378,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    /** Records {@code entityKey=value}; one instance per Entity by contract. */
-    public static final class KeyRecorder extends StatelessTestProcedure<String, Object, Void> {
+    /** Records {@code cellKey=value}; one instance per Cell by contract. */
+    public static final class KeyRecorder extends StatelessTestTasklet<String, Object, Void> {
         private String key = "";
 
         @Override
@@ -390,56 +388,56 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
-            this.key = entityKey.orElse("");
+        protected Object initState(Optional<String> cellKey) {
+            this.key = cellKey.orElse("");
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {
             RECORDED.add(key + "=" + input);
         }
     }
 
     public static final class StaticOperative extends Op {
         public StaticOperative() {
-            super("static_op", c -> c.input(String.class, "in").into(StaticProc.class));
+            super("static_op", c -> c.input(String.class, "in").into(StaticTask.class));
         }
     }
 
-    /** Static keys a/b; counts runs per INSTANCE to pin per-Entity instances. */
-    public static final class StaticProc extends StatelessTestProcedure<String, Object, Void> {
+    /** Static keys a/b; counts runs per INSTANCE to pin per-Cell instances. */
+    public static final class StaticTask extends StatelessTestTasklet<String, Object, Void> {
         private String key = "";
         private int instanceRuns;
 
         @Override
         public String name() {
-            return "static_proc";
+            return "static_task";
         }
 
         @Override
-        public List<String> entityKeys() {
+        public List<String> cellKeys() {
             return List.of("a", "b");
         }
 
         @Override
-        public List<String> entitiesFor(String input) {
+        public List<String> cellsFor(String input) {
             return List.of(input.split(":")[0]);
         }
 
         @Override
-        public boolean entitiesForOverridden() {
+        public boolean cellsForOverridden() {
             return true;
         }
 
         @Override
-        protected Object initState(Optional<String> entityKey) {
-            this.key = entityKey.orElse("");
+        protected Object initState(Optional<String> cellKey) {
+            this.key = cellKey.orElse("");
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) {
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {
             instanceRuns++;
             RECORDED.add(key + "#" + instanceRuns + "=" + input);
         }
@@ -458,42 +456,42 @@ abstract class DispatchTestBase {
         public PipelineOperative() {
             super(
                     "pipeline_op",
-                    c -> c.input(String.class, "in").into(MidProc.class).into(KeyRecorder.class));
+                    c -> c.input(String.class, "in").into(MidTask.class).into(KeyRecorder.class));
         }
     }
 
-    public static final class MidProc extends Proc<String> {
-        public MidProc() {
-            super("mid_proc", (input, ctx) -> ctx.emit("mid:" + input));
+    public static final class MidTask extends Task<String> {
+        public MidTask() {
+            super("mid_task", (input, ctx) -> ctx.emit("mid:" + input));
         }
     }
 
     public static final class MappedPipelineOperative extends Op {
         public MappedPipelineOperative() {
             super("mapped_pipeline_op", c -> c.input(String.class, "in")
-                    .into(MidProc.class)
+                    .into(MidTask.class)
                     .named("mapped_mid")
                     .map(String.class, s -> "M:" + s)
                     .into(KeyRecorder.class));
         }
     }
 
-    /** A mapped inter-proc edge whose consumer narrows by its own `entitiesFor`. */
+    /** A mapped inter-task edge whose consumer narrows by its own `cellsFor`. */
     public static final class MappedStaticPipelineOperative extends Op {
         public MappedStaticPipelineOperative() {
             super("mapped_static_op", c -> c.input(String.class, "in")
-                    .into(MidProc.class)
+                    .into(MidTask.class)
                     .named("mapped_static_mid")
                     .map(String.class, s -> "a:" + s)
-                    .into(StaticProc.class));
+                    .into(StaticTask.class));
         }
     }
 
-    /** A mapped inter-proc edge that keys the value it yields. */
+    /** A mapped inter-task edge that keys the value it yields. */
     public static final class MappedKeyedPipelineOperative extends Op {
         public MappedKeyedPipelineOperative() {
             super("mapped_keyed_op", c -> c.input(String.class, "in")
-                    .into(MidProc.class)
+                    .into(MidTask.class)
                     .named("mapped_keyed_mid")
                     .map(String.class, s -> "K:" + s)
                     .keyBy(shaped -> shaped.split(":")[1])
@@ -503,15 +501,15 @@ abstract class DispatchTestBase {
 
     public static final class PoisonOperative extends Op {
         public PoisonOperative() {
-            super("poison_op", c -> c.input(String.class, "in").into(PoisonProc.class));
+            super("poison_op", c -> c.input(String.class, "in").into(PoisonTask.class));
         }
     }
 
-    public static final class PoisonProc extends Proc<Void> {
-        public PoisonProc() {
-            super("poison_proc", (input, ctx) -> {
+    public static final class PoisonTask extends Task<Void> {
+        public PoisonTask() {
+            super("poison_task", (input, ctx) -> {
                 if (input.equals("bad-fatal")) {
-                    throw new ProcedureException.NonRetryable("fatal poison");
+                    throw new TaskletException.NonRetryable("fatal poison");
                 }
                 if (input.startsWith("bad")) {
                     throw new IllegalStateException("transient poison");
@@ -523,14 +521,14 @@ abstract class DispatchTestBase {
 
     public static final class TimerOperative extends Op {
         public TimerOperative() {
-            super("timer_op", c -> c.input(String.class, "in").into(TimerProc.class));
+            super("timer_op", c -> c.input(String.class, "in").into(TimerTask.class));
         }
     }
 
-    public static final class TimerProc implements Procedure<String, Object, Void, NoChange, EventTimeFrom, Void> {
+    public static final class TimerTask implements Tasklet<String, Object, Void, NoChange, EventTimeFrom, Void> {
         @Override
         public String name() {
-            return "timer_proc";
+            return "timer_task";
         }
 
         @Override
@@ -544,19 +542,19 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        public Object initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public Object initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new Object();
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, ProcedureCtx ctx) throws ProcedureException {
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) throws TaskletException {
             ctx.timerAtEventTime(ctx.now() + 10);
             ctx.timerAfter(Duration.ofMillis(5));
         }
 
         @Override
-        public void onTimer(long firedAt, TimerKind kind, StateHandle<Object, NoChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void onTimer(long firedAt, TimerKind kind, StateHandle<Object, NoChange> state, TaskletCtx ctx)
+                throws TaskletException {
             TIMER_EVENTS.add(kind + "@" + firedAt + " now=" + ctx.now());
             if (kind == TimerKind.EVENT_TIME) {
                 ctx.timerAfter(Duration.ofMillis(7));
@@ -566,13 +564,13 @@ abstract class DispatchTestBase {
 
     public static final class WallTimerOperative extends Op {
         public WallTimerOperative() {
-            super("wall_timer_op", c -> c.input(String.class, "in").into(WallTimerProc.class));
+            super("wall_timer_op", c -> c.input(String.class, "in").into(WallTimerTask.class));
         }
     }
 
-    public static final class WallTimerProc extends Proc<Void> {
-        public WallTimerProc() {
-            super("wall_timer_proc", (input, ctx) -> ctx.timerAtEventTime(1));
+    public static final class WallTimerTask extends Task<Void> {
+        public WallTimerTask() {
+            super("wall_timer_task", (input, ctx) -> ctx.timerAtEventTime(1));
         }
     }
 
@@ -581,24 +579,24 @@ abstract class DispatchTestBase {
             super("ckpt_op", c -> {
                 c.effectivelyOnce();
                 c.checkpointAck();
-                c.input(String.class, "in").into(CkptProc.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+                c.input(String.class, "in").into(CkptTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
             });
         }
     }
 
     /**
      * The tier IS durable state, so a checkpointing class journals something:
-     * this Procedure declares a Change, which is what makes the class
+     * this Tasklet declares a Change, which is what makes the class
      * {@code persistent} in the record.
      */
-    public static final class CkptProc implements Procedure<String, Object, String, CkptChange, WallClock, Void> {
+    public static final class CkptTask implements Tasklet<String, Object, String, CkptChange, WallClock, Void> {
         @Override
         public String name() {
-            return "ckpt_proc";
+            return "ckpt_task";
         }
 
         @Override
-        public Object initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public Object initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new Object();
         }
 
@@ -606,8 +604,7 @@ abstract class DispatchTestBase {
         public void applyChange(Object state, CkptChange change) {}
 
         @Override
-        public void run(String input, StateHandle<Object, CkptChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<Object, CkptChange> state, TaskletCtx ctx) throws TaskletException {
             ctx.emitKeyed("ck", input);
             if (input.equals("commit")) {
                 ctx.checkpoint();
@@ -620,24 +617,24 @@ abstract class DispatchTestBase {
 
     public static final class ReplayProbeOperative extends Op {
         public ReplayProbeOperative() {
-            super("replay_probe", c -> c.input(String.class, "in").into(ReplayProbeProc.class));
+            super("replay_probe", c -> c.input(String.class, "in").into(ReplayProbeTask.class));
         }
     }
 
-    public static final class ReplayProbeProc extends Proc<Void> {
-        public ReplayProbeProc() {
-            super("replay_probe_proc", (input, ctx) -> RECORDED.add("replaying=" + ctx.replaying()));
+    public static final class ReplayProbeTask extends Task<Void> {
+        public ReplayProbeTask() {
+            super("replay_probe_task", (input, ctx) -> RECORDED.add("replaying=" + ctx.replaying()));
         }
     }
 
     /** Completes twice, the later call with its input; on {@code fail} it then throws. */
-    public static final class CompletingProc extends Proc<Void> {
-        public CompletingProc() {
-            super("completing_proc", (input, ctx) -> {
+    public static final class CompletingTask extends Task<Void> {
+        public CompletingTask() {
+            super("completing_task", (input, ctx) -> {
                 ctx.complete("superseded");
                 ctx.complete("done:" + input);
                 if (input.equals("fail")) {
-                    throw new ProcedureException("failed after completing");
+                    throw new TaskletException("failed after completing");
                 }
             });
         }
@@ -645,7 +642,7 @@ abstract class DispatchTestBase {
 
     public static final class CompletingStreamOperative extends Op {
         public CompletingStreamOperative() {
-            super("completing_stream", c -> c.input(String.class, "in").into(CompletingProc.class));
+            super("completing_stream", c -> c.input(String.class, "in").into(CompletingTask.class));
         }
     }
 
@@ -661,8 +658,8 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        public void procedures(ChannelBuilder c) {
-            c.input(String.class, "seed").into(CompletingProc.class);
+        public void tasklets(ChannelBuilder c) {
+            c.input(String.class, "seed").into(CompletingTask.class);
         }
     }
 
@@ -683,8 +680,8 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        public void procedures(ChannelBuilder c) {
-            var fan = c.input(String.class, "seed").into(MidProc.class).named("wf_fan");
+        public void tasklets(ChannelBuilder c) {
+            var fan = c.input(String.class, "seed").into(MidTask.class).named("wf_fan");
             fan.map(String.class, s -> "mapped:" + s).into(KeyRecorder.class);
             fan.into(KeyRecorder.class, "wf_plain_leaf");
         }
@@ -702,19 +699,19 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        public void procedures(ChannelBuilder c) {
-            c.input(String.class, "seed").into(UndoableProc.class).into(KeyRecorder.class);
+        public void tasklets(ChannelBuilder c) {
+            c.input(String.class, "seed").into(UndoableTask.class).into(KeyRecorder.class);
         }
     }
 
-    public static final class UndoableProc extends Proc<String> {
-        public UndoableProc() {
-            super("undoable_proc", (input, ctx) -> ctx.emit("fwd:" + input));
+    public static final class UndoableTask extends Task<String> {
+        public UndoableTask() {
+            super("undoable_task", (input, ctx) -> ctx.emit("fwd:" + input));
         }
 
         @Override
-        public void compensate(List<String> completedOutput, StateHandle<Object, NoChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void compensate(List<String> completedOutput, StateHandle<Object, NoChange> state, TaskletCtx ctx)
+                throws TaskletException {
             for (String output : completedOutput) {
                 RECORDED.add("compensated:" + output);
                 ctx.emit("undo:" + output);

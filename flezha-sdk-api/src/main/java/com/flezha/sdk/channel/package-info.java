@@ -1,8 +1,8 @@
 /**
- * Channel and stream declarations: the graph connecting entry points, procedures and sinks.
+ * Channel and stream declarations: the graph connecting entry points, tasklets and sinks.
  *
  * <p>These types are declared inside an operative's {@code channels(ChannelBuilder)} or
- * {@code procedures(ChannelBuilder)} method and are never constructed directly.
+ * {@code tasklets(ChannelBuilder)} method and are never constructed directly.
  * {@link com.flezha.sdk.channel.ChannelBuilder} is the entry point, and every call returns the next
  * handle in the chain, so a complete graph is expressed as one fluent expression. The declaration
  * is read once at registration and validated as a whole; a malformed graph is refused there rather
@@ -15,23 +15,23 @@
  * deterministic; a parse failure is classified like a failing invocation and follows the same
  * retry and dead-letter path.
  *
- * <p>{@link com.flezha.sdk.channel.Stream} is a procedure's output handle. {@code named} labels the
+ * <p>{@link com.flezha.sdk.channel.Stream} is a tasklet's output handle. {@code named} labels the
  * channel, and that label is the identity the rest of the system uses, including sink registration
- * and test feeds; unlabelled, a channel takes the producing procedure's name. {@code into} wires a
- * further procedure as a consumer, which is how multi-stage graphs are expressed. {@code sink}
+ * and test feeds; unlabelled, a channel takes the producing tasklet's name. {@code into} wires a
+ * further tasklet as a consumer, which is how multi-stage graphs are expressed. {@code sink}
  * attaches a plugin, {@code keyed} declares that emits carry a natural key supplied through
  * {@code emitKeyed}. A durable workflow operative journals the handoff at every step boundary; the
  * payload codec it uses there is derived by the runtime and is declared nowhere.
  *
  * <p>{@link com.flezha.sdk.channel.EdgeStream} carries the transforms applied on the wiring itself:
  * {@code filter} discards values, {@code map} and {@code flatMap} reshape or expand them, and
- * {@code keyBy} assigns each value to an entity. These execute without an entity, a mailbox or a
+ * {@code keyBy} assigns each value to a cell. These execute without a cell, a mailbox or a
  * dispatch hop, which makes them the cheap place to reshape a value and the wrong place to do
- * substantial work. {@code keyBy} is total: it always names an entity and never declines, so
+ * substantial work. {@code keyBy} is total: it always names a cell and never declines, so
  * discarding is {@code filter}'s responsibility and must precede it.
  *
  * <p>{@link com.flezha.sdk.channel.Merge} opens a merged subscription, in which two or more source
- * channels each supply a mapping into one sum type consumed by a single procedure.
+ * channels each supply a mapping into one sum type consumed by a single tasklet.
  * {@link com.flezha.sdk.channel.RoutedDocument} supports operative-wide document delivery, in which
  * every key observed on a traffic channel receives each distinct document exactly once, on that
  * key's own next traffic item. {@link com.flezha.sdk.channel.RetryPolicy},

@@ -1,8 +1,8 @@
 package com.flezha.test;
 
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
@@ -15,12 +15,12 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Hand-written twin of {@link RollingWindow}: the exact {@code Procedure} /
+ * Hand-written twin of {@link RollingWindow}: the exact {@code Tasklet} /
  * {@code Change} impl the sugar expands to (variant names differ; behaviour
  * does not).
  */
 public final class RollingWindowTwin
-        implements Procedure<WindowInput, RollingWindowTwin.State, Double, RollingWindowTwin.WindowChange, WallClock, Void> {
+        implements Tasklet<WindowInput, RollingWindowTwin.State, Double, RollingWindowTwin.WindowChange, WallClock, Void> {
 
     static final int N = 3;
 
@@ -40,7 +40,7 @@ public final class RollingWindowTwin
     }
 
     @Override
-    public State initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+    public State initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
         return new State();
     }
 
@@ -62,7 +62,7 @@ public final class RollingWindowTwin
     }
 
     @Override
-    public void run(WindowInput input, StateHandle<State, WindowChange> state, ProcedureCtx ctx) throws ProcedureException {
+    public void run(WindowInput input, StateHandle<State, WindowChange> state, TaskletCtx ctx) throws TaskletException {
         state.apply(new WindowChange.PushBack(input.key(), input.value()));
         Deque<Double> w = state.get().window.get(input.key());
         if (w.size() > N) {

@@ -83,7 +83,7 @@ public final class FlezhaRunner implements AutoCloseable {
      * Declare an operative class the runtime can spawn instances of later (via the controller's
      * {@code AddOperative}), of either kind: the kind is read from the interface the class
      * implements, never named by the call. Calls the class's {@code channels(...)} or
-     * {@code procedures(...)} once and records the topology in the class registry of its kind.
+     * {@code tasklets(...)} once and records the topology in the class registry of its kind.
      * Legal before and after {@link #start()}. Invalid authoring is reported here, at the declaring
      * call site, as {@code StreamOperativeConfigurationException} or
      * {@code WorkflowOperativeConfigurationException}.

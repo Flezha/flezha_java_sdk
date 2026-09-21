@@ -44,8 +44,8 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
-                <!-- Expands each @Procedure class into the Procedure implementation the
-                     operative wires, named <Class>Procedure. Only the desk's stateless
+                <!-- Expands each @Tasklet class into the Tasklet implementation the
+                     operative wires, named <Class>Tasklet. Only the desk's stateless
                      steps use it; the ones that keep state write the interface out. -->
                 <configuration>
                     <annotationProcessorPaths>

@@ -2,9 +2,9 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operative.StreamOperative;
-import com.flezha.sdk.procedure.Procedure;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
@@ -22,8 +22,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * the runner alive: the {@code runner_pool_wedged} signature.
  *
  * <p>{@code abort} ends its activation as violently as this host allows
- * ({@code Error}, not a {@code ProcedureException}) WITHOUT emitting, once per
- * process. Whatever the host does with a violent failure, the Entity must be
+ * ({@code Error}, not a {@code TaskletException}) WITHOUT emitting, once per
+ * process. Whatever the host does with a violent failure, the Cell must be
  * served again and the aborting item must not produce twice.
  *
  * <p>Every other input emits {@code ok:<input>}, which is how the e2e proves
@@ -38,27 +38,27 @@ public final class WedgeProbeStreamOperative implements StreamOperative {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "input").into(WedgeProbeProcedure.class).sink("out");
+        c.input(String.class, "input").into(WedgeProbeTasklet.class).sink("out");
     }
 
-    public static final class WedgeProbeProcedure
-            implements Procedure<String, Stateless, String, NoChange, WallClock, Void> {
+    public static final class WedgeProbeTasklet
+            implements Tasklet<String, Stateless, String, NoChange, WallClock, Void> {
 
         private static final AtomicBoolean ABORTED = new AtomicBoolean(false);
 
         @Override
         public String name() {
-            return "wedge_probe_procedure";
+            return "wedge_probe_tasklet";
         }
 
         @Override
-        public Stateless initState(Optional<String> entityKey, Optional<RestoreInitPayload> initPayload) {
+        public Stateless initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
             return new Stateless();
         }
 
         @Override
-        public void run(String input, StateHandle<Stateless, NoChange> state, ProcedureCtx ctx)
-                throws ProcedureException {
+        public void run(String input, StateHandle<Stateless, NoChange> state, TaskletCtx ctx)
+                throws TaskletException {
             if ("wedge".equals(input)) {
                 // Never returns. The runner stays connected and heartbeating;
                 // only its dispatch progress dies. Teardown is the stdin-EOF watcher.

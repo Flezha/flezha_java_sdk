@@ -3,12 +3,12 @@ package com.flezha.sdk.operative;
 import com.flezha.sdk.channel.ChannelBuilder;
 
 /**
- * Declares a graph of channels and procedures that runs continuously over a stream of messages.
+ * Declares a graph of channels and tasklets that runs continuously over a stream of messages.
  *
  * <p>This is the operative kind to reach for when work is expressed as messages flowing through one
- * or more procedures: readings arriving from a sensor, trades from a market feed, events from an
- * application. It runs until stopped, holds per-entity state between messages, and scales by
- * splitting that state across entities. For work consisting of ordered steps that must not be
+ * or more tasklets: readings arriving from a sensor, trades from a market feed, events from an
+ * application. It runs until stopped, holds per-cell state between messages, and scales by
+ * splitting that state across cells. For work consisting of ordered steps that must not be
  * re-executed as a unit after a partial failure, use {@link WorkflowOperative} instead.
  *
  * <p>An implementation declares two things and nothing else:
@@ -24,9 +24,9 @@ import com.flezha.sdk.channel.ChannelBuilder;
  *     @Override
  *     public void channels(ChannelBuilder c) {
  *         c.input(String.class, "lines")
- *                 .into(SplitProcedure.class)
+ *                 .into(SplitTasklet.class)
  *                 .keyBy(word -> word)
- *                 .into(TallyProcedure.class)
+ *                 .into(TallyTasklet.class)
  *                 .sink("totals");
  *     }
  * }
@@ -61,13 +61,13 @@ public interface StreamOperative extends Operative {
     void channels(ChannelBuilder c);
 
     /**
-     * Whether per-entity state is persisted for this operative class. Defaults to {@code true}.
+     * Whether per-cell state is persisted for this operative class. Defaults to {@code true}.
      *
      * <p>Override to {@code false} to opt out for the whole class: changes are still applied in
-     * memory, so procedures behave normally, but nothing is written to disk and an entity begins
+     * memory, so tasklets behave normally, but nothing is written to disk and a cell begins
      * with no history after a restart. This is a throughput trade for work whose state can be
      * recomputed or safely lost, and it is not the same as declaring
-     * {@link com.flezha.sdk.state.NoChange}, which removes the change machinery from the procedure
+     * {@link com.flezha.sdk.state.NoChange}, which removes the change machinery from the tasklet
      * altogether.
      *
      * <p>An operator can override this per runner; the effective value is the runner's override

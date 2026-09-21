@@ -14,7 +14,7 @@ public final class SessionTimeoutStreamOperative implements StreamOperative {
     @Override
     public void channels(ChannelBuilder c) {
         c.input(String.class, "input")
-                .into(SessionTimeoutProcedure.class)
+                .into(SessionTimeoutTasklet.class)
                 .sink("kafka");
     }
 }

@@ -5,7 +5,7 @@ package com.flezha.sdk.channel;
  * {@link ChannelBuilder#input(Class, String)}. This is where a graph starts.
  *
  * <pre>{@code
- * c.input(String.class, "lines").into(SplitProcedure.class).sink("words");
+ * c.input(String.class, "lines").into(SplitTasklet.class).sink("words");
  * }</pre>
  *
  * <p>An entry channel is fed by the controller, so it has no producer side. Everything it offers is
@@ -16,14 +16,14 @@ package com.flezha.sdk.channel;
  * c.input(Trade.class, "trades")
  *         .filter(t -> t.qty() > 0)
  *         .keyBy(Trade::symbol)
- *         .into(CandleProcedure.class);
+ *         .into(CandleTasklet.class);
  * }</pre>
  *
  * <p>Sharing that surface is deliberate: it keeps the entry side from drifting away from
  * {@link Stream}, so a transform learned in one place works in the other.
  *
  * <p>Like {@link Stream}, this handle is usable only inside {@code channels()} or
- * {@code procedures()}. The graph freezes at registration, and a retained handle used afterwards
+ * {@code tasklets()}. The graph freezes at registration, and a retained handle used afterwards
  * throws {@link IllegalStateException} naming the operative.
  */
 public interface EntryChannel<T> extends EdgeStream<T> {}

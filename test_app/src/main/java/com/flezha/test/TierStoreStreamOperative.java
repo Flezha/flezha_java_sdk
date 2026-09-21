@@ -24,7 +24,7 @@ public final class TierStoreStreamOperative implements StreamOperative {
         c.input(String.class, "input")
                 .onFull(OverflowPolicy.DROP_NOTHING)
                 .retryBackoffMs(300)
-                .into(TierStoreProcedure.class)
+                .into(TierStoreTasklet.class)
                 .keyed()
                 .sink("sink");
     }

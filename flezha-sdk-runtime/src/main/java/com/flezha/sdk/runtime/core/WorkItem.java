@@ -12,7 +12,7 @@ import javax.annotation.Nonnull;
  */
 public sealed interface WorkItem {
 
-    /** Discriminant 0 — one input payload for the target Entity. */
+    /** Discriminant 0 — one input payload for the target Cell. */
     record Input(
             int channel,
             @Nonnull byte[] payload,

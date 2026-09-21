@@ -1,9 +1,9 @@
 package com.flezha.examples.agent;
 
-import com.flezha.sdk.authoring.Procedure;
+import com.flezha.sdk.authoring.Tasklet;
 
 /** One turn of the conversation. */
-@Procedure(id = "reply")
+@Tasklet(id = "reply")
 public final class Reply {
 
     public String run(String message, ConversationHandle conversation) {

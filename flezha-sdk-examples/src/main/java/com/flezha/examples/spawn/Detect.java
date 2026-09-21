@@ -1,10 +1,10 @@
 package com.flezha.examples.spawn;
 
-import com.flezha.sdk.authoring.Procedure;
-import com.flezha.sdk.procedure.IfRunning;
-import com.flezha.sdk.procedure.ProcedureCtx;
-import com.flezha.sdk.procedure.ProcedureException;
-import com.flezha.sdk.procedure.SpawnOptions;
+import com.flezha.sdk.authoring.Tasklet;
+import com.flezha.sdk.tasklet.IfRunning;
+import com.flezha.sdk.tasklet.SpawnOptions;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -14,17 +14,17 @@ import java.nio.charset.StandardCharsets;
  * emits only for some inputs. {@code emits} declares the output type, which a {@code void} return
  * cannot.
  */
-@Procedure(id = "detect", emits = String.class)
+@Tasklet(id = "detect", emits = String.class)
 public final class Detect {
 
-    public void run(String input, ProcedureCtx ctx) throws ProcedureException {
+    public void run(String input, TaskletCtx ctx) throws TaskletException {
         if (!input.startsWith("alert:")) {
             return;
         }
         String subject = input.substring("alert:".length());
 
         // One worker per subject, so the subject names it. The handle is ignored on purpose: a
-        // refused request unread by the end of this invocation logs itself, and this procedure
+        // refused request unread by the end of this invocation logs itself, and this tasklet
         // carries on detecting.
         ctx.spawnWorkflow(
                 "triage",
