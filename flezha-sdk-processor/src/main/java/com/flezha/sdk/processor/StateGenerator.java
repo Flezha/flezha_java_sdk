@@ -4,7 +4,9 @@ import com.flezha.sdk.authoring.Journal;
 import com.flezha.sdk.processor.StateModel.Field;
 import com.flezha.sdk.processor.StateModel.Variant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -24,6 +26,9 @@ final class StateGenerator {
     private final FlezhaProcessor out;
     private final TypeMirrors mirrors;
 
+    /** Each generated handle's state class, which a nested state's name alone does not give. */
+    private final Map<String, String> stateByHandle = new HashMap<>();
+
     StateGenerator(FlezhaProcessor out, TypeMirrors mirrors) {
         this.out = out;
         this.mirrors = mirrors;
@@ -36,6 +41,12 @@ final class StateGenerator {
         }
         out.write(model.changeFqn(), renderChange(model), state);
         out.write(model.handleFqn(), renderHandle(model), state);
+        stateByHandle.put(model.handleFqn(), model.stateFqn());
+    }
+
+    /** The state class behind a handle this generator wrote, or {@code null} for any other. */
+    String stateOf(String handleFqn) {
+        return stateByHandle.get(handleFqn);
     }
 
     /** The fields and the variants they contribute, or {@code null} once refused. */

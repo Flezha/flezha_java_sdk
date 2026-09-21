@@ -53,7 +53,7 @@ public final class FlezhaProcessor extends AbstractProcessor {
         this.filer = env.getFiler();
         TypeMirrors mirrors = new TypeMirrors(env.getElementUtils(), env.getTypeUtils());
         this.states = new StateGenerator(this, mirrors);
-        this.tasklets = new TaskletGenerator(this, mirrors, sourceTrees(env));
+        this.tasklets = new TaskletGenerator(this, mirrors, sourceTrees(env), states);
     }
 
     /** The compiler's source trees, which only javac exposes; {@code null} elsewhere. */

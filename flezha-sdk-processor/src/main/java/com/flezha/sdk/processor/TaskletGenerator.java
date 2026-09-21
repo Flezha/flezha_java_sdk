@@ -60,10 +60,13 @@ final class TaskletGenerator {
     /** The source trees, or {@code null} on a compiler that exposes none. */
     private final Trees trees;
 
-    TaskletGenerator(FlezhaProcessor out, TypeMirrors mirrors, Trees trees) {
+    private final StateGenerator states;
+
+    TaskletGenerator(FlezhaProcessor out, TypeMirrors mirrors, Trees trees, StateGenerator states) {
         this.out = out;
         this.mirrors = mirrors;
         this.trees = trees;
+        this.states = states;
     }
 
     /** Writes the tasklet and, for an operative annotation, the short form's operative of its kind. */
@@ -354,8 +357,9 @@ final class TaskletGenerator {
             return new StateShape(ta.get(0).toString(), ta.get(1).toString(), "state");
         }
         // Sugar form: `run(Input, <State>Handle)` — the @State-generated
-        // handle. Recover State from its name (it may be unresolved this
-        // round); the handle is co-located with its @State class.
+        // handle, written beside its Change as a top-level class of the state's
+        // package. It may be unresolved this round, so the state comes from the
+        // generator that wrote it, and from the name for one compiled elsewhere.
         String handleName = p1.toString();
         if (!handleName.endsWith("Handle")) {
             out.error(
@@ -365,8 +369,9 @@ final class TaskletGenerator {
             return null;
         }
         String handleFqn = handleName.contains(".") || pkg.isEmpty() ? handleName : pkg + "." + handleName;
-        String stateType = handleFqn.substring(0, handleFqn.length() - "Handle".length());
-        return new StateShape(stateType, stateType + "Change", "new " + handleFqn + "(state)");
+        String stem = handleFqn.substring(0, handleFqn.length() - "Handle".length());
+        String stateType = states.stateOf(handleFqn);
+        return new StateShape(stateType != null ? stateType : stem, stem + "Change", "new " + handleFqn + "(state)");
     }
 
     /** The keying and static-cell declaration rules, in the order they refuse today. */

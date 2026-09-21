@@ -224,6 +224,35 @@ class FlezhaProcessorTest {
         assertThat(change).contains("pollFirst()");
     }
 
+    // A nested state's handle and change are top-level classes of its package,
+    // so the tasklet cannot find the state by dropping `Handle` from the handle's
+    // name (KB-475).
+    @Test
+    void aStateNestedInItsTaskletIsNamedByItsOwnName() {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.State;
+                import com.flezha.sdk.authoring.Tasklet;
+                import java.util.ArrayDeque;
+                import java.util.Deque;
+                @Tasklet(id = "track")
+                public class Track {
+                    @State
+                    public static class Window {
+                        public Deque<Double> prices = new ArrayDeque<>();
+                    }
+                    public Double run(Double price, WindowHandle window) {
+                        window.pushBackPrices(price);
+                        return price;
+                    }
+                }
+                """;
+        String tasklet = generated("t.Track", "t.TrackTasklet", code);
+        assertThat(tasklet).contains("Tasklet<java.lang.Double, t.Track.Window, java.lang.Double, t.WindowChange,");
+        assertThat(tasklet).contains("return new t.Track.Window();");
+    }
+
     // Kryo builds a registered type from a record's canonical constructor or
     // from a no-arg one, and the generated variants have neither until they are
     // records: every read of a journaled derived change failed on the shape
