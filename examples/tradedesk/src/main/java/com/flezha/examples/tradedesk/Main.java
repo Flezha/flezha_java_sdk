@@ -13,13 +13,13 @@ import com.flezha.sdk.FlezhaRunner;
  *
  * <p>The guides write the desk's operatives one at a time, and each is registered here before
  * {@code start()}. {@code registerFactory(...)} is the same call for both kinds, the stream that
- * builds candles and the workflow that places one order.
+ * tracks prices and the workflow that places one order.
  */
 public final class Main {
 
     public static void main(String[] args) throws Exception {
         FlezhaRunner runner = Flezha.createRunner(args.length > 0 ? args[0] : "trading")
-                .registerFactory(CandlesOperative.class)
+                .registerFactory(PricesOperative.class)
                 .registerFactory(PaperOrderOperative.class)
                 .start();
 

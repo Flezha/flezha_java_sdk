@@ -6,32 +6,28 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 /**
- * The desk's stream: trades in, one candle per minute out, and an order started when a symbol
- * moves far enough.
+ * The desk's stream: trades in, each price compared with its symbol's recent average, and an order
+ * started when a price jumps far enough above it.
  *
  * <p>A stream operative runs for as long as the desk does. The exchange delivers several trades in
  * one frame, so the wiring splits the frame before anything else sees it, drops what the desk does
  * not trade on, and routes the rest to a cell per symbol.
  */
-public final class CandlesOperative implements StreamOperative {
+public final class PricesOperative implements StreamOperative {
 
     /** One frame from the exchange's feed, carrying however many trades happened in it. */
     public record TradeBatch(List<Trade> trades) {}
 
     /** One trade, as the exchange reports it. */
-    public record Trade(String symbol, double price, int quantity, long ts) {}
+    public record Trade(String symbol, double price, int quantity) {}
 
-    /**
-     * A finished minute for one symbol, carrying the close of the minute before it. The desk's
-     * decision is a comparison between the two, and putting the pair in the value is what keeps
-     * the stage that makes it free of state.
-     */
-    public record Candle(String symbol, long minute, int trades, double close, double previousClose) {}
+    /** A trade's price beside the average of the prices its symbol traded at before it. */
+    public record Move(String symbol, double price, double average, int prices) {}
 
     @Override
     @Nonnull
     public String factoryId() {
-        return "candles";
+        return "prices";
     }
 
     /**
@@ -48,9 +44,9 @@ public final class CandlesOperative implements StreamOperative {
      * <p>A tasklet's output is an ordinary channel, so each stage is wired onto the one before it
      * with the same {@code into} the entry channel used, and the expression reads in flow order.
      *
-     * <p>{@code sink("candles")} sits in the middle of that chain, which is the point: a sink is an
-     * address on the plugin layer, not the end of anything. Every finished candle is delivered
-     * there for whatever is listening, and the same value carries on to the next stage.
+     * <p>{@code sink("moves")} sits in the middle of that chain, which is the point: a sink is an
+     * address on the plugin layer, not the end of anything. Every move is delivered there for
+     * whatever is listening, and the same value carries on to the next stage.
      *
      * <p>Only the first stage is keyed, because keying is declared per edge rather than inherited:
      * a plain {@code into} leaves its consumer single-cell. That is the right shape here, since
@@ -67,9 +63,9 @@ public final class CandlesOperative implements StreamOperative {
                 .flatMap(Trade.class, TradeBatch::trades)
                 .filter(trade -> trade.quantity() > 0)
                 .keyBy(Trade::symbol)
-                .into(BuildCandles.class)
-                .sink("candles")
-                .into(MeasureMoveTasklet.class)
+                .into(TrackPricesTasklet.class)
+                .sink("moves")
+                .into(BuyAboveAverageTasklet.class)
                 .sink("signals")
                 .sealed();
     }
