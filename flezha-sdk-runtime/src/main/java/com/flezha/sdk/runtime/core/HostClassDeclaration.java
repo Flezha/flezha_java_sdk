@@ -95,10 +95,11 @@ public final class HostClassDeclaration {
             @Nonnull List<TaskletEntry> tasklets,
             @Nonnull int[] capacities) {
         Map<String, Object> decl = base(factoryId);
-        // Persistence is what the class's Changes imply: a class whose every
-        // Tasklet declares NoChange has nothing to flush.
-        if (tasklets.stream().anyMatch(p -> p.changeType != NoChange.class)) {
+        if (facts.persistent()) {
             decl.put("persistent", true);
+        }
+        if (facts.sleepWhenIdle()) {
+            decl.put("sleep_when_idle", true);
         }
         if (facts.effectivelyOnce()) {
             decl.put("effectively_once", true);
@@ -180,12 +181,6 @@ public final class HostClassDeclaration {
     public static Map<String, Object> forWorkflow(
             @Nonnull Map<String, Object> builderRecord, @Nonnull WorkflowOperative probe) {
         Map<String, Object> decl = new LinkedHashMap<>(builderRecord);
-        // Durability is the workflow's own declaration, not what its
-        // tasklets' Change types imply.
-        decl.remove("persistent");
-        if (probe.persistenceEnabled()) {
-            decl.put("persistent", true);
-        }
         if (probe.syncDurability()) {
             decl.put("sync_durability", true);
         }

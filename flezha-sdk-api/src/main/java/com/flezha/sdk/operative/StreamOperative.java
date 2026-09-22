@@ -56,10 +56,23 @@ public interface StreamOperative extends Operative {
      * {@link com.flezha.sdk.state.NoChange}, which removes the change machinery from the tasklet
      * altogether.
      *
-     * <p>An operator can override this per runner; the effective value is the runner's override
-     * where present, otherwise this method's, otherwise {@code true}.
+     * <p>The runtime announces the value to the controller, which resolves it for the class; an
+     * operator can still override it per class on the controller.
      */
     default boolean persistenceEnabled() {
         return true;
+    }
+
+    /**
+     * Whether an idle instance sleeps. Defaults to {@code false}.
+     *
+     * <p>Override to {@code true} and an instance with nothing to do for {@code FLEZHA_PARK_IDLE_MS}
+     * is evicted from its runner, holding no memory there, and wakes on its next message with its
+     * cells restored. Its input is then kept durably by the controller, one log append per
+     * message. A class that sleeps with {@link #persistenceEnabled()} off is refused at
+     * registration as {@code SleepWithoutPersistence}.
+     */
+    default boolean sleepWhenIdle() {
+        return false;
     }
 }

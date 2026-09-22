@@ -76,6 +76,7 @@ public final class Main {
                 .registerFactory(StatefulCounterStreamOperative.class)
                 .registerFactory(CoalescingCounterStreamOperative.class)
                 .registerFactory(PersistenceOffStreamOperative.class)
+                .registerFactory(SleepingCounterStreamOperative.class)
                 .registerFactory(HybridChannelStreamOperative.class)
                 .registerFactory(MergedInputStreamOperative.class)
                 .registerFactory(TransformChainStreamOperative.class)

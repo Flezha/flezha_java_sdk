@@ -139,11 +139,22 @@ public interface WorkflowOperative extends Operative {
      * as they apply, so a crash resumes from persisted state. When
      * {@code false}, the per-Cell flush drains and discards Changes with no
      * serialization or wire I/O — the operative is in-memory only (a crash
-     * re-runs from the top). The controller resolves this durable-by-default
-     * with a per-class operator opt-out.
+     * re-runs from the top). The runtime announces it to the controller,
+     * which resolves it with a per-class operator override.
      */
     default boolean persistenceEnabled() {
         return true;
+    }
+
+    /**
+     * Whether an idle instance sleeps: one waiting at a committed boundary
+     * for {@code FLEZHA_PARK_IDLE_MS} is evicted from its runner and wakes on
+     * its next message or its wake deadline. Defaults to
+     * {@link #persistenceEnabled()}; declaring it with persistence off is
+     * refused at registration as {@code SleepWithoutPersistence}.
+     */
+    default boolean sleepWhenIdle() {
+        return persistenceEnabled();
     }
 
     /**

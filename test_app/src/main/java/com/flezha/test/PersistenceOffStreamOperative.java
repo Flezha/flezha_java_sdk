@@ -5,9 +5,10 @@ import com.flezha.sdk.operative.StreamOperative;
 
 /**
  * Same Tasklet topology as {@link StatefulCounterStreamOperative} but with
- * persistence disabled at the operative-class level. Used by integration tests
- * to verify the toggle-off drain discards Changes without serialization or
- * wire I/O.
+ * persistence disabled at the operative-class level, over tasklets that
+ * journal a Change: the class's switch, not its Change types, is what it
+ * declares. Used by integration tests to verify the toggle-off drain discards
+ * Changes without serialization or wire I/O.
  */
 public final class PersistenceOffStreamOperative implements StreamOperative {
 

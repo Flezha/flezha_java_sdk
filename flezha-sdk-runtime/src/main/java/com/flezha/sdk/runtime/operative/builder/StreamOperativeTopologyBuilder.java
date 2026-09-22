@@ -12,6 +12,7 @@ import com.flezha.sdk.channel.RoutedDocument;
 import com.flezha.sdk.channel.Stream;
 import com.flezha.sdk.internal.RuntimeBridge;
 import com.flezha.sdk.operative.Operative;
+import com.flezha.sdk.operative.StreamOperative;
 import com.flezha.sdk.operative.StreamOperativeConfigurationException;
 import com.flezha.sdk.operative.WorkflowOperative;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
@@ -124,7 +125,12 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
      */
     @Nonnull
     public static StreamOperativeTopology build(@Nonnull Operative operative) {
-        return build(operative.factoryId(), operative::channels, operative instanceof WorkflowOperative w ? w : null);
+        return switch (operative) {
+            case WorkflowOperative w -> build(w.factoryId(), w::channels, w, w.persistenceEnabled(), w.sleepWhenIdle());
+            case StreamOperative s -> build(
+                    s.factoryId(), s::channels, null, s.persistenceEnabled(), s.sleepWhenIdle());
+            default -> build(operative.factoryId(), operative::channels, null, true, false);
+        };
     }
 
     /**
@@ -135,14 +141,18 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
     @Nonnull
     public static StreamOperativeTopology build(
             @Nonnull String factoryId, @Nonnull Consumer<ChannelBuilder> authoring) {
-        return build(factoryId, authoring, null);
+        return build(factoryId, authoring, null, true, false);
     }
 
     private static StreamOperativeTopology build(
-            String factoryId, Consumer<ChannelBuilder> authoring, @Nullable WorkflowOperative workflow) {
+            String factoryId,
+            Consumer<ChannelBuilder> authoring,
+            @Nullable WorkflowOperative workflow,
+            boolean persistent,
+            boolean sleepWhenIdle) {
         StreamOperativeTopologyBuilder b = new StreamOperativeTopologyBuilder();
         authoring.accept(b);
-        return b.freeze(factoryId, workflow);
+        return b.freeze(factoryId, workflow, persistent, sleepWhenIdle);
     }
 
     @Override
@@ -272,7 +282,8 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
     }
 
     @Nonnull
-    private StreamOperativeTopology freeze(String factoryId, @Nullable WorkflowOperative workflow) {
+    private StreamOperativeTopology freeze(
+            String factoryId, @Nullable WorkflowOperative workflow, boolean persistent, boolean sleepWhenIdle) {
         // Freeze first: any retained handle used from here on throws naming
         // the operative, whatever build's own outcome.
         frozenFactoryId = factoryId;
@@ -299,6 +310,8 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
         Map<String, Object> record = HostClassDeclaration.forStream(
                 factoryId,
                 new ClassFacts(
+                        persistent,
+                        sleepWhenIdle,
                         effectivelyOnce,
                         checkpointAck,
                         checkpointEvery,
@@ -356,6 +369,8 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
 
     /** The class-level facts the record states, exactly as declared. */
     public record ClassFacts(
+            boolean persistent,
+            boolean sleepWhenIdle,
             boolean effectivelyOnce,
             boolean checkpointAck,
             Integer checkpointEvery,

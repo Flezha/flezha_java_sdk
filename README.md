@@ -232,7 +232,7 @@ FLEZHA_E2E_RUNTIME=java mix test --include system   # from repo root: the shared
 | `FLEZHA_WORKER_POOL_SIZE` | `availableProcessors()` | Shared runner draining every Cell mailbox. |
 | `FLEZHA_LOG_LEVEL` | `warn` | `debug`, `info`, `warn` or `error` for the default logger. Unset, blank and unrecognised all mean `warn`. |
 | `FLEZHA_NATIVE_LIB_DIR` | `$TMPDIR` | Where `libflz_core_ffi` is extracted. Set it on containers where `/tmp` is `noexec`. |
-| `FLEZHA_WORKFLOW_PARK_IDLE_MS` | `5000` | Idle hysteresis before a looping workflow operative parks. |
+| `FLEZHA_PARK_IDLE_MS` | `600000` | How long an instance of a class that sleeps (`sleepWhenIdle()`) stays idle before it sleeps. |
 
 ## Diagnostics
 

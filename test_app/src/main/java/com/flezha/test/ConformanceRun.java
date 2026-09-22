@@ -99,8 +99,12 @@ public final class ConformanceRun {
 
         /** Whether the row declares a workflow class, which only the workflow kind can write. */
         boolean workflow() {
+            return declares("class.workflow");
+        }
+
+        boolean declares(String classStep) {
             for (String step : steps.split(";")) {
-                if (step.trim().equals("class.workflow")) {
+                if (step.trim().equals(classStep)) {
                     return true;
                 }
             }
@@ -171,11 +175,31 @@ public final class ConformanceRun {
         }
     }
 
-    /** The class a row declares on the stream kind. */
-    public static final class RowStreamOperative extends RowOperative implements StreamOperative {}
+    /** The class a row declares on the stream kind; its two class switches are the row's. */
+    public static final class RowStreamOperative extends RowOperative implements StreamOperative {
+        @Override
+        public boolean persistenceEnabled() {
+            return current.declares("class.persistent");
+        }
+
+        @Override
+        public boolean sleepWhenIdle() {
+            return current.declares("class.sleep_when_idle");
+        }
+    }
 
     /** The class a {@code class.workflow} row declares: the same steps, on the workflow kind. */
-    public static final class RowWorkflowOperative extends RowOperative implements WorkflowOperative {}
+    public static final class RowWorkflowOperative extends RowOperative implements WorkflowOperative {
+        @Override
+        public boolean persistenceEnabled() {
+            return current.declares("class.persistent");
+        }
+
+        @Override
+        public boolean sleepWhenIdle() {
+            return current.declares("class.sleep_when_idle") || persistenceEnabled();
+        }
+    }
 
     private static void interpret(ChannelBuilder c, String steps) {
         Map<String, EdgeStream<String>> handles = new LinkedHashMap<>();
@@ -311,17 +335,16 @@ public final class ConformanceRun {
 
     /**
      * {@code class.<flag>[(<value>)]} — the facts the class declares on the
-     * builder. {@code persistent} is implied here by the palette's journalling
-     * Change types, which is what a Java stream class's persistence IS, and by
-     * a workflow class's default; {@code workflow} is the kind of the class the
-     * row is declared on, {@link RowWorkflowOperative}; {@code sync_durability}
-     * is a declaration a stream class does not carry, and every row needing it
-     * is skipped before it reaches here.
+     * builder. {@code persistent} and {@code sleep_when_idle} are the row
+     * classes' switches; {@code workflow} is the kind of the class the row is
+     * declared on, {@link RowWorkflowOperative}; {@code sync_durability} is a
+     * declaration a stream class does not carry, and every row needing it is
+     * skipped before it reaches here.
      */
     private static void classFlag(ChannelBuilder c, String rest) {
         String[] call = splitCall(rest);
         switch (call[0]) {
-            case "persistent", "workflow" -> {}
+            case "persistent", "sleep_when_idle", "workflow" -> {}
             case "effectively_once" -> c.effectivelyOnce();
             case "checkpoint_ack" -> c.checkpointAck();
             case "checkpoint_every" -> c.checkpointEvery(Integer.parseInt(call[1]));

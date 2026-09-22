@@ -165,6 +165,48 @@ class HostClassDeclarationTest {
     }
 
     @Test
+    @DisplayName("a stream's opt-out is read from the class, not its Tasklets")
+    void aStreamOptsOutByItsSwitch() throws Exception {
+        StreamOperativeClassRegistry.registerClass(PersistenceOffOperative.class);
+        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_persistence_off_op"));
+
+        assertThat(decl.path("persistent").asBoolean())
+                .as("persistenceEnabled() false opts out even over a tasklet that journals a Change")
+                .isFalse();
+        assertThat(decl.path("sleep_when_idle").asBoolean()).isFalse();
+    }
+
+    @Test
+    @DisplayName("sleeping is a class setting of both kinds, on for a durable workflow by default")
+    void sleepWhenIdleIsDeclaredForBothKinds() throws Exception {
+        StreamOperativeClassRegistry.registerClass(SleepingOperative.class);
+        WorkflowOperativeClassRegistry.registerClass(DeclWorkflow.class);
+        WorkflowOperativeClassRegistry.registerClass(OptedOutWorkflow.class);
+
+        assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_sleeping_op"))
+                        .path("sleep_when_idle")
+                        .asBoolean())
+                .isTrue();
+        assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_workflow"))
+                        .path("sleep_when_idle")
+                        .asBoolean())
+                .as("a workflow sleeps whenever it persists")
+                .isTrue();
+        JsonNode optedOut = JSON.readTree(HostClassDeclaration.forFactory("decl_opted_out_workflow"));
+        assertThat(optedOut.path("persistent").asBoolean()).isFalse();
+        assertThat(optedOut.path("sleep_when_idle").asBoolean()).isFalse();
+    }
+
+    @Test
+    @DisplayName("sleeping without persistence is refused by name, for either kind")
+    void sleepingWithoutPersistenceIsRefused() {
+        assertThatThrownBy(() -> StreamOperativeClassRegistry.registerClass(SleeplessStreamOperative.class))
+                .hasMessageContaining("SleepWithoutPersistence");
+        assertThatThrownBy(() -> WorkflowOperativeClassRegistry.registerClass(SleeplessWorkflow.class))
+                .hasMessageContaining("SleepWithoutPersistence");
+    }
+
+    @Test
     @DisplayName("a workflow class declaring synchronous durability ships the flag")
     void syncDurabilityDeclaration() throws Exception {
         WorkflowOperativeClassRegistry.registerClass(SyncDurableWorkflow.class);
@@ -255,6 +297,11 @@ class HostClassDeclarationTest {
         @Override
         public String factoryId() {
             return "decl_full_op";
+        }
+
+        @Override
+        public boolean sleepWhenIdle() {
+            return true;
         }
 
         @Override
@@ -546,6 +593,63 @@ class HostClassDeclarationTest {
         }
     }
 
+    /** A tier-less class whose tasklet journals a Change, opted out by its switch. */
+    public static final class PersistenceOffOperative implements StreamOperative {
+        @Override
+        public String factoryId() {
+            return "decl_persistence_off_op";
+        }
+
+        @Override
+        public boolean persistenceEnabled() {
+            return false;
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    public static final class SleepingOperative implements StreamOperative {
+        @Override
+        public String factoryId() {
+            return "decl_sleeping_op";
+        }
+
+        @Override
+        public boolean sleepWhenIdle() {
+            return true;
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    public static final class SleeplessStreamOperative implements StreamOperative {
+        @Override
+        public String factoryId() {
+            return "decl_sleepless_op";
+        }
+
+        @Override
+        public boolean persistenceEnabled() {
+            return false;
+        }
+
+        @Override
+        public boolean sleepWhenIdle() {
+            return true;
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
     /** Two tasklets in one class, each at its own schema version. */
     public static final class MixedVersionOperative implements StreamOperative {
         @Override
@@ -679,6 +783,55 @@ class HostClassDeclarationTest {
         @Override
         public String factoryId() {
             return "decl_workflow";
+        }
+
+        @Override
+        public Optional<Duration> maxDuration() {
+            return Optional.of(Duration.ofSeconds(30));
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "in").into(VersionOneTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    public static final class OptedOutWorkflow implements WorkflowOperative {
+        @Override
+        public String factoryId() {
+            return "decl_opted_out_workflow";
+        }
+
+        @Override
+        public boolean persistenceEnabled() {
+            return false;
+        }
+
+        @Override
+        public Optional<Duration> maxDuration() {
+            return Optional.of(Duration.ofSeconds(30));
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "in").into(VersionOneTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    public static final class SleeplessWorkflow implements WorkflowOperative {
+        @Override
+        public String factoryId() {
+            return "decl_sleepless_workflow";
+        }
+
+        @Override
+        public boolean persistenceEnabled() {
+            return false;
+        }
+
+        @Override
+        public boolean sleepWhenIdle() {
+            return true;
         }
 
         @Override
