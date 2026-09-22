@@ -539,9 +539,29 @@ class FlezhaProcessorTest {
                 """;
         String source = generated("t.Place", "t.PlaceWorkflowOperative", code);
         assertThat(source).contains("implements WorkflowOperative");
-        assertThat(source).contains("public void tasklets(ChannelBuilder c)");
+        assertThat(source).contains("public void channels(ChannelBuilder c)");
         assertThat(source)
                 .contains("c.input(java.lang.String.class, \"order\").into(PlaceTasklet.class).sink(\"placed\");");
+        assertThat(source)
+                .as("an unwritten loop mode is the interface's default, not a restatement of it")
+                .doesNotContain("loopMode()");
+    }
+
+    @Test
+    void aShortFormWorkflowDeclaresItsLoopMode() {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.*;
+                import com.flezha.sdk.operative.LoopMode;
+                @WorkflowOperative(id = "chat", sink = "replies", loopMode = LoopMode.PER_INPUT)
+                public class Chat {
+                    public String run(String in) { return in; }
+                }
+                """;
+        assertThat(generated("t.Chat", "t.ChatWorkflowOperative", code))
+                .contains("public com.flezha.sdk.operative.LoopMode loopMode() {"
+                        + " return com.flezha.sdk.operative.LoopMode.PER_INPUT; }");
     }
 
     @Test

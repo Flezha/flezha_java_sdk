@@ -154,7 +154,7 @@ public final class FlezhaImpl implements RunnerHandle {
                 continue;
             }
             if (StreamOperativeClassRegistry.getTopology(factoryId) == null
-                    && WorkflowOperativeClassRegistry.getSpec(factoryId) == null) {
+                    && WorkflowOperativeClassRegistry.getTopology(factoryId) == null) {
                 LOG.warn("syncFactories: `{}` is not in the class registries; skipping", factoryId);
                 continue;
             }

@@ -1,24 +1,26 @@
 package com.flezha.sdk.operative;
 
+import com.flezha.sdk.channel.ChannelBuilder;
 import javax.annotation.Nonnull;
 
 /**
  * The shared base of both operative kinds.
  *
- * <p>{@link StreamOperative} declares a graph of tasklets that runs continuously over a stream,
- * holding per-cell state. {@link WorkflowOperative} declares ordered steps that run to completion
- * and resume at the step they reached. Both are operatives, both are declared on a runner, and both
- * are scheduled, restarted and relocated by the controller in the same way.
+ * <p>Both kinds declare a graph of tasklets on the same {@link ChannelBuilder}, in
+ * {@link #channels(ChannelBuilder)}. {@link StreamOperative} runs that graph continuously over a
+ * stream, holding per-cell state. {@link WorkflowOperative} runs it to completion, commits it stage
+ * by stage, and resumes at the stage it reached. Both are operatives, both are declared on a
+ * runner, and both are scheduled, restarted and relocated by the controller in the same way.
  *
- * <p>The only member common to both is {@link #factoryId()}. Everything that differs between the
- * kinds, the channel graph on one side and the step sequence on the other, stays on the per-kind
- * interface.
+ * <p>The members common to both are {@link #factoryId()} and {@link #channels(ChannelBuilder)}.
+ * Everything that differs between the kinds, the persistence opt-in on one side and the workflow
+ * settings on the other, stays on the per-kind interface.
  *
  * <p>You rarely implement this interface directly. Implement one of the two kinds, which extend it:
  *
  * <pre>{@code
  * public final class WordCount implements StreamOperative { ... }    // continuous, stateful
- * public final class Checkout implements WorkflowOperative { ... }   // ordered steps, resumable
+ * public final class Checkout implements WorkflowOperative { ... }   // runs to completion, resumable
  * }</pre>
  *
  * <p>Both are declared on the same runner, through the same call, which reads the kind from the
@@ -47,4 +49,20 @@ public interface Operative {
      */
     @Nonnull
     String factoryId();
+
+    /**
+     * Declares the graph. Called exactly once per class, at
+     * {@link com.flezha.sdk.FlezhaRunner#registerFactory(Class) registerFactory} time, and the resulting
+     * graph is shared by every instance of this operative that the controller later starts.
+     *
+     * <p>Channels are never constructed directly. Each call on the builder returns the next handle
+     * in the chain, so the whole graph is one fluent expression, and the completed declaration is
+     * validated as a whole before any message is processed. An inconsistent declaration, or one
+     * requesting a capability the deployment cannot supply, is refused at registration naming the
+     * declaration at fault.
+     *
+     * <p>Because this method runs once at registration rather than per message, it must not depend
+     * on anything that varies at run time.
+     */
+    void channels(ChannelBuilder c);
 }

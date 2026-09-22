@@ -11,7 +11,7 @@ public final class BenchChain1WorkflowOperative implements WorkflowOperative {
     }
 
     @Override
-    public void tasklets(ChannelBuilder c) {
+    public void channels(ChannelBuilder c) {
         BenchSteps.chain(c, 1);
     }
 }

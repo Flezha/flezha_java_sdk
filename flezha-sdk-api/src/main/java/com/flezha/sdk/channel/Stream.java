@@ -56,7 +56,7 @@ import javax.annotation.Nonnull;
  * the explicit node name given at wiring time) unless a {@link #sink(String)}
  * name or a {@link #named(String)} override supplies one.
  *
- * <p>Handles are only usable inside {@code channels()} / {@code tasklets()}:
+ * <p>Handles are only usable inside {@code channels()}:
  * the topology freezes at registration and a retained handle used afterwards
  * throws {@link IllegalStateException} naming the operative.
  *

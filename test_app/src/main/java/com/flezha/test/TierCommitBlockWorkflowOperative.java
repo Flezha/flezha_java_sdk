@@ -8,13 +8,14 @@ import com.flezha.sdk.operative.WorkflowOperative;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Mirror of the Rust test app's {@code tier_commit_block_workflow}: the
- * effectively-once workflow fixture. Task A commits durable state AND emits
- * {@code committed:<input>} under a stable key on a keyed hybrid channel
- * (captured into the atomic effect record); task B blocks until the resumed
- * runner sets the release env. A SIGKILL lands with A's effect record durable
- * and B unfinished; the resume re-runs A (idempotent change, deterministic
- * re-emit) and completes.
+ * Mirror of the Rust test app's {@code tier_commit_block_workflow}: the keyed
+ * hybrid-channel workflow fixture, and the {@code commit_block_chain} twin of
+ * {@code test/fixtures/reference_topologies.txt}. Task A commits durable state
+ * AND emits {@code committed:<input>} under a stable key on a keyed hybrid
+ * channel; task B blocks until the resumed runner sets the release env. A
+ * SIGKILL lands with A's state durable and B unfinished, and the resumed
+ * instance runs to completion. It declares no delivery tier: a workflow
+ * commits stage by stage, and the tier is refused on one.
  */
 public final class TierCommitBlockWorkflowOperative implements WorkflowOperative {
 
@@ -24,8 +25,7 @@ public final class TierCommitBlockWorkflowOperative implements WorkflowOperative
     }
 
     @Override
-    public void tasklets(ChannelBuilder c) {
-        c.effectivelyOnce();
+    public void channels(ChannelBuilder c) {
         c.input(String.class, "in")
                 .into(TierCommitA.class)
                 .keyed()

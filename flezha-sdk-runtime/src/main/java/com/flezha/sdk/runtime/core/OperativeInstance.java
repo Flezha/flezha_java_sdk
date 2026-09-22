@@ -13,7 +13,6 @@ import com.flezha.sdk.runtime.state.TimerOp;
 import com.flezha.sdk.runtime.state.TimerPolicy;
 import com.flezha.sdk.runtime.state.TimerSession;
 import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
-import com.flezha.sdk.runtime.workflow.WorkflowSpec;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -92,9 +91,9 @@ public final class OperativeInstance {
         if (topology != null) {
             return new OperativeInstance(operativeId, factoryId, topology, false);
         }
-        WorkflowSpec spec = WorkflowOperativeClassRegistry.getSpec(factoryId);
-        if (spec != null) {
-            return new OperativeInstance(operativeId, factoryId, spec.topology(), true);
+        topology = WorkflowOperativeClassRegistry.getTopology(factoryId);
+        if (topology != null) {
+            return new OperativeInstance(operativeId, factoryId, topology, true);
         }
         throw new IllegalStateException("unknown factory `" + factoryId + "` for operative `" + operativeId + "`");
     }
@@ -158,9 +157,13 @@ public final class OperativeInstance {
         boolean replay = item instanceof WorkItem.Input in && in.replay();
 
         EmitContext ctx = new EmitContext(this, cell, activation.token(), activation.changeSeq(), now, replay);
-        TimerSession session = item instanceof WorkItem.Timer timer
-                ? cell.timerPolicy.firingSession(new PendingTimers(), timer.scheduledAt(), timer.kind())
-                : cell.timerPolicy.session(new PendingTimers(), now);
+        // A workflow stage has nowhere to fire a timer, so its context carries no
+        // session and every timer call throws TimersUnavailable, as compensate's does.
+        TimerSession session = workflow
+                ? null
+                : item instanceof WorkItem.Timer timer
+                        ? cell.timerPolicy.firingSession(new PendingTimers(), timer.scheduledAt(), timer.kind())
+                        : cell.timerPolicy.session(new PendingTimers(), now);
         ctx.timers = session;
         List<Change> buffer = new ArrayList<>();
         Tasklet tasklet = cell.tasklet;
@@ -191,7 +194,9 @@ public final class OperativeInstance {
                         tasklet.run(value, handle, ctx);
                     }
                 }
-                timerOps.set(session.commit(new PendingTimers()));
+                if (session != null) {
+                    timerOps.set(session.commit(new PendingTimers()));
+                }
             });
         }
 

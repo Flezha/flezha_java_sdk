@@ -22,8 +22,8 @@ package com.flezha.sdk.channel;
  * <p>Sharing that surface is deliberate: it keeps the entry side from drifting away from
  * {@link Stream}, so a transform learned in one place works in the other.
  *
- * <p>Like {@link Stream}, this handle is usable only inside {@code channels()} or
- * {@code tasklets()}. The graph freezes at registration, and a retained handle used afterwards
- * throws {@link IllegalStateException} naming the operative.
+ * <p>Like {@link Stream}, this handle is usable only inside {@code channels()}. The graph freezes
+ * at registration, and a retained handle used afterwards throws {@link IllegalStateException}
+ * naming the operative.
  */
 public interface EntryChannel<T> extends EdgeStream<T> {}

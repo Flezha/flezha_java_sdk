@@ -15,7 +15,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * ladder. Task RA commits durable state, forwards on a hybrid channel, and
  * compensates by emitting an undo record; {@code retry_flaky} fails its first
  * {@code FLEZHA_WORKFLOW_RETRY_FAILS} attempts (0 by default — the env is what
- * each scenario arms) and then emits {@code attempt:<n>:<input>}.
+ * each scenario arms) and then emits {@code attempt:<n>:<input>}. The ladder is
+ * the default policy of the {@code mid} edge that feeds it: 3 attempts.
  */
 public final class RetryWorkflowOperative implements WorkflowOperative {
 
@@ -25,7 +26,7 @@ public final class RetryWorkflowOperative implements WorkflowOperative {
     }
 
     @Override
-    public void tasklets(ChannelBuilder c) {
+    public void channels(ChannelBuilder c) {
         c.input(String.class, "in")
                 .into(RetryA.class)
                 .sink("mid", s -> ("res:" + s).getBytes(StandardCharsets.UTF_8))

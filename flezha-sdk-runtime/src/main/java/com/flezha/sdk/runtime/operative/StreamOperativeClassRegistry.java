@@ -1,6 +1,7 @@
 package com.flezha.sdk.runtime.operative;
 
 import com.flezha.sdk.internal.RuntimeBridge;
+import com.flezha.sdk.operative.Operative;
 import com.flezha.sdk.operative.StreamOperative;
 import com.flezha.sdk.operative.StreamOperativeConfigurationException;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder;
@@ -40,23 +41,10 @@ public final class StreamOperativeClassRegistry {
      */
     @Nonnull
     public static String registerClass(@Nonnull Class<? extends StreamOperative> operativeClass) {
-        StreamOperative operative;
-        try {
-            operative = RuntimeBridge.construct(operativeClass);
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalArgumentException(
-                    "StreamOperative class `" + operativeClass.getName() + "` must have a public no-arg constructor: "
-                            + e.toString(),
-                    e);
-        }
-
+        StreamOperative operative = probe(operativeClass, "StreamOperative");
         String factoryId = operative.factoryId();
-        if (factoryId == null || factoryId.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "StreamOperative class `" + operativeClass.getName() + "` returned null/empty from factoryId()");
-        }
 
-        if (com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry.getSpec(factoryId) != null) {
+        if (com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry.getTopology(factoryId) != null) {
             throw new IllegalArgumentException("DuplicateFactoryId: `" + factoryId + "` for StreamOperative class `"
                     + operativeClass.getName() + "` (already registered as a WorkflowOperative)");
         }
@@ -65,6 +53,30 @@ public final class StreamOperativeClassRegistry {
 
         ENTRIES.put(factoryId, new Entry(operativeClass, topology));
         return factoryId;
+    }
+
+    /**
+     * Instantiate an operative class of either kind to read its declaration,
+     * refusing one with no public no-arg constructor or no factory id. Both
+     * class registries register through it.
+     *
+     * @throws IllegalArgumentException naming {@code kind} and the class.
+     */
+    @Nonnull
+    public static <T extends Operative> T probe(@Nonnull Class<T> operativeClass, @Nonnull String kind) {
+        T operative;
+        try {
+            operative = RuntimeBridge.construct(operativeClass);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalArgumentException(
+                    kind + " class `" + operativeClass.getName() + "` must have a public no-arg constructor: " + e, e);
+        }
+        String factoryId = operative.factoryId();
+        if (factoryId == null || factoryId.isEmpty()) {
+            throw new IllegalArgumentException(
+                    kind + " class `" + operativeClass.getName() + "` returned null/empty from factoryId()");
+        }
+        return operative;
     }
 
     /**

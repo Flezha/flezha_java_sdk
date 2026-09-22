@@ -3,10 +3,14 @@ package com.flezha.sdk;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
@@ -123,6 +127,66 @@ class ApiSurfaceCompilationTest {
 
         assertDoesNotCompile(usesStream("s.sink(\"x\").sealed().named(\"y\");"));
         assertDoesNotCompile(usesStream("s.sink(\"x\").sealed().keyed();"));
+    }
+
+    @Test
+    @DisplayName("The retry knobs are gone from the interface")
+    void theRetryKnobsAreGoneFromTheInterface() {
+        assertThat(compiles(workflowWith("c.input(String.class, \"in\").retryMax(2).retryBackoffMs(20);", "")))
+                .as("the edge's retry declaration must compile, or the refusals prove nothing")
+                .isTrue();
+
+        assertDoesNotCompile(workflowWith("", "@Override public int retryAttempts() { return 1; }"));
+        assertDoesNotCompile(workflowWith("", "@Override public java.time.Duration retryBackoff() { return null; }"));
+        assertDoesNotCompile(workflowWith("", "@Override public int barrierRetryAttempts() { return 1; }"));
+    }
+
+    @Test
+    @DisplayName("a workflow graph written in a body named tasklets does not compile: channels is abstract on the base")
+    void aWorkflowBodyNamedTaskletsDoesNotCompile() {
+        assertDoesNotCompile(
+                """
+                package nowhere;
+                import com.flezha.sdk.channel.ChannelBuilder;
+                import com.flezha.sdk.operative.WorkflowOperative;
+                public final class UsesLegacyApi implements WorkflowOperative {
+                    @Override public String factoryId() { return "legacy"; }
+                    public void tasklets(ChannelBuilder c) {}
+                }
+                """);
+    }
+
+    @Test
+    @DisplayName("The javadoc speaks in the graph vocabulary")
+    void theJavadocSpeaksInTheGraphVocabulary() throws IOException {
+        List<String> retired =
+                List.of("ordered steps", "step sequence", "resumes at the step", "between two steps", "step boundary");
+        List<String> found = new ArrayList<>();
+        for (Path tree : List.of(Path.of("src/main/java"), Path.of("../flezha-sdk-runtime/src/main/java"))) {
+            try (Stream<Path> walk = Files.walk(tree)) {
+                for (Path source :
+                        walk.filter(p -> p.toString().endsWith(".java")).toList()) {
+                    String text = Files.readString(source).replaceAll("\\s*\\n\\s*(\\*\\s*|//\\s*)?", " ");
+                    retired.stream().filter(text::contains).forEach(phrase -> found.add(source + ": " + phrase));
+                }
+            }
+        }
+        assertThat(found).as("a workflow is a graph committed stage by stage").isEmpty();
+    }
+
+    /** A workflow class whose graph body is {@code graph} and whose remaining members are {@code members}. */
+    private static String workflowWith(String graph, String members) {
+        return """
+                package nowhere;
+                import com.flezha.sdk.channel.ChannelBuilder;
+                import com.flezha.sdk.operative.WorkflowOperative;
+                public final class UsesLegacyApi implements WorkflowOperative {
+                    @Override public String factoryId() { return "legacy"; }
+                    @Override public void channels(ChannelBuilder c) { %s }
+                    %s
+                }
+                """
+                .formatted(graph, members);
     }
 
     /** One import of {@code type}, the only thing under test. */

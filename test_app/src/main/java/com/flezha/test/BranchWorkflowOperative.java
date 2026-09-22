@@ -33,24 +33,18 @@ public final class BranchWorkflowOperative implements WorkflowOperative {
         return "branch_workflow";
     }
 
-    /**
-     * Fail fast: the compensation scenario is about the rollback order, not the
-     * ladder that precedes it.
-     */
     @Override
-    public int retryAttempts() {
-        return 0;
-    }
-
-    @Override
-    public void tasklets(ChannelBuilder c) {
+    public void channels(ChannelBuilder c) {
         // One channel, two consumers: THE fan-out. Both branches read exactly
         // what BranchA released on it (held handle, wired twice).
         var mid = c.input(String.class, "in")
                 .into(BranchA.class)
                 .sink("mid", s -> ("a:" + s).getBytes(StandardCharsets.UTF_8));
+        // Fail fast: the compensation scenario is about the rollback order,
+        // not the ladder that precedes it.
         mid.into(BranchB.class)
                 .sink("bmid", s -> ("b:" + s).getBytes(StandardCharsets.UTF_8))
+                .retryMax(1)
                 .into(BranchD.class)
                 .sink("d_out");
         mid.into(BranchC.class).sink("c_out");

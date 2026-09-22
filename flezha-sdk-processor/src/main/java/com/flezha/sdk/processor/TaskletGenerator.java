@@ -6,6 +6,7 @@ import com.flezha.sdk.authoring.InitState;
 import com.flezha.sdk.authoring.StreamOperative;
 import com.flezha.sdk.authoring.Tasklet;
 import com.flezha.sdk.authoring.WorkflowOperative;
+import com.flezha.sdk.operative.LoopMode;
 import com.flezha.sdk.processor.TaskletModel.Declares;
 import com.flezha.sdk.processor.TaskletModel.Output;
 import com.flezha.sdk.processor.TaskletModel.StateShape;
@@ -87,7 +88,8 @@ final class TaskletGenerator {
 
     /**
      * A class and the one declaring annotation it carries, read alike from each of the three.
-     * {@code emits} is the declared output type, {@code null} when unset.
+     * {@code emits} is the declared output type, {@code null} when unset; {@code loopMode} is the
+     * written one, {@link LoopMode#ONCE} on every annotation that has none.
      */
     private record Declaration(
             TypeElement type,
@@ -99,7 +101,8 @@ final class TaskletGenerator {
             String emits,
             List<String> keys,
             int capacity,
-            String onFull) {
+            String onFull,
+            LoopMode loopMode) {
 
         String annotation() {
             return declares.annotation();
@@ -121,7 +124,8 @@ final class TaskletGenerator {
                     declaredEmits(p::emits),
                     List.of(p.keys()),
                     p.capacity(),
-                    ""));
+                    "",
+                    LoopMode.ONCE));
         }
         StreamOperative s = type.getAnnotation(StreamOperative.class);
         if (s != null) {
@@ -135,7 +139,8 @@ final class TaskletGenerator {
                     declaredEmits(s::emits),
                     List.of(s.keys()),
                     s.capacity(),
-                    s.onFull()));
+                    s.onFull(),
+                    LoopMode.ONCE));
         }
         WorkflowOperative w = type.getAnnotation(WorkflowOperative.class);
         if (w != null) {
@@ -149,7 +154,8 @@ final class TaskletGenerator {
                     declaredEmits(w::emits),
                     List.of(w.keys()),
                     w.capacity(),
-                    w.onFull()));
+                    w.onFull(),
+                    w.loopMode()));
         }
         if (found.size() > 1) {
             out.error(
@@ -310,6 +316,7 @@ final class TaskletGenerator {
                 d.sink(),
                 d.input().isEmpty() ? "input" : d.input(),
                 d.onFull(),
+                d.loopMode(),
                 d.capacity(),
                 stateful,
                 ctxParam,
@@ -595,13 +602,12 @@ final class TaskletGenerator {
 
     /**
      * The §5 short form's operative: one entry channel into this tasklet and, with a
-     * {@code sink}, this tasklet to that plugin sink, with every other operative method at its
-     * interface default. The two kinds differ only in the interface they state and the method they
-     * fill, because both author on the same builder.
+     * {@code sink}, this tasklet to that plugin sink, with a written loop mode and every other
+     * operative method at its interface default. The two kinds differ only in the interface they
+     * state, because both declare their graph in {@code channels} on the same builder.
      */
     private String renderShortFormOperative(TaskletModel m) {
         String operativeInterface = m.declares().simpleName;
-        String declaration = m.declares() == Declares.WORKFLOW ? "tasklets" : "channels";
 
         StringBuilder b = FlezhaProcessor.source(m.pkg());
         b.append("import com.flezha.sdk.channel.ChannelBuilder;\n");
@@ -617,7 +623,13 @@ final class TaskletGenerator {
         b.append("    @Override public String factoryId() { return ")
                 .append(mirrors.literal(m.id()))
                 .append("; }\n");
-        b.append("    @Override public void ").append(declaration).append("(ChannelBuilder c) {\n");
+        if (m.loopMode() != LoopMode.ONCE) {
+            b.append("    @Override public com.flezha.sdk.operative.LoopMode loopMode() { return ")
+                    .append("com.flezha.sdk.operative.LoopMode.")
+                    .append(m.loopMode().name())
+                    .append("; }\n");
+        }
+        b.append("    @Override public void channels(ChannelBuilder c) {\n");
         b.append("        c.input(")
                 .append(TypeMirrors.classLit(m.inputType()))
                 .append(", ")

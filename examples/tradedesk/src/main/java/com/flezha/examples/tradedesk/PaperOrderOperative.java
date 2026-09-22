@@ -27,9 +27,9 @@ public final class PaperOrderOperative implements WorkflowOperative {
     public record OrderTicket(String symbol, int quantity) {}
 
     /**
-     * The operative's stable identity, and the name {@code flz operative start paper_order
-     * --kind workflow} resolves. It is durable, so changing it declares a new operative rather
-     * than renaming this one.
+     * The operative's stable identity, and the name {@code flz operative start paper_order}
+     * resolves. It is durable, so changing it declares a new operative rather than renaming this
+     * one.
      */
     @Override
     @Nonnull
@@ -55,7 +55,7 @@ public final class PaperOrderOperative implements WorkflowOperative {
      * {@code named(...)} overrides that where a stable name of your own matters more.
      */
     @Override
-    public void tasklets(@Nonnull ChannelBuilder c) {
+    public void channels(@Nonnull ChannelBuilder c) {
         c.input(OrderTicket.class, "order")
                 .into(ReserveFunds.class)
                 .into(PlaceOrder.class)

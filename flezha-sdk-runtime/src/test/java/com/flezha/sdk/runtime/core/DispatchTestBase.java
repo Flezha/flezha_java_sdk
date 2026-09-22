@@ -677,7 +677,7 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        public void tasklets(ChannelBuilder c) {
+        public void channels(ChannelBuilder c) {
             c.input(String.class, "seed").into(CompletingTask.class);
         }
     }
@@ -699,7 +699,7 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        public void tasklets(ChannelBuilder c) {
+        public void channels(ChannelBuilder c) {
             var fan = c.input(String.class, "seed").into(MidTask.class).named("wf_fan");
             fan.map(String.class, s -> "mapped:" + s).into(KeyRecorder.class);
             fan.into(KeyRecorder.class, "wf_plain_leaf");
@@ -718,7 +718,7 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        public void tasklets(ChannelBuilder c) {
+        public void channels(ChannelBuilder c) {
             c.input(String.class, "seed").into(UndoableTask.class).into(KeyRecorder.class);
         }
     }

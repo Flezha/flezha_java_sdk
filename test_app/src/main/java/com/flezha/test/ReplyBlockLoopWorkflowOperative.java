@@ -43,7 +43,7 @@ public final class ReplyBlockLoopWorkflowOperative implements WorkflowOperative 
     }
 
     @Override
-    public void tasklets(ChannelBuilder c) {
+    public void channels(ChannelBuilder c) {
         c.input(String.class, "in")
                 .into(ChatSteps.Turn.class)
                 .named("mid")

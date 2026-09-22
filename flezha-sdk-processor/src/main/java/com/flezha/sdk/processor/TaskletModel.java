@@ -1,5 +1,6 @@
 package com.flezha.sdk.processor;
 
+import com.flezha.sdk.operative.LoopMode;
 import java.util.List;
 
 /**
@@ -26,6 +27,7 @@ record TaskletModel(
         String sink,
         String input,
         String onFull,
+        LoopMode loopMode,
         int capacity,
         boolean stateful,
         boolean ctxParam,

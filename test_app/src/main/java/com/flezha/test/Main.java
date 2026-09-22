@@ -119,12 +119,14 @@ public final class Main {
                 .registerFactory(BenchChain16WorkflowOperative.class)
                 .registerFactory(BenchChainOptOut4WorkflowOperative.class)
                 .registerFactory(BenchLoopWorkflowOperative.class)
+                .registerFactory(WorkflowTimerRefusedWorkflowOperative.class)
                 // The §5 short forms, registered by the classes the author wrote, as
                 // every hand-written operative is: nothing collects itself.
                 .registerFactory(SugarDoNothing.class)
                 .registerFactory(SugarStore.class)
                 .registerFactory(SugarNamedInput.class)
                 .registerFactory(SugarWorkflow.class)
+                .registerFactory(SugarWorkflowPerInput.class)
                 .registerFactory(SugarStateOnly.class)
                 .registerFactory(SugarStaticCellStreamOperative.class);
         return runner;

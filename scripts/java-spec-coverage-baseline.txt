@@ -49,7 +49,6 @@ Java SDK implements the workflow durable loop and suspension :: Each loop iterat
 Java SDK implements the workflow cell retry ladder :: A non-retryable error skips the ladder
 Java SDK implements the workflow cell retry ladder :: A transient cell failure recovers on retry
 Java SDK implements the workflow cell retry ladder :: An exhausted ladder compensates
-Java SDK implements the workflow cell retry ladder :: attempts > 1 with a zero backoff is refused
 Java SDK implements the workflow task-journal and TaskCommit handshake :: A commit timeout triggers compensation
 Java SDK implements the workflow task-journal and TaskCommit handshake :: A committed task is skipped on resume, not re-run
 Java SDK implements the workflow task-journal and TaskCommit handshake :: An opted-out class re-runs from the top

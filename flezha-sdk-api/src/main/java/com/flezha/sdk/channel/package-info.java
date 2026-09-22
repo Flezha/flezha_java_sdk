@@ -1,8 +1,8 @@
 /**
  * Channel and stream declarations: the graph connecting entry points, tasklets and sinks.
  *
- * <p>These types are declared inside an operative's {@code channels(ChannelBuilder)} or
- * {@code tasklets(ChannelBuilder)} method and are never constructed directly.
+ * <p>These types are declared inside an operative's {@code channels(ChannelBuilder)} method, the
+ * one graph body both operative kinds write, and are never constructed directly.
  * {@link com.flezha.sdk.channel.ChannelBuilder} is the entry point, and every call returns the next
  * handle in the chain, so a complete graph is expressed as one fluent expression. The declaration
  * is read once at registration and validated as a whole; a malformed graph is refused there rather
@@ -20,8 +20,8 @@
  * and test feeds; unlabelled, a channel takes the producing tasklet's name. {@code into} wires a
  * further tasklet as a consumer, which is how multi-stage graphs are expressed. {@code sink}
  * attaches a plugin, {@code keyed} declares that emits carry a natural key supplied through
- * {@code emitKeyed}. A durable workflow operative journals the handoff at every step boundary; the
- * payload codec it uses there is derived by the runtime and is declared nowhere.
+ * {@code emitKeyed}. A durable workflow operative journals the handoff at every stage boundary of
+ * its graph; the payload codec it uses there is derived by the runtime and is declared nowhere.
  *
  * <p>{@link com.flezha.sdk.channel.EdgeStream} carries the transforms applied on the wiring itself:
  * {@code filter} discards values, {@code map} and {@code flatMap} reshape or expand them, and

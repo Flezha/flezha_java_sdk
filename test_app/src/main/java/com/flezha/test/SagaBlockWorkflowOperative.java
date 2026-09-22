@@ -26,7 +26,7 @@ public final class SagaBlockWorkflowOperative implements WorkflowOperative {
     }
 
     @Override
-    public void tasklets(ChannelBuilder c) {
+    public void channels(ChannelBuilder c) {
         var sSagaA = c.input(String.class, "in").into(SagaA.class);
         var sSagaB = sSagaA.named("s1").into(SagaB.class);
         sSagaB.named("s2").into(SagaC.class);

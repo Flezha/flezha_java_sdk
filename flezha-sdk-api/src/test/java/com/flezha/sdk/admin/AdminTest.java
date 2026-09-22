@@ -35,11 +35,10 @@ class AdminTest {
     void aStartWithAnIdAnswersAlreadyRunning() {
         FlezhaImpl.ADMIN_ANSWER = "{\"id\":\"my_echo\",\"outcome\":\"already_running\"}";
 
-        assertThat(admin.startOperative(OperativeSpec.of("echo").id("my_echo").kind("stream")))
+        assertThat(admin.startOperative(OperativeSpec.of("echo").id("my_echo")))
                 .isEqualTo(new StartResult("my_echo", StartOutcome.ALREADY_RUNNING));
         assertThat(FlezhaImpl.ADMIN_CALLS)
-                .containsExactly(List.of(
-                        "Operative.start", "[{\"factory_id\":\"echo\",\"id\":\"my_echo\",\"kind\":\"stream\"}]"));
+                .containsExactly(List.of("Operative.start", "[{\"factory_id\":\"echo\",\"id\":\"my_echo\"}]"));
     }
 
     @Test

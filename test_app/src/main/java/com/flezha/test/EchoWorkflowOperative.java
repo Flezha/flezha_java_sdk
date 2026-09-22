@@ -21,7 +21,7 @@ public final class EchoWorkflowOperative implements WorkflowOperative {
     }
 
     @Override
-    public void tasklets(ChannelBuilder c) {
+    public void channels(ChannelBuilder c) {
         c.input(String.class, "in").into(Echo.class).sink("out");
     }
 

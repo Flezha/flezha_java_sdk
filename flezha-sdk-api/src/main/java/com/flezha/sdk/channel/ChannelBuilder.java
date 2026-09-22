@@ -5,8 +5,8 @@ import javax.annotation.Nonnull;
 
 /**
  * Producer-first fluent graph builder consumed by
- * {@link com.flezha.sdk.operative.StreamOperative#channels(ChannelBuilder)}
- * (and by workflow {@code tasklets(...)} authoring).
+ * {@link com.flezha.sdk.operative.Operative#channels(ChannelBuilder)}, the
+ * graph body of both operative kinds.
  *
  * <p>{@code c.input(T.class, "name").into(A.class).into(B.class).sink("plugin")}
  * — {@code .into} wires a consumer and returns that tasklet's <b>output

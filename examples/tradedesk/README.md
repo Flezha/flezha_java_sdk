@@ -46,7 +46,7 @@ One instance is one order. `--text` carries the order on the `order` channel;
 the start writes down everything the instance emits:
 
 ```sh
-flz operative start paper_order --id order_1 --kind workflow --namespace trading \
+flz operative start paper_order --id order_1 --namespace trading \
   --text '{"symbol": "AAPL", "quantity": 10}' --channel order \
   --plugins '[{"id":"order_1_writer","provider":"operative_file_sink","operative_id":"order_1","opts":{"path":"order_1.txt"},"hooks":[["on_output",{}]]}]'
 ```
@@ -72,7 +72,7 @@ The desk books at most 100 at a time, so a larger order is refused by the last
 step. Start one the same way, with a quantity above the limit:
 
 ```sh
-flz operative start paper_order --id order_2 --kind workflow --namespace trading \
+flz operative start paper_order --id order_2 --namespace trading \
   --text '{"symbol": "AAPL", "quantity": 500}' --channel order \
   --plugins '[{"id":"order_2_writer","provider":"operative_file_sink","operative_id":"order_2","opts":{"path":"order_2.txt"},"hooks":[["on_output",{}]]}]'
 ```

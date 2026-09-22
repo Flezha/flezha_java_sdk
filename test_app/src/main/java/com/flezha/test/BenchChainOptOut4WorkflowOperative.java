@@ -16,7 +16,7 @@ public final class BenchChainOptOut4WorkflowOperative implements WorkflowOperati
     }
 
     @Override
-    public void tasklets(ChannelBuilder c) {
+    public void channels(ChannelBuilder c) {
         BenchSteps.chain(c, 4);
     }
 }

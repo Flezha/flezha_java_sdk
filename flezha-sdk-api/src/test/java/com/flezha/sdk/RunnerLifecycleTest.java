@@ -67,12 +67,16 @@ class RunnerLifecycleTest {
         public String factoryId() {
             return "lifecycle_d";
         }
+
+        @Override
+        public void channels(ChannelBuilder c) {}
     }
 
     /**
-     * A class of both kinds: its kind cannot be read, so it is refused at registration. Both
-     * interfaces default {@code persistenceEnabled()}, so a class implementing both must resolve
-     * the inherited default itself — which is what makes the shape writable at all.
+     * A class of both kinds: its kind cannot be read, so it is refused at registration. The base
+     * declares the one {@code channels} both kinds write, and both interfaces default
+     * {@code persistenceEnabled()}, so a class implementing both must resolve the inherited default
+     * itself, which is what makes the shape writable at all.
      */
     public static final class BothKinds implements StreamOperative, WorkflowOperative {
         @Override
@@ -95,6 +99,9 @@ class RunnerLifecycleTest {
         public String factoryId() {
             return "lifecycle_neither";
         }
+
+        @Override
+        public void channels(ChannelBuilder c) {}
     }
 
     /** A short form: the runner registers the operative generated from it, {@link ShortFormStreamOperative}. */
@@ -324,7 +331,7 @@ class RunnerLifecycleTest {
     }
 
     @Test
-    @DisplayName("an operative of both kinds, or of neither, is refused at registration")
+    @DisplayName("A class of both kinds is refused at registration, and so is one of neither")
     void anUnreadableKindIsRefused() {
         FlezhaRunner runner = Flezha.createRunner("ns_kind_refusals");
 

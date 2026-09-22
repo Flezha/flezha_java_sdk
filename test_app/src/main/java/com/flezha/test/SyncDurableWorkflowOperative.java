@@ -24,7 +24,7 @@ public final class SyncDurableWorkflowOperative implements WorkflowOperative {
     }
 
     @Override
-    public void tasklets(ChannelBuilder c) {
+    public void channels(ChannelBuilder c) {
         c.input(String.class, "in")
                 .into(CommitBlockWorkflowOperative.CommitA.class)
                 .named("mid")

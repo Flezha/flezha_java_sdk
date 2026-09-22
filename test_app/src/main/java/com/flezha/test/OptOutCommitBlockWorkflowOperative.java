@@ -25,7 +25,7 @@ public final class OptOutCommitBlockWorkflowOperative implements WorkflowOperati
     }
 
     @Override
-    public void tasklets(ChannelBuilder c) {
+    public void channels(ChannelBuilder c) {
         c.input(String.class, "in")
                 .into(CommitBlockWorkflowOperative.CommitA.class)
                 .sink("mid", s -> ("a-ran:" + s).getBytes(StandardCharsets.UTF_8))

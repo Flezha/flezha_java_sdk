@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -104,6 +105,43 @@ class WorkflowDispatchTest extends DispatchTestBase {
                 .isEqualTo("mid:v");
     }
 
+    @Test
+    @DisplayName("A timer inside a workflow tasklet is refused")
+    void aTimerInsideAWorkflowTaskletIsRefused() {
+        WorkflowOperativeClassRegistry.registerClass(TimerWorkflow.class);
+        ItemEffect effect = soleEffect(work("timer_workflow", 0, Optional.empty(), 0, input(0, "x", 1)));
+
+        assertThat(effect.verdict())
+                .as("the attempt fails as one throwing any tasklet exception fails")
+                .isInstanceOf(Verdict.RetryableError.class);
+        assertThat(((Verdict.RetryableError) effect.verdict()).message()).startsWith("TimersUnavailable");
+        assertThat(effect.timers()).as("no timer op reaches the effect").isEmpty();
+    }
+
+    /** A workflow whose one tasklet registers a processing-time timer. */
+    public static final class TimerWorkflow implements com.flezha.sdk.operative.WorkflowOperative {
+        @Override
+        public String factoryId() {
+            return "timer_workflow";
+        }
+
+        @Override
+        public boolean persistenceEnabled() {
+            return false;
+        }
+
+        @Override
+        public void channels(com.flezha.sdk.channel.ChannelBuilder c) {
+            c.input(String.class, "seed").into(TimerAfterTask.class);
+        }
+    }
+
+    public static final class TimerAfterTask extends Task<Void> {
+        public TimerAfterTask() {
+            super("timer_after_task", (input, ctx) -> ctx.timerAfter(Duration.ofSeconds(1)));
+        }
+    }
+
     /** A DURABLE structured chain that declares nothing about its handoff. */
     public static final class DurableHandoffWorkflow implements com.flezha.sdk.operative.WorkflowOperative {
         @Override
@@ -112,7 +150,7 @@ class WorkflowDispatchTest extends DispatchTestBase {
         }
 
         @Override
-        public void tasklets(com.flezha.sdk.channel.ChannelBuilder c) {
+        public void channels(com.flezha.sdk.channel.ChannelBuilder c) {
             c.input(String.class, "seed")
                     .into(MidTask.class)
                     .named("wf_durable")

@@ -16,6 +16,7 @@ public class SpawnException extends Exception {
         return switch (kind) {
             case "already_running" -> new AlreadyRunning(message);
             case "factory_unknown" -> new FactoryUnknown(message);
+            case "factory_not_workflow" -> new FactoryNotWorkflow(message);
             case "timeout" -> new Timeout(message);
             case "unavailable" -> new Unavailable(message);
             default -> new Refused(message);
@@ -32,6 +33,13 @@ public class SpawnException extends Exception {
     /** No connected runner registers the requested factory. */
     public static final class FactoryUnknown extends SpawnException {
         public FactoryUnknown(String message) {
+            super(message);
+        }
+    }
+
+    /** The requested factory is registered, but as a stream: only a workflow can be spawned. */
+    public static final class FactoryNotWorkflow extends SpawnException {
+        public FactoryNotWorkflow(String message) {
             super(message);
         }
     }

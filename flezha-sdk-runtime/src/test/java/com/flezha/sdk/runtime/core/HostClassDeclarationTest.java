@@ -14,9 +14,7 @@ import com.flezha.sdk.operative.WorkflowOperative;
 import com.flezha.sdk.runtime.RepositoryFixture;
 import com.flezha.sdk.runtime.operative.StatelessTestTasklet;
 import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
-import com.flezha.sdk.runtime.operative.StreamOperativeTopology;
 import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
-import com.flezha.sdk.runtime.workflow.WorkflowSpec;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.tasklet.TaskletCtx;
@@ -52,8 +50,7 @@ class HostClassDeclarationTest {
     @DisplayName("a stream declaration emits channels and tasklets in id order with tier facts")
     void streamDeclaration() throws Exception {
         StreamOperativeClassRegistry.registerClass(TierOperative.class);
-        StreamOperativeTopology topology = StreamOperativeClassRegistry.getTopology("decl_tier_op");
-        JsonNode decl = JSON.readTree(HostClassDeclaration.forStream(topology));
+        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_tier_op"));
 
         assertThat(decl.get("factory_id").asText()).isEqualTo("decl_tier_op");
         assertThat(decl.get("sdk_lang").asInt()).isEqualTo(2);
@@ -117,8 +114,7 @@ class HostClassDeclarationTest {
     @DisplayName("each Tasklet declares its own schema version, never the class maximum")
     void perTaskletSchemaVersions() throws Exception {
         StreamOperativeClassRegistry.registerClass(MixedVersionOperative.class);
-        JsonNode decl = JSON.readTree(
-                HostClassDeclaration.forStream(StreamOperativeClassRegistry.getTopology("decl_mixed_version_op")));
+        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_mixed_version_op"));
 
         assertThat(decl.has("schema_version"))
                 .as("a class-wide version would re-stamp a Tasklet with a version it never declared")
@@ -146,8 +142,7 @@ class HostClassDeclarationTest {
     @DisplayName("a workflow declaration carries its tasklets with the workflow block")
     void workflowDeclaration() throws Exception {
         WorkflowOperativeClassRegistry.registerClass(DeclWorkflow.class);
-        WorkflowSpec spec = WorkflowOperativeClassRegistry.getSpec("decl_workflow");
-        JsonNode decl = JSON.readTree(HostClassDeclaration.forWorkflow(spec));
+        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_workflow"));
 
         assertThat(decl.get("factory_id").asText()).isEqualTo("decl_workflow");
         assertThat(decl.get("channels")).isNotEmpty();
@@ -158,10 +153,11 @@ class HostClassDeclarationTest {
         JsonNode workflow = decl.get("workflow");
         assertThat(workflow.get("loop_mode").asText()).isEqualTo("once");
         assertThat(workflow.get("rollback_mode").asText()).isEqualTo("all_or_nothing");
-        assertThat(workflow.get("retry_attempts").asInt()).isEqualTo(3);
-        assertThat(workflow.get("retry_backoff_ms").asLong()).isEqualTo(500);
-        assertThat(workflow.get("barrier_retry_attempts").asInt()).isEqualTo(3);
         assertThat(workflow.get("max_duration_ms").asLong()).isEqualTo(30_000);
+        assertThat(workflow.fieldNames())
+                .toIterable()
+                .as("retry is the edge's, carried on each channel")
+                .doesNotContain("retry_attempts", "retry_backoff_ms", "barrier_retry_attempts");
         assertThat(workflow.has("wake_after_ms")).isFalse();
         assertThat(decl.has("sync_durability"))
                 .as("asynchronous remote durability is the cost-free default")
@@ -169,42 +165,11 @@ class HostClassDeclarationTest {
     }
 
     @Test
-    @DisplayName("a workflow declaring the stream tier keeps the facts and puts none of the keys on the wire")
-    void workflowDeclarationDropsTheStreamTierKeys() throws Exception {
-        WorkflowOperativeClassRegistry.registerClass(TierWorkflow.class);
-        WorkflowSpec spec = WorkflowOperativeClassRegistry.getSpec("decl_tier_workflow");
-        JsonNode decl = JSON.readTree(HostClassDeclaration.forWorkflow(spec));
-
-        assertThat(spec.topology().declaration())
-                .as("the in-process tier is the topology's, and the wire record must not gate it")
-                .containsEntry("effectively_once", true)
-                .containsEntry("checkpoint_ack", true);
-
-        // The core refuses effectively_once and correction_window_ms on a class
-        // carrying a workflow block, and the checkpoint family rests on an
-        // acknowledgement that refusal leaves unreachable there.
-        assertThat(decl.fieldNames())
-                .toIterable()
-                .doesNotContain(
-                        "effectively_once",
-                        "checkpoint_ack",
-                        "checkpoint_every",
-                        "checkpoint_outputs",
-                        "checkpoint_max_delay_ms",
-                        "correction_window_ms",
-                        "beyond_window_policy");
-        assertThat(decl.get("workflow")).isNotNull();
-        assertThat(decl.get("channels")).isNotEmpty();
-    }
-
-    @Test
     @DisplayName("a workflow class declaring synchronous durability ships the flag")
     void syncDurabilityDeclaration() throws Exception {
         WorkflowOperativeClassRegistry.registerClass(SyncDurableWorkflow.class);
-        WorkflowSpec spec = WorkflowOperativeClassRegistry.getSpec("decl_sync_workflow");
-        assertThat(spec.syncDurability()).isTrue();
 
-        JsonNode decl = JSON.readTree(HostClassDeclaration.forWorkflow(spec));
+        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_sync_workflow"));
         assertThat(decl.get("sync_durability").asBoolean()).isTrue();
     }
 
@@ -212,8 +177,7 @@ class HostClassDeclarationTest {
     @DisplayName("a declared hook needs no second declaration: a written compensate is compensable")
     void aWrittenCompensateIsDeclared() throws Exception {
         WorkflowOperativeClassRegistry.registerClass(FullyDeclaredWorkflow.class);
-        JsonNode decl = JSON.readTree(
-                HostClassDeclaration.forWorkflow(WorkflowOperativeClassRegistry.getSpec("decl_full_workflow")));
+        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_full_workflow"));
 
         assertThat(decl.get("tasklets").get(0).path("compensate_overridden").asBoolean())
                 .as("the rollback plans only from compensable tasklets")
@@ -227,12 +191,9 @@ class HostClassDeclarationTest {
         StreamOperativeClassRegistry.registerClass(FullyDeclaredDynamicOperative.class);
         WorkflowOperativeClassRegistry.registerClass(FullyDeclaredWorkflow.class);
 
-        JsonNode stream =
-                JSON.readTree(HostClassDeclaration.forStream(StreamOperativeClassRegistry.getTopology("decl_full_op")));
-        JsonNode dynamic = JSON.readTree(
-                HostClassDeclaration.forStream(StreamOperativeClassRegistry.getTopology("decl_full_dynamic_op")));
-        JsonNode workflow = JSON.readTree(
-                HostClassDeclaration.forWorkflow(WorkflowOperativeClassRegistry.getSpec("decl_full_workflow")));
+        JsonNode stream = JSON.readTree(HostClassDeclaration.forFactory("decl_full_op"));
+        JsonNode dynamic = JSON.readTree(HostClassDeclaration.forFactory("decl_full_dynamic_op"));
+        JsonNode workflow = JSON.readTree(HostClassDeclaration.forFactory("decl_full_workflow"));
 
         // A key may live on any node of its section: the entry channel has no
         // `producer`, the plugin-bound one has the `keyed` flag.
@@ -446,7 +407,7 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public void tasklets(ChannelBuilder c) {
+        public void channels(ChannelBuilder c) {
             c.input(String.class, "in").into(UndoTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
@@ -467,8 +428,7 @@ class HostClassDeclarationTest {
     @DisplayName("the checkpoint interval options ride the declaration only when declared")
     void checkpointIntervalOptions() throws Exception {
         StreamOperativeClassRegistry.registerClass(BatchedOutputsOperative.class);
-        StreamOperativeTopology topology = StreamOperativeClassRegistry.getTopology("decl_batched_op");
-        JsonNode decl = JSON.readTree(HostClassDeclaration.forStream(topology));
+        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_batched_op"));
 
         assertThat(decl.has("checkpoint_ack"))
                 .as("each option writes its OWN raw flag; the core implies the granularity")
@@ -494,9 +454,8 @@ class HostClassDeclarationTest {
         // channel carries a journal codec, so a terminal whose only wiring is a
         // plugin sink ships an empty handoff and the crash-resumed loop reads
         // that as convergence.
-        WorkflowSpec spec = WorkflowSpec.build(ChainedTerminalIntoSinkWorkflow.class);
         WorkflowOperativeClassRegistry.registerClass(ChainedTerminalIntoSinkWorkflow.class);
-        byte[] declaration = HostClassDeclaration.forWorkflow(spec);
+        byte[] declaration = HostClassDeclaration.forFactory("decl_chained_sink");
 
         long ctx = FlzCore.newContext();
         try {
@@ -522,7 +481,7 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public void tasklets(ChannelBuilder c) {
+        public void channels(ChannelBuilder c) {
             c.input(String.class, "in").into(ChainedSinkTask.class).sink("out");
         }
     }
@@ -662,7 +621,7 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public void tasklets(ChannelBuilder c) {
+        public void channels(ChannelBuilder c) {
             c.input(String.class, "in").into(VersionOneTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
@@ -692,21 +651,6 @@ class HostClassDeclarationTest {
         public void run(String input, StateHandle<Object, DeclChange> state, TaskletCtx ctx)
                 throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emitKeyed("k", input);
-        }
-    }
-
-    /** A workflow whose channel graph declares the stream tier, as the conformance twin does. */
-    public static final class TierWorkflow implements WorkflowOperative {
-        @Override
-        public String factoryId() {
-            return "decl_tier_workflow";
-        }
-
-        @Override
-        public void tasklets(ChannelBuilder c) {
-            c.effectivelyOnce();
-            c.checkpointAck();
-            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -743,7 +687,7 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public void tasklets(ChannelBuilder c) {
+        public void channels(ChannelBuilder c) {
             c.input(String.class, "in").into(VersionOneTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }

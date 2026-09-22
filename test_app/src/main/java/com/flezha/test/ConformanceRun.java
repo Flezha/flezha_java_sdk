@@ -8,13 +8,15 @@ import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.EdgeStream;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.Stream;
+import com.flezha.sdk.operative.Operative;
 import com.flezha.sdk.operative.StreamOperative;
 import com.flezha.sdk.operative.StreamOperativeConfigurationException;
+import com.flezha.sdk.operative.WorkflowOperative;
+import com.flezha.sdk.operative.WorkflowOperativeConfigurationException;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.runtime.operative.ChannelDescriptor;
 import com.flezha.sdk.runtime.operative.StreamOperativeTopology;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder;
-import com.flezha.sdk.runtime.workflow.WorkflowSpec;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -87,13 +89,24 @@ public final class ConformanceRun {
     /** The capacity a row declared per role, read as the tasklet is minted. */
     private static final Map<String, Integer> MAILBOX = new HashMap<>();
 
-    /** The row {@link RowStreamOperative} declares when the runner defines it. */
+    /** The row a {@link RowOperative} declares when the runner defines it. */
     private static Row current;
 
     private ConformanceRun() {}
 
     /** A row of the four-column refusal table. */
-    private record Row(String topology, String steps, String needs) {}
+    private record Row(String topology, String steps, String needs) {
+
+        /** Whether the row declares a workflow class, which only the workflow kind can write. */
+        boolean workflow() {
+            for (String step : steps.split(";")) {
+                if (step.trim().equals("class.workflow")) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
 
     // -----------------------------------------------------------------------
     // The fixture.
@@ -144,8 +157,8 @@ public final class ConformanceRun {
     // -----------------------------------------------------------------------
     // The interpreter.
 
-    /** The class a row declares: the steps are read at {@code channels()} time. */
-    public static final class RowStreamOperative implements StreamOperative {
+    /** The class a row declares, of either kind: the steps are read at {@code channels()} time. */
+    private abstract static class RowOperative implements Operative {
 
         @Override
         public String factoryId() {
@@ -157,6 +170,12 @@ public final class ConformanceRun {
             interpret(c, current.steps());
         }
     }
+
+    /** The class a row declares on the stream kind. */
+    public static final class RowStreamOperative extends RowOperative implements StreamOperative {}
+
+    /** The class a {@code class.workflow} row declares: the same steps, on the workflow kind. */
+    public static final class RowWorkflowOperative extends RowOperative implements WorkflowOperative {}
 
     private static void interpret(ChannelBuilder c, String steps) {
         Map<String, EdgeStream<String>> handles = new LinkedHashMap<>();
@@ -293,14 +312,16 @@ public final class ConformanceRun {
     /**
      * {@code class.<flag>[(<value>)]} — the facts the class declares on the
      * builder. {@code persistent} is implied here by the palette's journalling
-     * Change types, which is what a Java class's persistence IS; {@code workflow}
-     * and {@code sync_durability} are declarations a stream class does not carry,
-     * and every row needing one is skipped before it reaches here.
+     * Change types, which is what a Java stream class's persistence IS, and by
+     * a workflow class's default; {@code workflow} is the kind of the class the
+     * row is declared on, {@link RowWorkflowOperative}; {@code sync_durability}
+     * is a declaration a stream class does not carry, and every row needing it
+     * is skipped before it reaches here.
      */
     private static void classFlag(ChannelBuilder c, String rest) {
         String[] call = splitCall(rest);
         switch (call[0]) {
-            case "persistent" -> {}
+            case "persistent", "workflow" -> {}
             case "effectively_once" -> c.effectivelyOnce();
             case "checkpoint_ack" -> c.checkpointAck();
             case "checkpoint_every" -> c.checkpointEvery(Integer.parseInt(call[1]));
@@ -373,8 +394,7 @@ public final class ConformanceRun {
     private static StreamOperativeTopology cited(String topology) {
         return switch (topology) {
             case "hybrid_channel" -> StreamOperativeTopologyBuilder.build(new HybridChannelStreamOperative());
-            case "commit_block_chain" -> WorkflowSpec.build(TierCommitBlockWorkflowOperative.class)
-                    .topology();
+            case "commit_block_chain" -> StreamOperativeTopologyBuilder.build(new TierCommitBlockWorkflowOperative());
             default -> throw new IllegalStateException(
                     "the fixture cites a topology this app does not declare: " + topology);
         };
@@ -385,7 +405,8 @@ public final class ConformanceRun {
             return cited(row.topology());
         }
         load(row);
-        return StreamOperativeTopologyBuilder.build(row.topology(), c -> interpret(c, row.steps()));
+        return StreamOperativeTopologyBuilder.build(
+                row.workflow() ? new RowWorkflowOperative() : new RowStreamOperative());
     }
 
     /** One row's verdict, in the report's shape. */
@@ -593,8 +614,8 @@ public final class ConformanceRun {
         }
         load(row);
         try {
-            runner.registerFactory(RowStreamOperative.class);
-        } catch (StreamOperativeConfigurationException refusal) {
+            runner.registerFactory(row.workflow() ? RowWorkflowOperative.class : RowStreamOperative.class);
+        } catch (StreamOperativeConfigurationException | WorkflowOperativeConfigurationException refusal) {
             System.err.println(topology + ": " + refusal.getMessage());
             System.exit(1);
         }

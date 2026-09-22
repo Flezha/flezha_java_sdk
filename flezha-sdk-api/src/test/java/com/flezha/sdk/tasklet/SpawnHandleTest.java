@@ -92,6 +92,7 @@ class SpawnHandleTest {
     void eachFailureKindIsItsOwnException() {
         Map<String, Class<? extends SpawnException>> kinds = Map.of(
                 "factory_unknown", SpawnException.FactoryUnknown.class,
+                "factory_not_workflow", SpawnException.FactoryNotWorkflow.class,
                 "timeout", SpawnException.Timeout.class,
                 "unavailable", SpawnException.Unavailable.class);
         SpawnRequests.install(core);

@@ -152,15 +152,16 @@ public class TaskletException extends Exception {
     }
 
     /**
-     * Thrown where timers do not apply — a workflow operative's stage (it has its
-     * own wake model) and a {@code compensate} hook. The refusal is structural:
-     * those contexts carry no timer session at all.
+     * Thrown where timers do not apply: a tasklet running inside a workflow operative
+     * (it has its own wake model) and a {@code compensate} hook. The refusal is
+     * structural: those contexts carry no timer session at all. Like any other
+     * exception a tasklet throws, it fails the attempt.
      */
     public static final class TimersUnavailable extends TaskletException {
 
         public TimersUnavailable() {
-            super("timers are not available in this context; only a stream operative's `run` /"
-                    + " `onTimer` may register them");
+            super("TimersUnavailable: timers are not available in this context; only a stream operative's"
+                    + " `run` / `onTimer` may register them");
         }
     }
 

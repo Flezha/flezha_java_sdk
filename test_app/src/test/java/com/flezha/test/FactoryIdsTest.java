@@ -74,13 +74,15 @@ class FactoryIdsTest {
             "sugar_static_cell",
             "sugar_store_input",
             "sugar_workflow",
+            "sugar_workflow_per_input",
             "sync_durable_workflow",
             "tier_commit_block_workflow",
             "tier_store",
             "transform_chain",
             "typed_once_workflow",
             "undo_outbox_workflow",
-            "wedge_probe");
+            "wedge_probe",
+            "workflow_timer_refused");
 
     @BeforeEach
     void reset() {

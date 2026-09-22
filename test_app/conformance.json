@@ -64,7 +64,8 @@
       "sugar_store_input",
       "sugar_named_input",
       "sugar_workflow",
-      "sugar_state_only"
+      "sugar_state_only",
+      "sugar_workflow_per_input"
     ],
     "liveness": [
       "wedge_probe"
@@ -121,7 +122,8 @@
       "bench_chain_4",
       "bench_chain_16",
       "bench_chain_optout_4",
-      "bench_loop_workflow"
+      "bench_loop_workflow",
+      "workflow_timer_refused"
     ],
     "dynamic_cell": [
       "dynamic_cell"

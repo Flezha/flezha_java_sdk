@@ -31,7 +31,7 @@ public final class TypedOnceWorkflowOperative implements WorkflowOperative {
     }
 
     @Override
-    public void tasklets(ChannelBuilder c) {
+    public void channels(ChannelBuilder c) {
         c.input(Ticket.class, "order").into(OncePlaced.class).sink("placed");
     }
 

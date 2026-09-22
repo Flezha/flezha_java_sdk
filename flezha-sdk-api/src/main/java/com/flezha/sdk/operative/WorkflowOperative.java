@@ -6,29 +6,33 @@ import java.util.Optional;
 import javax.annotation.Nonnull;
 
 /**
- * Declares work that runs to completion and resumes at the step it reached.
+ * Declares a graph of tasklets that runs to completion, committed stage by stage, and resumes at
+ * the stage it reached.
  *
- * <p>This is the operative kind for a job with ordered steps that must not be re-executed as a unit
- * after a partial failure: reserve stock, charge the card, dispatch the parcel. Once the card is
- * charged, restarting from the beginning is not a correct recovery, so each completed step is
- * recorded and a crash resumes at the next one. For work expressed as messages flowing
- * continuously through tasklets, use {@link StreamOperative} instead; this is the heavier
- * mechanism and costs a journal write per step.
+ * <p>This is the operative kind for a job that must not be re-executed as a unit after a partial
+ * failure: reserve stock, charge the card, dispatch the parcel. Once the card is charged,
+ * restarting from the beginning is not a correct recovery, so each stage of the graph is committed
+ * at its boundary and a crash resumes at the stage that had not committed. For work expressed as
+ * messages flowing continuously through tasklets, use {@link StreamOperative} instead; this is the
+ * heavier mechanism and costs a journal write per stage.
  *
  * <p>A workflow is started with its tasklets' initial state, runs on the messages that arrive on
- * its entry channels until an exit trigger, and is then torn down. It reuses the same building blocks a stream operative uses
- * (tasklets, channels, cells, per-cell state, {@code ctx.emit}) under a different
- * lifecycle:
+ * its entry channels until an exit trigger, and is then torn down. It reuses the same building
+ * blocks a stream operative uses (tasklets, channels, cells, per-cell state, {@code ctx.emit})
+ * under a different lifecycle:
  *
  * <ul>
- *   <li><strong>Tasklets</strong>: override {@link #tasklets} to author
- *       Tasklets/Channels/Cells on the same {@link ChannelBuilder} a
- *       stream operative uses; the workflow driver runs the static DAG in
- *       topological order with a per-tasklet count-based barrier (cells
- *       within one tasklet still run in parallel); a message runs only the
- *       chain of the entry channel it arrived on, fan-out branches are
- *       independent, and a fan-in node runs once, after every producer
- *       feeding it in that chain committed, with the accumulated batch.</li>
+ *   <li><strong>Graph</strong>: {@link #channels} authors Tasklets/Channels/Cells on the same
+ *       {@link ChannelBuilder} a stream operative uses; the workflow driver runs the static DAG in
+ *       topological order with a per-tasklet count-based barrier (cells within one tasklet still
+ *       run in parallel); a message runs only the chain of the entry channel it arrived on,
+ *       fan-out branches are independent, and a fan-in node runs once, after every producer
+ *       feeding it in that chain committed, with the accumulated batch. A cycle is refused at
+ *       registration, and so is a graph that declares no tasklet.</li>
+ *   <li><strong>Retry</strong>: a failing cell is retried under the policy of the edge that feeds
+ *       its tasklet, {@code retryMax} / {@code retryBackoffMs} on the builder, exactly as a stream
+ *       tunes it. Only the failing cell re-runs; its siblings stay buffered at the barrier, and a
+ *       failed attempt's staged output is dropped rather than double-emitted.</li>
  *   <li><strong>Exit triggers</strong>: the operative terminates on the first
  *       of: the chain running to quiescence, a tasklet calling
  *       {@link com.flezha.sdk.tasklet.TaskletCtx#complete(byte[])}, a chained
@@ -41,15 +45,15 @@ import javax.annotation.Nonnull;
  *       instance parks while it waits for one.</li>
  * </ul>
  *
- * <p>A workflow declares its chain in {@link #tasklets}, on the same builder a stream operative
+ * <p>A workflow declares its graph in {@link #channels}, on the same builder a stream operative
  * uses, and is declared with {@link com.flezha.sdk.FlezhaRunner#registerFactory(Class)}. The value
- * passed between two steps is written down at that boundary, which is what allows a resumed
- * workflow to pick up there; the runtime derives how to write it, so the chain declares nothing
- * about it:
+ * a tasklet hands to the next stage is written down at the stage boundary, which is what allows a
+ * resumed workflow to pick up there; the runtime derives how to write it, so the graph declares
+ * nothing about it:
  *
  * <pre>{@code
  * @Override
- * public void tasklets(ChannelBuilder c) {
+ * public void channels(ChannelBuilder c) {
  *     c.input(String.class, "order")
  *             .into(Reserve.class)
  *             .named("reserved")
@@ -60,24 +64,19 @@ import javax.annotation.Nonnull;
  * }
  * }</pre>
  *
- * <p>{@link RollbackMode} then selects what an exhausted retry ladder does: unwind the completed
- * steps through their {@code compensate} methods, or retain progress. A step's undo handle belongs
- * in its state rather than its emitted output, because state is restored on resume and output is
- * not.
+ * <p>A workflow carries none of a stream's delivery settings: the effectively-once tier, the
+ * checkpoint settings and the correction window are refused at registration by name
+ * ({@code EffectivelyOnceOnWorkflow}, {@code CheckpointOnWorkflow},
+ * {@code CorrectionWindowOnWorkflow}), because a durable workflow already commits stage by stage.
+ * A tasklet running inside a workflow cannot register a timer: every timer call on its context
+ * throws {@link com.flezha.sdk.tasklet.TaskletException.TimersUnavailable}.
+ *
+ * <p>{@link RollbackMode} then selects what an exhausted retry ladder does: unwind the committed
+ * stages through their tasklets' {@code compensate} methods, or retain progress. A tasklet's undo
+ * handle belongs in its state rather than its emitted output, because state is restored on resume
+ * and output is not.
  */
 public interface WorkflowOperative extends Operative {
-
-    /**
-     * Declare a static <strong>DAG</strong> of Tasklets / Channels / Cells
-     * on the same graph builder a stream operative uses. The workflow driver
-     * runs the declaration in topological order: a message runs the chain of
-     * the entry channel it arrived on, and a tasklet becomes runnable only
-     * after <strong>every</strong> producer feeding it in that chain has
-     * committed; fan-out branches are independent, and a fan-in node is
-     * dispatched once, with the accumulated batch of those producers' outputs. Cycles are
-     * rejected at registration, and so is a class that declares no tasklet.
-     */
-    default void tasklets(ChannelBuilder c) {}
 
     /**
      * Optional wall-clock backstop. {@link Optional#empty()} (the default) means
@@ -118,41 +117,6 @@ public interface WorkflowOperative extends Operative {
     @Nonnull
     default Optional<Duration> wakeAfter() {
         return Optional.empty();
-    }
-
-    /**
-     * Total attempts for a failing cell's batch, including the first (default
-     * 3). {@code 0} or {@code 1} collapses to fail-fast.
-     *
-     * <p>Retry is strictly PRE-commit: a journaled task is never retried. Only the
-     * failing cell re-runs — its siblings stay buffered at the barrier — and
-     * each attempt gets a fresh sink, so a failed attempt's staged output is
-     * dropped rather than double-emitted.
-     */
-    default int retryAttempts() {
-        return 3;
-    }
-
-    /**
-     * Exponential-backoff base between attempts (default 500 ms). A zero backoff
-     * with more than one attempt is rejected at registration: it would hot-spin.
-     */
-    @Nonnull
-    default Duration retryBackoff() {
-        return Duration.ofMillis(500);
-    }
-
-    /**
-     * Sends of one commit barrier ({@code TaskCommit} / {@code IterCommit}, the
-     * first send included) before an ack that never arrives fails the run
-     * (default 3; {@code 0} or {@code 1} is the single wait). A re-send carries
-     * the same reference id and the controller journals a barrier once by its
-     * identity, so a transient control-channel stall delays the chain instead
-     * of ending it. The re-sends wait out {@link #retryBackoff()} between
-     * attempts.
-     */
-    default int barrierRetryAttempts() {
-        return 3;
     }
 
     /**

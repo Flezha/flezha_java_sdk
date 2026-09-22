@@ -11,8 +11,9 @@ import com.flezha.sdk.channel.RetryPolicy;
 import com.flezha.sdk.channel.RoutedDocument;
 import com.flezha.sdk.channel.Stream;
 import com.flezha.sdk.internal.RuntimeBridge;
-import com.flezha.sdk.operative.StreamOperative;
+import com.flezha.sdk.operative.Operative;
 import com.flezha.sdk.operative.StreamOperativeConfigurationException;
+import com.flezha.sdk.operative.WorkflowOperative;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.core.HostLink;
 import com.flezha.sdk.runtime.operative.EdgeYield;
@@ -37,11 +38,12 @@ import java.util.OptionalLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Implements the producer-first graph {@link ChannelBuilder} (and the
  * {@link EntryChannel} / {@link Stream} handles). Tracks declared channels
- * and node registrations, validates the graph at {@link #build(String)}
+ * and node registrations, validates the graph at {@link #build(Operative)}
  * time, and produces a frozen {@link StreamOperativeTopology}.
  *
  * <p>Mirror of the Rust SDK's {@code channel/builder.rs} +
@@ -70,8 +72,8 @@ import javax.annotation.Nonnull;
  * itself is only what erasure makes and no record could carry — a payload type
  * that does not reach its consumer's input, a type argument left generic at the
  * tasklet class, a missing {@code eventTime} extractor, a tasklet class
- * with no public no-arg constructor. After {@link #build(String)} the topology
- * is frozen: a retained handle used afterwards throws
+ * with no public no-arg constructor. After {@link #build(Operative)} the
+ * topology is frozen: a retained handle used afterwards throws
  * {@link IllegalStateException} naming the operative.
  */
 public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
@@ -106,37 +108,41 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
 
     private BeyondWindowPolicy beyondWindowPolicy = BeyondWindowPolicy.PROCESS_AS_ARRIVAL;
 
-    /** Set at {@link #build(String)}: every mutating path refuses afterwards. */
+    /** Set at build time: every mutating path refuses afterwards. */
     private boolean frozen;
 
     private String frozenFactoryId = "<unbuilt>";
 
     /**
-     * Run the supplied {@link StreamOperative#channels(ChannelBuilder)} once, validate,
-     * and freeze the result into a {@link StreamOperativeTopology}.
+     * Run the class's {@link Operative#channels(ChannelBuilder)} once, submit the
+     * record its kind writes to the core's check, and freeze the result into a
+     * {@link StreamOperativeTopology}. Both kinds declare their graph on this
+     * builder; a {@link WorkflowOperative} submits its own settings beside it,
+     * so the core judges it as a workflow.
      *
      * @throws StreamOperativeConfigurationException if any validation rule fails.
      */
     @Nonnull
-    public static StreamOperativeTopology build(@Nonnull StreamOperative operative) {
-        return build(operative.factoryId(), operative::channels);
+    public static StreamOperativeTopology build(@Nonnull Operative operative) {
+        return build(operative.factoryId(), operative::channels, operative instanceof WorkflowOperative w ? w : null);
     }
 
     /**
-     * Run an authoring lambda against a fresh builder, validate, and freeze the
-     * result into a {@link StreamOperativeTopology}. Shared by stream
-     * {@link StreamOperative#channels} authoring and workflow
-     * {@code tasklets(...)} authoring — both declare Tasklets / Channels /
-     * Cells on the same {@link ChannelBuilder}.
+     * {@link #build(Operative)} for an authoring lambda, judged as a stream class.
      *
      * @throws StreamOperativeConfigurationException if any validation rule fails.
      */
     @Nonnull
     public static StreamOperativeTopology build(
             @Nonnull String factoryId, @Nonnull Consumer<ChannelBuilder> authoring) {
+        return build(factoryId, authoring, null);
+    }
+
+    private static StreamOperativeTopology build(
+            String factoryId, Consumer<ChannelBuilder> authoring, @Nullable WorkflowOperative workflow) {
         StreamOperativeTopologyBuilder b = new StreamOperativeTopologyBuilder();
         authoring.accept(b);
-        return b.build(factoryId);
+        return b.freeze(factoryId, workflow);
     }
 
     @Override
@@ -266,7 +272,7 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
     }
 
     @Nonnull
-    public StreamOperativeTopology build(@Nonnull String factoryId) {
+    private StreamOperativeTopology freeze(String factoryId, @Nullable WorkflowOperative workflow) {
         // Freeze first: any retained handle used from here on throws naming
         // the operative, whatever build's own outcome.
         frozenFactoryId = factoryId;
@@ -302,6 +308,9 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
                 channels,
                 tasklets,
                 capacities);
+        if (workflow != null) {
+            record = HostClassDeclaration.forWorkflow(record, workflow);
+        }
         return TopologyMaterializer.materialize(
                 factoryId, channels, tasklets, capacities, record, HostClassDeclaration.check(record));
     }
@@ -359,7 +368,7 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
     void checkMutable() {
         if (frozen) {
             throw new IllegalStateException("operative `" + frozenFactoryId
-                    + "`: the topology is frozen; stream handles are only usable inside channels()/tasklets()");
+                    + "`: the topology is frozen; stream handles are only usable inside channels()");
         }
     }
 

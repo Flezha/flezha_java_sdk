@@ -23,7 +23,7 @@ public final class CommitBlockWorkflowOperative implements WorkflowOperative {
     }
 
     @Override
-    public void tasklets(ChannelBuilder c) {
+    public void channels(ChannelBuilder c) {
         var sCommitA = c.input(String.class, "in").into(CommitA.class);
         sCommitA.named("mid").into(BlockB.class);
     }

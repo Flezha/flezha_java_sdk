@@ -32,7 +32,7 @@ public final class DiamondWorkflowOperative implements WorkflowOperative {
     }
 
     @Override
-    public void tasklets(ChannelBuilder c) {
+    public void channels(ChannelBuilder c) {
         // Held handle wired twice = fan-out; two streams naming DiamJoin
         // (unnamed, same class) = the fan-in.
         var fan = c.input(String.class, "in")

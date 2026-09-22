@@ -6,6 +6,7 @@ import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.native_.FlezhaNativeException;
 import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.operative.StreamOperativeConfigurationException;
+import com.flezha.sdk.operative.WorkflowOperative;
 import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
 import com.flezha.sdk.runtime.operative.StreamOperativeTopology;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.ChannelEntry;
@@ -13,7 +14,6 @@ import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.C
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.PendingEdge;
 import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.TaskletEntry;
 import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
-import com.flezha.sdk.runtime.workflow.WorkflowSpec;
 import com.flezha.sdk.state.EventTimeFrom;
 import com.flezha.sdk.state.LogicalClock;
 import com.flezha.sdk.state.NoChange;
@@ -61,46 +61,31 @@ public final class HostClassDeclaration {
     /** Header format byte for the host's plain change bodies (Kryo = 4). */
     private static final int FORMAT_ID_KRYO = 4;
 
-    /** Declared by a stream class alone; see {@link #forWorkflow(WorkflowSpec)}. */
-    private static final List<String> STREAM_TIER_KEYS = List.of(
-            "effectively_once",
-            "checkpoint_ack",
-            "checkpoint_every",
-            "checkpoint_outputs",
-            "checkpoint_max_delay_ms",
-            "correction_window_ms",
-            "beyond_window_policy");
-
     private HostClassDeclaration() {}
 
-    /** Resolve {@code factoryId} in the class registries and encode its record. */
+    /**
+     * Resolve {@code factoryId} in the class registries and encode the record
+     * its class was built from, of either kind. Written once at build time, so
+     * the bytes the core judged are the bytes it registers.
+     */
     @Nonnull
     public static byte[] forFactory(@Nonnull String factoryId) {
         StreamOperativeTopology topology = StreamOperativeClassRegistry.getTopology(factoryId);
-        if (topology != null) {
-            return forStream(topology);
+        if (topology == null) {
+            topology = WorkflowOperativeClassRegistry.getTopology(factoryId);
         }
-        WorkflowSpec spec = WorkflowOperativeClassRegistry.getSpec(factoryId);
-        if (spec != null) {
-            return forWorkflow(spec);
+        if (topology == null) {
+            throw new IllegalStateException("factory `" + factoryId + "` is not registered");
         }
-        throw new IllegalStateException("factory `" + factoryId + "` is not registered");
-    }
-
-    /**
-     * The record the class was built from, encoded. Written once at build
-     * time, so the bytes the core judged are the bytes it registers.
-     */
-    @Nonnull
-    public static byte[] forStream(@Nonnull StreamOperativeTopology topology) {
         return encode(topology.declaration());
     }
 
     /**
-     * The record a stream builder submits: the class facts as declared, one
-     * entry per channel and tasklet in id order, and per channel the chains
-     * its handles were given. Consumers, channel kinds, sink names and the
-     * acknowledgement granularity are NOT here — they are the core's answer.
+     * The record the builder writes, which a stream class submits as is: the
+     * class facts as declared, one entry per channel and tasklet in id order,
+     * and per channel the chains its handles were given. Consumers, channel
+     * kinds, sink names and the acknowledgement granularity are NOT here —
+     * they are the core's answer.
      */
     @Nonnull
     public static Map<String, Object> forStream(
@@ -184,47 +169,45 @@ public final class HostClassDeclaration {
         return names;
     }
 
+    /**
+     * The record a workflow class submits: the {@link #forStream} record its
+     * {@code channels} told the builder, every tier, checkpoint and correction
+     * key included, plus the class's own durability and the {@code workflow}
+     * block. The core judges a record carrying that block on a workflow's
+     * settings and refuses a stream-only one by its own name.
+     */
     @Nonnull
-    public static byte[] forWorkflow(@Nonnull WorkflowSpec spec) {
-        Map<String, Object> decl = new LinkedHashMap<>(spec.topology().declaration());
+    public static Map<String, Object> forWorkflow(
+            @Nonnull Map<String, Object> builderRecord, @Nonnull WorkflowOperative probe) {
+        Map<String, Object> decl = new LinkedHashMap<>(builderRecord);
         // Durability is the workflow's own declaration, not what its
         // tasklets' Change types imply.
         decl.remove("persistent");
-        // The tier, checkpoint and correction keys are a stream class's to put
-        // on the wire. The core refuses effectively_once and
-        // correction_window_ms on a workflow outright, and the checkpoint
-        // family rests on an acknowledgement that refusal leaves unreachable
-        // there. The topology keeps the facts either way: gating the
-        // declaration must not gate the in-process tier.
-        STREAM_TIER_KEYS.forEach(decl::remove);
-        if (spec.persistenceEnabled()) {
+        if (probe.persistenceEnabled()) {
             decl.put("persistent", true);
         }
-        if (spec.syncDurability()) {
+        if (probe.syncDurability()) {
             decl.put("sync_durability", true);
         }
 
         Map<String, Object> workflow = new LinkedHashMap<>();
         workflow.put(
                 "loop_mode",
-                switch (spec.loopMode()) {
+                switch (probe.loopMode()) {
                     case ONCE -> "once";
                     case PER_INPUT -> "per_input";
                     case CHAINED -> "chained";
                 });
         workflow.put(
                 "rollback_mode",
-                switch (spec.rollbackMode()) {
+                switch (probe.rollbackMode()) {
                     case ALL_OR_NOTHING -> "all_or_nothing";
                     case KEEP_PROGRESS -> "keep_progress";
                 });
-        workflow.put("retry_attempts", spec.retry().maxAttempts());
-        workflow.put("retry_backoff_ms", spec.retry().backoffBaseMs());
-        workflow.put("barrier_retry_attempts", spec.barrierRetryAttempts());
-        spec.maxDuration().ifPresent(d -> workflow.put("max_duration_ms", d.toMillis()));
-        spec.wakeAfter().ifPresent(d -> workflow.put("wake_after_ms", d.toMillis()));
+        probe.maxDuration().ifPresent(d -> workflow.put("max_duration_ms", d.toMillis()));
+        probe.wakeAfter().ifPresent(d -> workflow.put("wake_after_ms", d.toMillis()));
         decl.put("workflow", workflow);
-        return encode(decl);
+        return decl;
     }
 
     private static Map<String, Object> base(String factoryId) {

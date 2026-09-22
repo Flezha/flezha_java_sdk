@@ -8,10 +8,12 @@ import com.flezha.sdk.channel.ChannelBuilder;
  * <p>This is the operative kind to reach for when work is expressed as messages flowing through one
  * or more tasklets: readings arriving from a sensor, trades from a market feed, events from an
  * application. It runs until stopped, holds per-cell state between messages, and scales by
- * splitting that state across cells. For work consisting of ordered steps that must not be
- * re-executed as a unit after a partial failure, use {@link WorkflowOperative} instead.
+ * splitting that state across cells. For a graph that runs to completion and must not be
+ * re-executed as a unit after a partial failure, committed stage by stage and resumed at the stage
+ * it reached, use {@link WorkflowOperative} instead.
  *
- * <p>An implementation declares two things and nothing else:
+ * <p>An implementation declares two things and nothing else, its {@link #factoryId()} and its
+ * graph in {@link #channels(ChannelBuilder)}:
  *
  * <pre>{@code
  * public final class WordCountOperative implements StreamOperative {
@@ -43,22 +45,6 @@ import com.flezha.sdk.channel.ChannelBuilder;
  * handles messages.
  */
 public interface StreamOperative extends Operative {
-
-    /**
-     * Declares the graph. Called exactly once per class, at
-     * {@link com.flezha.sdk.FlezhaRunner#registerFactory(Class) registerFactory} time, and the resulting
-     * graph is shared by every instance of this operative that the controller later starts.
-     *
-     * <p>Channels are never constructed directly. Each call on the builder returns the next handle
-     * in the chain, so the whole graph is one fluent expression, and the completed declaration is
-     * validated as a whole before any message is processed. An inconsistent declaration, or one
-     * requesting a capability the deployment cannot supply, raises
-     * {@link StreamOperativeConfigurationException} naming the declaration at fault.
-     *
-     * <p>Because this method runs once at registration rather than per message, it must not depend
-     * on anything that varies at run time.
-     */
-    void channels(ChannelBuilder c);
 
     /**
      * Whether per-cell state is persisted for this operative class. Defaults to {@code true}.
