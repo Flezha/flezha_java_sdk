@@ -193,7 +193,7 @@ retention, and a tier without keyed sinks is refused at registration.
 |---|---|
 | `flezha-sdk-api` | Public API: `Flezha`, `StreamOperative`, `WorkflowOperative`, `Tasklet`, `TaskletCtx`, `StableId`, channel builders, clocks. No native dependency. |
 | `flezha-sdk-processor` | Annotation processor: `<Class>Tasklet` from `@Tasklet`, the change type and handle from `@State`, the short-form operatives. Goes on the compiler's processor path. |
-| `flezha-sdk-runtime` | Control plane, data plane, framing, worker pool, reconnect, state persistence, workflow driver. |
+| `flezha-sdk-runtime` | Control plane, data plane, framing, worker pool, reconnect, state persistence, workflow class registration. |
 | `flezha-sdk-native` | JNI bindings + bundled per-OS `libflz_core_ffi`. |
 | `flezha-sdk-testing` | `TaskletTestHarness`, added with `<scope>test</scope>`. |
 | `flezha-sdk-examples` | Worked examples. Compiled by the build, so they cannot rot. |

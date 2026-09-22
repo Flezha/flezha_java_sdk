@@ -120,6 +120,7 @@ public final class Main {
                 .registerFactory(BenchChainOptOut4WorkflowOperative.class)
                 .registerFactory(BenchLoopWorkflowOperative.class)
                 .registerFactory(WorkflowTimerRefusedWorkflowOperative.class)
+                .registerFactory(StaticCellWorkflowOperative.class)
                 // The §5 short forms, registered by the classes the author wrote, as
                 // every hand-written operative is: nothing collects itself.
                 .registerFactory(SugarDoNothing.class)

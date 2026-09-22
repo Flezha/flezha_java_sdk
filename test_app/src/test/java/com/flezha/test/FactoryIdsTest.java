@@ -67,6 +67,7 @@ class FactoryIdsTest {
             "stateful_counter",
             "stateless_loop_workflow",
             "static_cell",
+            "static_cell_workflow",
             "store_input",
             "sugar_do_nothing",
             "sugar_named_input",
