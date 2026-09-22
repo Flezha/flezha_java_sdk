@@ -4,7 +4,7 @@ package com.flezha.sdk.operative;
  * Thrown at {@link com.flezha.sdk.FlezhaRunner#registerFactory declaration} time when a
  * {@link WorkflowOperative}'s authoring is invalid: an external-stop-only operative (no
  * self-termination and no {@code maxDuration()}), or a {@link WorkflowOperative#channels} graph the
- * core refuses (no tasklet, a cycle, a dynamic-cell tasklet, a disconnected tasklet, no entry
+ * core refuses (no tasklet, a cycle, a disconnected tasklet, no entry
  * channel, or a stream-only setting such as the effectively-once tier), in which case the message
  * carries the refusal's name.
  *

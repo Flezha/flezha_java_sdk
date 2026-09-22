@@ -48,6 +48,8 @@ class FactoryIdsTest {
             "echo_workflow",
             "cell_stress",
             "hybrid_channel",
+            "keyed_block_workflow",
+            "keyed_saga_workflow",
             "merged_input",
             "mixed_operative",
             "optout_commit_block",

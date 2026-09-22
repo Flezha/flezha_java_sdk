@@ -132,6 +132,19 @@ class WorkflowOperativeClassRegistryTest {
     }
 
     @Test
+    @DisplayName("a keyBy edge into a workflow tasklet registers it in dynamic mode")
+    void aKeyedEdgeIntoAWorkflowTaskletRegisters() throws Exception {
+        String factoryId = WorkflowOperativeClassRegistry.registerClass(KeyedWorkflow.class);
+        JsonNode tasklets =
+                JSON.readTree(HostClassDeclaration.forFactory(factoryId)).get("tasklets");
+
+        assertThat(tasklets.get(1).get("name").asText()).isEqualTo("sink");
+        assertThat(tasklets.get(1).get("cell_mode").asText())
+                .as("a tasklet a keyed edge reaches is dynamic, as a stream's is")
+                .isEqualTo("dynamic");
+    }
+
+    @Test
     @DisplayName("a cycle is refused — a bounded topology is a DAG")
     void cycleIsRefused() {
         assertThatThrownBy(() -> WorkflowOperativeClassRegistry.registerClass(CyclicWorkflow.class))
@@ -211,6 +224,23 @@ class WorkflowOperativeClassRegistryTest {
         @Override
         public void channels(ChannelBuilder c) {
             c.input(String.class, "seed").into(EchoTask.class).into(SinkTask.class);
+        }
+    }
+
+    public static final class KeyedWorkflow implements WorkflowOperative {
+        @Override
+        public String factoryId() {
+            return "vb_keyed";
+        }
+
+        @Override
+        public boolean persistenceEnabled() {
+            return false;
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "seed").into(EchoTask.class).keyBy(s -> s).into(SinkTask.class);
         }
     }
 

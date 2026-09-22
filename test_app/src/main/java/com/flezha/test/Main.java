@@ -105,6 +105,8 @@ public final class Main {
                 .registerFactory(OptOutCommitBlockWorkflowOperative.class)
                 .registerFactory(TierCommitBlockWorkflowOperative.class)
                 .registerFactory(SagaBlockWorkflowOperative.class)
+                .registerFactory(KeyedWorkflowOperatives.KeyedBlock.class)
+                .registerFactory(KeyedWorkflowOperatives.KeyedSaga.class)
                 .registerFactory(OutboxBlockWorkflowOperative.class)
                 .registerFactory(UndoOutboxWorkflowOperative.class)
                 .registerFactory(ChatLoopWorkflowOperative.class)
