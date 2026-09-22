@@ -68,10 +68,9 @@ class StreamOperativeTopologyBuilderTest {
         }
 
         @Test
-        @DisplayName("static-mode tasklet without cellsForOverridden is rejected")
-        void staticWithoutCellsForOverriddenRejected() {
-            assertThatThrownBy(
-                            () -> StreamOperativeTopologyBuilder.build(new MissingCellsForOverriddenStreamOperative()))
+        @DisplayName("static-mode tasklet that declares no cellsFor is rejected")
+        void staticWithoutCellsForRejected() {
+            assertThatThrownBy(() -> StreamOperativeTopologyBuilder.build(new MissingCellsForStreamOperative()))
                     .isInstanceOf(StreamOperativeConfigurationException.class)
                     .hasMessageContaining("CellsForMissing")
                     .hasMessageContaining("declares non-empty cell_keys() but does not override cells_for");
@@ -228,11 +227,6 @@ class StreamOperativeTopologyBuilderTest {
         }
 
         @Override
-        public boolean cellsForOverridden() {
-            return true;
-        }
-
-        @Override
         public List<String> cellsFor(String input) {
             return List.of(input.substring(0, 1));
         }
@@ -331,7 +325,7 @@ class StreamOperativeTopologyBuilderTest {
         }
     }
 
-    public static final class MissingCellsForOverriddenTasklet extends StatelessTestTasklet<String, Object, String> {
+    public static final class MissingCellsForTasklet extends StatelessTestTasklet<String, Object, String> {
         @Override
         public String name() {
             return "missing_pfo_tasklet";
@@ -351,7 +345,7 @@ class StreamOperativeTopologyBuilderTest {
         public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
-    public static final class MissingCellsForOverriddenStreamOperative implements StreamOperative {
+    public static final class MissingCellsForStreamOperative implements StreamOperative {
         @Override
         public String factoryId() {
             return "missing_pfo_operative";
@@ -359,7 +353,7 @@ class StreamOperativeTopologyBuilderTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(MissingCellsForOverriddenTasklet.class);
+            c.input(String.class, "input").into(MissingCellsForTasklet.class);
         }
     }
 

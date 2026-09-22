@@ -65,11 +65,6 @@ public final class ReserveFunds
         ctx.emit(new Reserved(order, reservationId));
     }
 
-    @Override
-    public boolean compensateOverridden() {
-        return true;
-    }
-
     /**
      * The undo. The workflow driver calls it only when the instance ends abnormally, in reverse
      * order of the steps that finished. It has to be safe to call twice: a crash part way through

@@ -53,11 +53,6 @@ public final class StaticCellStreamOperative implements StreamOperative {
         }
 
         @Override
-        public boolean cellsForOverridden() {
-            return true;
-        }
-
-        @Override
         public List<String> cellsFor(String input) {
             return List.of(StaticCellStreamOperative.partition(input));
         }

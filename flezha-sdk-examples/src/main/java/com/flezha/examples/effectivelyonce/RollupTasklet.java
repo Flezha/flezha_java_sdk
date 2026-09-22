@@ -44,11 +44,6 @@ public final class RollupTasklet
     }
 
     @Override
-    public boolean cellsForOverridden() {
-        return true;
-    }
-
-    @Override
     public void applyChange(@Nonnull Totals state, @Nonnull AddTick change) {
         state.sum += change.value();
         state.ticks++;

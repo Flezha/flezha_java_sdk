@@ -207,11 +207,6 @@ class ClockAndKeyedValidationTest {
         public long eventTime(String input) {
             return Long.parseLong(input);
         }
-
-        @Override
-        public boolean eventTimeOverridden() {
-            return true;
-        }
     }
 
     /** LogicalClock + NoChange: there is no durable seq to serve. */

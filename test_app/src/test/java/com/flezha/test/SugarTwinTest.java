@@ -53,7 +53,11 @@ class SugarTwinTest {
         var tasklet = new SugarEntryTasklet();
         assertThat(tasklet.cellsFor("apple")).containsExactly("a");
         assertThat(tasklet.cellsFor("zebra")).containsExactly("d");
-        assertThat(tasklet.cellsForOverridden()).isTrue();
+        var topology = StreamOperativeTopologyBuilder.build(new SugarStaticCellStreamOperative());
+        assertThat(topology.tasklet(topology.taskletNameToId().get(tasklet.name()))
+                        .cellsForOverridden())
+                .as("the generated class writes cellsFor, which is what declares it")
+                .isTrue();
         assertThat(tasklet.cellKeys()).containsExactly("a", "b", "c", "d");
 
         var h = TaskletTestHarness.of(tasklet);

@@ -1,13 +1,14 @@
 package com.flezha.sdk.runtime.operative.builder;
 
 import com.flezha.sdk.runtime.config.FlezhaEnv;
+import java.util.OptionalInt;
 
 /**
  * Resolves a Tasklet's per-Cell mailbox capacity per the Rust SDK's
  * three-tier precedence rule:
  *
  * <ol>
- *   <li>Explicit Tasklet override ({@code mailboxCapacityOverridden() == true}).</li>
+ *   <li>The Tasklet's own {@code mailboxCapacity()}, when it overrides it.</li>
  *   <li>{@code FLEZHA_MAILBOX_CAPACITY} env var (parsed as a positive int).</li>
  *   <li>Built-in default ({@link #DEFAULT_MAILBOX_CAPACITY}).</li>
  * </ol>
@@ -29,8 +30,8 @@ public final class MailboxCapacityResolver {
     private MailboxCapacityResolver() {}
 
     /** Resolve using the live process environment for the env-var tier. */
-    public static int resolve(int declared, boolean overridden) {
-        return resolveInner(declared, overridden, System.getenv(ENV_MAILBOX_CAPACITY));
+    public static int resolve(OptionalInt declared) {
+        return resolveInner(declared, System.getenv(ENV_MAILBOX_CAPACITY));
     }
 
     /**
@@ -38,10 +39,8 @@ public final class MailboxCapacityResolver {
      * a string that fails to parse as a positive {@code int}, in which case
      * the default is used.
      */
-    static int resolveInner(int declared, boolean overridden, String envValue) {
-        if (overridden) {
-            return declared;
-        }
-        return FlezhaEnv.parsePositive(ENV_MAILBOX_CAPACITY, envValue, DEFAULT_MAILBOX_CAPACITY);
+    static int resolveInner(OptionalInt declared, String envValue) {
+        return declared.orElseGet(
+                () -> FlezhaEnv.parsePositive(ENV_MAILBOX_CAPACITY, envValue, DEFAULT_MAILBOX_CAPACITY));
     }
 }

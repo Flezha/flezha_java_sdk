@@ -50,11 +50,6 @@ public abstract class BoundedMailboxTasklet
     }
 
     @Override
-    public boolean mailboxCapacityOverridden() {
-        return true;
-    }
-
-    @Override
     public void run(String input, StateHandle<State, Inc> state, TaskletCtx ctx) throws TaskletException {
         state.apply(new Inc());
         ctx.emit(input.getBytes(StandardCharsets.UTF_8));

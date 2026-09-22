@@ -36,11 +36,6 @@ public final class CandleTasklet
     }
 
     @Override
-    public boolean eventTimeOverridden() {
-        return true;
-    }
-
-    @Override
     public CandleState initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
         return new CandleState();
     }

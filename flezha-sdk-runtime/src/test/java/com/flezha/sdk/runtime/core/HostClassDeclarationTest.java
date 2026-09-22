@@ -209,6 +209,18 @@ class HostClassDeclarationTest {
     }
 
     @Test
+    @DisplayName("a declared hook needs no second declaration: a written compensate is compensable")
+    void aWrittenCompensateIsDeclared() throws Exception {
+        WorkflowOperativeClassRegistry.registerClass(FullyDeclaredWorkflow.class);
+        JsonNode decl = JSON.readTree(
+                HostClassDeclaration.forWorkflow(WorkflowOperativeClassRegistry.getSpec("decl_full_workflow")));
+
+        assertThat(decl.get("tasklets").get(0).path("compensate_overridden").asBoolean())
+                .as("the rollback plans only from compensable tasklets")
+                .isTrue();
+    }
+
+    @Test
     @DisplayName("the builder can spell every key the shared fixture pins")
     void everyPinnedDeclarationKeyHasAJavaSpelling() throws Exception {
         StreamOperativeClassRegistry.registerClass(FullyDeclaredOperative.class);
@@ -340,11 +352,6 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public boolean maxCellsOverridden() {
-            return true;
-        }
-
-        @Override
         public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx)
                 throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emit(input);
@@ -392,16 +399,6 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public boolean cellsForOverridden() {
-            return true;
-        }
-
-        @Override
-        public boolean compensateOverridden() {
-            return true;
-        }
-
-        @Override
         public long compactAfterBytes() {
             return 4096;
         }
@@ -419,16 +416,14 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public boolean eventTimeOverridden() {
-            return true;
-        }
-
-        @Override
         public void run(String input, StateHandle<State, DeclChange> state, TaskletCtx ctx)
                 throws com.flezha.sdk.tasklet.TaskletException {
             state.apply(new DeclChange(input));
             ctx.emitKeyed("a", input);
         }
+
+        @Override
+        public void compensate(List<String> completedOutput, StateHandle<State, DeclChange> state, TaskletCtx ctx) {}
     }
 
     public record DeclChange(String value) implements com.flezha.sdk.state.Change {}
@@ -452,7 +447,7 @@ class HostClassDeclarationTest {
 
         @Override
         public void tasklets(ChannelBuilder c) {
-            c.input(String.class, "in").into(VersionOneTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "in").into(UndoTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -713,6 +708,27 @@ class HostClassDeclarationTest {
             c.checkpointAck();
             c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
+    }
+
+    public static final class UndoTask extends StatelessTestTasklet<String, Object, String> {
+        @Override
+        public String name() {
+            return "undo_task";
+        }
+
+        @Override
+        protected Object initState(Optional<String> cellKey) {
+            return new Object();
+        }
+
+        @Override
+        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx)
+                throws com.flezha.sdk.tasklet.TaskletException {
+            ctx.emit(input);
+        }
+
+        @Override
+        public void compensate(List<String> completedOutput, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
     public static final class DeclWorkflow implements WorkflowOperative {

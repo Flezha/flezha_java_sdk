@@ -426,11 +426,6 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        public boolean cellsForOverridden() {
-            return true;
-        }
-
-        @Override
         protected Object initState(Optional<String> cellKey) {
             this.key = cellKey.orElse("");
             return new Object();
@@ -563,11 +558,6 @@ abstract class DispatchTestBase {
         @Override
         public long eventTime(String input) {
             return Long.parseLong(input);
-        }
-
-        @Override
-        public boolean eventTimeOverridden() {
-            return true;
         }
 
         @Override
@@ -745,11 +735,6 @@ abstract class DispatchTestBase {
                 RECORDED.add("compensated:" + output);
                 ctx.emit("undo:" + output);
             }
-        }
-
-        @Override
-        public boolean compensateOverridden() {
-            return true;
         }
     }
 }

@@ -32,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -285,8 +286,7 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
         int[] capacities = new int[tasklets.size()];
         for (int i = 0; i < tasklets.size(); i++) {
             TaskletEntry tasklet = tasklets.get(i);
-            capacities[i] =
-                    MailboxCapacityResolver.resolve(tasklet.mailboxCapacityDeclared, tasklet.mailboxCapacityOverridden);
+            capacities[i] = MailboxCapacityResolver.resolve(tasklet.mailboxCapacity);
         }
         markKeyedTargetsDynamic();
 
@@ -430,7 +430,8 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
 
     /**
      * Everything a fresh node records off one probe instance: the type tokens,
-     * the Cell-mode and durability declarations, and the two clock refusals.
+     * the Cell-mode and durability declarations, the optional hooks its class
+     * writes, and the one clock refusal.
      *
      * <p>Every clock in the sealed hierarchy is wired. The missing
      * {@code eventTime(Input)} extractor is refused here because the record
@@ -438,9 +439,10 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
      * bound at compile time, and erasure precludes that form.
      */
     private TaskletEntry probeDeclarations(Tasklet<?, ?, ?, ?, ?, ?> probe, String identity) {
+        Class<?> impl = probe.getClass();
         TaskletEntry entry = new TaskletEntry();
         entry.cellKeys = List.copyOf(probe.cellKeys());
-        entry.cellsForOverridden = probe.cellsForOverridden();
+        entry.cellsForOverridden = Hook.CELLS_FOR.declaredBy(impl);
         entry.inputType = probe.inputType();
         entry.outputType = probe.outputType();
         entry.changeType = probe.changeType();
@@ -450,16 +452,48 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
         entry.schemaVersion = probe.schemaVersion();
         entry.minReadableSchemaVersion = probe.minReadableSchemaVersion();
         entry.compactAfterBytes = probe.compactAfterBytes();
-        entry.mailboxCapacityDeclared = probe.mailboxCapacity();
-        entry.mailboxCapacityOverridden = probe.mailboxCapacityOverridden();
-        entry.compensateOverridden = probe.compensateOverridden();
+        entry.mailboxCapacity =
+                Hook.MAILBOX_CAPACITY.declaredBy(impl) ? OptionalInt.of(probe.mailboxCapacity()) : OptionalInt.empty();
+        entry.compensateOverridden = Hook.COMPENSATE.declaredBy(impl);
         entry.cellIdleTtl = probe.cellIdleTtl();
-        entry.maxCells = probe.maxCellsOverridden() ? OptionalLong.of(probe.maxCells()) : OptionalLong.empty();
-        if (entry.clockType == EventTimeFrom.class && !probe.eventTimeOverridden()) {
+        entry.maxCells = Hook.MAX_CELLS.declaredBy(impl) ? OptionalLong.of(probe.maxCells()) : OptionalLong.empty();
+        if (entry.clockType == EventTimeFrom.class && !Hook.EVENT_TIME.declaredBy(impl)) {
             errors.add(StreamOperativeConfigurationException.eventTimeExtractorMissing(identity)
                     .getMessage());
         }
         return entry;
+    }
+
+    /** The optional {@link Tasklet} hooks a class declares by writing them, each by its erased signature. */
+    enum Hook {
+        COMPENSATE("compensate", List.class, StateHandle.class, TaskletCtx.class),
+        CELLS_FOR("cellsFor", Object.class),
+        EVENT_TIME("eventTime", Object.class),
+        MAILBOX_CAPACITY("mailboxCapacity"),
+        MAX_CELLS("maxCells");
+
+        private final String method;
+        private final Class<?>[] erased;
+
+        Hook(String method, Class<?>... erased) {
+            this.method = method;
+            this.erased = erased;
+        }
+
+        /**
+         * Whether {@code impl}, or any class above it, writes this hook rather
+         * than inheriting the interface's default. A hook taking {@code Input}
+         * erases to {@code Object}, and an author writing a concrete parameter
+         * type gets a compiler bridge on their own class, so bridges are what
+         * answer {@code true} there and are not filtered out.
+         */
+        boolean declaredBy(Class<?> impl) {
+            try {
+                return impl.getMethod(method, erased).getDeclaringClass() != Tasklet.class;
+            } catch (NoSuchMethodException e) {
+                throw new IllegalStateException("Tasklet declares no hook `" + method + "`", e);
+            }
+        }
     }
 
     private Tasklet<?, ?, ?, ?, ?, ?> instantiate(Class<? extends Tasklet<?, ?, ?, ?, ?, ?>> taskletClass) {
@@ -784,8 +818,9 @@ public final class StreamOperativeTopologyBuilder implements ChannelBuilder {
         public int minReadableSchemaVersion;
         public long compactAfterBytes;
         Integer outputChannelId;
-        int mailboxCapacityDeclared;
-        boolean mailboxCapacityOverridden;
+        /** The capacity the tasklet writes, empty when it takes the environment's or the default. */
+        OptionalInt mailboxCapacity = OptionalInt.empty();
+
         public boolean compensateOverridden;
         public Optional<Duration> cellIdleTtl = Optional.empty();
         public OptionalLong maxCells = OptionalLong.empty();

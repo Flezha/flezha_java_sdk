@@ -60,11 +60,6 @@ public final class PlaceOrder
         ctx.emit(new PlacedOrder(reserved.order(), orderId));
     }
 
-    @Override
-    public boolean compensateOverridden() {
-        return true;
-    }
-
     /** The undo: the order is cancelled at the exchange, by the id this step wrote down. */
     @Override
     public void compensate(List<PlacedOrder> completedOutput, StateHandle<Placement, Placed> state, TaskletCtx ctx)

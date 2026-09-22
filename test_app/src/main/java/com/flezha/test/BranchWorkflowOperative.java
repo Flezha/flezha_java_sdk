@@ -65,11 +65,6 @@ public final class BranchWorkflowOperative implements WorkflowOperative {
         }
 
         @Override
-        public boolean compensateOverridden() {
-            return true;
-        }
-
-        @Override
         public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
                 throws TaskletException {
             ctx.emit("undo-a");
@@ -82,11 +77,6 @@ public final class BranchWorkflowOperative implements WorkflowOperative {
         @Override
         public String name() {
             return "branch_b";
-        }
-
-        @Override
-        public boolean compensateOverridden() {
-            return true;
         }
 
         @Override
@@ -109,11 +99,6 @@ public final class BranchWorkflowOperative implements WorkflowOperative {
                 throws TaskletException {
             state.apply(new Insert(name()));
             ctx.emit("c:" + input);
-        }
-
-        @Override
-        public boolean compensateOverridden() {
-            return true;
         }
 
         @Override

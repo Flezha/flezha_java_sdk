@@ -96,6 +96,10 @@ import javax.annotation.Nonnull;
  * {@link #clockType()}, {@link #configType()}) or registration fails naming the class and the
  * parameter. An explicit override always wins.
  *
+ * <p>The optional hooks, {@link #compensate}, {@link #cellsFor}, {@link #eventTime},
+ * {@link #mailboxCapacity} and {@link #maxCells}, are declared by writing them: registration reads
+ * which ones the class overrides, itself or through a class above it.
+ *
  * <p>Implementations must provide a public no-argument constructor.
  *
  * @param <Input> the value handed to {@link #run}, decoded from the channel that feeds this
@@ -394,17 +398,12 @@ public interface Tasklet<
      * For static mode: which cells does this input belong to? Returning
      * multiple keys causes the SDK to enqueue the input on each named
      * cell's mailbox (fan-out). Returning an empty list drops the input.
-     * Static-mode tasklets MUST override this method AND return {@code true}
-     * from {@link #cellsForOverridden()}.
+     * A tasklet declaring {@link #cellKeys()} must override this, or
+     * registration refuses it.
      */
     @Nonnull
     default List<String> cellsFor(Input input) {
         return List.of();
-    }
-
-    /** Sentinel for static-mode-default detection. */
-    default boolean cellsForOverridden() {
-        return false;
     }
 
     /**
@@ -415,32 +414,18 @@ public interface Tasklet<
      *
      * <p>Override precedence at registration time:
      * <ol>
-     *   <li>This method's value, if {@link #mailboxCapacityOverridden()}
-     *       returns {@code true}.</li>
+     *   <li>This method's value, if the tasklet overrides it.</li>
      *   <li>{@code FLEZHA_MAILBOX_CAPACITY} env var (parsed as a positive
      *       integer).</li>
      *   <li>The built-in default ({@code 1024}).</li>
      * </ol>
      *
-     * <p>Implementors overriding the default MUST also override
-     * {@link #mailboxCapacityOverridden()} to return {@code true} so the
-     * runtime applies the Tasklet value over any {@code FLEZHA_MAILBOX_CAPACITY}
-     * env value. Capacity must be in {@code 1..=1_048_576}; out-of-range
-     * values fail {@code FlezhaRunner.registerFactory(...)} with the
-     * offending Tasklet's name.
+     * <p>Capacity must be in {@code 1..=1_048_576}; out-of-range values fail
+     * {@code FlezhaRunner.registerFactory(...)} with the offending Tasklet's
+     * name.
      */
     default int mailboxCapacity() {
         return 1024;
-    }
-
-    /**
-     * Override-detection sentinel for {@link #mailboxCapacity()}. Default
-     * {@code false}; implementors that override {@code mailboxCapacity()}
-     * MUST also override this to return {@code true} so the runtime applies
-     * the Tasklet value over any {@code FLEZHA_MAILBOX_CAPACITY} env override.
-     */
-    default boolean mailboxCapacityOverridden() {
-        return false;
     }
 
     /**
@@ -480,19 +465,12 @@ public interface Tasklet<
      * reverse precisely. Compensation MUST be idempotent by author contract: a
      * crash mid-rollback may re-invoke it.
      *
-     * <p>The default is a no-op; a tasklet that overrides this MUST also
-     * override {@link #compensateOverridden()} to return {@code true} so the
-     * workflow driver registers it as compensable (hookless tasklets are
-     * skipped during rollback).
+     * <p>Overriding this is what registers the tasklet as compensable; one
+     * that does not is skipped during rollback.
      */
     default void compensate(List<Output> completedOutput, StateHandle<State, ChangeT> state, TaskletCtx ctx)
             throws TaskletException {
         // No-op: a tasklet with no reversible effect needs no compensation.
-    }
-
-    /** Override-detection sentinel for {@link #compensate}. Default {@code false}. */
-    default boolean compensateOverridden() {
-        return false;
     }
 
     /**
@@ -506,9 +484,6 @@ public interface Tasklet<
      * that, so declaring {@code EventTimeFrom} without overriding this fails
      * Operative registration — the same defect, caught before any input is
      * served.
-     *
-     * <p>A tasklet that overrides this MUST also override
-     * {@link #eventTimeOverridden()} to return {@code true}.
      */
     default long eventTime(Input input) {
         throw new UnsupportedOperationException(
@@ -530,11 +505,6 @@ public interface Tasklet<
         return java.util.Optional.empty();
     }
 
-    /** Override-detection sentinel for {@link #eventTime}. Default {@code false}. */
-    default boolean eventTimeOverridden() {
-        return false;
-    }
-
     /**
      * Dynamic-mode soft cap on live Cells for this Tasklet. At the cap,
      * inputs for a new key are dropped; existing keys are unaffected. This
@@ -543,10 +513,5 @@ public interface Tasklet<
      */
     default long maxCells() {
         return 100_000L;
-    }
-
-    /** Override-detection sentinel for {@link #maxCells}. Default {@code false}. */
-    default boolean maxCellsOverridden() {
-        return false;
     }
 }

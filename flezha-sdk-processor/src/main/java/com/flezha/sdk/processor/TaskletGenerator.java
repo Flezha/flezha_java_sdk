@@ -518,7 +518,6 @@ final class TaskletGenerator {
             b.append("    @Override public List<String> cellKeys() { return List.of(")
                     .append(m.cellKeys().stream().map(mirrors::literal).collect(Collectors.joining(", ")))
                     .append("); }\n");
-            b.append("    @Override public boolean cellsForOverridden() { return true; }\n");
             b.append("    @Override public List<String> cellsFor(")
                     .append(m.inputType())
                     .append(" input) { return impl.")
@@ -529,7 +528,6 @@ final class TaskletGenerator {
             b.append("    @Override public int mailboxCapacity() { return ")
                     .append(m.capacity())
                     .append("; }\n");
-            b.append("    @Override public boolean mailboxCapacityOverridden() { return true; }\n");
         }
     }
 

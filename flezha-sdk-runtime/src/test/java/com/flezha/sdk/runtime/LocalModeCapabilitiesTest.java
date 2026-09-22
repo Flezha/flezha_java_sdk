@@ -329,11 +329,6 @@ class LocalModeCapabilitiesTest {
         public int mailboxCapacity() {
             return 4;
         }
-
-        @Override
-        public boolean mailboxCapacityOverridden() {
-            return true;
-        }
     }
 
     public static final class BoundedMailboxDropNothingStreamOperative implements StreamOperative {

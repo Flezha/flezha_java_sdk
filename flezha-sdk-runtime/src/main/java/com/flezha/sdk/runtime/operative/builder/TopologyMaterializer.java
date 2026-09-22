@@ -125,7 +125,6 @@ final class TopologyMaterializer {
                     entry.minReadableSchemaVersion,
                     entry.compactAfterBytes,
                     capacities[i],
-                    entry.mailboxCapacityOverridden,
                     entry.compensateOverridden,
                     entry.cellIdleTtl,
                     entry.maxCells));

@@ -61,11 +61,6 @@ final class Palette {
         public int mailboxCapacity() {
             return ConformanceRun.mailboxOf(role());
         }
-
-        @Override
-        public boolean mailboxCapacityOverridden() {
-            return true;
-        }
     }
 
     public static final class Plain extends Role {
@@ -121,11 +116,6 @@ final class Palette {
         }
 
         @Override
-        public boolean cellsForOverridden() {
-            return true;
-        }
-
-        @Override
         public List<String> cellsFor(String input) {
             return List.of("a");
         }
@@ -164,11 +154,6 @@ final class Palette {
         public int mailboxCapacity() {
             return ConformanceRun.mailboxOf("nochange");
         }
-
-        @Override
-        public boolean mailboxCapacityOverridden() {
-            return true;
-        }
     }
 
     /** An event-time clock, with the extractor erasure makes it declare here. */
@@ -194,18 +179,8 @@ final class Palette {
         }
 
         @Override
-        public boolean eventTimeOverridden() {
-            return true;
-        }
-
-        @Override
         public int mailboxCapacity() {
             return ConformanceRun.mailboxOf("eventtime");
-        }
-
-        @Override
-        public boolean mailboxCapacityOverridden() {
-            return true;
         }
     }
 }

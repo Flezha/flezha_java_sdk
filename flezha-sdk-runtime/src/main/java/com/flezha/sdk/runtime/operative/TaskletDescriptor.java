@@ -34,7 +34,6 @@ public final class TaskletDescriptor {
     private final int minReadableSchemaVersion;
     private final long compactAfterBytes;
     private final int mailboxCapacity;
-    private final boolean mailboxCapacityOverridden;
     private final boolean compensateOverridden;
     private final java.util.Optional<java.time.Duration> cellIdleTtl;
 
@@ -58,7 +57,6 @@ public final class TaskletDescriptor {
             int minReadableSchemaVersion,
             long compactAfterBytes,
             int mailboxCapacity,
-            boolean mailboxCapacityOverridden,
             boolean compensateOverridden,
             @Nonnull java.util.Optional<java.time.Duration> cellIdleTtl,
             @Nonnull java.util.OptionalLong maxCells) {
@@ -82,7 +80,6 @@ public final class TaskletDescriptor {
         this.minReadableSchemaVersion = minReadableSchemaVersion;
         this.compactAfterBytes = compactAfterBytes;
         this.mailboxCapacity = mailboxCapacity;
-        this.mailboxCapacityOverridden = mailboxCapacityOverridden;
     }
 
     @Nonnull
@@ -189,10 +186,5 @@ public final class TaskletDescriptor {
     /** Resolved per-Cell mailbox capacity (Tasklet override → env var → default). */
     public int mailboxCapacity() {
         return mailboxCapacity;
-    }
-
-    /** Whether the Tasklet explicitly overrode {@code mailboxCapacity()}. */
-    public boolean mailboxCapacityOverridden() {
-        return mailboxCapacityOverridden;
     }
 }

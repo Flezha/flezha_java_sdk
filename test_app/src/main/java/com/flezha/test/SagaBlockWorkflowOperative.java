@@ -44,11 +44,6 @@ public final class SagaBlockWorkflowOperative implements WorkflowOperative {
         }
 
         @Override
-        public boolean compensateOverridden() {
-            return true;
-        }
-
-        @Override
         public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
                 throws TaskletException {
             WorkflowE2eGate.blockUntilReleased();
@@ -64,11 +59,6 @@ public final class SagaBlockWorkflowOperative implements WorkflowOperative {
         @Override
         public String name() {
             return "saga_b";
-        }
-
-        @Override
-        public boolean compensateOverridden() {
-            return true;
         }
 
         @Override

@@ -46,11 +46,6 @@ public final class CandleTasklet
     }
 
     @Override
-    public boolean eventTimeOverridden() {
-        return true;
-    }
-
-    @Override
     public void applyChange(@Nonnull Candle state, @Nonnull Tick tick) {
         if (state.open == 0) {
             state.open = tick.price();

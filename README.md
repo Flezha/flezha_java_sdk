@@ -179,7 +179,7 @@ controller are refused at startup with the responsible declaration named.
 | Edge transforms | `.map(T.class, f)` / `.filter(p)` / `.flatMap(T.class, f)` on the wiring | Reshape, drop or fan out values without a Tasklet, with no cell, no mailbox and no dispatch hop. |
 | Dynamic cell mode | `.keyBy(f)` on the wiring | One Cell per key the stream actually carries, created on first sight, and visible where the graph is declared. |
 | Operative-wide document | `c.routeLatest(Doc.class, documents, traffic, keyFn)` | Every key seen on the traffic stream receives each distinct document exactly once, on that key's own next traffic item, the one delivery a keyed tasklet cannot get from a broadcast. One tick of latency per key is the price of only ever emitting keys this member owns. |
-| Workflow transaction | `implements WorkflowOperative` + `tasklets(...)` | Resumable chain: a committed step is skipped on resume, not re-run. Failure unwinds via `compensate`. |
+| Workflow transaction | `implements WorkflowOperative` + `tasklets(...)` | Resumable chain: a committed step is skipped on resume, not re-run. Failure unwinds through each step's `compensate`, declared by writing it. |
 | Durable loop / suspension | `loopMode()` + `wakeAfter()` | One durable iteration per message; parks when idle, holding its journal. |
 | Cell retry | `retryAttempts()` / `retryBackoff()` | Only the failing cell re-runs; a failed attempt's output is dropped, not double-emitted. |
 

@@ -26,11 +26,6 @@ public final class Reserve extends Step {
     }
 
     @Override
-    public boolean compensateOverridden() {
-        return true;
-    }
-
-    @Override
     public void compensate(
             @Nonnull List<String> completedOutput,
             @Nonnull StateHandle<Handle, Reserved> state,

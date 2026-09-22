@@ -134,11 +134,6 @@ public final class ChatSteps {
         }
 
         @Override
-        public boolean compensateOverridden() {
-            return true;
-        }
-
-        @Override
         public void compensate(
                 List<String> completedOutput, StateHandle<ReplyLog, ReplyChange> state, TaskletCtx ctx)
                 throws TaskletException {

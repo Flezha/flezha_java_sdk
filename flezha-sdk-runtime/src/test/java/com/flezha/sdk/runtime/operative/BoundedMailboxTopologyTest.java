@@ -55,13 +55,11 @@ class BoundedMailboxTopologyTest {
     }
 
     @Test
-    @DisplayName("Tasklet.mailboxCapacity() override flows into the descriptor when overridden flag is set")
+    @DisplayName("a written Tasklet.mailboxCapacity() flows into the descriptor")
     void taskletOverrideHonored() {
         StreamOperativeTopology topology = StreamOperativeTopologyBuilder.build(new BigMailboxStreamOperative());
         int taskletId = topology.taskletNameToId().get("big_mailbox_tasklet");
         assertThat(topology.tasklets().get(taskletId).mailboxCapacity()).isEqualTo(8192);
-        assertThat(topology.tasklets().get(taskletId).mailboxCapacityOverridden())
-                .isTrue();
     }
 
     @Test
@@ -70,7 +68,6 @@ class BoundedMailboxTopologyTest {
         StreamOperativeTopology topology = StreamOperativeTopologyBuilder.build(new TwoStageStreamOperative());
         for (TaskletDescriptor desc : topology.tasklets()) {
             assertThat(desc.mailboxCapacity()).isEqualTo(1024);
-            assertThat(desc.mailboxCapacityOverridden()).isFalse();
         }
     }
 
@@ -224,11 +221,6 @@ class BoundedMailboxTopologyTest {
         }
 
         @Override
-        public boolean mailboxCapacityOverridden() {
-            return true;
-        }
-
-        @Override
         public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
@@ -261,11 +253,6 @@ class BoundedMailboxTopologyTest {
         }
 
         @Override
-        public boolean mailboxCapacityOverridden() {
-            return true;
-        }
-
-        @Override
         public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
@@ -295,11 +282,6 @@ class BoundedMailboxTopologyTest {
         @Override
         public int mailboxCapacity() {
             return 9_999_999;
-        }
-
-        @Override
-        public boolean mailboxCapacityOverridden() {
-            return true;
         }
 
         @Override

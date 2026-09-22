@@ -54,11 +54,6 @@ public final class CellStressStreamOperative implements StreamOperative {
         public List<String> cellKeys() {
             return STRESS_KEYS;
         }
-
-        @Override
-        public boolean cellsForOverridden() {
-            return true;
-        }
     }
 
     /** Fans every input out to all eight Cells. */

@@ -42,11 +42,6 @@ public final class RetryWorkflowOperative implements WorkflowOperative {
         }
 
         @Override
-        public boolean compensateOverridden() {
-            return true;
-        }
-
-        @Override
         public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
                 throws TaskletException {
             ctx.emit("undone");

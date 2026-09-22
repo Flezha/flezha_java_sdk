@@ -2,6 +2,7 @@ package com.flezha.sdk.runtime.operative.builder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.OptionalInt;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -17,58 +18,65 @@ class MailboxCapacityResolverTest {
     @Test
     @DisplayName("explicit override on the Tasklet wins over env value")
     void overrideOnTaskletTakesPrecedence() {
-        assertThat(MailboxCapacityResolver.resolveInner(4096, true, "2048")).isEqualTo(4096);
+        assertThat(MailboxCapacityResolver.resolveInner(OptionalInt.of(4096), "2048"))
+                .isEqualTo(4096);
     }
 
     @Test
     @DisplayName("env value is used when the Tasklet does not override")
     void envWinsOverDefault() {
-        assertThat(MailboxCapacityResolver.resolveInner(1024, false, "2048")).isEqualTo(2048);
+        assertThat(MailboxCapacityResolver.resolveInner(OptionalInt.empty(), "2048"))
+                .isEqualTo(2048);
     }
 
     @Test
     @DisplayName("unparseable env value falls through to the default")
     void unparseableEnvFallsThroughToDefault() {
-        assertThat(MailboxCapacityResolver.resolveInner(1024, false, "banana"))
+        assertThat(MailboxCapacityResolver.resolveInner(OptionalInt.empty(), "banana"))
                 .isEqualTo(MailboxCapacityResolver.DEFAULT_MAILBOX_CAPACITY);
     }
 
     @Test
     @DisplayName("missing env value falls through to the default")
     void missingEnvFallsThroughToDefault() {
-        assertThat(MailboxCapacityResolver.resolveInner(1024, false, null))
+        assertThat(MailboxCapacityResolver.resolveInner(OptionalInt.empty(), null))
                 .isEqualTo(MailboxCapacityResolver.DEFAULT_MAILBOX_CAPACITY);
     }
 
     @Test
     @DisplayName("a zero declared override is resolved as declared, for the core to judge")
     void zeroDeclaredIsResolvedNotRefused() {
-        assertThat(MailboxCapacityResolver.resolveInner(0, true, null)).isZero();
+        assertThat(MailboxCapacityResolver.resolveInner(OptionalInt.of(0), null))
+                .isZero();
     }
 
     @Test
     @DisplayName("a declared override above the upper bound is resolved as declared")
     void tooLargeIsResolvedNotRefused() {
-        assertThat(MailboxCapacityResolver.resolveInner(MailboxCapacityResolver.MAX_MAILBOX_CAPACITY + 1, true, null))
+        assertThat(MailboxCapacityResolver.resolveInner(
+                        OptionalInt.of(MailboxCapacityResolver.MAX_MAILBOX_CAPACITY + 1), null))
                 .isEqualTo(MailboxCapacityResolver.MAX_MAILBOX_CAPACITY + 1);
     }
 
     @Test
     @DisplayName("zero declared override beats a valid env value (override always wins)")
     void zeroOverrideBeatsEnv() {
-        assertThat(MailboxCapacityResolver.resolveInner(0, true, "4096")).isZero();
+        assertThat(MailboxCapacityResolver.resolveInner(OptionalInt.of(0), "4096"))
+                .isZero();
     }
 
     @Test
     @DisplayName("capacity = 1 is allowed")
     void capacityOneIsAllowed() {
-        assertThat(MailboxCapacityResolver.resolveInner(1, true, null)).isEqualTo(1);
+        assertThat(MailboxCapacityResolver.resolveInner(OptionalInt.of(1), null))
+                .isEqualTo(1);
     }
 
     @Test
     @DisplayName("capacity = MAX_MAILBOX_CAPACITY is allowed")
     void maxIsAllowed() {
-        assertThat(MailboxCapacityResolver.resolveInner(MailboxCapacityResolver.MAX_MAILBOX_CAPACITY, true, null))
+        assertThat(MailboxCapacityResolver.resolveInner(
+                        OptionalInt.of(MailboxCapacityResolver.MAX_MAILBOX_CAPACITY), null))
                 .isEqualTo(MailboxCapacityResolver.MAX_MAILBOX_CAPACITY);
     }
 }
