@@ -76,7 +76,6 @@ Operative Type Declaration :: Wiring mismatch fails declaration with a diagnosab
 Operative declares persistenceEnabled default-method, frozen at instance start :: Code-declared opt-out is honored
 Operative declares persistenceEnabled default-method, frozen at instance start :: Default-on with no override
 Operative declares persistenceEnabled default-method, frozen at instance start :: Resolved value frozen at instance start
-Operative declares persistenceEnabled default-method, frozen at instance start :: Runner override takes precedence
 Per-Cell flusher with toggle-aware drain :: Changes returned in a completion reach the WAL
 Per-Cell flusher with toggle-aware drain :: Persistence disabled drains and discards
 Tasklet Interface and Per-Cell Dispatch :: A key-less emit in a keyed Cell carries that Cell's key

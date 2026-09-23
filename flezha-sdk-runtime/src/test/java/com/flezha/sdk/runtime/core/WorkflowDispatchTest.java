@@ -3,7 +3,9 @@ package com.flezha.sdk.runtime.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.runtime.state.KryoCodec;
+import com.flezha.sdk.runtime.state.TimerOp;
 import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
+import com.flezha.sdk.state.TimerKind;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -106,16 +108,23 @@ class WorkflowDispatchTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("A timer inside a workflow tasklet is refused")
-    void aTimerInsideAWorkflowTaskletIsRefused() {
+    @DisplayName("A timer inside a workflow tasklet fires: its registration reaches the effect, as in a stream")
+    void aTimerInsideAWorkflowTaskletFires() {
         WorkflowOperativeClassRegistry.registerClass(TimerWorkflow.class);
         ItemEffect effect = soleEffect(work("timer_workflow", 0, Optional.empty(), 0, input(0, "x", 1)));
 
-        assertThat(effect.verdict())
-                .as("the attempt fails as one throwing any tasklet exception fails")
-                .isInstanceOf(Verdict.RetryableError.class);
-        assertThat(((Verdict.RetryableError) effect.verdict()).message()).startsWith("TimersUnavailable");
-        assertThat(effect.timers()).as("no timer op reaches the effect").isEmpty();
+        assertThat(effect.verdict()).isInstanceOf(Verdict.Ok.class);
+        assertThat(effect.timers())
+                .as("the registration is the core's to commit and arm")
+                .containsExactly(TimerOp.register(TimerKind.PROCESSING_TIME, 1_001));
+    }
+
+    @Test
+    @DisplayName("The retired wake method does not compile: WorkflowOperative declares no wakeAfter")
+    void theRetiredWakeMethodDoesNotCompile() {
+        assertThat(java.util.Arrays.stream(com.flezha.sdk.operative.WorkflowOperative.class.getMethods())
+                        .map(java.lang.reflect.Method::getName))
+                .doesNotContain("wakeAfter");
     }
 
     /** A workflow whose one tasklet registers a processing-time timer. */

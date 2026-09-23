@@ -68,8 +68,11 @@ import javax.annotation.Nonnull;
  * checkpoint settings and the correction window are refused at registration by name
  * ({@code EffectivelyOnceOnWorkflow}, {@code CheckpointOnWorkflow},
  * {@code CorrectionWindowOnWorkflow}), because a durable workflow already commits stage by stage.
- * A tasklet running inside a workflow cannot register a timer: every timer call on its context
- * throws {@link com.flezha.sdk.tasklet.TaskletException.TimersUnavailable}.
+ * A tasklet running inside a workflow registers timers as a stream tasklet does. Its firing is a
+ * trigger of the run: it opens a pass at that tasklet, joins the tasklet's stage while it runs, or
+ * waits for the pass in flight; and its removal is durable when that stage commits. A sleeping
+ * instance wakes at the earliest pending processing-time timer. A {@link LoopMode#ONCE} instance
+ * ends with its one pass, so a timer due after it never fires.
  *
  * <p>{@link RollbackMode} then selects what an exhausted retry ladder does: unwind the committed
  * stages through their tasklets' {@code compensate} methods, or retain progress. A tasklet's undo
@@ -108,15 +111,6 @@ public interface WorkflowOperative extends Operative {
     @Nonnull
     default LoopMode loopMode() {
         return LoopMode.ONCE;
-    }
-
-    /**
-     * How long a parked (suspended) instance sleeps before the controller wakes
-     * it, even with no inbound message. Empty = wake only on a message.
-     */
-    @Nonnull
-    default Optional<Duration> wakeAfter() {
-        return Optional.empty();
     }
 
     /**

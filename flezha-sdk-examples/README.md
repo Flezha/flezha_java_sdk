@@ -85,7 +85,7 @@ step, and an exhausted retry ladder unwinds what was already done.
 
 **[`agent/`](src/main/java/com/flezha/examples/agent)** is a long-lived agent
 that holds its conversation in durable state and resumes mid-thread after a
-restart, waking on a message or on a timer. This is the shape to copy for
+restart, waking when a message arrives. This is the shape to copy for
 anything intended to run for weeks.
 
 **[`spawn/`](src/main/java/com/flezha/examples/spawn)** shows a stream tasklet

@@ -13,10 +13,19 @@ final class WorkflowE2eGate {
 
     static final String RELEASE_ENV = "FLEZHA_WORKFLOW_E2E_RELEASE";
 
+    /** Where a runner booted with this variable parks: a crash point the harness names. */
+    static final String HOLD_ENV = "FLEZHA_WORKFLOW_E2E_HOLD";
+
     private WorkflowE2eGate() {}
 
     static boolean released() {
         return System.getenv(RELEASE_ENV) != null;
+    }
+
+    static void holdAt(String point) {
+        if (point.equals(System.getenv(HOLD_ENV))) {
+            blockUntilReleased();
+        }
     }
 
     static void blockUntilReleased() {

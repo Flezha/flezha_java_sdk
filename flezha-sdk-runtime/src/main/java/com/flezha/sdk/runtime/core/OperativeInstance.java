@@ -157,13 +157,9 @@ public final class OperativeInstance {
         boolean replay = item instanceof WorkItem.Input in && in.replay();
 
         EmitContext ctx = new EmitContext(this, cell, activation.token(), activation.changeSeq(), now, replay);
-        // A workflow stage has nowhere to fire a timer, so its context carries no
-        // session and every timer call throws TimersUnavailable, as compensate's does.
-        TimerSession session = workflow
-                ? null
-                : item instanceof WorkItem.Timer timer
-                        ? cell.timerPolicy.firingSession(new PendingTimers(), timer.scheduledAt(), timer.kind())
-                        : cell.timerPolicy.session(new PendingTimers(), now);
+        TimerSession session = item instanceof WorkItem.Timer timer
+                ? cell.timerPolicy.firingSession(new PendingTimers(), timer.scheduledAt(), timer.kind())
+                : cell.timerPolicy.session(new PendingTimers(), now);
         ctx.timers = session;
         List<Change> buffer = new ArrayList<>();
         Tasklet tasklet = cell.tasklet;

@@ -2,8 +2,14 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.Stream;
+import com.flezha.sdk.state.StateHandle;
+import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
+import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Step classes for the {@code mix bench.workflow} Java fixtures — the mirror of
@@ -51,6 +57,29 @@ public final class BenchSteps {
     public static final class S14 extends DurableStep { public String name() { return "bench_s14"; } }
     public static final class S15 extends DurableStep { public String name() { return "bench_s15"; } }
 
-    /** The loop's durable first step: bounded state, input passed on. */
-    public static final class Turn extends DurableStep { public String name() { return "bench_turn"; } }
+    /**
+     * The loop's durable first step: bounded state, input passed on. With
+     * {@code FLEZHA_BENCH_WAKE_AFTER_MS} set each turn arms a timer that far out, whose
+     * firing sends the bench's wake marker, {@code wake:<fired_at>}.
+     */
+    public static final class Turn extends DurableStep {
+        public String name() {
+            return "bench_turn";
+        }
+
+        @Override
+        public void run(String input, StateHandle<SeenState, Insert> state, TaskletCtx ctx) throws TaskletException {
+            super.run(input, state, ctx);
+            Optional<Long> after = TestEnv.optLong("FLEZHA_BENCH_WAKE_AFTER_MS");
+            if (after.isPresent()) {
+                ctx.timerAfter(Duration.ofMillis(after.get()));
+            }
+        }
+
+        @Override
+        public void onTimer(long firedAt, TimerKind kind, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
+                throws TaskletException {
+            ctx.emit("wake:" + firedAt);
+        }
+    }
 }

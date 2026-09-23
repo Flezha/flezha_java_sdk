@@ -200,7 +200,6 @@ public final class HostClassDeclaration {
                     case KEEP_PROGRESS -> "keep_progress";
                 });
         probe.maxDuration().ifPresent(d -> workflow.put("max_duration_ms", d.toMillis()));
-        probe.wakeAfter().ifPresent(d -> workflow.put("wake_after_ms", d.toMillis()));
         decl.put("workflow", workflow);
         return decl;
     }

@@ -158,7 +158,6 @@ class HostClassDeclarationTest {
                 .toIterable()
                 .as("retry is the edge's, carried on each channel")
                 .doesNotContain("retry_attempts", "retry_backoff_ms", "barrier_retry_attempts");
-        assertThat(workflow.has("wake_after_ms")).isFalse();
         assertThat(decl.has("sync_durability"))
                 .as("asynchronous remote durability is the cost-free default")
                 .isFalse();
@@ -247,7 +246,7 @@ class HostClassDeclarationTest {
         List<JsonNode> tasklets = new ArrayList<>(nodes(stream.get("tasklets")));
         tasklets.addAll(nodes(dynamic.get("tasklets")));
         assertEverySpellingExists("tasklet", tasklets, Set.of());
-        assertEverySpellingExists("workflow", List.of(workflow.get("workflow")), Set.of("wake_after_ms"));
+        assertEverySpellingExists("workflow", List.of(workflow.get("workflow")), Set.of());
         assertThat(workflow.has("sync_durability")).isTrue();
     }
 

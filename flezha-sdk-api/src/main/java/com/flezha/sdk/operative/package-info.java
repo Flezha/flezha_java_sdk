@@ -25,9 +25,9 @@
  * next stage is written down there, encoded by a codec the runtime derives, which no channel
  * declares. {@link com.flezha.sdk.operative.RollbackMode} selects whether an exhausted retry ladder
  * unwinds the committed stages through their tasklets' {@code compensate} methods or retains
- * progress. {@link com.flezha.sdk.operative.LoopMode} and {@code wakeAfter()} turn a workflow into
- * a long-lived loop: one durable iteration per inbound message, optionally woken by a timer,
- * parking between iterations while holding its journal.
+ * progress. {@link com.flezha.sdk.operative.LoopMode} turns a workflow into a long-lived loop: one
+ * durable iteration per inbound message or timer firing, parking between iterations while holding
+ * its journal, and woken by the next message or the earliest timer its tasklets registered.
  */
 @javax.annotation.ParametersAreNonnullByDefault
 package com.flezha.sdk.operative;

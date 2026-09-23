@@ -7,9 +7,9 @@
  *
  * <p>{@link com.flezha.examples.agent.ChatOperative} declares the two properties that make this a
  * loop rather than a single pass. {@link com.flezha.sdk.operative.LoopMode} of {@code PER_INPUT}
- * gives one durable iteration per inbound message. {@code wakeAfter} additionally schedules a wake
- * when no message has arrived, which is how an agent produces a nudge, a summary or a follow-up
- * without being addressed; omit it and the agent wakes only when spoken to.
+ * gives one durable iteration per inbound message. An agent that should also act without being
+ * addressed, for a nudge, a summary or a follow-up, has a tasklet register a timer with
+ * {@code ctx.timerAfter} and handle it in {@code onTimer}: the sleeping instance wakes at it.
  *
  * <p>{@link com.flezha.examples.agent.Reply} is where a real implementation would call a model,
  * passing the accumulated turns as history. Keeping the reply a function of that history is
