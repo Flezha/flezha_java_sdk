@@ -46,9 +46,11 @@ class FactoryIdsTest {
             "do_nothing",
             "dynamic_cell",
             "echo_workflow",
+            "event_timer_workflow",
             "cell_stress",
             "hybrid_channel",
             "keyed_block_workflow",
+            "keyed_loop_workflow",
             "keyed_saga_workflow",
             "merged_input",
             "mixed_operative",
@@ -82,11 +84,11 @@ class FactoryIdsTest {
             "sync_durable_workflow",
             "tier_commit_block_workflow",
             "tier_store",
+            "timer_loop_workflow",
             "transform_chain",
             "typed_once_workflow",
             "undo_outbox_workflow",
-            "wedge_probe",
-            "workflow_timer_refused");
+            "wedge_probe");
 
     @BeforeEach
     void reset() {

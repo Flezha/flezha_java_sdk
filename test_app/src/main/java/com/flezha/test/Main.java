@@ -112,6 +112,7 @@ public final class Main {
                 .registerFactory(UndoOutboxWorkflowOperative.class)
                 .registerFactory(ChatLoopWorkflowOperative.class)
                 .registerFactory(StatelessLoopWorkflowOperative.class)
+                .registerFactory(KeyedLoopWorkflowOperative.class)
                 .registerFactory(ChatRewindWorkflowOperative.class)
                 .registerFactory(ReplyBlockLoopWorkflowOperative.class)
                 .registerFactory(RetryWorkflowOperative.class)
