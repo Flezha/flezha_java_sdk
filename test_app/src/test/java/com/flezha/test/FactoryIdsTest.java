@@ -47,6 +47,7 @@ class FactoryIdsTest {
             "dynamic_cell",
             "echo_workflow",
             "event_timer_workflow",
+            "failed_stage_workflow",
             "cell_stress",
             "hybrid_channel",
             "keyed_block_workflow",

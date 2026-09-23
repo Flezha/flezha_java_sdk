@@ -10,13 +10,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
- * Mirror of the Rust test app's {@code undo_outbox_workflow}: the compensation
- * half of the transactional outbox. Task UA commits, emits its forward output on
- * a hybrid plugin channel, and declares a {@code compensate} hook that EMITS an
- * undo record — plugin-bound, so it is staged and rides a {@code compensated}
- * journal entry rather than the wire. Task C fails immediately, so the chain
- * always rolls back; the hook BLOCKS until the release env is set, so on the
- * first runner the undo is emitted-but-never-journaled when the SIGKILL lands.
+ * Mirror of the Rust test app's {@code undo_outbox_workflow}: a compensation's
+ * undo output. Task UA commits, emits its forward output on a hybrid plugin
+ * channel, and declares a {@code compensate} hook that EMITS an undo record,
+ * which rides UA's Cell's own record and is released once the
+ * {@code compensated} entry naming it is durable. Task C fails immediately, so
+ * the chain always rolls back; the hook BLOCKS until the release env is set, so
+ * on the first runner the SIGKILL lands before the undo was written.
  */
 public final class UndoOutboxWorkflowOperative implements WorkflowOperative {
 

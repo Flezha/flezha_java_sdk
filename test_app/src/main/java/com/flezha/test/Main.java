@@ -110,6 +110,7 @@ public final class Main {
                 .registerFactory(KeyedWorkflowOperatives.KeyedSaga.class)
                 .registerFactory(OutboxBlockWorkflowOperative.class)
                 .registerFactory(UndoOutboxWorkflowOperative.class)
+                .registerFactory(FailedStageWorkflowOperative.class)
                 .registerFactory(ChatLoopWorkflowOperative.class)
                 .registerFactory(StatelessLoopWorkflowOperative.class)
                 .registerFactory(KeyedLoopWorkflowOperative.class)

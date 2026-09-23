@@ -225,16 +225,15 @@ final class EmitContext implements TaskletCtx {
      * event time. That is the STREAM shape — the core routes each output
      * on {@code (edge, key)} and reads the consumer.
      *
-     * <p>A workflow stage is folded, not routed: {@code fold_effect}
-     * ({@code flz_core::host::workflow}) discards the consumer and collects
-     * every output as ONE released value, which the driver then fans out to
-     * each child itself. One output per consumer would therefore multiply
-     * the stage's released batch — and every downstream node's work — by
-     * the channel's consumer count. So a structured workflow releases the
-     * value once, untransformed and unkeyed; each consumer applies its own
-     * edge on delivery in {@link CellRouting#valuesForCell}, which is the
-     * seam a live run and a journal re-seed both cross. Mirrors the Rust
-     * SDK's {@code WorkflowCollectAdapter::emit}.
+     * <p>A workflow stage is held, not routed: the core keeps every output
+     * as ONE released value on the instance's pass sheet and addresses each
+     * consumer itself when the stage commits. One output per consumer would
+     * therefore multiply the stage's released batch (and every downstream
+     * node's work) by the channel's consumer count. So a structured
+     * workflow releases the value once, untransformed and unkeyed; each
+     * consumer applies its own edge on delivery in
+     * {@link CellRouting#valuesForCell}, which is the seam a live run and a
+     * journal re-seed both cross.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void collectEdgeOutputs(int channelId, ChannelDescriptor descriptor, Object value) {
@@ -277,10 +276,10 @@ final class EmitContext implements TaskletCtx {
     }
 
     /**
-     * A plugin output. Non-tier keyed channels carry the identity stamps
-     * the pre-core frame writer minted; under the tier the controller
-     * derives them at flush time, so none ride here — both byte-shapes
-     * preserved.
+     * A plugin output. A keyed channel of a class that records no effects
+     * carries the identity stamps; under the tier, and for a durable
+     * workflow, the controller derives them from the effect record at flush
+     * time, so none ride here.
      */
     private void collectPluginOutput(
             ChannelDescriptor descriptor, byte[] bytes, @Nullable Map<String, String> meta, @Nullable String key) {
@@ -292,7 +291,7 @@ final class EmitContext implements TaskletCtx {
                 }
             }
         }
-        if (descriptor.keyed() && !instance.topology.effectivelyOnce()) {
+        if (descriptor.keyed() && !instance.topology.recordsEffects()) {
             metadata.add(Map.entry("flz.cell", cell.id.encoded()));
             metadata.add(Map.entry("flz.seq", invocationSeq + "." + emitOrdinal));
             metadata.add(Map.entry("flz.key", key));

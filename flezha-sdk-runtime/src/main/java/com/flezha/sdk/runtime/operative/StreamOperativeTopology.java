@@ -53,6 +53,17 @@ public final class StreamOperativeTopology {
     }
 
     /**
+     * Whether each invocation's output rides one effect record the controller
+     * stamps at flush: under the effectively-once tier, and for a durable
+     * workflow, whose stage commit names the record. Read off the declaration
+     * record, which carries both facts.
+     */
+    public boolean recordsEffects() {
+        return effectivelyOnce
+                || (declaration.containsKey("workflow") && Boolean.TRUE.equals(declaration.get("persistent")));
+    }
+
+    /**
      * The {@code HostClassDecl} record this class was built from — what the
      * builder was told, submitted to the core's one check and re-sent
      * verbatim at declare time. Written once, so the bytes the core judged
