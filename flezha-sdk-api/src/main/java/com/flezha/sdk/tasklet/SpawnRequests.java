@@ -8,7 +8,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * The seam between {@link TaskletCtx#spawnWorkflow} and the control plane. The runtime installs a
+ * The seam between {@link TaskletCtx#spawnBounded} and the control plane. The runtime installs a
  * {@link Requester} when it starts the core; the api layer, which cannot see the core, routes every
  * request through it. The core owns the rest: the replay skip, the deadline, the release of a handle
  * when its activation ends, and the warning for a failure nobody read.
@@ -57,7 +57,7 @@ public final class SpawnRequests {
             } else {
                 String message = "no control plane to request a spawn on";
                 answer.put("error", "unavailable").put("message", message);
-                LOG.warn("spawnWorkflow(factory `{}`, id `{}`) failed: {}", factoryId, id, message);
+                LOG.warn("spawnBounded(factory `{}`, id `{}`) failed: {}", factoryId, id, message);
             }
             String json = answer.toString();
             return new SpawnHandle(timeoutMs -> json);

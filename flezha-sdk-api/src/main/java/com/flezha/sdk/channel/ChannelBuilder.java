@@ -5,8 +5,8 @@ import javax.annotation.Nonnull;
 
 /**
  * Producer-first fluent graph builder consumed by
- * {@link com.flezha.sdk.operative.Operative#channels(ChannelBuilder)}, the
- * graph body of both operative kinds.
+ * {@link com.flezha.sdk.operator.Operator#channels(ChannelBuilder)}, the
+ * graph body of both operator kinds.
  *
  * <p>{@code c.input(T.class, "name").into(A.class).into(B.class).sink("plugin")}
  * — {@code .into} wires a consumer and returns that tasklet's <b>output
@@ -16,9 +16,9 @@ import javax.annotation.Nonnull;
  * streams naming the same consumer class.
  *
  * <p>Entry channel names stay explicit and mandatory — they are the
- * operative's external input address. Inter-tasklet channel names
+ * operator's external input address. Inter-tasklet channel names
  * auto-derive from the producer node's identity, with {@link Stream#named}
- * as the override. Declarations land in a per-operative topology the runtime
+ * as the override. Declarations land in a per-operator topology the runtime
  * freezes at registration.
  */
 public interface ChannelBuilder {
@@ -57,7 +57,7 @@ public interface ChannelBuilder {
     <I> Merge<I> merge(Class<I> type);
 
     /**
-     * Turn an operative-wide document stream into per-key deliveries: every key
+     * Turn an operator-wide document stream into per-key deliveries: every key
      * seen on {@code traffic} receives each distinct document exactly once, on
      * that key's own next traffic item, as a {@link RoutedDocument} the consumer
      * keys by.
@@ -109,7 +109,7 @@ public interface ChannelBuilder {
      * tasklet whose {@code {document, version, delivered}} state rides the
      * standard change journal: authoring sugar over existing primitives, not a
      * runtime feature. The node is named {@code route_latest} like any tasklet
-     * node, so a second router in one operative needs
+     * node, so a second router in one operator needs
      * {@link #routeLatest(Class, EdgeStream, EdgeStream, Function, String)} to
      * name it.
      *
@@ -123,7 +123,7 @@ public interface ChannelBuilder {
 
     /**
      * {@link #routeLatest(Class, EdgeStream, EdgeStream, Function)} with an
-     * explicit node identity, so one operative may carry several routers (the
+     * explicit node identity, so one operator may carry several routers (the
      * node-identity rule makes unnamed mentions of one class one node).
      */
     @Nonnull
@@ -135,13 +135,13 @@ public interface ChannelBuilder {
             String nodeName);
 
     /**
-     * Opt this Operative into the <b>effectively-once output tier</b>: each
+     * Opt this Operator into the <b>effectively-once output tier</b>: each
      * invocation's state changes, plugin outputs and consumed input offset ship
      * as ONE {@code cell_effect_record}, which the controller persists as one
      * WAL record under one fsync. A crash can then never advance the consumed
      * offset while losing the state or the output it was advanced for.
      *
-     * <p>Every plugin-bound channel of a tier-enabled Operative MUST be declared
+     * <p>Every plugin-bound channel of a tier-enabled Operator MUST be declared
      * {@code .keyed()} — the tier's replay re-emits outputs, and only a keyed
      * sink can absorb that as an idempotent upsert. A non-keyed plugin channel
      * fails registration.
@@ -197,7 +197,7 @@ public interface ChannelBuilder {
     void outputsAtCheckpoint(long maxDelayMs);
 
     /**
-     * Declare that this Operative corrects itself when an input arrives late:
+     * Declare that this Operator corrects itself when an input arrives late:
      * an input whose event time falls behind the Cell's event-time high-water
      * mark, but by less than {@code windowMs}, triggers the controller to rewind
      * the Cell to a baseline before that event time and replay the affected

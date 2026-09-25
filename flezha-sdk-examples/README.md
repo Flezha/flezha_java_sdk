@@ -23,7 +23,7 @@ new idea, so reading them out of order will leave gaps.
 **1. [`examples/echo`](../examples/echo)** is the minimal complete application,
 and it sits outside this module as a standalone project so it can be opened and
 built on its own. It establishes the three-part structure every Flezha
-application has: a tasklet holding the code invoked per message, an operative
+application has: a tasklet holding the code invoked per message, an operator
 declaring the graph, and a main starting a runner. It declares no state, which
 keeps the whole example short enough to hold in mind at once.
 
@@ -78,7 +78,7 @@ already-published result when an input arrives after its interval closed. Rather
 than discarding the message or misattributing it, the runtime replays the
 affected cell with the message in its correct position and re-emits.
 
-**[`workflow/`](src/main/java/com/flezha/examples/workflow)** covers ordered
+**[`bounded/`](src/main/java/com/flezha/examples/bounded)** covers ordered
 steps that must not be re-executed as a unit after a partial failure: reserve,
 charge, dispatch. Completed steps are journaled, a crash resumes at the next
 step, and an exhausted retry ladder unwinds what was already done.
@@ -88,8 +88,8 @@ that holds its conversation in durable state and resumes mid-thread after a
 restart, waking when a message arrives. This is the shape to copy for
 anything intended to run for weeks.
 
-**[`spawn/`](src/main/java/com/flezha/examples/spawn)** shows a stream tasklet
-requesting a workflow worker from the controller, so a detector can delegate
+**[`spawn/`](src/main/java/com/flezha/examples/spawn)** shows an unbounded tasklet
+requesting a bounded worker from the controller, so a detector can delegate
 substantial work without becoming a dispatcher itself.
 
 ## Looking things up

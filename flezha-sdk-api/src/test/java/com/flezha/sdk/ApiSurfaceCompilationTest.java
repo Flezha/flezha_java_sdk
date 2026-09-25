@@ -35,11 +35,11 @@ class ApiSurfaceCompilationTest {
     @ParameterizedTest(name = "{0} does not resolve")
     @ValueSource(
             strings = {
-                "com.flezha.sdk.StreamOperativeHandler",
+                "com.flezha.sdk.UnboundedOperatorHandler",
                 "com.flezha.sdk.FactoryRegistry",
                 "com.flezha.sdk.RunnerBuilder",
-                "com.flezha.sdk.operative.StreamOperativeRegistry",
-                "com.flezha.sdk.operative.WorkflowOperativeRegistry",
+                "com.flezha.sdk.operator.UnboundedOperatorRegistry",
+                "com.flezha.sdk.operator.BoundedOperatorRegistry",
             })
     void deletedTypesDoNotResolve(String type) {
         Compilation result = compile(usesImport(type));
@@ -51,42 +51,42 @@ class ApiSurfaceCompilationTest {
     }
 
     @Test
-    @DisplayName("the workflow kind is not in a package of its own: com.flezha.sdk.workflow does not resolve")
-    void theWorkflowKindIsNotInAPackageOfItsOwn() {
+    @DisplayName("the bounded kind is not in a package of its own: com.flezha.sdk.bounded does not resolve")
+    void theBoundedKindIsNotInAPackageOfItsOwn() {
         for (String type : List.of(
-                "com.flezha.sdk.workflow.WorkflowOperative",
-                "com.flezha.sdk.workflow.WorkflowOperativeConfigurationException",
-                "com.flezha.sdk.workflow.LoopMode",
-                "com.flezha.sdk.workflow.RollbackMode")) {
+                "com.flezha.sdk.bounded.BoundedOperator",
+                "com.flezha.sdk.bounded.BoundedOperatorConfigurationException",
+                "com.flezha.sdk.bounded.LoopMode",
+                "com.flezha.sdk.bounded.RollbackMode")) {
             assertDoesNotCompile(usesImport(type));
         }
     }
 
     @Test
-    @DisplayName("both kinds and the base share one package, the workflow supporting types with them")
+    @DisplayName("both kinds and the base share one package, the bounded supporting types with them")
     void bothKindsAndTheBaseShareOnePackage() {
         assertThat(
                         compiles(
                                 """
                         package nowhere;
-                        import com.flezha.sdk.operative.LoopMode;
-                        import com.flezha.sdk.operative.Operative;
-                        import com.flezha.sdk.operative.RollbackMode;
-                        import com.flezha.sdk.operative.StreamOperative;
-                        import com.flezha.sdk.operative.WorkflowOperative;
-                        import com.flezha.sdk.operative.WorkflowOperativeConfigurationException;
+                        import com.flezha.sdk.operator.LoopMode;
+                        import com.flezha.sdk.operator.Operator;
+                        import com.flezha.sdk.operator.RollbackMode;
+                        import com.flezha.sdk.operator.UnboundedOperator;
+                        import com.flezha.sdk.operator.BoundedOperator;
+                        import com.flezha.sdk.operator.BoundedOperatorConfigurationException;
                         public final class UsesLegacyApi {
                             // Both kinds are the base, so one return type holds either.
-                            Operative eitherKind(StreamOperative s, WorkflowOperative w, boolean b) {
+                            Operator eitherKind(UnboundedOperator s, BoundedOperator w, boolean b) {
                                 return b ? s : w;
                             }
 
                             LoopMode loop;
                             RollbackMode rollback;
-                            WorkflowOperativeConfigurationException refusal;
+                            BoundedOperatorConfigurationException refusal;
                         }
                         """))
-                .as("the base, both kinds and the workflow supporting types resolve from one package")
+                .as("the base, both kinds and the bounded supporting types resolve from one package")
                 .isTrue();
     }
 
@@ -108,48 +108,48 @@ class ApiSurfaceCompilationTest {
     void callingRemovedEgressMethodsFails() {
         // Control first: without it a classpath that resolved nothing would
         // make every refusal below vacuously true.
-        assertThat(compiles(usesStream("s.sink(\"x\");")))
+        assertThat(compiles(usesUnbounded("s.sink(\"x\");")))
                 .as("the replacement spelling must compile — otherwise the refusals prove nothing")
                 .isTrue();
 
-        assertDoesNotCompile(usesStream("s.output(\"x\");"));
-        assertDoesNotCompile(usesStream("s.output(\"x\", v -> v.getBytes());"));
-        assertDoesNotCompile(usesStream("s.alsoOutput(\"x\");"));
-        assertDoesNotCompile(usesStream("s.alsoOutput(\"x\", v -> v.getBytes());"));
+        assertDoesNotCompile(usesUnbounded("s.output(\"x\");"));
+        assertDoesNotCompile(usesUnbounded("s.output(\"x\", v -> v.getBytes());"));
+        assertDoesNotCompile(usesUnbounded("s.alsoOutput(\"x\");"));
+        assertDoesNotCompile(usesUnbounded("s.alsoOutput(\"x\", v -> v.getBytes());"));
     }
 
     @Test
     @DisplayName("a sealed channel accepts no further declaration")
     void sealedRefusesFurtherDeclaration() {
-        assertThat(compiles(usesStream("s.sink(\"x\").sealed();")))
+        assertThat(compiles(usesUnbounded("s.sink(\"x\").sealed();")))
                 .as("sealing a sink is the supported terminator")
                 .isTrue();
 
-        assertDoesNotCompile(usesStream("s.sink(\"x\").sealed().named(\"y\");"));
-        assertDoesNotCompile(usesStream("s.sink(\"x\").sealed().keyed();"));
+        assertDoesNotCompile(usesUnbounded("s.sink(\"x\").sealed().named(\"y\");"));
+        assertDoesNotCompile(usesUnbounded("s.sink(\"x\").sealed().keyed();"));
     }
 
     @Test
     @DisplayName("The retry knobs are gone from the interface")
     void theRetryKnobsAreGoneFromTheInterface() {
-        assertThat(compiles(workflowWith("c.input(String.class, \"in\").retryMax(2).retryBackoffMs(20);", "")))
+        assertThat(compiles(boundedWith("c.input(String.class, \"in\").retryMax(2).retryBackoffMs(20);", "")))
                 .as("the edge's retry declaration must compile, or the refusals prove nothing")
                 .isTrue();
 
-        assertDoesNotCompile(workflowWith("", "@Override public int retryAttempts() { return 1; }"));
-        assertDoesNotCompile(workflowWith("", "@Override public java.time.Duration retryBackoff() { return null; }"));
-        assertDoesNotCompile(workflowWith("", "@Override public int barrierRetryAttempts() { return 1; }"));
+        assertDoesNotCompile(boundedWith("", "@Override public int retryAttempts() { return 1; }"));
+        assertDoesNotCompile(boundedWith("", "@Override public java.time.Duration retryBackoff() { return null; }"));
+        assertDoesNotCompile(boundedWith("", "@Override public int barrierRetryAttempts() { return 1; }"));
     }
 
     @Test
-    @DisplayName("a workflow graph written in a body named tasklets does not compile: channels is abstract on the base")
-    void aWorkflowBodyNamedTaskletsDoesNotCompile() {
+    @DisplayName("a bounded graph written in a body named tasklets does not compile: channels is abstract on the base")
+    void aBoundedBodyNamedTaskletsDoesNotCompile() {
         assertDoesNotCompile(
                 """
                 package nowhere;
                 import com.flezha.sdk.channel.ChannelBuilder;
-                import com.flezha.sdk.operative.WorkflowOperative;
-                public final class UsesLegacyApi implements WorkflowOperative {
+                import com.flezha.sdk.operator.BoundedOperator;
+                public final class UsesLegacyApi implements BoundedOperator {
                     @Override public String factoryId() { return "legacy"; }
                     public void tasklets(ChannelBuilder c) {}
                 }
@@ -171,16 +171,18 @@ class ApiSurfaceCompilationTest {
                 }
             }
         }
-        assertThat(found).as("a workflow is a graph committed stage by stage").isEmpty();
+        assertThat(found)
+                .as("a bounded operator is a graph committed stage by stage")
+                .isEmpty();
     }
 
-    /** A workflow class whose graph body is {@code graph} and whose remaining members are {@code members}. */
-    private static String workflowWith(String graph, String members) {
+    /** A bounded class whose graph body is {@code graph} and whose remaining members are {@code members}. */
+    private static String boundedWith(String graph, String members) {
         return """
                 package nowhere;
                 import com.flezha.sdk.channel.ChannelBuilder;
-                import com.flezha.sdk.operative.WorkflowOperative;
-                public final class UsesLegacyApi implements WorkflowOperative {
+                import com.flezha.sdk.operator.BoundedOperator;
+                public final class UsesLegacyApi implements BoundedOperator {
                     @Override public String factoryId() { return "legacy"; }
                     @Override public void channels(ChannelBuilder c) { %s }
                     %s
@@ -200,7 +202,7 @@ class ApiSurfaceCompilationTest {
     }
 
     /** One `Stream<String>` in scope, `body` the only thing under test. */
-    private static String usesStream(String body) {
+    private static String usesUnbounded(String body) {
         return """
                 package nowhere;
                 import com.flezha.sdk.channel.Stream;

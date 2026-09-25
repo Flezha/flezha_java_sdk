@@ -8,15 +8,15 @@ import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.EdgeStream;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.Stream;
-import com.flezha.sdk.operative.Operative;
-import com.flezha.sdk.operative.StreamOperative;
-import com.flezha.sdk.operative.StreamOperativeConfigurationException;
-import com.flezha.sdk.operative.WorkflowOperative;
-import com.flezha.sdk.operative.WorkflowOperativeConfigurationException;
+import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
+import com.flezha.sdk.operator.BoundedOperator;
+import com.flezha.sdk.operator.BoundedOperatorConfigurationException;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.runtime.operative.ChannelDescriptor;
-import com.flezha.sdk.runtime.operative.StreamOperativeTopology;
-import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder;
+import com.flezha.sdk.runtime.operator.ChannelDescriptor;
+import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
+import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,7 +35,7 @@ import java.util.function.Consumer;
  * <p>{@code flz_core/src/host/check_tests.rs} is the same table driven against
  * the record directly, because the core has no builder. This one maps the same
  * step vocabulary onto the Java graph builder, so what is measured here is what
- * an author of a Java operative actually writes.
+ * an author of a Java operator actually writes.
  *
  * <p>Two entry points, both off {@link Main}:
  *
@@ -58,9 +58,9 @@ import java.util.function.Consumer;
  * producer-side links ({@code named}, {@code sink}, {@code keyed},
  * {@code branch}) live on {@link Stream} and an entry channel's handle is an
  * {@link EdgeStream}, so a row applying one to an entry channel has no Java
- * spelling; and a stream class has no {@code syncDurability} knob at all — it
- * is a workflow declaration here, which is why only
- * {@code HostClassDeclaration.forWorkflow} writes the key. The fixture's
+ * spelling; and an unbounded class has no {@code syncDurability} knob at all — it
+ * is a bounded declaration here, which is why only
+ * {@code HostClassDeclaration.forBounded} writes the key. The fixture's
  * {@code needs} column names both.
  */
 public final class ConformanceRun {
@@ -74,12 +74,12 @@ public final class ConformanceRun {
      * BY NAME, which is what makes the skip checkable.
      */
     private static final List<String> SURFACES =
-            List.of("merge", "branch", "workflow", "shorthand", "shorthand_typed_output");
+            List.of("merge", "branch", "bounded", "shorthand", "shorthand_typed_output");
 
     /**
      * The §5 short-form refusals Java raises at COMPILE time, each with the {@code FlezhaProcessorTest}
      * case that pins the message: {@code ShortFormWithTopology} in
-     * {@code anAnnotatedClassImplementingAnOperativeInterfaceIsRefused}, {@code SinkWithoutOutput} in
+     * {@code anAnnotatedClassImplementingAnOperatorInterfaceIsRefused}, {@code SinkWithoutOutput} in
      * {@code aSinkOnAVoidRunIsRefused}. A row the compiler answers cannot be driven through a builder
      * that never sees it, so the app cites the test and the drill checks the cited file carries the name.
      */
@@ -89,7 +89,7 @@ public final class ConformanceRun {
     /** The capacity a row declared per role, read as the tasklet is minted. */
     private static final Map<String, Integer> MAILBOX = new HashMap<>();
 
-    /** The row a {@link RowOperative} declares when the runner defines it. */
+    /** The row a {@link RowOperator} declares when the runner defines it. */
     private static Row current;
 
     private ConformanceRun() {}
@@ -97,9 +97,9 @@ public final class ConformanceRun {
     /** A row of the four-column refusal table. */
     private record Row(String topology, String steps, String needs) {
 
-        /** Whether the row declares a workflow class, which only the workflow kind can write. */
-        boolean workflow() {
-            return declares("class.workflow");
+        /** Whether the row declares a bounded class, which only the bounded kind can write. */
+        boolean bounded() {
+            return declares("class.bounded");
         }
 
         boolean declares(String classStep) {
@@ -162,7 +162,7 @@ public final class ConformanceRun {
     // The interpreter.
 
     /** The class a row declares, of either kind: the steps are read at {@code channels()} time. */
-    private abstract static class RowOperative implements Operative {
+    private abstract static class RowOperator implements Operator {
 
         @Override
         public String factoryId() {
@@ -175,8 +175,8 @@ public final class ConformanceRun {
         }
     }
 
-    /** The class a row declares on the stream kind; its two class switches are the row's. */
-    public static final class RowStreamOperative extends RowOperative implements StreamOperative {
+    /** The class a row declares on the unbounded kind; its two class switches are the row's. */
+    public static final class RowUnboundedOperator extends RowOperator implements UnboundedOperator {
         @Override
         public boolean persistenceEnabled() {
             return current.declares("class.persistent");
@@ -188,8 +188,8 @@ public final class ConformanceRun {
         }
     }
 
-    /** The class a {@code class.workflow} row declares: the same steps, on the workflow kind. */
-    public static final class RowWorkflowOperative extends RowOperative implements WorkflowOperative {
+    /** The class a {@code class.bounded} row declares: the same steps, on the bounded kind. */
+    public static final class RowBoundedOperator extends RowOperator implements BoundedOperator {
         @Override
         public boolean persistenceEnabled() {
             return current.declares("class.persistent");
@@ -336,15 +336,15 @@ public final class ConformanceRun {
     /**
      * {@code class.<flag>[(<value>)]} — the facts the class declares on the
      * builder. {@code persistent} and {@code sleep_when_idle} are the row
-     * classes' switches; {@code workflow} is the kind of the class the row is
-     * declared on, {@link RowWorkflowOperative}; {@code sync_durability} is a
-     * declaration a stream class does not carry, and every row needing it is
+     * classes' switches; {@code bounded} is the kind of the class the row is
+     * declared on, {@link RowBoundedOperator}; {@code sync_durability} is a
+     * declaration an unbounded class does not carry, and every row needing it is
      * skipped before it reaches here.
      */
     private static void classFlag(ChannelBuilder c, String rest) {
         String[] call = splitCall(rest);
         switch (call[0]) {
-            case "persistent", "sleep_when_idle", "workflow" -> {}
+            case "persistent", "sleep_when_idle", "bounded" -> {}
             case "effectively_once" -> c.effectivelyOnce();
             case "checkpoint_ack" -> c.checkpointAck();
             case "checkpoint_every" -> c.checkpointEvery(Integer.parseInt(call[1]));
@@ -414,22 +414,22 @@ public final class ConformanceRun {
      * The two twins the fixture cites rather than re-spells: this app's own
      * fixtures, which is what the seven-column table states.
      */
-    private static StreamOperativeTopology cited(String topology) {
+    private static UnboundedOperatorTopology cited(String topology) {
         return switch (topology) {
-            case "hybrid_channel" -> StreamOperativeTopologyBuilder.build(new HybridChannelStreamOperative());
-            case "commit_block_chain" -> StreamOperativeTopologyBuilder.build(new TierCommitBlockWorkflowOperative());
+            case "hybrid_channel" -> UnboundedOperatorTopologyBuilder.build(new HybridChannelUnboundedOperator());
+            case "commit_block_chain" -> UnboundedOperatorTopologyBuilder.build(new TierCommitBlockBoundedOperator());
             default -> throw new IllegalStateException(
                     "the fixture cites a topology this app does not declare: " + topology);
         };
     }
 
-    private static StreamOperativeTopology topologyOf(Row row) {
+    private static UnboundedOperatorTopology topologyOf(Row row) {
         if (row.steps().equals("cited above")) {
             return cited(row.topology());
         }
         load(row);
-        return StreamOperativeTopologyBuilder.build(
-                row.workflow() ? new RowWorkflowOperative() : new RowStreamOperative());
+        return UnboundedOperatorTopologyBuilder.build(
+                row.bounded() ? new RowBoundedOperator() : new RowUnboundedOperator());
     }
 
     /** One row's verdict, in the report's shape. */
@@ -446,10 +446,10 @@ public final class ConformanceRun {
             return judgeShorthand(json, entry, shorthand);
         }
         try {
-            StreamOperativeTopology topology = topologyOf(row);
+            UnboundedOperatorTopology topology = topologyOf(row);
             entry.put("outcome", "accepted");
             entry.set("derived", derived(json, topology));
-        } catch (StreamOperativeConfigurationException refusal) {
+        } catch (UnboundedOperatorConfigurationException refusal) {
             entry.put("outcome", "refused");
             ArrayNode names = entry.putArray("names");
             refusal.refusals().forEach(names::add);
@@ -460,7 +460,7 @@ public final class ConformanceRun {
     /**
      * A {@code shorthand(<id>|-, <sink>|-, <input>|-)} step. {@code -} is a field the row leaves
      * unwritten; {@code .noout} marks a body declaring no output, and {@code .topology} a class that
-     * also implements an operative interface.
+     * also implements an operator interface.
      */
     private record Shorthand(boolean hasSink, boolean noout, boolean topology) {
 
@@ -527,8 +527,8 @@ public final class ConformanceRun {
 
     /** Register the duplicate row's pair; the second call is the one under test. */
     private static void driveDuplicate(FlezhaRunner runner) {
-        runner.registerFactory(ShorthandDupStream.class);
-        runner.registerFactory(ShorthandDupWorkflow.class);
+        runner.registerFactory(ShorthandDupUnbounded.class);
+        runner.registerFactory(ShorthandDupBounded.class);
     }
 
     /** The leading refusal name of a message the contract requires to begin with one. */
@@ -541,7 +541,7 @@ public final class ConformanceRun {
      * The derived declaration, in the columns the fixture's seven-column table
      * states: what the core answered, as the topology materialised it.
      */
-    private static ArrayNode derived(ObjectMapper json, StreamOperativeTopology topology) {
+    private static ArrayNode derived(ObjectMapper json, UnboundedOperatorTopology topology) {
         ArrayNode channels = json.createArrayNode();
         for (int index = 0; index < topology.channels().size(); index++) {
             ChannelDescriptor channel = topology.channels().get(index);
@@ -624,7 +624,7 @@ public final class ConformanceRun {
                     System.err.println(topology + ": " + refusal.getMessage());
                     System.exit(1);
                 }
-                System.err.println(topology + ": the runner accepted a second operative under one factory id");
+                System.err.println(topology + ": the runner accepted a second operator under one factory id");
                 System.exit(1);
             }
             System.err.println(topology + ": " + shorthand.get(0).refusal()
@@ -637,8 +637,8 @@ public final class ConformanceRun {
         }
         load(row);
         try {
-            runner.registerFactory(row.workflow() ? RowWorkflowOperative.class : RowStreamOperative.class);
-        } catch (StreamOperativeConfigurationException | WorkflowOperativeConfigurationException refusal) {
+            runner.registerFactory(row.bounded() ? RowBoundedOperator.class : RowUnboundedOperator.class);
+        } catch (UnboundedOperatorConfigurationException | BoundedOperatorConfigurationException refusal) {
             System.err.println(topology + ": " + refusal.getMessage());
             System.exit(1);
         }

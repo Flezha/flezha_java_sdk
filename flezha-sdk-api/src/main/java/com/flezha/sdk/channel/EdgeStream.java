@@ -62,7 +62,7 @@ public interface EdgeStream<T> {
      * state directories, journal entries, the derived channel name,
      * diagnostics. This lets one Tasklet class appear at several graph
      * positions with independent state. Node identity strings are unique per
-     * operative; a collision fails registration.
+     * operator; a collision fails registration.
      */
     @Nonnull
     <O> Stream<O> into(Class<? extends Tasklet<T, ?, O, ?, ?, ?>> tasklet, String nodeName);
@@ -111,7 +111,7 @@ public interface EdgeStream<T> {
      * Override the default {@link OverflowPolicy}, which is
      * {@link OverflowPolicy#DROP_NOTHING} for every channel kind. On an entry
      * channel {@code DROP_NOTHING} parks the shared wire reader on this
-     * operative's saturation; declare a drop policy when shedding under
+     * operator's saturation; declare a drop policy when shedding under
      * saturation is acceptable and ordering or completeness can be sacrificed
      * for liveness.
      */

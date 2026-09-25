@@ -1,9 +1,9 @@
 package com.flezha.sdk.runtime.core;
 
 import com.flezha.sdk.channel.ChannelKind;
-import com.flezha.sdk.runtime.operative.ChannelDescriptor;
-import com.flezha.sdk.runtime.operative.ConsumerEdge;
-import com.flezha.sdk.runtime.operative.TaskletDescriptor;
+import com.flezha.sdk.runtime.operator.ChannelDescriptor;
+import com.flezha.sdk.runtime.operator.ConsumerEdge;
+import com.flezha.sdk.runtime.operator.TaskletDescriptor;
 import com.flezha.sdk.runtime.state.TimerSession;
 import com.flezha.sdk.state.EventTimeFrom;
 import com.flezha.sdk.state.TimerKind;
@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
  */
 final class EmitContext implements TaskletCtx {
 
-    private final OperativeInstance instance;
+    private final OperatorInstance instance;
     private final Cell cell;
     private final long token;
     private final long invocationSeq;
@@ -48,7 +48,7 @@ final class EmitContext implements TaskletCtx {
     private int stableIdOrdinal;
     private int emitOrdinal;
 
-    EmitContext(OperativeInstance instance, Cell cell, long token, long invocationSeq, long now, boolean replay) {
+    EmitContext(OperatorInstance instance, Cell cell, long token, long invocationSeq, long now, boolean replay) {
         this.instance = instance;
         this.cell = cell;
         this.token = token;
@@ -222,28 +222,28 @@ final class EmitContext implements TaskletCtx {
 
     /**
      * Producer-side edge evaluation: transform chain, edge key, consumer
-     * event time. That is the STREAM shape — the core routes each output
+     * event time. That is the UNBOUNDED shape — the core routes each output
      * on {@code (edge, key)} and reads the consumer.
      *
-     * <p>A workflow stage is held, not routed: the core keeps every output
+     * <p>A bounded stage is held, not routed: the core keeps every output
      * as ONE released value on the instance's pass sheet and addresses each
      * consumer itself when the stage commits. One output per consumer would
      * therefore multiply the stage's released batch (and every downstream
      * node's work) by the channel's consumer count. So a structured
-     * workflow releases the value once, untransformed and unkeyed; each
+     * bounded operator releases the value once, untransformed and unkeyed; each
      * consumer applies its own edge on delivery in
      * {@link CellRouting#valuesForCell}, which is the seam a live run and a
      * journal re-seed both cross.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void collectEdgeOutputs(int channelId, ChannelDescriptor descriptor, Object value) {
-        // A channel with no consumer releases nothing: on a workflow that
+        // A channel with no consumer releases nothing: on a bounded operator that
         // is a plugin-bound terminal, and seeding the next stage from it
         // would hand the driver a terminal output.
         if (descriptor.consumers().isEmpty()) {
             return;
         }
-        if (instance.workflow) {
+        if (instance.bounded) {
             outputs.add(new Output(
                     // The consumer the fold discards; naming the channel's
                     // first keeps the target a well-formed Edge.
@@ -278,7 +278,7 @@ final class EmitContext implements TaskletCtx {
     /**
      * A plugin output. A keyed channel of a class that records no effects
      * carries the identity stamps; under the tier, and for a durable
-     * workflow, the controller derives them from the effect record at flush
+     * bounded operator, the controller derives them from the effect record at flush
      * time, so none ride here.
      */
     private void collectPluginOutput(

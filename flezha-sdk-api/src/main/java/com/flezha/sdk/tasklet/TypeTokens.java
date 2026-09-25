@@ -1,6 +1,6 @@
 package com.flezha.sdk.tasklet;
 
-import com.flezha.sdk.operative.StreamOperativeConfigurationException;
+import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -60,7 +60,7 @@ final class TypeTokens {
     static Class<?> require(Class<?> impl, Token token) {
         Class<?> resolved = find(impl, token);
         if (resolved == null) {
-            throw StreamOperativeConfigurationException.unresolvedTypeToken(
+            throw UnboundedOperatorConfigurationException.unresolvedTypeToken(
                     impl.getName(), token.parameter, token.method);
         }
         return resolved;

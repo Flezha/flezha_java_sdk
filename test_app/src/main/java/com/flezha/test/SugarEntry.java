@@ -4,7 +4,7 @@ import com.flezha.sdk.authoring.Tasklet;
 import com.flezha.sdk.authoring.CellsFor;
 import java.util.List;
 
-/** Static-cell entry tasklet of the 2-tasklet reference operative. */
+/** Static-cell entry tasklet of the 2-tasklet reference operator. */
 @Tasklet(id = "macro_static_entry_tasklet", keys = {"a", "b", "c", "d"})
 public class SugarEntry {
 

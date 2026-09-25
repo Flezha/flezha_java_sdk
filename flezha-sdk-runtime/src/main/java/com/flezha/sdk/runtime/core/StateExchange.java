@@ -14,7 +14,7 @@ import java.util.function.BiFunction;
  * The state crossing, in both directions: restore bodies folded onto a cell,
  * the JSON shape the controller reads and writes, and the change buffer one
  * invocation produced. Every method is handed the cell it works on — the cell
- * map itself is {@link OperativeInstance}'s and stays there.
+ * map itself is {@link OperatorInstance}'s and stays there.
  */
 final class StateExchange {
 
@@ -57,7 +57,7 @@ final class StateExchange {
         // no readable properties — an author mistake worth surfacing — but
         // `Stateless` is the SDK's own marker for "there is no state", so it
         // ships `{}` and reads back through `applyState`'s no-arg
-        // constructor. Without this, every stateless Java operative failed
+        // constructor. Without this, every stateless Java operator failed
         // its migration serialize and its shutdown state ship.
         if (cell.state instanceof Stateless) {
             return "{}".getBytes(StandardCharsets.UTF_8);

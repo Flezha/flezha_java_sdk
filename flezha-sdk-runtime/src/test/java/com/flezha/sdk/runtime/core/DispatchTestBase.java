@@ -3,11 +3,11 @@ package com.flezha.sdk.runtime.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operative.StreamOperative;
-import com.flezha.sdk.operative.WorkflowOperative;
-import com.flezha.sdk.runtime.operative.StatelessTestTasklet;
-import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
-import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
+import com.flezha.sdk.operator.BoundedOperator;
+import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.StatelessTestTasklet;
+import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.EventTimeFrom;
 import com.flezha.sdk.state.NoChange;
@@ -35,7 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
  * The pure host layer, driven entirely through
  * {@link ActivationDispatcher#dispatch}: constructed Activations in, asserted
  * ActivationResults out — no native core, no wire. This base owns the driving
- * helpers and the operative / tasklet fixtures the behaviour classes below it
+ * helpers and the operator / tasklet fixtures the behaviour classes below it
  * share; each subclass owns one behaviour of the host.
  */
 abstract class DispatchTestBase {
@@ -59,8 +59,8 @@ abstract class DispatchTestBase {
         TRAVERSALS.set(0);
         TIMER_EVENTS.clear();
         REFUSE.set(false);
-        StreamOperativeClassRegistry.reset();
-        WorkflowOperativeClassRegistry.reset();
+        UnboundedOperatorClassRegistry.reset();
+        BoundedOperatorClassRegistry.reset();
         dispatcher = new ActivationDispatcher();
     }
 
@@ -109,11 +109,11 @@ abstract class DispatchTestBase {
     // ==================================================================
 
     /**
-     * A StreamOperative fixture: an id and a wiring, which is all any of these
+     * An UnboundedOperator fixture: an id and a wiring, which is all any of these
      * vary. The class stays real (the registry instantiates it by name) and
      * declares only what it is.
      */
-    public abstract static class Op implements StreamOperative {
+    public abstract static class Op implements UnboundedOperator {
         private final String factoryId;
         private final Consumer<ChannelBuilder> wiring;
 
@@ -183,8 +183,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class CounterOperative extends Op {
-        public CounterOperative() {
+    public static final class CounterOperator extends Op {
+        public CounterOperator() {
             super("counter_op", c -> c.input(String.class, "in")
                     .into(CountTask.class)
                     .sink("out", s -> ("seen:" + s).getBytes(StandardCharsets.UTF_8)));
@@ -230,8 +230,8 @@ abstract class DispatchTestBase {
      * the test proves is that the runtime routes an older body to the
      * migration instead of to the codec.
      */
-    public static final class MigratingCounterOperative extends Op {
-        public MigratingCounterOperative() {
+    public static final class MigratingCounterOperator extends Op {
+        public MigratingCounterOperator() {
             super("migrating_counter_op", c -> c.input(String.class, "in")
                     .into(MigratingCountTask.class)
                     .sink("out", s -> ("seen:" + s).getBytes(StandardCharsets.UTF_8)));
@@ -300,16 +300,16 @@ abstract class DispatchTestBase {
      * `sink("items_output")` and no `.named(...)` anywhere: the string an
      * author can read in the source is the channel the frame is addressed by.
      */
-    public static final class SinkNamesChannelOperative extends Op {
-        public SinkNamesChannelOperative() {
+    public static final class SinkNamesChannelOperator extends Op {
+        public SinkNamesChannelOperator() {
             super("sink_names_channel", c -> c.input(String.class, "in")
                     .into(StatelessStateTask.class)
                     .sink("items_output", s -> s.getBytes(StandardCharsets.UTF_8)));
         }
     }
 
-    public static final class KeyedEmitOperative extends Op {
-        public KeyedEmitOperative() {
+    public static final class KeyedEmitOperator extends Op {
+        public KeyedEmitOperator() {
             super("keyed_op", c -> c.input(String.class, "in")
                     .into(KeyedTask.class)
                     .keyed()
@@ -317,8 +317,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class StatelessStateOperative extends Op {
-        public StatelessStateOperative() {
+    public static final class StatelessStateOperator extends Op {
+        public StatelessStateOperator() {
             super("stateless_state_op", c -> c.input(String.class, "in")
                     .into(StatelessStateTask.class)
                     .sink("out", s -> s.getBytes(StandardCharsets.UTF_8)));
@@ -356,8 +356,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class DynamicChainOperative extends Op {
-        public DynamicChainOperative() {
+    public static final class DynamicChainOperator extends Op {
+        public DynamicChainOperator() {
             super("dyn_chain", c -> c.input(String.class, "in")
                     .filter(raw -> {
                         TRAVERSALS.incrementAndGet();
@@ -369,8 +369,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class FanOutOperative extends Op {
-        public FanOutOperative() {
+    public static final class FanOutOperator extends Op {
+        public FanOutOperator() {
             super("fan_out", c -> c.input(String.class, "in")
                     .flatMap(String.class, raw -> List.of(raw.split(":")[0] + "@1m", raw.split(":")[0] + "@5m"))
                     .keyBy(slot -> slot)
@@ -399,8 +399,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class StaticOperative extends Op {
-        public StaticOperative() {
+    public static final class StaticOperator extends Op {
+        public StaticOperator() {
             super("static_op", c -> c.input(String.class, "in").into(StaticTask.class));
         }
     }
@@ -438,8 +438,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class MergeOperative extends Op {
-        public MergeOperative() {
+    public static final class MergeOperator extends Op {
+        public MergeOperator() {
             super("merge_op", c -> c.merge(String.class)
                     .from(c.input(String.class, "a"), s -> "A:" + s)
                     .from(c.input(String.class, "b"), s -> "B:" + s)
@@ -447,8 +447,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class PipelineOperative extends Op {
-        public PipelineOperative() {
+    public static final class PipelineOperator extends Op {
+        public PipelineOperator() {
             super(
                     "pipeline_op",
                     c -> c.input(String.class, "in").into(MidTask.class).into(KeyRecorder.class));
@@ -461,8 +461,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class MappedPipelineOperative extends Op {
-        public MappedPipelineOperative() {
+    public static final class MappedPipelineOperator extends Op {
+        public MappedPipelineOperator() {
             super("mapped_pipeline_op", c -> c.input(String.class, "in")
                     .into(MidTask.class)
                     .named("mapped_mid")
@@ -472,8 +472,8 @@ abstract class DispatchTestBase {
     }
 
     /** A mapped inter-task edge whose consumer narrows by its own `cellsFor`. */
-    public static final class MappedStaticPipelineOperative extends Op {
-        public MappedStaticPipelineOperative() {
+    public static final class MappedStaticPipelineOperator extends Op {
+        public MappedStaticPipelineOperator() {
             super("mapped_static_op", c -> c.input(String.class, "in")
                     .into(MidTask.class)
                     .named("mapped_static_mid")
@@ -483,8 +483,8 @@ abstract class DispatchTestBase {
     }
 
     /** A mapped inter-task edge that keys the value it yields. */
-    public static final class MappedKeyedPipelineOperative extends Op {
-        public MappedKeyedPipelineOperative() {
+    public static final class MappedKeyedPipelineOperator extends Op {
+        public MappedKeyedPipelineOperator() {
             super("mapped_keyed_op", c -> c.input(String.class, "in")
                     .into(MidTask.class)
                     .named("mapped_keyed_mid")
@@ -494,8 +494,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class PoisonOperative extends Op {
-        public PoisonOperative() {
+    public static final class PoisonOperator extends Op {
+        public PoisonOperator() {
             super("poison_op", c -> c.input(String.class, "in").into(PoisonTask.class));
         }
     }
@@ -517,8 +517,8 @@ abstract class DispatchTestBase {
     /** A JSON-typed entry: what the default entry decoder rejects is the seam's to classify. */
     public record Ticket(String text) {}
 
-    public static final class TypedEntryOperative extends Op {
-        public TypedEntryOperative() {
+    public static final class TypedEntryOperator extends Op {
+        public TypedEntryOperator() {
             super("typed_entry_op", c -> c.input(Ticket.class, "in").into(TypedEntryTask.class));
         }
     }
@@ -543,8 +543,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class TimerOperative extends Op {
-        public TimerOperative() {
+    public static final class TimerOperator extends Op {
+        public TimerOperator() {
             super("timer_op", c -> c.input(String.class, "in").into(TimerTask.class));
         }
     }
@@ -581,8 +581,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class WallTimerOperative extends Op {
-        public WallTimerOperative() {
+    public static final class WallTimerOperator extends Op {
+        public WallTimerOperator() {
             super("wall_timer_op", c -> c.input(String.class, "in").into(WallTimerTask.class));
         }
     }
@@ -593,8 +593,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class CheckpointOperative extends Op {
-        public CheckpointOperative() {
+    public static final class CheckpointOperator extends Op {
+        public CheckpointOperator() {
             super("ckpt_op", c -> {
                 c.effectivelyOnce();
                 c.checkpointAck();
@@ -634,8 +634,8 @@ abstract class DispatchTestBase {
     /** The one Change the checkpoint fixture journals. */
     public record CkptChange(String value) implements Change {}
 
-    public static final class ReplayProbeOperative extends Op {
-        public ReplayProbeOperative() {
+    public static final class ReplayProbeOperator extends Op {
+        public ReplayProbeOperator() {
             super("replay_probe", c -> c.input(String.class, "in").into(ReplayProbeTask.class));
         }
     }
@@ -659,16 +659,16 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class CompletingStreamOperative extends Op {
-        public CompletingStreamOperative() {
-            super("completing_stream", c -> c.input(String.class, "in").into(CompletingTask.class));
+    public static final class CompletingUnboundedOperator extends Op {
+        public CompletingUnboundedOperator() {
+            super("completing_unbounded", c -> c.input(String.class, "in").into(CompletingTask.class));
         }
     }
 
-    public static final class CompletingWorkflow implements WorkflowOperative {
+    public static final class CompletingBounded implements BoundedOperator {
         @Override
         public String factoryId() {
-            return "completing_workflow";
+            return "completing_bounded";
         }
 
         @Override
@@ -683,14 +683,14 @@ abstract class DispatchTestBase {
     }
 
     /**
-     * A structured workflow whose producing channel `wf_fan` has TWO consumers,
+     * A structured bounded operator whose producing channel `bounded_fan` has TWO consumers,
      * one of them behind a map — the shape the fan-in diamond's root has, and
      * the one a per-consumer producer-side emit multiplies.
      */
-    public static final class FanOutWorkflow implements WorkflowOperative {
+    public static final class FanOutBounded implements BoundedOperator {
         @Override
         public String factoryId() {
-            return "fanout_workflow";
+            return "fanout_bounded";
         }
 
         @Override
@@ -700,16 +700,16 @@ abstract class DispatchTestBase {
 
         @Override
         public void channels(ChannelBuilder c) {
-            var fan = c.input(String.class, "seed").into(MidTask.class).named("wf_fan");
+            var fan = c.input(String.class, "seed").into(MidTask.class).named("bounded_fan");
             fan.map(String.class, s -> "mapped:" + s).into(KeyRecorder.class);
-            fan.into(KeyRecorder.class, "wf_plain_leaf");
+            fan.into(KeyRecorder.class, "bounded_plain_leaf");
         }
     }
 
-    public static final class SagaWorkflow implements WorkflowOperative {
+    public static final class SagaBounded implements BoundedOperator {
         @Override
         public String factoryId() {
-            return "saga_workflow";
+            return "saga_bounded";
         }
 
         @Override

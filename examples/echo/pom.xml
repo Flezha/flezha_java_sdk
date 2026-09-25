@@ -14,7 +14,7 @@
     <packaging>jar</packaging>
 
     <name>Flezha echo example</name>
-    <description>One message in, one message out: a tasklet, an operative and a runner.</description>
+    <description>One message in, one message out: a tasklet, an operator and a runner.</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

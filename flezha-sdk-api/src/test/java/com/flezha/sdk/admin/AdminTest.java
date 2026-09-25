@@ -25,9 +25,9 @@ class AdminTest {
     void aStartWithoutAnIdAnswersTheGeneratedId() {
         FlezhaImpl.ADMIN_ANSWER = "{\"id\":\"echo-k7m2qzxw4pd3fn2a\",\"outcome\":\"started\"}";
 
-        assertThat(admin.startOperative(OperativeSpec.of("echo")))
+        assertThat(admin.startOperator(OperatorSpec.of("echo")))
                 .isEqualTo(new StartResult("echo-k7m2qzxw4pd3fn2a", StartOutcome.STARTED));
-        assertThat(FlezhaImpl.ADMIN_CALLS).containsExactly(List.of("Operative.start", "[{\"factory_id\":\"echo\"}]"));
+        assertThat(FlezhaImpl.ADMIN_CALLS).containsExactly(List.of("Operator.start", "[{\"factory_id\":\"echo\"}]"));
     }
 
     @Test
@@ -35,22 +35,22 @@ class AdminTest {
     void aStartWithAnIdAnswersAlreadyRunning() {
         FlezhaImpl.ADMIN_ANSWER = "{\"id\":\"my_echo\",\"outcome\":\"already_running\"}";
 
-        assertThat(admin.startOperative(OperativeSpec.of("echo").id("my_echo")))
+        assertThat(admin.startOperator(OperatorSpec.of("echo").id("my_echo")))
                 .isEqualTo(new StartResult("my_echo", StartOutcome.ALREADY_RUNNING));
         assertThat(FlezhaImpl.ADMIN_CALLS)
-                .containsExactly(List.of("Operative.start", "[{\"factory_id\":\"echo\",\"id\":\"my_echo\"}]"));
+                .containsExactly(List.of("Operator.start", "[{\"factory_id\":\"echo\",\"id\":\"my_echo\"}]"));
     }
 
     @Test
     @DisplayName("a start answer of another shape is refused naming it")
     void aStartAnswerOfAnotherShapeIsRefused() {
         FlezhaImpl.ADMIN_ANSWER = "{\"id\":\"my_echo\",\"outcome\":\"duplicate\"}";
-        assertThatThrownBy(() -> admin.startOperative(OperativeSpec.of("echo").id("my_echo")))
+        assertThatThrownBy(() -> admin.startOperator(OperatorSpec.of("echo").id("my_echo")))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("duplicate");
 
         FlezhaImpl.ADMIN_ANSWER = "{\"outcome\":\"started\"}";
-        assertThatThrownBy(() -> admin.startOperative(OperativeSpec.of("echo")))
+        assertThatThrownBy(() -> admin.startOperator(OperatorSpec.of("echo")))
                 .isInstanceOf(IllegalStateException.class);
     }
 }

@@ -38,7 +38,7 @@ class SpawnHandleTest {
         SpawnRequests.install(core);
 
         SpawnResult result =
-                new StubCtx(false, 42).spawnWorkflow("worker", PAYLOAD).await();
+                new StubCtx(false, 42).spawnBounded("worker", PAYLOAD).await();
 
         assertThat(result).isEqualTo(new SpawnResult("worker-k7m2qzxw4pd3fn2a", SpawnOutcome.SPAWNED));
         assertThat(core.requests).containsExactly("42/worker//p/deliver/false");
@@ -51,9 +51,9 @@ class SpawnHandleTest {
         SpawnRequests.install(core);
         TaskletCtx ctx = new StubCtx(false, 42);
 
-        assertThat(ctx.spawnWorkflow("worker", PAYLOAD, SpawnOptions.id("w1")).await())
+        assertThat(ctx.spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1")).await())
                 .isEqualTo(new SpawnResult("w1", SpawnOutcome.DELIVERED));
-        ctx.spawnWorkflow("worker", PAYLOAD, SpawnOptions.id("w1").ifRunning(IfRunning.ERROR));
+        ctx.spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1").ifRunning(IfRunning.ERROR));
 
         assertThat(core.requests).containsExactly("42/worker/w1/p/deliver/false", "42/worker/w1/p/error/false");
     }
@@ -66,7 +66,7 @@ class SpawnHandleTest {
         SpawnRequests.install(core);
 
         SpawnHandle handle = new StubCtx(false, 42)
-                .spawnWorkflow("worker", PAYLOAD, SpawnOptions.id("w1").ifRunning(IfRunning.ERROR));
+                .spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1").ifRunning(IfRunning.ERROR));
 
         assertThatThrownBy(handle::await)
                 .isInstanceOf(SpawnException.AlreadyRunning.class)
@@ -80,7 +80,7 @@ class SpawnHandleTest {
         core.answer = failure("", "refused", message);
         SpawnRequests.install(core);
 
-        SpawnHandle handle = new StubCtx(false, 42).spawnWorkflow("worker", PAYLOAD);
+        SpawnHandle handle = new StubCtx(false, 42).spawnBounded("worker", PAYLOAD);
 
         assertThatThrownBy(handle::tryResult)
                 .isInstanceOf(SpawnException.Refused.class)
@@ -92,13 +92,13 @@ class SpawnHandleTest {
     void eachFailureKindIsItsOwnException() {
         Map<String, Class<? extends SpawnException>> kinds = Map.of(
                 "factory_unknown", SpawnException.FactoryUnknown.class,
-                "factory_not_workflow", SpawnException.FactoryNotWorkflow.class,
+                "factory_not_bounded", SpawnException.FactoryNotBounded.class,
                 "timeout", SpawnException.Timeout.class,
                 "unavailable", SpawnException.Unavailable.class);
         SpawnRequests.install(core);
         kinds.forEach((kind, type) -> {
             core.answer = failure("", kind, "the core's sentence for " + kind);
-            assertThatThrownBy(new StubCtx(false, 42).spawnWorkflow("worker", PAYLOAD)::await)
+            assertThatThrownBy(new StubCtx(false, 42).spawnBounded("worker", PAYLOAD)::await)
                     .isInstanceOf(type)
                     .hasMessage("the core's sentence for " + kind);
         });
@@ -108,7 +108,7 @@ class SpawnHandleTest {
     @DisplayName("tryResult answers pending without waiting until the answer arrives")
     void tryResultAnswersPendingUntilTheAnswerArrives() throws Exception {
         SpawnRequests.install(core);
-        SpawnHandle handle = new StubCtx(false, 42).spawnWorkflow("worker", PAYLOAD);
+        SpawnHandle handle = new StubCtx(false, 42).spawnBounded("worker", PAYLOAD);
 
         assertThat(handle.tryResult()).isEmpty();
 
@@ -122,7 +122,7 @@ class SpawnHandleTest {
     void awaitLeavesTheDeadlineToTheCoreAndEveryReadAsksTheCore() throws Exception {
         core.answer = "{\"id\":\"w1\",\"outcome\":\"spawned\"}";
         SpawnRequests.install(core);
-        SpawnHandle handle = new StubCtx(false, 42).spawnWorkflow("worker", PAYLOAD, SpawnOptions.id("w1"));
+        SpawnHandle handle = new StubCtx(false, 42).spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1"));
 
         assertThat(handle.await()).isEqualTo(handle.await());
         assertThat(handle.tryResult()).contains(new SpawnResult("w1", SpawnOutcome.SPAWNED));
@@ -137,12 +137,12 @@ class SpawnHandleTest {
         TaskletCtx replaying = new StubCtx(true, 42);
 
         core.answer = "{\"id\":\"\",\"outcome\":\"skipped_on_replay\"}";
-        assertThat(replaying.spawnWorkflow("worker", PAYLOAD).await())
+        assertThat(replaying.spawnBounded("worker", PAYLOAD).await())
                 .isEqualTo(new SpawnResult("", SpawnOutcome.SKIPPED_ON_REPLAY));
 
         core.answer = "{\"id\":\"w1\",\"outcome\":\"skipped_on_replay\"}";
         assertThat(replaying
-                        .spawnWorkflow("worker", PAYLOAD, SpawnOptions.id("w1"))
+                        .spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1"))
                         .await())
                 .isEqualTo(new SpawnResult("w1", SpawnOutcome.SKIPPED_ON_REPLAY));
 
@@ -154,10 +154,10 @@ class SpawnHandleTest {
     void withoutAControlPlaneEveryReadAnswersUnavailable() {
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         SpawnHandle handle = capturingStderr(
-                stderr, () -> new StubCtx(false, 42).spawnWorkflow("worker", PAYLOAD, SpawnOptions.id("w1")));
+                stderr, () -> new StubCtx(false, 42).spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1")));
 
         assertThat(stderr.toString(StandardCharsets.UTF_8))
-                .isEqualTo("[flezha] spawnWorkflow(factory `worker`, id `w1`) failed: no control plane to request a"
+                .isEqualTo("[flezha] spawnBounded(factory `worker`, id `w1`) failed: no control plane to request a"
                         + " spawn on" + System.lineSeparator());
         assertThatThrownBy(handle::tryResult).isInstanceOf(SpawnException.Unavailable.class);
         assertThatThrownBy(handle::await)
@@ -171,9 +171,9 @@ class SpawnHandleTest {
     void withoutAControlPlaneAReplayedSpawnAnswersSkipped() throws Exception {
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         TaskletCtx replaying = new StubCtx(true, 42);
-        SpawnHandle unnamed = capturingStderr(stderr, () -> replaying.spawnWorkflow("worker", PAYLOAD));
+        SpawnHandle unnamed = capturingStderr(stderr, () -> replaying.spawnBounded("worker", PAYLOAD));
         SpawnHandle named =
-                capturingStderr(stderr, () -> replaying.spawnWorkflow("worker", PAYLOAD, SpawnOptions.id("w1")));
+                capturingStderr(stderr, () -> replaying.spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1")));
 
         assertThat(stderr.toString(StandardCharsets.UTF_8)).isEmpty();
         assertThat(unnamed.tryResult()).contains(new SpawnResult("", SpawnOutcome.SKIPPED_ON_REPLAY));
@@ -186,7 +186,7 @@ class SpawnHandleTest {
         core.answer = "{\"id\":\"w1\",\"outcome\":\"hatched\"}";
         SpawnRequests.install(core);
 
-        assertThatThrownBy(new StubCtx(false, 42).spawnWorkflow("worker", PAYLOAD)::await)
+        assertThatThrownBy(new StubCtx(false, 42).spawnBounded("worker", PAYLOAD)::await)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("hatched");
     }
@@ -242,7 +242,7 @@ class SpawnHandleTest {
         }
     }
 
-    /** Only the members {@code spawnWorkflow}'s default implementation reads. */
+    /** Only the members {@code spawnBounded}'s default implementation reads. */
     private record StubCtx(boolean replay, long token) implements TaskletCtx {
         @Override
         public boolean replaying() {

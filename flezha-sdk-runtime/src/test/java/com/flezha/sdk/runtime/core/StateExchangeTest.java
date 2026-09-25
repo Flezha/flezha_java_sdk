@@ -2,7 +2,7 @@ package com.flezha.sdk.runtime.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
+import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
@@ -20,7 +20,7 @@ class StateExchangeTest extends DispatchTestBase {
     @Test
     @DisplayName("a RestoreFold body tagged with an older version goes to the migration, not the codec")
     void restoreFoldMigratesTaggedBodies() {
-        StreamOperativeClassRegistry.registerClass(MigratingCounterOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(MigratingCounterOperator.class);
         ActivationDispatcher dispatcher = new ActivationDispatcher();
 
         ActivationOutcome restored = dispatcher
@@ -47,7 +47,7 @@ class StateExchangeTest extends DispatchTestBase {
     @Test
     @DisplayName("a Tasklet declaring no migration refuses an older body rather than decoding it")
     void restoreFoldWithoutAMigrationRefuses() {
-        StreamOperativeClassRegistry.registerClass(CounterOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(CounterOperator.class);
         ActivationDispatcher dispatcher = new ActivationDispatcher();
 
         ActivationOutcome outcome = dispatcher
@@ -72,7 +72,7 @@ class StateExchangeTest extends DispatchTestBase {
     @Test
     @DisplayName("RestoreFold rebuilds snapshot + changes; SnapshotRequest and LiveStateRead read the result")
     void restoreSnapshotAndLiveRead() {
-        StreamOperativeClassRegistry.registerClass(CounterOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(CounterOperator.class);
         ItemEffect first = soleEffect(work("counter_op", 0, Optional.empty(), 0, input(0, "a", 1)));
         soleEffect(work("counter_op", 0, Optional.empty(), 1, input(0, "b", 2)));
 
@@ -111,7 +111,7 @@ class StateExchangeTest extends DispatchTestBase {
     @Test
     @DisplayName("a restore fold reads back a @State-derived change and rebuilds the state from it")
     void restoreFoldReadsBackADerivedChange() {
-        StreamOperativeClassRegistry.registerClass(SugarTallyStreamOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(SugarTallyUnboundedOperator.class);
         ItemEffect ran = soleEffect(work("sugar_tally_op", 0, Optional.empty(), 0, input(0, "a", 1)));
         assertThat(ran.changes()).as("pushSeen then setN").hasSize(2);
 
@@ -139,7 +139,7 @@ class StateExchangeTest extends DispatchTestBase {
     @Test
     @DisplayName("ApplyState replaces the state from its JSON form; MigrationSerialize reads it back")
     void applyStateRoundTrips() {
-        StreamOperativeClassRegistry.registerClass(CounterOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(CounterOperator.class);
         ActivationOutcome applied = outcome(command(
                 "counter_op",
                 0,
@@ -155,11 +155,11 @@ class StateExchangeTest extends DispatchTestBase {
 
     // A stateless tasklet has nothing to ship, and Jackson refuses an empty
     // bean: the marker is what the migration serialize and the graceful
-    // shutdown's state ship carry for a stateless Java operative.
+    // shutdown's state ship carry for a stateless Java operator.
     @Test
     @DisplayName("a Stateless state serializes as an empty object and reads back")
     void statelessStateShipsAsEmptyObject() {
-        StreamOperativeClassRegistry.registerClass(StatelessStateOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(StatelessStateOperator.class);
 
         ActivationOutcome migrated =
                 outcome(command("stateless_state_op", 0, Optional.empty(), new ActivationKind.MigrationSerialize()));

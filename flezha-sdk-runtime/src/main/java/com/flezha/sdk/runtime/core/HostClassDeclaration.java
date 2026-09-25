@@ -5,15 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.native_.FlezhaNativeException;
 import com.flezha.sdk.native_.FlzCore;
-import com.flezha.sdk.operative.StreamOperativeConfigurationException;
-import com.flezha.sdk.operative.WorkflowOperative;
-import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
-import com.flezha.sdk.runtime.operative.StreamOperativeTopology;
-import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.ChannelEntry;
-import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.ClassFacts;
-import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.PendingEdge;
-import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder.TaskletEntry;
-import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
+import com.flezha.sdk.operator.BoundedOperator;
+import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
+import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
+import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.ChannelEntry;
+import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.ClassFacts;
+import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.PendingEdge;
+import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.TaskletEntry;
 import com.flezha.sdk.state.EventTimeFrom;
 import com.flezha.sdk.state.LogicalClock;
 import com.flezha.sdk.state.NoChange;
@@ -70,9 +70,9 @@ public final class HostClassDeclaration {
      */
     @Nonnull
     public static byte[] forFactory(@Nonnull String factoryId) {
-        StreamOperativeTopology topology = StreamOperativeClassRegistry.getTopology(factoryId);
+        UnboundedOperatorTopology topology = UnboundedOperatorClassRegistry.getTopology(factoryId);
         if (topology == null) {
-            topology = WorkflowOperativeClassRegistry.getTopology(factoryId);
+            topology = BoundedOperatorClassRegistry.getTopology(factoryId);
         }
         if (topology == null) {
             throw new IllegalStateException("factory `" + factoryId + "` is not registered");
@@ -81,14 +81,14 @@ public final class HostClassDeclaration {
     }
 
     /**
-     * The record the builder writes, which a stream class submits as is: the
+     * The record the builder writes, which an unbounded class submits as is: the
      * class facts as declared, one entry per channel and tasklet in id order,
      * and per channel the chains its handles were given. Consumers, channel
      * kinds, sink names and the acknowledgement granularity are NOT here —
      * they are the core's answer.
      */
     @Nonnull
-    public static Map<String, Object> forStream(
+    public static Map<String, Object> forUnbounded(
             @Nonnull String factoryId,
             @Nonnull ClassFacts facts,
             @Nonnull List<ChannelEntry> channels,
@@ -141,7 +141,7 @@ public final class HostClassDeclaration {
         try {
             return DerivedDeclaration.of(JSON.readTree(FlzCore.checkClass(ctx, encode(record))));
         } catch (FlezhaNativeException refusal) {
-            throw new StreamOperativeConfigurationException(refusal.getMessage(), refusals(refusal.body()));
+            throw new UnboundedOperatorConfigurationException(refusal.getMessage(), refusals(refusal.body()));
         } catch (Exception e) {
             throw new IllegalStateException("the core's derived declaration did not decode: " + e.getMessage(), e);
         } finally {
@@ -171,36 +171,36 @@ public final class HostClassDeclaration {
     }
 
     /**
-     * The record a workflow class submits: the {@link #forStream} record its
+     * The record a bounded class submits: the {@link #forUnbounded} record its
      * {@code channels} told the builder, every tier, checkpoint and correction
-     * key included, plus the class's own durability and the {@code workflow}
-     * block. The core judges a record carrying that block on a workflow's
-     * settings and refuses a stream-only one by its own name.
+     * key included, plus the class's own durability and the {@code bounded}
+     * block. The core judges a record carrying that block on a bounded operator's
+     * settings and refuses an unbounded-only one by its own name.
      */
     @Nonnull
-    public static Map<String, Object> forWorkflow(
-            @Nonnull Map<String, Object> builderRecord, @Nonnull WorkflowOperative probe) {
+    public static Map<String, Object> forBounded(
+            @Nonnull Map<String, Object> builderRecord, @Nonnull BoundedOperator probe) {
         Map<String, Object> decl = new LinkedHashMap<>(builderRecord);
         if (probe.syncDurability()) {
             decl.put("sync_durability", true);
         }
 
-        Map<String, Object> workflow = new LinkedHashMap<>();
-        workflow.put(
+        Map<String, Object> bounded = new LinkedHashMap<>();
+        bounded.put(
                 "loop_mode",
                 switch (probe.loopMode()) {
                     case ONCE -> "once";
                     case PER_INPUT -> "per_input";
                     case CHAINED -> "chained";
                 });
-        workflow.put(
+        bounded.put(
                 "rollback_mode",
                 switch (probe.rollbackMode()) {
                     case ALL_OR_NOTHING -> "all_or_nothing";
                     case KEEP_PROGRESS -> "keep_progress";
                 });
-        probe.maxDuration().ifPresent(d -> workflow.put("max_duration_ms", d.toMillis()));
-        decl.put("workflow", workflow);
+        probe.maxDuration().ifPresent(d -> bounded.put("max_duration_ms", d.toMillis()));
+        decl.put("bounded", bounded);
         return decl;
     }
 

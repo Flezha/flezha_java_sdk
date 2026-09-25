@@ -20,9 +20,9 @@ import javax.annotation.Nonnull;
 
 /**
  * Kryo-backed serializer for per-Cell state and per-Cell Change
- * payloads. Constructed once per {@code StreamOperativeInstance}; the {@code userTypes}
+ * payloads. Constructed once per {@code UnboundedOperatorInstance}; the {@code userTypes}
  * list aggregates the {@code Tasklet.kryoTypes()} returns across every Tasklet in
- * the StreamOperative class.
+ * the UnboundedOperator class.
  *
  * <p>Stable type IDs are essential for cross-version compatibility under
  * additive Change evolution: a new Change variant added in v2 ships at id
@@ -59,7 +59,7 @@ public final class KryoCodec {
      * than one per part, so a call costs one thread-local lookup.
      *
      * <p>The unbounded growth is what the discarded {@code Output(bos)} had: a
-     * 4 KB window flushing into a stream that accepted any size. {@code Input}
+     * 4 KB window flushing into an unbounded operator that accepted any size. {@code Input}
      * starts uninitialized; every decode sets its buffer before reading.
      */
     private static final class Locals {

@@ -16,7 +16,7 @@ import javax.annotation.Nonnull;
  * <p>Unlike the echo example's {@code @Tasklet} class, this one implements {@link Tasklet}
  * directly, because the change it records is its own: {@link Increment} updates two fields at once,
  * which a {@code @State} class cannot derive. Declaring a change type is the whole of what makes a
- * tasklet durable; the operative is unmodified.
+ * tasklet durable; the operator is unmodified.
  *
  * <p>State is not persisted by serialising the state object. The runtime records the ordered list
  * of changes applied and reconstructs the object after a restart by replaying that list, over the

@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The dynamic-mode consumer of {@link DynamicCellStreamOperative}. It
+ * The dynamic-mode consumer of {@link DynamicCellUnboundedOperator}. It
  * declares no keying member of any kind — the edge's {@code keyBy} is what makes
  * it dynamic — and applies a Change per input so the controller writes a WAL
  * file per lazily-created Cell. {@code cellIdleTtl} stays on the tasklet:

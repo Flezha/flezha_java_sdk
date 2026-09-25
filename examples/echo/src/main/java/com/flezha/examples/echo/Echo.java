@@ -3,18 +3,18 @@ package com.flezha.examples.echo;
 import com.flezha.sdk.authoring.Tasklet;
 
 /**
- * A processing stage of the operative's graph, invoked once per message. This one prefixes the
+ * A processing stage of the operator's graph, invoked once per message. This one prefixes the
  * input, and what {@code run} returns is emitted.
  *
  * <p>The annotation processor generates {@code EchoTasklet} from this class at compile time,
- * reading the input and output types from the {@code run} signature. The operative names that
+ * reading the input and output types from the {@code run} signature. The operator names that
  * generated class. {@code run} takes no state parameter, so nothing is kept between messages and
  * nothing is journaled.
  *
  * <p>{@code id} is the tasklet's stable identity. State is filed under it, so changing it later
  * declares a different tasklet rather than renaming this one.
  *
- * <p>Where the result goes is not decided here. The operative decides that, so the graph can be
+ * <p>Where the result goes is not decided here. The operator decides that, so the graph can be
  * rewired without touching this class.
  */
 @Tasklet(id = "echo")

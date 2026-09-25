@@ -3,8 +3,8 @@ package com.flezha.examples;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.flezha.examples.pipeline.PipelineOperative;
-import com.flezha.sdk.LocalOperative;
+import com.flezha.examples.pipeline.PipelineOperator;
+import com.flezha.sdk.LocalOperator;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +18,7 @@ class PipelineTest {
     void twoStagesRunInOrder() throws Exception {
         List<String> out = new ArrayList<>();
 
-        try (LocalOperative run = LocalOperative.start(PipelineOperative.class)) {
+        try (LocalOperator run = LocalOperator.start(PipelineOperator.class)) {
             run.onSink("shouted", frame -> out.add(new String(frame.payload(), UTF_8)));
             run.feed("in", "  Hello World  ");
             run.runUntilIdle(Duration.ofSeconds(5));

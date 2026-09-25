@@ -2,15 +2,15 @@
 
 Java 21 SDK for authoring Flezha compute engines.
 
-You write tasklets that handle one message at a time, and operatives that
+You write tasklets that handle one message at a time, and operators that
 declare how those tasklets are connected. A controller then owns everything
-around them: placing each operative on a host, persisting per-cell state,
+around them: placing each operator on a host, persisting per-cell state,
 enforcing the delivery guarantee you declared, retrying failures, relocating work
 when a host is withdrawn, and reconnecting when a connection drops. Recovery
 resumes a cell at the point it reached rather than restarting it, which is the
 property the rest of this document keeps returning to.
 
-Functionally at parity with the Rust SDK: every operative shape, durability tier
+Functionally at parity with the Rust SDK: every operator shape, durability tier
 and delivery guarantee available there is available here.
 
 ## Add it
@@ -24,7 +24,7 @@ and delivery guarantee available there is available here.
 ```
 
 Java 21 or later. `flezha-sdk-testing` is a separate artifact, with `<scope>test</scope>`.
-The annotation processor generates the tasklet classes an operative wires, so it
+The annotation processor generates the tasklet classes an operator wires, so it
 goes on the compiler's processor path:
 
 ```xml
@@ -70,14 +70,14 @@ public final class Echo {
 
 The annotation processor generates `EchoTasklet` from this class at compile
 time, reading the input and output types from the `run` signature, and what `run`
-returns is emitted. The operative names that generated class. `run` takes no state
+returns is emitted. The operator names that generated class. `run` takes no state
 parameter, so nothing is kept between messages and nothing is journaled. A second
 parameter, the handle a `@State` class generates, makes the tasklet durable, and
 a trailing `TaskletCtx` parameter lets the body read the clock and emit for itself.
 
-**The operative** declares the graph and holds no logic of its own. A tasklet
+**The operator** declares the graph and holds no logic of its own. A tasklet
 cannot be deployed alone, because nothing in the system knows where its messages
-originate or where its output belongs. The operative supplies that binding, which
+originate or where its output belongs. The operator supplies that binding, which
 makes it the unit the controller schedules onto a host, restarts after a failure,
 relocates when a host is withdrawn, and scales across several hosts.
 
@@ -85,9 +85,9 @@ relocates when a host is withdrawn, and scales across several hosts.
 package com.example.echo;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operative.StreamOperative;
+import com.flezha.sdk.operator.UnboundedOperator;
 
-public final class EchoOperative implements StreamOperative {
+public final class EchoOperator implements UnboundedOperator {
 
     /** Also durable. Renaming it makes the cluster forget what was running. */
     @Override
@@ -116,7 +116,7 @@ tasklet, and `named(...)` renames a channel that has no sink to name it.
 Naming one channel both ways is refused.
 
 **The main** starts a runner: the process that connects to a controller and serves
-the operatives declared on it.
+the operators declared on it.
 
 ```java
 package com.example.echo;
@@ -126,7 +126,7 @@ import com.flezha.sdk.Flezha;
 public final class Main {
     public static void main(String[] args) throws Exception {
         Flezha.createRunner("my_app")
-                .registerFactory(EchoOperative.class)
+                .registerFactory(EchoOperator.class)
                 .run();
     }
 }
@@ -136,10 +136,10 @@ public final class Main {
 `close()` from another thread. `start()` returns to the caller instead and leaves
 the runner to be closed explicitly.
 
-Declare every operative on the builder before the runner starts. One runner can
-serve several, and `registerFactory(...)` is the same call for the workflow kind.
+Declare every operator on the builder before the runner starts. One runner can
+serve several, and `registerFactory(...)` is the same call for the bounded kind.
 
-To run this without a controller, replace the main with `LocalOperative`, which
+To run this without a controller, replace the main with `LocalOperator`, which
 executes the same declared wiring inside the calling JVM and delivers sink output
 to a callback. Nothing is durable in that mode, and declarations requiring a
 controller are refused at startup with the responsible declaration named.
@@ -161,7 +161,7 @@ controller are refused at startup with the responsible declaration named.
   The output is `flezha-sdk-api/target/site/apidocs/index.html`. The plugin skips
   when its output appears current, so delete that directory if an edit does not
   appear.
-- **Run a graph without a controller:** `LocalOperative` executes a declared
+- **Run a graph without a controller:** `LocalOperator` executes a declared
   graph in the calling JVM. See
   [`local/`](flezha-sdk-examples/src/main/java/com/flezha/examples/local).
 - **Threading model, packaging and cross-SDK comparison:** `docs/sdk/java_sdk.md`.
@@ -178,10 +178,10 @@ controller are refused at startup with the responsible declaration named.
 | Dead-letter queue | `.retryMax(n)` on the channel | A poison payload is retried, then parked durably, never silently dropped. |
 | Edge transforms | `.map(T.class, f)` / `.filter(p)` / `.flatMap(T.class, f)` on the wiring | Reshape, drop or fan out values without a Tasklet, with no cell, no mailbox and no dispatch hop. |
 | Dynamic cell mode | `.keyBy(f)` on the wiring | One Cell per key the stream actually carries, created on first sight, and visible where the graph is declared. |
-| Operative-wide document | `c.routeLatest(Doc.class, documents, traffic, keyFn)` | Every key seen on the traffic stream receives each distinct document exactly once, on that key's own next traffic item, the one delivery a keyed tasklet cannot get from a broadcast. One tick of latency per key is the price of only ever emitting keys this member owns. |
-| Workflow transaction | `implements WorkflowOperative` + `channels(...)` | A graph committed stage by stage: a committed stage is not re-run on resume, which continues at the stage it reached. Failure unwinds through each tasklet's `compensate`, declared by writing it. |
+| Operator-wide document | `c.routeLatest(Doc.class, documents, traffic, keyFn)` | Every key seen on the traffic stream receives each distinct document exactly once, on that key's own next traffic item, the one delivery a keyed tasklet cannot get from a broadcast. One tick of latency per key is the price of only ever emitting keys this member owns. |
+| Bounded operator transaction | `implements BoundedOperator` + `channels(...)` | A graph committed stage by stage: a committed stage is not re-run on resume, which continues at the stage it reached. Failure unwinds through each tasklet's `compensate`, declared by writing it. |
 | Durable loop / suspension | `loopMode()` + `ctx.timerAfter(d)` | One durable iteration per message; parks when idle, holding its journal, and wakes at its earliest pending timer. |
-| Cell retry | `.retryMax(n)` / `.retryBackoffMs(ms)` on the edge that feeds the tasklet | In a workflow, only the failing cell re-runs; a failed attempt's output is dropped, not double-emitted. |
+| Cell retry | `.retryMax(n)` / `.retryBackoffMs(ms)` on the edge that feeds the tasklet | In a bounded operator, only the failing cell re-runs; a failed attempt's output is dropped, not double-emitted. |
 
 Each is a declaration the controller must honour, so declare what you need rather
 than what sounds reassuring: a `correctionWindow` sizes the controller's input-log
@@ -191,9 +191,9 @@ retention, and a tier without keyed sinks is refused at registration.
 
 | Module | Purpose |
 |---|---|
-| `flezha-sdk-api` | Public API: `Flezha`, `StreamOperative`, `WorkflowOperative`, `Tasklet`, `TaskletCtx`, `StableId`, channel builders, clocks. No native dependency. |
-| `flezha-sdk-processor` | Annotation processor: `<Class>Tasklet` from `@Tasklet`, the change type and handle from `@State`, the short-form operatives. Goes on the compiler's processor path. |
-| `flezha-sdk-runtime` | Control plane, data plane, framing, worker pool, reconnect, state persistence, workflow class registration. |
+| `flezha-sdk-api` | Public API: `Flezha`, `UnboundedOperator`, `BoundedOperator`, `Tasklet`, `TaskletCtx`, `StableId`, channel builders, clocks. No native dependency. |
+| `flezha-sdk-processor` | Annotation processor: `<Class>Tasklet` from `@Tasklet`, the change type and handle from `@State`, the short-form operators. Goes on the compiler's processor path. |
+| `flezha-sdk-runtime` | Control plane, data plane, framing, worker pool, reconnect, state persistence, bounded class registration. |
 | `flezha-sdk-native` | JNI bindings + bundled per-OS `libflz_core_ffi`. |
 | `flezha-sdk-testing` | `TaskletTestHarness`, added with `<scope>test</scope>`. |
 | `flezha-sdk-examples` | Worked examples. Compiled by the build, so they cannot rot. |

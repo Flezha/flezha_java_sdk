@@ -3,17 +3,17 @@
  *
  * <p>An application is built from two authoring types and started by a runner. A
  * {@link com.flezha.sdk.tasklet.Tasklet} contains the code that handles a single message. A
- * {@link com.flezha.sdk.operative.StreamOperative} or
- * {@link com.flezha.sdk.operative.WorkflowOperative} declares the graph that connects entry
+ * {@link com.flezha.sdk.operator.UnboundedOperator} or
+ * {@link com.flezha.sdk.operator.BoundedOperator} declares the graph that connects entry
  * channels, tasklets and sinks, and is the unit the cluster schedules, restarts and relocates.
  * {@link com.flezha.sdk.Flezha#createRunner(String)} returns a {@link com.flezha.sdk.FlezhaRunner}
- * builder on which every operative class is declared before the runner is started.
+ * builder on which every operator class is declared before the runner is started.
  *
  * <p>A runner connects to a controller, which owns placement, durability, delivery guarantees,
  * retries and reconnection. {@code run()} connects and blocks until shutdown; {@code start()}
  * returns to the caller and leaves the runner to be closed explicitly.
  *
- * <p>{@link com.flezha.sdk.LocalOperative} executes the same declared graph inside the calling JVM
+ * <p>{@link com.flezha.sdk.LocalOperator} executes the same declared graph inside the calling JVM
  * with no controller, no socket and no container. Messages are supplied with {@code feed} and sink
  * output is delivered to a callback registered with {@code onSink}. Nothing is durable in this
  * mode: state is held in memory, no write-ahead log or snapshot is written, and no recovery is
@@ -23,7 +23,7 @@
  *
  * <p>The remaining types in this package are the supporting surface for those two paths:
  * {@link com.flezha.sdk.SinkOutput} is the frame handed to a local-mode sink callback, and
- * {@link com.flezha.sdk.OperativeTypeInUseException} is raised when an operative class is removed
+ * {@link com.flezha.sdk.OperatorTypeInUseException} is raised when an operator class is removed
  * from a started runner while instances of it are still live.
  *
  * <p>{@link com.flezha.sdk.Logger} is where the SDK's own diagnostics go. The default,

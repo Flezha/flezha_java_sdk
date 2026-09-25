@@ -8,13 +8,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.native_.FlezhaNativeException;
 import com.flezha.sdk.native_.FlzCore;
-import com.flezha.sdk.operative.LoopMode;
-import com.flezha.sdk.operative.StreamOperative;
-import com.flezha.sdk.operative.WorkflowOperative;
+import com.flezha.sdk.operator.BoundedOperator;
+import com.flezha.sdk.operator.LoopMode;
+import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.runtime.RepositoryFixture;
-import com.flezha.sdk.runtime.operative.StatelessTestTasklet;
-import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
-import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
+import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.StatelessTestTasklet;
+import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.tasklet.TaskletCtx;
@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The {@code HostClassDecl} JSON builder — the successor of the retired
- * {@code AddOperativeResponse}-metadata declarations: what the poll core is
+ * {@code AddOperatorResponse}-metadata declarations: what the poll core is
  * told about a registered class, with ids equal to declaration order.
  */
 class HostClassDeclarationTest {
@@ -42,14 +42,14 @@ class HostClassDeclarationTest {
 
     @AfterEach
     void reset() {
-        StreamOperativeClassRegistry.reset();
-        WorkflowOperativeClassRegistry.reset();
+        UnboundedOperatorClassRegistry.reset();
+        BoundedOperatorClassRegistry.reset();
     }
 
     @Test
-    @DisplayName("a stream declaration emits channels and tasklets in id order with tier facts")
-    void streamDeclaration() throws Exception {
-        StreamOperativeClassRegistry.registerClass(TierOperative.class);
+    @DisplayName("an unbounded declaration emits channels and tasklets in id order with tier facts")
+    void unboundedDeclaration() throws Exception {
+        UnboundedOperatorClassRegistry.registerClass(TierOperator.class);
         JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_tier_op"));
 
         assertThat(decl.get("factory_id").asText()).isEqualTo("decl_tier_op");
@@ -71,7 +71,7 @@ class HostClassDeclarationTest {
         assertThat(decl.get("persistent").asBoolean())
                 .as("the tier IS durable state, so the class journals a Change")
                 .isTrue();
-        assertThat(decl.has("workflow")).isFalse();
+        assertThat(decl.has("bounded")).isFalse();
 
         JsonNode channels = decl.get("channels");
         assertThat(channels).hasSize(2);
@@ -113,7 +113,7 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("each Tasklet declares its own schema version, never the class maximum")
     void perTaskletSchemaVersions() throws Exception {
-        StreamOperativeClassRegistry.registerClass(MixedVersionOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(MixedVersionOperator.class);
         JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_mixed_version_op"));
 
         assertThat(decl.has("schema_version"))
@@ -139,22 +139,22 @@ class HostClassDeclarationTest {
     }
 
     @Test
-    @DisplayName("a workflow declaration carries its tasklets with the workflow block")
-    void workflowDeclaration() throws Exception {
-        WorkflowOperativeClassRegistry.registerClass(DeclWorkflow.class);
-        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_workflow"));
+    @DisplayName("a bounded declaration carries its tasklets with the bounded block")
+    void boundedDeclaration() throws Exception {
+        BoundedOperatorClassRegistry.registerClass(DeclBounded.class);
+        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_bounded"));
 
-        assertThat(decl.get("factory_id").asText()).isEqualTo("decl_workflow");
+        assertThat(decl.get("factory_id").asText()).isEqualTo("decl_bounded");
         assertThat(decl.get("channels")).isNotEmpty();
         assertThat(decl.get("tasklets")).hasSize(1);
         assertThat(decl.get("tasklets").get(0).get("name").asText()).isEqualTo("v1_task");
         assertThat(decl.get("persistent").asBoolean()).isTrue();
 
-        JsonNode workflow = decl.get("workflow");
-        assertThat(workflow.get("loop_mode").asText()).isEqualTo("once");
-        assertThat(workflow.get("rollback_mode").asText()).isEqualTo("all_or_nothing");
-        assertThat(workflow.get("max_duration_ms").asLong()).isEqualTo(30_000);
-        assertThat(workflow.fieldNames())
+        JsonNode bounded = decl.get("bounded");
+        assertThat(bounded.get("loop_mode").asText()).isEqualTo("once");
+        assertThat(bounded.get("rollback_mode").asText()).isEqualTo("all_or_nothing");
+        assertThat(bounded.get("max_duration_ms").asLong()).isEqualTo(30_000);
+        assertThat(bounded.fieldNames())
                 .toIterable()
                 .as("retry is the edge's, carried on each channel")
                 .doesNotContain("retry_attempts", "retry_backoff_ms", "barrier_retry_attempts");
@@ -164,9 +164,9 @@ class HostClassDeclarationTest {
     }
 
     @Test
-    @DisplayName("a stream's opt-out is read from the class, not its Tasklets")
-    void aStreamOptsOutByItsSwitch() throws Exception {
-        StreamOperativeClassRegistry.registerClass(PersistenceOffOperative.class);
+    @DisplayName("an unbounded operator's opt-out is read from the class, not its Tasklets")
+    void anUnboundedOptsOutByItsSwitch() throws Exception {
+        UnboundedOperatorClassRegistry.registerClass(PersistenceOffOperator.class);
         JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_persistence_off_op"));
 
         assertThat(decl.path("persistent").asBoolean())
@@ -176,22 +176,22 @@ class HostClassDeclarationTest {
     }
 
     @Test
-    @DisplayName("sleeping is a class setting of both kinds, on for a durable workflow by default")
+    @DisplayName("sleeping is a class setting of both kinds, on for a durable bounded by default")
     void sleepWhenIdleIsDeclaredForBothKinds() throws Exception {
-        StreamOperativeClassRegistry.registerClass(SleepingOperative.class);
-        WorkflowOperativeClassRegistry.registerClass(DeclWorkflow.class);
-        WorkflowOperativeClassRegistry.registerClass(OptedOutWorkflow.class);
+        UnboundedOperatorClassRegistry.registerClass(SleepingOperator.class);
+        BoundedOperatorClassRegistry.registerClass(DeclBounded.class);
+        BoundedOperatorClassRegistry.registerClass(OptedOutBounded.class);
 
         assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_sleeping_op"))
                         .path("sleep_when_idle")
                         .asBoolean())
                 .isTrue();
-        assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_workflow"))
+        assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_bounded"))
                         .path("sleep_when_idle")
                         .asBoolean())
-                .as("a workflow sleeps whenever it persists")
+                .as("a bounded sleeps whenever it persists")
                 .isTrue();
-        JsonNode optedOut = JSON.readTree(HostClassDeclaration.forFactory("decl_opted_out_workflow"));
+        JsonNode optedOut = JSON.readTree(HostClassDeclaration.forFactory("decl_opted_out_bounded"));
         assertThat(optedOut.path("persistent").asBoolean()).isFalse();
         assertThat(optedOut.path("sleep_when_idle").asBoolean()).isFalse();
     }
@@ -199,26 +199,26 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("sleeping without persistence is refused by name, for either kind")
     void sleepingWithoutPersistenceIsRefused() {
-        assertThatThrownBy(() -> StreamOperativeClassRegistry.registerClass(SleeplessStreamOperative.class))
+        assertThatThrownBy(() -> UnboundedOperatorClassRegistry.registerClass(SleeplessUnboundedOperator.class))
                 .hasMessageContaining("SleepWithoutPersistence");
-        assertThatThrownBy(() -> WorkflowOperativeClassRegistry.registerClass(SleeplessWorkflow.class))
+        assertThatThrownBy(() -> BoundedOperatorClassRegistry.registerClass(SleeplessBounded.class))
                 .hasMessageContaining("SleepWithoutPersistence");
     }
 
     @Test
-    @DisplayName("a workflow class declaring synchronous durability ships the flag")
+    @DisplayName("a bounded class declaring synchronous durability ships the flag")
     void syncDurabilityDeclaration() throws Exception {
-        WorkflowOperativeClassRegistry.registerClass(SyncDurableWorkflow.class);
+        BoundedOperatorClassRegistry.registerClass(SyncDurableBounded.class);
 
-        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_sync_workflow"));
+        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_sync_bounded"));
         assertThat(decl.get("sync_durability").asBoolean()).isTrue();
     }
 
     @Test
     @DisplayName("a declared hook needs no second declaration: a written compensate is compensable")
     void aWrittenCompensateIsDeclared() throws Exception {
-        WorkflowOperativeClassRegistry.registerClass(FullyDeclaredWorkflow.class);
-        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_full_workflow"));
+        BoundedOperatorClassRegistry.registerClass(FullyDeclaredBounded.class);
+        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_full_bounded"));
 
         assertThat(decl.get("tasklets").get(0).path("compensate_overridden").asBoolean())
                 .as("the rollback plans only from compensable tasklets")
@@ -228,17 +228,17 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("the builder can spell every key the shared fixture pins")
     void everyPinnedDeclarationKeyHasAJavaSpelling() throws Exception {
-        StreamOperativeClassRegistry.registerClass(FullyDeclaredOperative.class);
-        StreamOperativeClassRegistry.registerClass(FullyDeclaredDynamicOperative.class);
-        WorkflowOperativeClassRegistry.registerClass(FullyDeclaredWorkflow.class);
+        UnboundedOperatorClassRegistry.registerClass(FullyDeclaredOperator.class);
+        UnboundedOperatorClassRegistry.registerClass(FullyDeclaredDynamicOperator.class);
+        BoundedOperatorClassRegistry.registerClass(FullyDeclaredBounded.class);
 
         JsonNode stream = JSON.readTree(HostClassDeclaration.forFactory("decl_full_op"));
         JsonNode dynamic = JSON.readTree(HostClassDeclaration.forFactory("decl_full_dynamic_op"));
-        JsonNode workflow = JSON.readTree(HostClassDeclaration.forFactory("decl_full_workflow"));
+        JsonNode bounded = JSON.readTree(HostClassDeclaration.forFactory("decl_full_bounded"));
 
         // A key may live on any node of its section: the entry channel has no
         // `producer`, the plugin-bound one has the `keyed` flag.
-        assertEverySpellingExists("class", List.of(stream), Set.of("sync_durability", "workflow"));
+        assertEverySpellingExists("class", List.of(stream), Set.of("sync_durability", "bounded"));
         assertEverySpellingExists("channel", nodes(stream.get("channels")), Set.of());
         // Cell mode splits the tasklet keys: a static tasklet declares its
         // key set, a dynamic one its TTL and cap. Both modes together are the
@@ -246,8 +246,8 @@ class HostClassDeclarationTest {
         List<JsonNode> tasklets = new ArrayList<>(nodes(stream.get("tasklets")));
         tasklets.addAll(nodes(dynamic.get("tasklets")));
         assertEverySpellingExists("tasklet", tasklets, Set.of());
-        assertEverySpellingExists("workflow", List.of(workflow.get("workflow")), Set.of());
-        assertThat(workflow.has("sync_durability")).isTrue();
+        assertEverySpellingExists("bounded", List.of(bounded.get("bounded")), Set.of());
+        assertThat(bounded.has("sync_durability")).isTrue();
     }
 
     private static List<JsonNode> nodes(JsonNode array) {
@@ -259,7 +259,7 @@ class HostClassDeclarationTest {
     /**
      * Every key the fixture pins for {@code section} that no node of that
      * section carries, minus the ones this declaration legitimately omits (a
-     * static tasklet has no {@code idle_ttl_ms}, a stream class no
+     * static tasklet has no {@code idle_ttl_ms}, an unbounded class no
      * {@code sync_durability}). A key with no Java spelling at all shows up
      * here and nowhere else.
      */
@@ -291,8 +291,8 @@ class HostClassDeclarationTest {
                 .collect(Collectors.toCollection(java.util.ArrayList::new));
     }
 
-    /** Declares every stream-side option the Java surface has a spelling for. */
-    public static final class FullyDeclaredOperative implements StreamOperative {
+    /** Declares every unbounded-side option the Java surface has a spelling for. */
+    public static final class FullyDeclaredOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "decl_full_op";
@@ -322,7 +322,7 @@ class HostClassDeclarationTest {
     }
 
     /** The dynamic half of the tasklet surface: a lazy Cell with a TTL and a cap. */
-    public static final class FullyDeclaredDynamicOperative implements StreamOperative {
+    public static final class FullyDeclaredDynamicOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "decl_full_dynamic_op";
@@ -435,11 +435,11 @@ class HostClassDeclarationTest {
 
     public record DeclChange(String value) implements com.flezha.sdk.state.Change {}
 
-    /** Declares every workflow-side option the Java surface has a spelling for. */
-    public static final class FullyDeclaredWorkflow implements WorkflowOperative {
+    /** Declares every bounded-side option the Java surface has a spelling for. */
+    public static final class FullyDeclaredBounded implements BoundedOperator {
         @Override
         public String factoryId() {
-            return "decl_full_workflow";
+            return "decl_full_bounded";
         }
 
         @Override
@@ -461,10 +461,10 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("forFactory resolves both registries and refuses an unknown id")
     void forFactoryResolvesRegistries() {
-        StreamOperativeClassRegistry.registerClass(TierOperative.class);
-        WorkflowOperativeClassRegistry.registerClass(DeclWorkflow.class);
+        UnboundedOperatorClassRegistry.registerClass(TierOperator.class);
+        BoundedOperatorClassRegistry.registerClass(DeclBounded.class);
         assertThat(HostClassDeclaration.forFactory("decl_tier_op")).isNotEmpty();
-        assertThat(HostClassDeclaration.forFactory("decl_workflow")).isNotEmpty();
+        assertThat(HostClassDeclaration.forFactory("decl_bounded")).isNotEmpty();
         assertThatThrownBy(() -> HostClassDeclaration.forFactory("missing"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("missing");
@@ -473,7 +473,7 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("the checkpoint interval options ride the declaration only when declared")
     void checkpointIntervalOptions() throws Exception {
-        StreamOperativeClassRegistry.registerClass(BatchedOutputsOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(BatchedOutputsOperator.class);
         JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_batched_op"));
 
         assertThat(decl.has("checkpoint_ack"))
@@ -487,7 +487,7 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("an interval option without the tier is refused, naming the missing tier")
     void checkpointOptionsWithoutTier() {
-        assertThatThrownBy(() -> StreamOperativeClassRegistry.registerClass(NoTierBatchedOperative.class))
+        assertThatThrownBy(() -> UnboundedOperatorClassRegistry.registerClass(NoTierBatchedOperator.class))
                 .hasMessageContaining("CheckpointAckWithoutTier");
     }
 
@@ -500,7 +500,7 @@ class HostClassDeclarationTest {
         // channel carries a journal codec, so a terminal whose only wiring is a
         // plugin sink ships an empty handoff and the crash-resumed loop reads
         // that as convergence.
-        WorkflowOperativeClassRegistry.registerClass(ChainedTerminalIntoSinkWorkflow.class);
+        BoundedOperatorClassRegistry.registerClass(ChainedTerminalIntoSinkBounded.class);
         byte[] declaration = HostClassDeclaration.forFactory("decl_chained_sink");
 
         long ctx = FlzCore.newContext();
@@ -515,7 +515,7 @@ class HostClassDeclarationTest {
     }
 
     /** A durable CHAINED loop whose terminal task's only output is a plugin sink. */
-    public static final class ChainedTerminalIntoSinkWorkflow implements WorkflowOperative {
+    public static final class ChainedTerminalIntoSinkBounded implements BoundedOperator {
         @Override
         public String factoryId() {
             return "decl_chained_sink";
@@ -550,7 +550,7 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class BatchedOutputsOperative implements StreamOperative {
+    public static final class BatchedOutputsOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "decl_batched_op";
@@ -565,7 +565,7 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class NoTierBatchedOperative implements StreamOperative {
+    public static final class NoTierBatchedOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "decl_no_tier_batched_op";
@@ -578,7 +578,7 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class TierOperative implements StreamOperative {
+    public static final class TierOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "decl_tier_op";
@@ -593,7 +593,7 @@ class HostClassDeclarationTest {
     }
 
     /** A tier-less class whose tasklet journals a Change, opted out by its switch. */
-    public static final class PersistenceOffOperative implements StreamOperative {
+    public static final class PersistenceOffOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "decl_persistence_off_op";
@@ -610,7 +610,7 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class SleepingOperative implements StreamOperative {
+    public static final class SleepingOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "decl_sleeping_op";
@@ -627,7 +627,7 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class SleeplessStreamOperative implements StreamOperative {
+    public static final class SleeplessUnboundedOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "decl_sleepless_op";
@@ -650,7 +650,7 @@ class HostClassDeclarationTest {
     }
 
     /** Two tasklets in one class, each at its own schema version. */
-    public static final class MixedVersionOperative implements StreamOperative {
+    public static final class MixedVersionOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "decl_mixed_version_op";
@@ -712,10 +712,10 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class SyncDurableWorkflow implements WorkflowOperative {
+    public static final class SyncDurableBounded implements BoundedOperator {
         @Override
         public String factoryId() {
-            return "decl_sync_workflow";
+            return "decl_sync_bounded";
         }
 
         @Override
@@ -778,10 +778,10 @@ class HostClassDeclarationTest {
         public void compensate(List<String> completedOutput, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
     }
 
-    public static final class DeclWorkflow implements WorkflowOperative {
+    public static final class DeclBounded implements BoundedOperator {
         @Override
         public String factoryId() {
-            return "decl_workflow";
+            return "decl_bounded";
         }
 
         @Override
@@ -795,10 +795,10 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class OptedOutWorkflow implements WorkflowOperative {
+    public static final class OptedOutBounded implements BoundedOperator {
         @Override
         public String factoryId() {
-            return "decl_opted_out_workflow";
+            return "decl_opted_out_bounded";
         }
 
         @Override
@@ -817,10 +817,10 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class SleeplessWorkflow implements WorkflowOperative {
+    public static final class SleeplessBounded implements BoundedOperator {
         @Override
         public String factoryId() {
-            return "decl_sleepless_workflow";
+            return "decl_sleepless_bounded";
         }
 
         @Override

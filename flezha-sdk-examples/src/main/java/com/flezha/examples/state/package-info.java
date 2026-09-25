@@ -30,7 +30,7 @@
  *
  * <p>Declaring a change type also makes a cell readable from outside the pipeline. Nothing
  * further is required: {@code flz state get} returns the current value of any cell of a running
- * operative, which is how a dashboard or an operational query reads a value without waiting for it
+ * operator, which is how a dashboard or an operational query reads a value without waiting for it
  * to reach a sink.
  */
 package com.flezha.examples.state;

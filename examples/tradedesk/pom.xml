@@ -14,7 +14,7 @@
     <packaging>jar</packaging>
 
     <name>Flezha tradedesk example</name>
-    <description>The Part 2 toy trader: the runner that serves the desk's operatives.</description>
+    <description>The Part 2 toy trader: the runner that serves the desk's operators.</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -45,7 +45,7 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <!-- Expands each @Tasklet class into the Tasklet implementation the
-                     operative wires, named <Class>Tasklet. Only the desk's stateless
+                     operator wires, named <Class>Tasklet. Only the desk's stateless
                      steps use it; the ones that keep state write the interface out. -->
                 <configuration>
                     <annotationProcessorPaths>

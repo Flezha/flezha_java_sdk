@@ -1,7 +1,7 @@
 package com.flezha.examples.tradedesk;
 
-import com.flezha.examples.tradedesk.PricesOperative.Move;
-import com.flezha.examples.tradedesk.PricesOperative.Trade;
+import com.flezha.examples.tradedesk.PricesOperator.Move;
+import com.flezha.examples.tradedesk.PricesOperator.Trade;
 import com.flezha.sdk.authoring.State;
 import com.flezha.sdk.authoring.Tasklet;
 import java.util.ArrayDeque;
@@ -11,7 +11,7 @@ import java.util.Optional;
 /**
  * Keeps a symbol's last ten prices, and compares each new trade with their average.
  *
- * <p>One cell per symbol, because the operative keys the channel by symbol, and the window is that
+ * <p>One cell per symbol, because the operator keys the channel by symbol, and the window is that
  * cell's state. Every change to it is recorded as it happens, so a runner that is killed and
  * started again finds the window it had rather than an empty one.
  */

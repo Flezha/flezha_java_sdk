@@ -56,7 +56,7 @@ public final class FlezhaEnv {
         int max = parsePositive(
                 FLEZHA_WORKER_POOL_MAX, lookup.apply(FLEZHA_WORKER_POOL_MAX), count * DEFAULT_FETCHER_MAX_MULTIPLE);
         // A ceiling below the configured count would make the host start
-        // fewer fetchers than the operator asked for; the count wins.
+        // fewer fetchers than the user asked for; the count wins.
         return new ResolvedConfig(count, Math.max(count, max));
     }
 

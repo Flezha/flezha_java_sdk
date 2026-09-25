@@ -1,17 +1,17 @@
 /**
- * Tasklet-requested spawning: a stream tasklet asking the cluster for a workflow worker.
+ * Tasklet-requested spawning: an unbounded tasklet asking the cluster for a bounded worker.
  *
  * <p>A detector watching a stream identifies something warranting substantial work and wants a
  * worker assigned to it, without an external dispatcher and without becoming one itself.
  *
- * <p>{@code ctx.spawnWorkflow} with {@link com.flezha.sdk.tasklet.SpawnOptions} naming an id is
+ * <p>{@code ctx.spawnBounded} with {@link com.flezha.sdk.tasklet.SpawnOptions} naming an id is
  * spawn-or-deliver against that single instance identifier. The first alert for a subject starts a
  * worker with that alert as its first input; subsequent alerts for the same subject are delivered to
  * the worker already handling it. Concurrent requests, whether from other cells or other hosts,
  * are resolved controller-side onto exactly one instance, so there is no check-then-create race for
  * the author to defend against. {@link com.flezha.sdk.tasklet.IfRunning} selects that behaviour.
  *
- * <p>Without an id, {@code ctx.spawnWorkflow("triage", payload)} starts a new instance under an id
+ * <p>Without an id, {@code ctx.spawnBounded("triage", payload)} starts a new instance under an id
  * the controller generates, and never delivers into a running one. A spawn reissued after a lost or
  * timed-out answer then starts a second instance, and a replayed invocation answers an empty id,
  * because the generated one existed only in the live run's answer. Pass an id when at most one
@@ -28,10 +28,10 @@
  * <p>With authorization on, the default in a release, the namespace's {@code runner@<namespace>}
  * principal needs the {@code spawner} role, or every spawn is refused:
  * {@code flz role bind runner@<namespace> spawner <namespace>}. The role also lets this runner's
- * {@code admin()} start and send to operatives in its namespace, and nothing else.
+ * {@code admin()} start and send to operators in its namespace, and nothing else.
  *
- * <p>{@link com.flezha.examples.spawn.Main} declares both operatives on one runner, since the
- * requesting stream operative and the workflow operative it requests are ordinary declarations with
+ * <p>{@link com.flezha.examples.spawn.Main} declares both operators on one runner, since the
+ * requesting unbounded operator and the bounded operator it requests are ordinary declarations with
  * no special relationship beyond the factory id.
  */
 package com.flezha.examples.spawn;

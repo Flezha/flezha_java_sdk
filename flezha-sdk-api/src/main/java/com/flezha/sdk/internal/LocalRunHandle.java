@@ -6,7 +6,7 @@ import java.util.function.Consumer;
 
 /**
  * SPI the runtime's {@code LocalImpl} implements and the public
- * {@code LocalOperative} holds — the local-mode twin of {@link RunnerHandle},
+ * {@code LocalOperator} holds — the local-mode twin of {@link RunnerHandle},
  * resolved through {@link RuntimeBridge} so the api module still compiles
  * standalone.
  *

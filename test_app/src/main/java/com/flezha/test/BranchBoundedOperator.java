@@ -1,0 +1,123 @@
+package com.flezha.test;
+
+import com.flezha.sdk.channel.ChannelBuilder;
+import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.TaskletException;
+import com.flezha.sdk.state.NoChange;
+import com.flezha.sdk.state.StateHandle;
+import com.flezha.sdk.operator.BoundedOperator;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+/**
+ * Mirror of the Rust test app's {@code branch_bounded}: the tasklet TREE.
+ *
+ * <pre>
+ *     BranchA ─┬─▶ BranchB ─▶ BranchD
+ *              └─▶ BranchC
+ * </pre>
+ *
+ * Every tasklet commits durable state and compensates by emitting an undo
+ * record, so both tree behaviours are observable at one sink: crash-resume
+ * (BranchD blocks, so the respawn re-runs D alone and the sibling's {@code c:}
+ * marker appears exactly once) and compensation (with {@code FLEZHA_BRANCH_FAIL}
+ * armed BranchD fails, and the rollback unwinds the two branches before the root
+ * they share).
+ */
+public final class BranchBoundedOperator implements BoundedOperator {
+
+    static final String BRANCH_FAIL_ENV = "FLEZHA_BRANCH_FAIL";
+
+    @Override
+    public String factoryId() {
+        return "branch_bounded";
+    }
+
+    @Override
+    public void channels(ChannelBuilder c) {
+        // One channel, two consumers: THE fan-out. Both branches read exactly
+        // what BranchA released on it (held handle, wired twice).
+        var mid = c.input(String.class, "in")
+                .into(BranchA.class)
+                .sink("mid", s -> ("a:" + s).getBytes(StandardCharsets.UTF_8));
+        // Fail fast: the compensation scenario is about the rollback order,
+        // not the ladder that precedes it.
+        mid.into(BranchB.class)
+                .sink("bmid", s -> ("b:" + s).getBytes(StandardCharsets.UTF_8))
+                .retryMax(1)
+                .into(BranchD.class)
+                .sink("d_out");
+        mid.into(BranchC.class).sink("c_out");
+    }
+
+    /** The shared root. */
+    public static final class BranchA extends DurableStep {
+
+        @Override
+        public String name() {
+            return "branch_a";
+        }
+
+        @Override
+        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
+                throws TaskletException {
+            ctx.emit("undo-a");
+        }
+    }
+
+    /** The deep branch's upper half. */
+    public static final class BranchB extends DurableStep {
+
+        @Override
+        public String name() {
+            return "branch_b";
+        }
+
+        @Override
+        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
+                throws TaskletException {
+            ctx.emit("undo-b");
+        }
+    }
+
+    /** The sibling leaf: emits straight to the sink, and its undo does too. */
+    public static final class BranchC extends DurableStep {
+
+        @Override
+        public String name() {
+            return "branch_c";
+        }
+
+        @Override
+        public void run(String input, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
+                throws TaskletException {
+            state.apply(new Insert(name()));
+            ctx.emit("c:" + input);
+        }
+
+        @Override
+        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
+                throws TaskletException {
+            ctx.emit("undo-c");
+        }
+    }
+
+    /** The deep leaf under BranchB: blocks (crash-resume), or fails (compensation). */
+    public static final class BranchD extends StatelessStep {
+
+        @Override
+        public String name() {
+            return "branch_d";
+        }
+
+        @Override
+        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
+                throws TaskletException {
+            if (System.getenv(BRANCH_FAIL_ENV) != null) {
+                throw new TaskletException("branch_d failed");
+            }
+            BoundedE2eGate.blockUntilReleased();
+            ctx.emit("d:" + input);
+        }
+    }
+}

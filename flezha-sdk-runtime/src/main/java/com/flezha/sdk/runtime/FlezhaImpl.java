@@ -2,15 +2,15 @@ package com.flezha.sdk.runtime;
 
 import com.flezha.sdk.Flezha;
 import com.flezha.sdk.Logger;
-import com.flezha.sdk.OperativeTypeInUseException;
+import com.flezha.sdk.OperatorTypeInUseException;
 import com.flezha.sdk.internal.RunnerHandle;
 import com.flezha.sdk.native_.FlzCore;
+import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
 import com.flezha.sdk.runtime.config.FlezhaEnv;
 import com.flezha.sdk.runtime.core.ActivationDispatcher;
 import com.flezha.sdk.runtime.core.CoreSpawnRequester;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
-import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
-import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
+import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
 import com.flezha.sdk.tasklet.SpawnRequests;
 import java.util.List;
 import java.util.Map;
@@ -120,18 +120,18 @@ public final class FlezhaImpl implements RunnerHandle {
 
     @Override
     @Nonnull
-    public Map<String, ?> operatives() {
+    public Map<String, ?> operators() {
         return dispatcher.instances();
     }
 
     @Override
     public void removeType(@Nonnull String factoryId) {
         if (dispatcher.hasInstanceOf(factoryId)) {
-            throw new OperativeTypeInUseException(
-                    "factory '" + factoryId + "' has live operative instance(s); stop them before removing the type");
+            throw new OperatorTypeInUseException(
+                    "factory '" + factoryId + "' has live operator instance(s); stop them before removing the type");
         }
-        if (StreamOperativeClassRegistry.unregisterClass(factoryId) == null) {
-            WorkflowOperativeClassRegistry.unregisterClass(factoryId);
+        if (UnboundedOperatorClassRegistry.unregisterClass(factoryId) == null) {
+            BoundedOperatorClassRegistry.unregisterClass(factoryId);
         }
         declared.remove(factoryId);
     }
@@ -153,8 +153,8 @@ public final class FlezhaImpl implements RunnerHandle {
             if (declared.contains(factoryId)) {
                 continue;
             }
-            if (StreamOperativeClassRegistry.getTopology(factoryId) == null
-                    && WorkflowOperativeClassRegistry.getTopology(factoryId) == null) {
+            if (UnboundedOperatorClassRegistry.getTopology(factoryId) == null
+                    && BoundedOperatorClassRegistry.getTopology(factoryId) == null) {
                 LOG.warn("syncFactories: `{}` is not in the class registries; skipping", factoryId);
                 continue;
             }

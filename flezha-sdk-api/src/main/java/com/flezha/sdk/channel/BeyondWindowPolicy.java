@@ -9,7 +9,7 @@ public enum BeyondWindowPolicy {
 
     /**
      * Process it as though it had just arrived (the default). This is the
-     * behaviour of an Operative that declares no window at all, which is why it
+     * behaviour of an Operator that declares no window at all, which is why it
      * is the default: declaring a correction window must never silently start
      * dropping data.
      */

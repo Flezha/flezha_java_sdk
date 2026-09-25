@@ -117,12 +117,12 @@ public interface Tasklet<
         Input, State, Output, ChangeT extends Change, ClockT extends com.flezha.sdk.state.Clock, ConfigT> {
 
     /**
-     * This tasklet's name, unique within its operative.
+     * This tasklet's name, unique within its operator.
      *
      * <p>The name identifies the tasklet in durable state and in the channel labels derived from
      * it, so changing it means the runtime no longer recognises what it already recorded.
      *
-     * @return the stable name, unique among the tasklets of one operative
+     * @return the stable name, unique among the tasklets of one operator
      */
     @Nonnull
     String name();
@@ -408,7 +408,7 @@ public interface Tasklet<
 
     /**
      * Per-Cell mailbox capacity. The consumer Cell allocates one
-     * bounded ring buffer of this size at operative startup. Static-mode Tasklets
+     * bounded ring buffer of this size at operator startup. Static-mode Tasklets
      * allocate one mailbox per declared cell key, all sharing the same
      * capacity.
      *
@@ -450,16 +450,16 @@ public interface Tasklet<
      * @param ctx the runtime handle for emitting output, reading the clock, obtaining a
      *     replay-stable identifier, and registering timers
      * @throws TaskletException to fail this invocation. The failure is recorded against the
-     *     operative, tasklet and cell, and any output emitted earlier in this invocation is
+     *     operator, tasklet and cell, and any output emitted earlier in this invocation is
      *     discarded rather than released. Any other runtime exception is treated the same way
      */
     void run(Input input, StateHandle<State, ChangeT> state, TaskletCtx ctx) throws TaskletException;
 
     /**
-     * Optional saga <strong>compensation</strong> hook (workflow operatives only).
+     * Optional saga <strong>compensation</strong> hook (bounded operators only).
      * A tasklet whose {@link #run} commits a reversible side effect overrides
-     * this to undo it. The workflow driver fires it ONLY during abnormal-termination
-     * rollback — never on a clean completion, never for a stream operative —
+     * this to undo it. The bounded driver fires it ONLY during abnormal-termination
+     * rollback — never on a clean completion, never for an unbounded operator —
      * once per cell that ran, in reverse completion order, handing back that
      * cell's own collected outputs and its {@link StateHandle} so it can
      * reverse precisely. Compensation MUST be idempotent by author contract: a
@@ -482,7 +482,7 @@ public interface Tasklet<
      * <p>Rust binds the extractor at compile time via
      * {@code EventTimeFrom<F: TimeExtractor<Input>>}. Java's erasure precludes
      * that, so declaring {@code EventTimeFrom} without overriding this fails
-     * Operative registration — the same defect, caught before any input is
+     * Operator registration — the same defect, caught before any input is
      * served.
      */
     default long eventTime(Input input) {

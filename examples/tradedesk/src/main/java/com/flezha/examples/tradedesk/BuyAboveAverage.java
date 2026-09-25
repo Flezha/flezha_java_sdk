@@ -1,8 +1,8 @@
 package com.flezha.examples.tradedesk;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.flezha.examples.tradedesk.PaperOrderOperative.OrderTicket;
-import com.flezha.examples.tradedesk.PricesOperative.Move;
+import com.flezha.examples.tradedesk.PaperOrderOperator.OrderTicket;
+import com.flezha.examples.tradedesk.PricesOperator.Move;
 import com.flezha.sdk.authoring.Tasklet;
 import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -15,7 +15,7 @@ import com.flezha.sdk.tasklet.TaskletException;
  * back. That is why it is written with {@code @Tasklet} and no state, beside {@link TrackPrices},
  * which keeps the window.
  *
- * <p>{@code run} takes the context because it does two things per input: it starts a workflow and
+ * <p>{@code run} takes the context because it does two things per input: it starts a bounded operator and
  * it emits. {@code emits} declares the output type, which a {@code void} return cannot.
  */
 @Tasklet(id = "buy_above_average", emits = String.class)
@@ -44,7 +44,7 @@ public final class BuyAboveAverage {
 
         // No id: the controller names the instance. A replay of this invocation issues no request,
         // so re-running an input never places a second order.
-        ctx.spawnWorkflow("paper_order", ticket);
+        ctx.spawnBounded("paper_order", ticket);
 
         ctx.emit(String.format(
                 "%s %.2f is %.2f%% above its average of %.2f, buying %d",

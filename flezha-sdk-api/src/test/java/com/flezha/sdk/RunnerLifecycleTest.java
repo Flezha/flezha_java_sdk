@@ -6,8 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operative.StreamOperative;
-import com.flezha.sdk.operative.WorkflowOperative;
+import com.flezha.sdk.operator.BoundedOperator;
+import com.flezha.sdk.operator.UnboundedOperator;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CyclicBarrier;
@@ -32,7 +32,7 @@ class RunnerLifecycleTest {
 
     private static final String AUTHORS_REFUSAL = "the author's own refusal";
 
-    public static final class OperativeA implements StreamOperative {
+    public static final class OperatorA implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "lifecycle_a";
@@ -42,7 +42,7 @@ class RunnerLifecycleTest {
         public void channels(ChannelBuilder c) {}
     }
 
-    public static final class OperativeB implements StreamOperative {
+    public static final class OperatorB implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "lifecycle_b";
@@ -52,7 +52,7 @@ class RunnerLifecycleTest {
         public void channels(ChannelBuilder c) {}
     }
 
-    public static final class OperativeC implements StreamOperative {
+    public static final class OperatorC implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "lifecycle_c";
@@ -62,7 +62,7 @@ class RunnerLifecycleTest {
         public void channels(ChannelBuilder c) {}
     }
 
-    public static final class WorkflowD implements WorkflowOperative {
+    public static final class BoundedD implements BoundedOperator {
         @Override
         public String factoryId() {
             return "lifecycle_d";
@@ -75,10 +75,10 @@ class RunnerLifecycleTest {
     /**
      * A class of both kinds: its kind cannot be read, so it is refused at registration. The base
      * declares the one {@code channels} both kinds write, and both interfaces default
-     * {@code persistenceEnabled()}, so a class implementing both must resolve the inherited default
-     * itself, which is what makes the shape writable at all.
+     * {@code persistenceEnabled()} and {@code sleepWhenIdle()}, so a class implementing both must
+     * resolve the inherited defaults itself, which is what makes the shape writable at all.
      */
-    public static final class BothKinds implements StreamOperative, WorkflowOperative {
+    public static final class BothKinds implements UnboundedOperator, BoundedOperator {
         @Override
         public String factoryId() {
             return "lifecycle_both";
@@ -91,10 +91,15 @@ class RunnerLifecycleTest {
         public boolean persistenceEnabled() {
             return true;
         }
+
+        @Override
+        public boolean sleepWhenIdle() {
+            return false;
+        }
     }
 
     /** A class of neither kind, reaching the runner through the shared base. */
-    public static final class NeitherKind implements com.flezha.sdk.operative.Operative {
+    public static final class NeitherKind implements com.flezha.sdk.operator.Operator {
         @Override
         public String factoryId() {
             return "lifecycle_neither";
@@ -104,27 +109,27 @@ class RunnerLifecycleTest {
         public void channels(ChannelBuilder c) {}
     }
 
-    /** A short form: the runner registers the operative generated from it, {@link ShortFormStreamOperative}. */
-    @com.flezha.sdk.authoring.StreamOperative(id = "lifecycle_short", sink = "out")
+    /** A short form: the runner registers the operator generated from it, {@link ShortFormUnboundedOperator}. */
+    @com.flezha.sdk.authoring.UnboundedOperator(id = "lifecycle_short", sink = "out")
     public static final class ShortForm {
         public String run(String input) {
             return input;
         }
     }
 
-    /** A short form with no generated operative beside it, as when the processor never ran. */
-    @com.flezha.sdk.authoring.WorkflowOperative(id = "lifecycle_orphan")
+    /** A short form with no generated operator beside it, as when the processor never ran. */
+    @com.flezha.sdk.authoring.BoundedOperator(id = "lifecycle_orphan")
     public static final class Orphan {
         public String run(String input) {
             return input;
         }
     }
 
-    /** Neither an operative nor a short form. */
-    public static final class NotAnOperative {}
+    /** Neither an operator nor a short form. */
+    public static final class NotAnOperator {}
 
-    public static final class ThrowingConstructorOperative implements StreamOperative {
-        public ThrowingConstructorOperative() {
+    public static final class ThrowingConstructorOperator implements UnboundedOperator {
+        public ThrowingConstructorOperator() {
             throw new IllegalStateException(AUTHORS_REFUSAL);
         }
 
@@ -142,7 +147,7 @@ class RunnerLifecycleTest {
     void releaseSingletonSlot() {
         Flezha.currentRunner().ifPresent(FlezhaRunner::close);
         com.flezha.sdk.runtime.FlezhaImpl.resetForTests();
-        com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry.reset();
+        com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry.reset();
     }
 
     @Test
@@ -150,7 +155,7 @@ class RunnerLifecycleTest {
             "second start() in the same JVM is rejected naming the running namespace, without reaching the runtime")
     void secondStartIsRejected() {
         FlezhaRunner first =
-                Flezha.createRunner("ns1").registerFactory(OperativeA.class).start();
+                Flezha.createRunner("ns1").registerFactory(OperatorA.class).start();
         int startsBefore = com.flezha.sdk.runtime.FlezhaImpl.STARTS.get();
 
         assertThatThrownBy(() -> Flezha.createRunner("ns2").start())
@@ -168,11 +173,11 @@ class RunnerLifecycleTest {
     @DisplayName("creating and mutating runners never claims the slot")
     void creatingRunnersNeverClaimsTheSlot() {
         FlezhaRunner active =
-                Flezha.createRunner("ns1").registerFactory(OperativeA.class).start();
+                Flezha.createRunner("ns1").registerFactory(OperatorA.class).start();
 
         assertThatCode(() -> Flezha.createRunner("ns2")
-                        .registerFactory(OperativeB.class)
-                        .unregisterFactory(OperativeB.class))
+                        .registerFactory(OperatorB.class)
+                        .unregisterFactory(OperatorB.class))
                 .as("mutating an unstarted runner while another is active is legal")
                 .doesNotThrowAnyException();
 
@@ -183,7 +188,7 @@ class RunnerLifecycleTest {
     @DisplayName("start() twice on the same runner is rejected")
     void doubleStartOnOneRunnerIsRejected() {
         FlezhaRunner runner = Flezha.createRunner("ns_double")
-                .registerFactory(OperativeA.class)
+                .registerFactory(OperatorA.class)
                 .start();
         assertThatThrownBy(runner::start)
                 .isInstanceOf(IllegalStateException.class)
@@ -191,15 +196,15 @@ class RunnerLifecycleTest {
     }
 
     @Test
-    @DisplayName("zero-operative start is legal; the handshake supplier serves an empty set")
-    void zeroOperativeStartIsLegal() {
+    @DisplayName("zero-operator start is legal; the handshake supplier serves an empty set")
+    void zeroOperatorStartIsLegal() {
         FlezhaRunner runner = Flezha.createRunner("ns_zero").start();
         assertThat(runner.getNamespace()).isEqualTo("ns_zero");
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
                 .as("the init handshake must carry an empty factory list")
                 .isEmpty();
         // Types may be defined later on the live runner.
-        runner.registerFactory(OperativeA.class);
+        runner.registerFactory(OperatorA.class);
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
                 .containsExactly("lifecycle_a");
     }
@@ -208,9 +213,9 @@ class RunnerLifecycleTest {
     @DisplayName("a pre-start remove shapes the declared set the handshake reads")
     void preStartRemoveShapesTheHandshake() {
         FlezhaRunner runner = Flezha.createRunner("ns_shape")
-                .registerFactory(OperativeA.class)
-                .registerFactory(OperativeB.class)
-                .unregisterFactory(OperativeB.class)
+                .registerFactory(OperatorA.class)
+                .registerFactory(OperatorB.class)
+                .unregisterFactory(OperatorB.class)
                 .start();
         assertThat(runner.getNamespace()).isEqualTo("ns_shape");
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
@@ -223,7 +228,7 @@ class RunnerLifecycleTest {
     @Test
     @DisplayName("a post-start define ships the full factory set")
     void postStartDefineShipsTheFullSet() {
-        Flezha.createRunner("ns_def").registerFactory(OperativeA.class).start().registerFactory(OperativeC.class);
+        Flezha.createRunner("ns_def").registerFactory(OperatorA.class).start().registerFactory(OperatorC.class);
 
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.SYNCED_SETS)
                 .containsExactly(List.of("lifecycle_a", "lifecycle_c"));
@@ -233,46 +238,43 @@ class RunnerLifecycleTest {
     @DisplayName("a post-start remove (no live instances) ships the remaining full set")
     void postStartRemoveShipsTheRemainingSet() {
         Flezha.createRunner("ns_rem")
-                .registerFactory(OperativeA.class)
-                .registerFactory(OperativeC.class)
+                .registerFactory(OperatorA.class)
+                .registerFactory(OperatorC.class)
                 .start()
-                .unregisterFactory(OperativeC.class);
+                .unregisterFactory(OperatorC.class);
 
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.SYNCED_SETS).containsExactly(List.of("lifecycle_a"));
-        assertThat(com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry.registeredIds())
+        assertThat(com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry.registeredIds())
                 .as("the runtime-side class must be unregistered")
                 .doesNotContain("lifecycle_c");
     }
 
     @Test
-    @DisplayName(
-            "a workflow class is defined and removed through the workflow registry and declared beside the streams")
-    void workflowDefineAndRemoveReachTheWorkflowRegistry() {
-        FlezhaRunner runner = Flezha.createRunner("ns_workflow").registerFactory(WorkflowD.class);
-        assertThat(com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry.registeredIds())
+    @DisplayName("a bounded class is defined and removed through the bounded registry and declared beside the streams")
+    void boundedDefineAndRemoveReachTheBoundedRegistry() {
+        FlezhaRunner runner = Flezha.createRunner("ns_bounded").registerFactory(BoundedD.class);
+        assertThat(com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry.registeredIds())
                 .containsExactly("lifecycle_d");
 
-        runner.unregisterFactory(WorkflowD.class);
-        assertThat(com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry.registeredIds())
+        runner.unregisterFactory(BoundedD.class);
+        assertThat(com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry.registeredIds())
                 .as("a pre-start remove unregisters the runtime-side class")
                 .isEmpty();
 
-        runner.registerFactory(OperativeA.class)
-                .registerFactory(WorkflowD.class)
-                .start();
+        runner.registerFactory(OperatorA.class).registerFactory(BoundedD.class).start();
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
                 .containsExactly("lifecycle_a", "lifecycle_d");
     }
 
     @Test
-    @DisplayName("removing a type with live instances throws OperativeTypeInUseException and keeps it defined")
+    @DisplayName("removing a type with live instances throws OperatorTypeInUseException and keeps it defined")
     void removeWithLiveInstancesRefuses() {
         FlezhaRunner runner =
-                Flezha.createRunner("ns_live").registerFactory(OperativeA.class).start();
+                Flezha.createRunner("ns_live").registerFactory(OperatorA.class).start();
         com.flezha.sdk.runtime.FlezhaImpl.LIVE_INSTANCES.put("lifecycle_a", 1);
 
-        assertThatThrownBy(() -> runner.unregisterFactory(OperativeA.class))
-                .isInstanceOf(OperativeTypeInUseException.class)
+        assertThatThrownBy(() -> runner.unregisterFactory(OperatorA.class))
+                .isInstanceOf(OperatorTypeInUseException.class)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("lifecycle_a");
 
@@ -285,20 +287,20 @@ class RunnerLifecycleTest {
 
         // Once the instances stop, the removal succeeds.
         com.flezha.sdk.runtime.FlezhaImpl.LIVE_INSTANCES.remove("lifecycle_a");
-        runner.unregisterFactory(OperativeA.class);
+        runner.unregisterFactory(OperatorA.class);
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.SYNCED_SETS).containsExactly(List.of());
     }
 
     @Test
     @DisplayName("removing an undefined type throws IllegalArgumentException naming the factory id")
     void removeUndefinedTypeIsRejected() {
-        FlezhaRunner runner = Flezha.createRunner("ns_undef").registerFactory(OperativeA.class);
-        assertThatThrownBy(() -> runner.unregisterFactory(OperativeB.class))
+        FlezhaRunner runner = Flezha.createRunner("ns_undef").registerFactory(OperatorA.class);
+        assertThatThrownBy(() -> runner.unregisterFactory(OperatorB.class))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("lifecycle_b");
         // Already-removed counts as undefined too.
-        runner.unregisterFactory(OperativeA.class);
-        assertThatThrownBy(() -> runner.unregisterFactory(OperativeA.class))
+        runner.unregisterFactory(OperatorA.class);
+        assertThatThrownBy(() -> runner.unregisterFactory(OperatorA.class))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("lifecycle_a");
     }
@@ -306,8 +308,8 @@ class RunnerLifecycleTest {
     @Test
     @DisplayName("defining a duplicate factory id on one runner is rejected")
     void duplicateFactoryIdIsRejected() {
-        FlezhaRunner runner = Flezha.createRunner("ns_dup").registerFactory(OperativeA.class);
-        assertThatThrownBy(() -> runner.registerFactory(OperativeA.class))
+        FlezhaRunner runner = Flezha.createRunner("ns_dup").registerFactory(OperatorA.class);
+        assertThatThrownBy(() -> runner.registerFactory(OperatorA.class))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageStartingWith("DuplicateFactoryId")
                 .hasMessageContaining("lifecycle_a");
@@ -317,16 +319,16 @@ class RunnerLifecycleTest {
     @DisplayName("one registerFactory takes either kind")
     void oneMethodRegistersEitherKind() {
         FlezhaRunner runner = Flezha.createRunner("ns_both_kinds")
-                .registerFactory(OperativeA.class)
-                .registerFactory(WorkflowD.class)
+                .registerFactory(OperatorA.class)
+                .registerFactory(BoundedD.class)
                 .start();
 
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.SYNCED_SETS).isEmpty();
-        assertThat(com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry.registeredIds())
+        assertThat(com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry.registeredIds())
                 .containsExactlyInAnyOrder("lifecycle_a", "lifecycle_d");
 
-        runner.unregisterFactory(WorkflowD.class);
-        assertThat(com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry.registeredIds())
+        runner.unregisterFactory(BoundedD.class);
+        assertThat(com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry.registeredIds())
                 .containsExactly("lifecycle_a");
     }
 
@@ -337,58 +339,58 @@ class RunnerLifecycleTest {
 
         assertThatThrownBy(() -> runner.registerFactory(BothKinds.class))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("AmbiguousOperativeKind")
+                .hasMessageStartingWith("AmbiguousOperatorKind")
                 .hasMessageContaining("BothKinds");
 
         assertThatThrownBy(() -> runner.registerFactory(NeitherKind.class))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("UnknownOperativeKind")
+                .hasMessageStartingWith("UnknownOperatorKind")
                 .hasMessageContaining("NeitherKind");
 
-        assertThatThrownBy(() -> runner.registerFactory(NotAnOperative.class))
+        assertThatThrownBy(() -> runner.registerFactory(NotAnOperator.class))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("UnknownOperativeKind")
-                .hasMessageContaining("NotAnOperative")
-                .hasMessageContaining("@StreamOperative");
+                .hasMessageStartingWith("UnknownOperatorKind")
+                .hasMessageContaining("NotAnOperator")
+                .hasMessageContaining("@UnboundedOperator");
 
-        assertThat(com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry.registeredIds())
+        assertThat(com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry.registeredIds())
                 .isEmpty();
     }
 
     @Test
-    @DisplayName("the author registers the class they wrote, and a hand-written operative beside it")
+    @DisplayName("the author registers the class they wrote, and a hand-written operator beside it")
     void theAuthorRegistersTheClassTheyWrote() {
         FlezhaRunner runner = Flezha.createRunner("ns_short_form")
                 .registerFactory(ShortForm.class)
-                .registerFactory(OperativeA.class);
-        assertThat(com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry.registeredIds())
+                .registerFactory(OperatorA.class);
+        assertThat(com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry.registeredIds())
                 .containsExactly("lifecycle_short", "lifecycle_a");
 
         runner.unregisterFactory(ShortForm.class);
-        assertThat(com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry.registeredIds())
+        assertThat(com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry.registeredIds())
                 .as("unregister takes what register took")
                 .containsExactly("lifecycle_a");
     }
 
     @Test
-    @DisplayName("a short form whose generated operative is missing is refused naming the processor")
-    void aShortFormWithoutItsGeneratedOperativeIsRefused() {
+    @DisplayName("a short form whose generated operator is missing is refused naming the processor")
+    void aShortFormWithoutItsGeneratedOperatorIsRefused() {
         FlezhaRunner runner = Flezha.createRunner("ns_orphan");
 
         assertThatThrownBy(() -> runner.registerFactory(Orphan.class))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("OrphanWorkflowOperative")
+                .hasMessageContaining("OrphanBoundedOperator")
                 .hasMessageContaining("flezha-sdk-processor");
     }
 
     @Test
-    @DisplayName("pre-start awaitTermination()/getOperatives() throw ISE; close() is a no-op")
+    @DisplayName("pre-start awaitTermination()/getOperators() throw ISE; close() is a no-op")
     void preStartLifecycleCalls() {
         FlezhaRunner runner = Flezha.createRunner("ns_cold");
         assertThatThrownBy(runner::awaitTermination)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("not started");
-        assertThatThrownBy(runner::getOperatives)
+        assertThatThrownBy(runner::getOperators)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("not started");
         assertThatCode(runner::close).doesNotThrowAnyException();
@@ -401,29 +403,29 @@ class RunnerLifecycleTest {
     @DisplayName("define/remove on a closed runner are refused and never reach the runtime")
     void mutatingAClosedRunnerIsRefused() {
         FlezhaRunner runner = Flezha.createRunner("ns_closed")
-                .registerFactory(OperativeA.class)
+                .registerFactory(OperatorA.class)
                 .start();
         runner.close();
 
         // close() destroys the core context; a mutation that got through would
         // carry the freed handle back across the JNI boundary.
-        assertThatThrownBy(() -> runner.registerFactory(OperativeB.class))
+        assertThatThrownBy(() -> runner.registerFactory(OperatorB.class))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("ns_closed");
-        assertThatThrownBy(() -> runner.registerFactory(WorkflowD.class))
+        assertThatThrownBy(() -> runner.registerFactory(BoundedD.class))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("ns_closed");
-        assertThatThrownBy(() -> runner.unregisterFactory(OperativeA.class))
+        assertThatThrownBy(() -> runner.unregisterFactory(OperatorA.class))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("ns_closed");
-        assertThatThrownBy(() -> runner.unregisterFactory(WorkflowD.class))
+        assertThatThrownBy(() -> runner.unregisterFactory(BoundedD.class))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("ns_closed");
 
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.SYNCED_SETS)
                 .as("a refused mutation must not reach the runtime")
                 .isEmpty();
-        assertThat(com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry.registeredIds())
+        assertThat(com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry.registeredIds())
                 .as("a refused define must not register the class")
                 .doesNotContain("lifecycle_b");
     }
@@ -431,11 +433,11 @@ class RunnerLifecycleTest {
     @Test
     @DisplayName("a runner may be started again after the first one closes")
     void restartAfterCloseSucceeds() {
-        Flezha.createRunner("ns1").registerFactory(OperativeA.class).start().close();
+        Flezha.createRunner("ns1").registerFactory(OperatorA.class).start().close();
         assertThat(Flezha.currentRunner()).isEmpty();
 
         FlezhaRunner second =
-                Flezha.createRunner("ns2").registerFactory(OperativeB.class).start();
+                Flezha.createRunner("ns2").registerFactory(OperatorB.class).start();
         assertThat(second.getNamespace()).isEqualTo("ns2");
         assertThat(Flezha.currentRunner()).containsSame(second);
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
@@ -447,7 +449,7 @@ class RunnerLifecycleTest {
     @DisplayName("try-with-resources starts the runner for the block and closes it at the end")
     void tryWithResourcesWorks() {
         try (FlezhaRunner r =
-                Flezha.createRunner("ns_try").registerFactory(OperativeA.class).start()) {
+                Flezha.createRunner("ns_try").registerFactory(OperatorA.class).start()) {
             assertThat(r.getNamespace()).isEqualTo("ns_try");
             assertThat(Flezha.currentRunner()).containsSame(r);
         }
@@ -457,9 +459,8 @@ class RunnerLifecycleTest {
     @Test
     @DisplayName("close() from another thread wakes a thread blocked in awaitTermination()")
     void closeWakesAwaitTermination() throws Exception {
-        FlezhaRunner runner = Flezha.createRunner("ns_await")
-                .registerFactory(OperativeA.class)
-                .start();
+        FlezhaRunner runner =
+                Flezha.createRunner("ns_await").registerFactory(OperatorA.class).start();
         ExecutorService pool = Executors.newSingleThreadExecutor();
         try {
             Future<?> blocked = pool.submit(() -> {
@@ -482,7 +483,7 @@ class RunnerLifecycleTest {
     void currentRunnerReflectsLifecycle() {
         assertThat(Flezha.currentRunner()).isEmpty();
         FlezhaRunner runner =
-                Flezha.createRunner("ns_cur").registerFactory(OperativeA.class).start();
+                Flezha.createRunner("ns_cur").registerFactory(OperatorA.class).start();
         assertThat(Flezha.currentRunner()).containsSame(runner);
         runner.close();
         assertThat(Flezha.currentRunner()).isEmpty();
@@ -491,8 +492,8 @@ class RunnerLifecycleTest {
     @Test
     @DisplayName("two concurrent start() calls — exactly one wins, the loser is told the winner's namespace")
     void concurrentStartsExactlyOneWins() throws Exception {
-        FlezhaRunner r1 = Flezha.createRunner("ns_one").registerFactory(OperativeA.class);
-        FlezhaRunner r2 = Flezha.createRunner("ns_two").registerFactory(OperativeB.class);
+        FlezhaRunner r1 = Flezha.createRunner("ns_one").registerFactory(OperatorA.class);
+        FlezhaRunner r2 = Flezha.createRunner("ns_two").registerFactory(OperatorB.class);
 
         CyclicBarrier barrier = new CyclicBarrier(2);
         ExecutorService pool = Executors.newFixedThreadPool(2);
@@ -525,7 +526,7 @@ class RunnerLifecycleTest {
     void removeUndefinedTypeWithThrowingConstructorCarriesTheAuthorsError() {
         FlezhaRunner runner = Flezha.createRunner("ns_throwing_ctor");
 
-        Throwable thrown = catchThrowable(() -> runner.unregisterFactory(ThrowingConstructorOperative.class));
+        Throwable thrown = catchThrowable(() -> runner.unregisterFactory(ThrowingConstructorOperator.class));
 
         assertThat(thrown).isNotNull();
         assertThat(Arrays.asList(thrown, thrown.getCause()))

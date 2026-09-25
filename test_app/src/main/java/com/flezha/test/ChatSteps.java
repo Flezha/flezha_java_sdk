@@ -13,8 +13,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The tasklets the durable chat loops share ({@code chat_loop_workflow},
- * {@code stateless_loop_workflow}, {@code chat_rewind_workflow} and the bench
+ * The tasklets the durable chat loops share ({@code chat_loop_bounded},
+ * {@code stateless_loop_bounded}, {@code chat_rewind_bounded} and the bench
  * loop), mirroring the Rust test app's {@code ChatTurn} / {@code ChatReply} /
  * {@code ChatReplyUndoable}.
  */
@@ -52,7 +52,7 @@ public final class ChatSteps {
                 return;
             }
             if (CRASH_TURN.equals(input)) {
-                WorkflowE2eGate.blockUntilReleased();
+                BoundedE2eGate.blockUntilReleased();
             }
             state.apply(new Insert(input));
             ctx.emit(input);

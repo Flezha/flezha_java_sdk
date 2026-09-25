@@ -17,18 +17,18 @@ import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 
 /**
- * Generates {@code Tasklet} and short-form operative implementations from the
- * {@code @Tasklet} / {@code @StreamOperative} / {@code @WorkflowOperative} / {@code @State}
+ * Generates {@code Tasklet} and short-form operator implementations from the
+ * {@code @Tasklet} / {@code @UnboundedOperator} / {@code @BoundedOperator} / {@code @State}
  * authoring annotations, mirroring the Rust SDK macros. See {@code docs/sdk/authoring_contract.md}.
  *
  * <p>Per round: {@code @State} classes generate a {@code <Name>Change}
  * (field-granular variants + {@code apply} + {@code kryoTypes}); {@code @Tasklet}
- * classes generate a {@code <Name>Tasklet}, and {@code @StreamOperative} /
- * {@code @WorkflowOperative} classes generate it beside the §5 short form's
- * {@code <Name>StreamOperative} or {@code <Name>WorkflowOperative}.
+ * classes generate a {@code <Name>Tasklet}, and {@code @UnboundedOperator} /
+ * {@code @BoundedOperator} classes generate it beside the §5 short form's
+ * {@code <Name>UnboundedOperator} or {@code <Name>BoundedOperator}.
  *
  * <p>Nothing is collected and nothing registers itself: the application hands each short-form
- * class to {@code FlezhaRunner.registerFactory}, as it hands it any operative.
+ * class to {@code FlezhaRunner.registerFactory}, as it hands it any operator.
  *
  * <p>This class owns the rounds and the two sinks every generator writes through
  * ({@link #write} and {@link #error}); {@link StateGenerator} and
@@ -36,8 +36,8 @@ import javax.tools.Diagnostic;
  */
 @SupportedAnnotationTypes({
     "com.flezha.sdk.authoring.Tasklet",
-    "com.flezha.sdk.authoring.StreamOperative",
-    "com.flezha.sdk.authoring.WorkflowOperative",
+    "com.flezha.sdk.authoring.UnboundedOperator",
+    "com.flezha.sdk.authoring.BoundedOperator",
     "com.flezha.sdk.authoring.State"
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_21)

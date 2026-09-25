@@ -66,7 +66,7 @@ public final class FlzCore {
      * tasklets. Throws, naming the capability, when the declaration needs a
      * controller.
      */
-    public static native void localStart(long ctx, String factoryId, String operativeId);
+    public static native void localStart(long ctx, String factoryId, String operatorId);
 
     /** Queue the sink named {@code channel} for {@link #localNextOutput}. */
     public static native void localOnSink(long ctx, String channel);
@@ -144,7 +144,7 @@ public final class FlzCore {
     public static native void abandon(long ctx, long token);
 
     /**
-     * The ABI form of {@code ctx.spawnWorkflow}: request a workflow instance
+     * The ABI form of {@code ctx.spawnBounded}: request a bounded instance
      * in the runner's own namespace from the polled activation {@code token},
      * returning the handle number at once. An empty {@code id} asks the
      * controller to generate one; {@code ifRunning} is the wire string
@@ -168,7 +168,7 @@ public final class FlzCore {
     /**
      * Administer the namespace this connection proved: one entry for the whole
      * surface, because the verb is data. {@code verb} names a function of the
-     * controller's published consumer surface ({@code "Operative.start"}) and
+     * controller's published consumer surface ({@code "Operator.start"}) and
      * {@code args} is a JSON array of that call's arguments other than the
      * namespace, which the controller fills from the connection. Returns the
      * published function's own answer as JSON; throws on refusal, no control

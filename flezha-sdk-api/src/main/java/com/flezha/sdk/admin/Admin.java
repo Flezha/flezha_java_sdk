@@ -16,7 +16,7 @@ import javax.annotation.Nonnull;
  * <p>No tasklet has to be running and the application holds no credential of
  * its own: the controller judges every call as the identity the connection
  * already established, so nothing an unattended process holds expires. An
- * operator grants a namespace's applications the authority once and revokes it
+ * user grants a namespace's applications the authority once and revokes it
  * the same way, and a revocation takes effect on the next call:
  *
  * <pre>{@code flz role bind runner@team-orders app team-orders}</pre>
@@ -35,12 +35,12 @@ public final class Admin {
     }
 
     /**
-     * Start an operative, answering the id it runs under and what the start
+     * Start an operator, answering the id it runs under and what the start
      * did. A refused start throws, as every refused call here does.
      */
     @Nonnull
-    public StartResult startOperative(OperativeSpec spec) {
-        JsonNode answer = call("Operative.start", spec.fields());
+    public StartResult startOperator(OperatorSpec spec) {
+        JsonNode answer = call("Operator.start", spec.fields());
         try {
             String outcome = answer.required("outcome").asText().toUpperCase(Locale.ROOT);
             return new StartResult(answer.required("id").asText(), StartOutcome.valueOf(outcome));
@@ -49,19 +49,19 @@ public final class Admin {
         }
     }
 
-    /** Stop an operative, or the whole partition group it names. */
+    /** Stop an operator, or the whole partition group it names. */
     @Nonnull
-    public JsonNode stopOperative(String operativeId) {
-        return call("Operative.stop", operativeId);
+    public JsonNode stopOperator(String operatorId) {
+        return call("Operator.stop", operatorId);
     }
 
     /**
-     * Inject a message into an operative's input stream and block for the
+     * Inject a message into an operator's input stream and block for the
      * delivery verdict. {@code channel} may be empty for none.
      */
     @Nonnull
-    public JsonNode send(String operativeId, String message, String channel) {
-        return call("Operative.send", operativeId, message, channel);
+    public JsonNode send(String operatorId, String message, String channel) {
+        return call("Operator.send", operatorId, message, channel);
     }
 
     /** Enable a plugin, built from the fields {@code flz plugin enable} takes. */
@@ -76,10 +76,10 @@ public final class Admin {
         return call("PluginManager.disable", pluginId);
     }
 
-    /** The operative ids running in this namespace. */
+    /** The operator ids running in this namespace. */
     @Nonnull
-    public JsonNode listOperatives() {
-        return call("Operative.list_operatives");
+    public JsonNode listOperators() {
+        return call("Operator.list_operators");
     }
 
     /** The plugins enabled on the controller node answering this call. */
@@ -90,8 +90,8 @@ public final class Admin {
 
     /** One cell's live state, and the change sequence it was read at. */
     @Nonnull
-    public JsonNode cellState(String operativeId, String cellKey) {
-        return call("Operative.cell_state", operativeId, cellKey);
+    public JsonNode cellState(String operatorId, String cellKey) {
+        return call("Operator.cell_state", operatorId, cellKey);
     }
 
     /**

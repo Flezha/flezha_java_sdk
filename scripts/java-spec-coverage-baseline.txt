@@ -8,7 +8,7 @@
 #
 # One `Requirement :: Scenario` per line, sorted.
 Auto-Reconnect on Unexpected Disconnect :: Controller restart is invisible to Java pollers
-Command Dispatch :: AddOperative spawns a Java-hosted operative instance
+Command Dispatch :: AddOperator spawns a Java-hosted operator instance
 Command Dispatch :: Ping never reaches Java
 Command Dispatch :: Restore is a fold handed to Java
 Diagnostics Reach a Stream Without a Third-Party Logging Dependency :: No third-party logging facade on the compile classpath
@@ -26,7 +26,7 @@ JNI Bridge to flz_core_ffi :: Version mismatch refuses at context creation
 Java SDK Entry Point :: Controller unavailable triggers exponential backoff retries
 Java SDK Entry Point :: RunnerBuilder is not importable
 Java SDK Entry Point :: Successful connection on a created runner
-Java SDK Entry Point :: start() with zero defined operative types is legal
+Java SDK Entry Point :: start() with zero defined operator types is legal
 Java SDK data heartbeat reports dispatch progress :: A wedged Java runner is distinguishable from an idle one
 Java SDK data heartbeat reports dispatch progress :: The heartbeat carries dispatch progress
 Java SDK implements checkpoint ack granularity :: A park closes the open interval
@@ -43,39 +43,37 @@ Java SDK implements the effectively-once output tier :: A poisoned tier invocati
 Java SDK implements the effectively-once output tier :: A tier class with a non-keyed plugin channel fails registration
 Java SDK implements the effectively-once output tier :: A tier invocation ships one effect record, not separate frames
 Java SDK implements the effectively-once output tier :: Effect-record bytes are byte-identical to the Rust encoder
-Java SDK implements the workflow durable loop and suspension :: A resumed loop restarts at the journaled iteration
-Java SDK implements the workflow durable loop and suspension :: An idle loop parks instead of completing
-Java SDK implements the workflow durable loop and suspension :: Each loop iteration commits at its boundary
-Java SDK implements the workflow cell retry ladder :: A non-retryable error skips the ladder
-Java SDK implements the workflow cell retry ladder :: A transient cell failure recovers on retry
-Java SDK implements the workflow cell retry ladder :: An exhausted ladder compensates
-Java SDK implements the workflow task-journal and TaskCommit handshake :: A commit timeout triggers compensation
-Java SDK implements the workflow task-journal and TaskCommit handshake :: A committed task is skipped on resume, not re-run
-Java SDK implements the workflow task-journal and TaskCommit handshake :: An opted-out class re-runs from the top
-Java SDK implements workflow branching :: A branching chain runs its branches and joins
-Java SDK implements workflow branching :: Compensation runs in reverse-topological order
-Java SDK implements workflow branching :: Fan-in does not overwrite an edge
-Java SDK implements workflow loop rewind :: A hookless task still drains the rewind undo
-Java SDK implements workflow loop rewind :: A rewind does not re-deliver consumed inputs
-Java SDK implements workflow loop rewind :: A rewind undoes committed iterations in reverse order
-Java SDK implements workflow staged commit and the transactional outbox :: A failing stage leaks no staged output
-Java SDK implements workflow staged commit and the transactional outbox :: A task's emits are staged, not shipped, until the barrier
+Java SDK implements the bounded operator durable loop and suspension :: A resumed loop restarts at the journaled iteration
+Java SDK implements the bounded operator durable loop and suspension :: An idle loop parks instead of completing
+Java SDK implements the bounded operator durable loop and suspension :: Each loop iteration commits at its boundary
+Java SDK implements the bounded cell retry ladder :: A non-retryable error skips the ladder
+Java SDK implements the bounded cell retry ladder :: A transient cell failure recovers on retry
+Java SDK implements the bounded cell retry ladder :: An exhausted ladder compensates
+Java SDK implements the bounded operator task-journal and TaskCommit handshake :: A commit timeout triggers compensation
+Java SDK implements the bounded operator task-journal and TaskCommit handshake :: A committed task is skipped on resume, not re-run
+Java SDK implements the bounded operator task-journal and TaskCommit handshake :: An opted-out class re-runs from the top
+Java SDK implements bounded operator branching :: A branching chain runs its branches and joins
+Java SDK implements bounded operator branching :: Compensation runs in reverse-topological order
+Java SDK implements bounded operator branching :: Fan-in does not overwrite an edge
+Java SDK implements bounded loop rewind :: A hookless task still drains the rewind undo
+Java SDK implements bounded loop rewind :: A rewind does not re-deliver consumed inputs
+Java SDK implements bounded loop rewind :: A rewind undoes committed iterations in reverse order
 Kryo serialization with stable registered type IDs :: Built-in types registered with stable IDs
 Kryo serialization with stable registered type IDs :: Unregistered class fails loud
 Kryo serialization with stable registered type IDs :: User types registered after built-ins
-Operative Type Declaration :: Declaring a stream operative class before start() succeeds
-Operative Type Declaration :: Declaring an operative type after start() is accepted
-Operative Type Declaration :: Declaring or removing a type on a closed runner is refused
-Operative Type Declaration :: Duplicate factoryId across two stream operative classes is rejected
-Operative Type Declaration :: Dynamic-mode tasklet declares and creates cells lazily
-Operative Type Declaration :: Removing a type that is not defined is rejected
-Operative Type Declaration :: Removing a type with live instances is refused and keeps it defined
-Operative Type Declaration :: Typed entry channel deserializes at the edge
-Operative Type Declaration :: Unreachable node fails declaration
-Operative Type Declaration :: Wiring mismatch fails declaration with a diagnosable error
-Operative declares persistenceEnabled default-method, frozen at instance start :: Code-declared opt-out is honored
-Operative declares persistenceEnabled default-method, frozen at instance start :: Default-on with no override
-Operative declares persistenceEnabled default-method, frozen at instance start :: Resolved value frozen at instance start
+Operator Type Declaration :: Declaring an unbounded operator class before start() succeeds
+Operator Type Declaration :: Declaring an operator type after start() is accepted
+Operator Type Declaration :: Declaring or removing a type on a closed runner is refused
+Operator Type Declaration :: Duplicate factoryId across two unbounded operator classes is rejected
+Operator Type Declaration :: Dynamic-mode tasklet declares and creates cells lazily
+Operator Type Declaration :: Removing a type that is not defined is rejected
+Operator Type Declaration :: Removing a type with live instances is refused and keeps it defined
+Operator Type Declaration :: Typed entry channel deserializes at the edge
+Operator Type Declaration :: Unreachable node fails declaration
+Operator Type Declaration :: Wiring mismatch fails declaration with a diagnosable error
+Operator declares persistenceEnabled default-method, frozen at instance start :: Code-declared opt-out is honored
+Operator declares persistenceEnabled default-method, frozen at instance start :: Default-on with no override
+Operator declares persistenceEnabled default-method, frozen at instance start :: Resolved value frozen at instance start
 Per-Cell flusher with toggle-aware drain :: Changes returned in a completion reach the WAL
 Per-Cell flusher with toggle-aware drain :: Persistence disabled drains and discards
 Tasklet Interface and Per-Cell Dispatch :: A key-less emit in a keyed Cell carries that Cell's key
@@ -107,9 +105,9 @@ Tasklet interface declares Change, Clock, Config generic parameters :: User-defi
 Tasklet.run receives StateHandle, not direct State reference :: Direct field mutation requires apply
 Tasklet.run receives StateHandle, not direct State reference :: Mutation via apply runs applyChange and records
 Tasklet.run receives StateHandle, not direct State reference :: Read access via get() is allocation-free
-Public Java SDK handler classes use canonical Operative vocabulary :: New handlers wire into dispatch
-Public Java SDK handler classes use canonical Operative vocabulary :: Old handler classes do not exist
-Public Operative / Tasklet / Cell user-facing API names :: User extends StreamOperative
+Public Java SDK handler classes use canonical Operator vocabulary :: New handlers wire into dispatch
+Public Java SDK handler classes use canonical Operator vocabulary :: Old handler classes do not exist
+Public Operator / Tasklet / Cell user-facing API names :: User extends UnboundedOperator
 Runner lifecycle — start, run, awaitTermination, close :: close() wakes a thread blocked in awaitTermination()
 Runner lifecycle — start, run, awaitTermination, close :: run() blocks until shutdown
 Runner lifecycle — start, run, awaitTermination, close :: start() returns immediately after the handshake, before shutdown

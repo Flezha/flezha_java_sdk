@@ -1,10 +1,10 @@
 package com.flezha.sdk.processor;
 
-import com.flezha.sdk.operative.LoopMode;
+import com.flezha.sdk.operator.LoopMode;
 import java.util.List;
 
 /**
- * What a {@code @Tasklet}, {@code @StreamOperative} or {@code @WorkflowOperative} class resolves
+ * What a {@code @Tasklet}, {@code @UnboundedOperator} or {@code @BoundedOperator} class resolves
  * to: the source to write, the five type arguments its {@code implements Tasklet<…>} clause
  * states, and the shape of the {@code run} wrapper. Every string is already the text the renderer
  * emits, so rendering reads no {@code javax.lang.model} type.
@@ -40,20 +40,20 @@ record TaskletModel(
         return userSimple + "Tasklet";
     }
 
-    /** The generated short-form operative's simple name, which states the interface it implements. */
-    String operativeSimple() {
+    /** The generated short-form operator's simple name, which states the interface it implements. */
+    String operatorSimple() {
         return userSimple + declares.simpleName;
     }
 
     /**
-     * What the annotation declares: a tasklet, or a whole single-tasklet operative of a kind.
-     * Each operative annotation shares its simple name with the interface its generated operative
+     * What the annotation declares: a tasklet, or a whole single-tasklet operator of a kind.
+     * Each operator annotation shares its simple name with the interface its generated operator
      * implements.
      */
     enum Declares {
         TASKLET("Tasklet"),
-        STREAM("StreamOperative"),
-        WORKFLOW("WorkflowOperative");
+        UNBOUNDED("UnboundedOperator"),
+        BOUNDED("BoundedOperator");
 
         final String simpleName;
 

@@ -3,7 +3,7 @@ package com.flezha.sdk.tasklet;
 /**
  * Recoverable error thrown by {@link Tasklet#run} or {@link TaskletCtx} emit
  * methods. The runtime catches this, logs against
- * {@code (operativeInstance, tasklet, cell)}, discards any partial emits, and
+ * {@code (operatorInstance, tasklet, cell)}, discards any partial emits, and
  * continues dispatching subsequent inputs on the same Cell.
  */
 public class TaskletException extends Exception {
@@ -91,13 +91,13 @@ public class TaskletException extends Exception {
 
     /**
      * Thrown when an {@code emit} or {@code emitWithMeta} call references a
-     * channel name that was not declared on this StreamOperative's topology.
+     * channel name that was not declared on this UnboundedOperator's topology.
      */
     public static final class UnknownChannel extends TaskletException {
         private final String channel;
 
         public UnknownChannel(String channel) {
-            super("channel `" + channel + "` is not declared on this operative");
+            super("channel `" + channel + "` is not declared on this operator");
             this.channel = channel;
         }
 
@@ -140,7 +140,7 @@ public class TaskletException extends Exception {
     /**
      * Thrown when a Cell already holds {@code maxTimersPerCell()} pending
      * timers and registers one more. A per-Cell timer set is author-controlled
-     * memory multiplied by a stream Cell count; the cap is what keeps a
+     * memory multiplied by an unbounded Cell count; the cap is what keeps a
      * runaway registration a refusal rather than an OOM.
      */
     public static final class TimerCapExceeded extends TaskletException {

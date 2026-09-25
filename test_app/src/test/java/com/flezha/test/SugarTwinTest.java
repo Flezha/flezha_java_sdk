@@ -3,8 +3,8 @@ package com.flezha.test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
-import com.flezha.sdk.runtime.operative.builder.StreamOperativeTopologyBuilder;
+import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.WallClock;
 import com.flezha.sdk.testing.TaskletTestHarness;
@@ -16,17 +16,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Asserts the {@code @StreamOperative} / {@code @WorkflowOperative} / {@code @Tasklet} /
- * {@code @State}-generated operatives register and process input identically to the hand-written
- * equivalents, and that the 2-tasklet reference operative matches the cross-SDK authoring contract
+ * Asserts the {@code @UnboundedOperator} / {@code @BoundedOperator} / {@code @Tasklet} /
+ * {@code @State}-generated operators register and process input identically to the hand-written
+ * equivalents, and that the 2-tasklet reference operator matches the cross-SDK authoring contract
  * (see {@code docs/sdk/authoring_contract.md} §6).
  */
 class SugarTwinTest {
 
     @BeforeEach
     void reset() {
-        StreamOperativeClassRegistry.reset();
-        com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry.reset();
+        UnboundedOperatorClassRegistry.reset();
+        com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry.reset();
     }
 
     @Test
@@ -53,7 +53,7 @@ class SugarTwinTest {
         var tasklet = new SugarEntryTasklet();
         assertThat(tasklet.cellsFor("apple")).containsExactly("a");
         assertThat(tasklet.cellsFor("zebra")).containsExactly("d");
-        var topology = StreamOperativeTopologyBuilder.build(new SugarStaticCellStreamOperative());
+        var topology = UnboundedOperatorTopologyBuilder.build(new SugarStaticCellUnboundedOperator());
         assertThat(topology.tasklet(topology.taskletNameToId().get(tasklet.name()))
                         .cellsForOverridden())
                 .as("the generated class writes cellsFor, which is what declares it")
@@ -75,15 +75,15 @@ class SugarTwinTest {
     @Test
     void shortFormsRegisterOnlyWhenTheAuthorRegistersThem() {
         var runner = com.flezha.sdk.Flezha.createRunner("sugar_twin_ns");
-        assertThat(StreamOperativeClassRegistry.factoryIds()).isEmpty();
+        assertThat(UnboundedOperatorClassRegistry.factoryIds()).isEmpty();
 
         runner.registerFactory(SugarDoNothing.class)
                 .registerFactory(SugarStore.class)
                 .registerFactory(SugarNamedInput.class)
                 .registerFactory(SugarStateOnly.class)
-                .registerFactory(SugarStaticCellStreamOperative.class);
+                .registerFactory(SugarStaticCellUnboundedOperator.class);
 
-        assertThat(StreamOperativeClassRegistry.factoryIds())
+        assertThat(UnboundedOperatorClassRegistry.factoryIds())
                 .contains(
                         "sugar_do_nothing",
                         "sugar_store_input",
@@ -92,15 +92,15 @@ class SugarTwinTest {
                         "sugar_static_cell");
 
         runner.unregisterFactory(SugarStateOnly.class);
-        assertThat(StreamOperativeClassRegistry.factoryIds()).doesNotContain("sugar_state_only");
+        assertThat(UnboundedOperatorClassRegistry.factoryIds()).doesNotContain("sugar_state_only");
     }
 
-    /** fails when: the workflow short form stops declaring a workflow operative. */
+    /** fails when: the bounded short form stops declaring a bounded operator. */
     @Test
-    void theWorkflowShortFormRegistersAsAWorkflow() {
-        com.flezha.sdk.Flezha.createRunner("sugar_twin_workflow_ns").registerFactory(SugarWorkflow.class);
-        assertThat(com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry.factoryIds())
-                .contains("sugar_workflow");
+    void theBoundedShortFormRegistersAsABounded() {
+        com.flezha.sdk.Flezha.createRunner("sugar_twin_bounded_ns").registerFactory(SugarBounded.class);
+        assertThat(com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry.factoryIds())
+                .contains("sugar_bounded");
     }
 
     /**
@@ -109,7 +109,7 @@ class SugarTwinTest {
      */
     @Test
     void aShortFormWithNoSinkDeclaresNoPluginChannelAndKeepsState() {
-        var topology = StreamOperativeTopologyBuilder.build(new SugarStateOnlyStreamOperative());
+        var topology = UnboundedOperatorTopologyBuilder.build(new SugarStateOnlyUnboundedOperator());
         assertThat(topology.channels()).hasSize(1);
         assertThat(topology.channels().get(0).name()).isEqualTo("ticks");
         assertThat(topology.channels().get(0).pluginSink()).isEmpty();
@@ -126,7 +126,7 @@ class SugarTwinTest {
     /** fails when: the short form stops honouring the entry channel name the author wrote. */
     @Test
     void theGeneratedShorthandNamesItsEntryChannel() {
-        var topology = StreamOperativeTopologyBuilder.build(new SugarNamedInputStreamOperative());
+        var topology = UnboundedOperatorTopologyBuilder.build(new SugarNamedInputUnboundedOperator());
         assertThat(topology.channels().get(0).name()).isEqualTo("prices");
     }
 
@@ -137,40 +137,40 @@ class SugarTwinTest {
     }
 
     /**
-     * fails when: the two kinds stop sharing one factory-id namespace, so a workflow could be
-     * placed under an id a stream already answers. The refusal is the real registries' — this is
+     * fails when: the two kinds stop sharing one factory-id namespace, so a bounded operator could be
+     * placed under an id an unbounded operator already answers. The refusal is the real registries' — this is
      * the module where both are on the classpath.
      */
     @Test
-    void aWorkflowUnderAStreamsFactoryIdIsRefused() {
-        var runner = com.flezha.sdk.Flezha.createRunner("sugar_twin_dup_ns").registerFactory(ShorthandDupStream.class);
+    void aBoundedUnderAnUnboundedFactoryIdIsRefused() {
+        var runner = com.flezha.sdk.Flezha.createRunner("sugar_twin_dup_ns").registerFactory(ShorthandDupUnbounded.class);
 
-        assertThatThrownBy(() -> runner.registerFactory(ShorthandDupWorkflow.class))
+        assertThatThrownBy(() -> runner.registerFactory(ShorthandDupBounded.class))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageStartingWith("DuplicateFactoryId")
                 .hasMessageContaining("plain");
 
-        assertThat(com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry.factoryIds())
+        assertThat(com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry.factoryIds())
                 .doesNotContain("plain");
     }
 
     /**
      * fails when: the generated shorthand stops naming its entry channel
-     * {@code input} — the address §6's conformance table and every operative
+     * {@code input} — the address §6's conformance table and every operator
      * in the tree ships under.
      */
     @Test
     void theGeneratedShorthandKeepsTheDefaultEntryChannelName() {
-        var topology = StreamOperativeTopologyBuilder.build(new SugarDoNothingStreamOperative());
+        var topology = UnboundedOperatorTopologyBuilder.build(new SugarDoNothingUnboundedOperator());
         assertThat(topology.channels().get(0).name()).isEqualTo("input");
     }
 
     /**
-     * Cross-SDK conformance: the reference operative's associated-type mapping
-     * matches the contract table (and the Rust expansion of the same operative).
+     * Cross-SDK conformance: the reference operator's associated-type mapping
+     * matches the contract table (and the Rust expansion of the same operator).
      */
     @Test
-    void referenceOperativeMatchesContract() {
+    void referenceOperatorMatchesContract() {
         var entry = new SugarEntryTasklet();
         assertThat(entry.inputType()).isEqualTo(String.class);
         assertThat(entry.outputType()).isEqualTo(String.class);

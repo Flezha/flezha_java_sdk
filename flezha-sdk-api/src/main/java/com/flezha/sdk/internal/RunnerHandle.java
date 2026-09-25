@@ -19,9 +19,9 @@ public interface RunnerHandle {
     @Nonnull
     String runnerId();
 
-    /** Snapshot of currently-spawned Operative instances keyed by {@code operative_id}. */
+    /** Snapshot of currently-spawned Operator instances keyed by {@code operator_id}. */
     @Nonnull
-    Map<String, ?> operatives();
+    Map<String, ?> operators();
 
     /** Block until the runner shuts down. */
     void awaitTermination() throws InterruptedException;
@@ -32,9 +32,9 @@ public interface RunnerHandle {
     /**
      * Remove {@code factoryId}'s class from the runtime class registries —
      * unregister-first, then scan live instances; a live hit re-registers the
-     * class and throws {@link com.flezha.sdk.OperativeTypeInUseException}
+     * class and throws {@link com.flezha.sdk.OperatorTypeInUseException}
      * (the transient unregistered window is benign: a failing
-     * {@code AddOperative} is re-placed by convergence).
+     * {@code AddOperator} is re-placed by convergence).
      */
     void removeType(String factoryId);
 

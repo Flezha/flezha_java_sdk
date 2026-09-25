@@ -1,9 +1,9 @@
 package com.flezha.sdk.admin;
 
-/** What an operative start did. */
+/** What an operator start did. */
 public enum StartOutcome {
-    /** The start ran the operative. */
+    /** The start ran the operator. */
     STARTED,
-    /** The named operative was already running and was left untouched. */
+    /** The named operator was already running and was left untouched. */
     ALREADY_RUNNING
 }

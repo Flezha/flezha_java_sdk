@@ -4,9 +4,9 @@ import com.flezha.sdk.admin.Admin;
 import com.flezha.sdk.internal.RegistryCore;
 import com.flezha.sdk.internal.RunnerHandle;
 import com.flezha.sdk.internal.RuntimeBridge;
-import com.flezha.sdk.operative.Operative;
-import com.flezha.sdk.operative.StreamOperative;
-import com.flezha.sdk.operative.WorkflowOperative;
+import com.flezha.sdk.operator.BoundedOperator;
+import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.operator.UnboundedOperator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +19,7 @@ import javax.annotation.Nonnull;
  * This JVM's runner: create → declare ({@link #registerFactory} /
  * {@link #unregisterFactory}) → start on one object, returned by
  * {@link Flezha#createRunner(String)}.
- * Operative types may be declared and removed before AND after
+ * Operator types may be declared and removed before AND after
  * {@link #start()}, until the started runner is closed; a post-start change
  * is declared to the core immediately and reaches the controller on the next
  * connect/reconnect init frame, which carries the runner's full factory set.
@@ -50,11 +50,11 @@ public final class FlezhaRunner implements AutoCloseable {
      * empty; generation 2 must re-define its types). The runtime-side class
      * registries stay process-global behind these.
      */
-    private final RegistryCore<StreamOperative> stream =
-            new RegistryCore<>("com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry", "operative");
+    private final RegistryCore<UnboundedOperator> stream =
+            new RegistryCore<>("com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry", "operator");
 
-    private final RegistryCore<WorkflowOperative> workflow =
-            new RegistryCore<>("com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry", "workflow");
+    private final RegistryCore<BoundedOperator> bounded =
+            new RegistryCore<>("com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry", "bounded");
 
     private final AtomicReference<RunnerHandle> handle = new AtomicReference<>();
 
@@ -80,82 +80,82 @@ public final class FlezhaRunner implements AutoCloseable {
     }
 
     /**
-     * Declare an operative class the runtime can spawn instances of later (via the controller's
-     * {@code AddOperative}), of either kind: the kind is read from the interface the class
+     * Declare an operator class the runtime can spawn instances of later (via the controller's
+     * {@code AddOperator}), of either kind: the kind is read from the interface the class
      * implements, never named by the call. Calls the class's {@code channels(...)} once and
      * records the topology in the class registry of its kind.
      * Legal before and after {@link #start()}. Invalid authoring is reported here, at the declaring
-     * call site, as {@code StreamOperativeConfigurationException} or
-     * {@code WorkflowOperativeConfigurationException}.
+     * call site, as {@code UnboundedOperatorConfigurationException} or
+     * {@code BoundedOperatorConfigurationException}.
      *
      * <p>A short form is registered by the class the author wrote, annotated
-     * {@link com.flezha.sdk.authoring.StreamOperative @StreamOperative} or
-     * {@link com.flezha.sdk.authoring.WorkflowOperative @WorkflowOperative}: the call declares the
-     * operative the annotation processor generated from it, {@code <Class>StreamOperative} or
-     * {@code <Class>WorkflowOperative} in the class's package.
+     * {@link com.flezha.sdk.authoring.UnboundedOperator @UnboundedOperator} or
+     * {@link com.flezha.sdk.authoring.BoundedOperator @BoundedOperator}: the call declares the
+     * operator the annotation processor generated from it, {@code <Class>UnboundedOperator} or
+     * {@code <Class>BoundedOperator} in the class's package.
      *
-     * <p>Streams and workflows share one factory-id namespace per runner, so a second class under
+     * <p>Unbounded and bounded operators share one factory-id namespace per runner, so a second class under
      * an id this runner already holds is refused whichever kind either one is.
      *
      * @throws IllegalArgumentException on a duplicate factory id (the message begins with
      *     {@code DuplicateFactoryId}), when the class implements both kind interfaces
-     *     ({@code AmbiguousOperativeKind}), when it implements neither and is not a short form
-     *     ({@code UnknownOperativeKind}), or when a short form's generated operative is missing.
+     *     ({@code AmbiguousOperatorKind}), when it implements neither and is not a short form
+     *     ({@code UnknownOperatorKind}), or when a short form's generated operator is missing.
      * @throws IllegalStateException on a closed runner.
      */
     @Nonnull
-    public FlezhaRunner registerFactory(Class<?> operativeClass) {
+    public FlezhaRunner registerFactory(Class<?> operatorClass) {
         open("registerFactory()");
-        Class<? extends Operative> operative = operativeOf(operativeClass, "registerFactory()");
-        if (isWorkflow(operative)) {
-            workflow.register(operative.asSubclass(WorkflowOperative.class));
+        Class<? extends Operator> operator = operatorOf(operatorClass, "registerFactory()");
+        if (isBounded(operator)) {
+            bounded.register(operator.asSubclass(BoundedOperator.class));
         } else {
-            stream.register(operative.asSubclass(StreamOperative.class));
+            stream.register(operator.asSubclass(UnboundedOperator.class));
         }
         syncFactoriesIfStarted();
         return this;
     }
 
     /**
-     * Remove a declared operative class from this runner — the inverse of
+     * Remove a declared operator class from this runner — the inverse of
      * {@link #registerFactory(Class)}, taking what it took. Legal before and after
      * {@link #start()}.
      *
      * @throws IllegalArgumentException if the class's factory id is not currently defined on this
      *     runner, or its kind cannot be read.
-     * @throws OperativeTypeInUseException if the runner is started and live operative instances of
+     * @throws OperatorTypeInUseException if the runner is started and live operator instances of
      *     the factory exist — the type stays defined.
      * @throws IllegalStateException on a closed runner.
      */
     @Nonnull
-    public FlezhaRunner unregisterFactory(Class<?> operativeClass) {
+    public FlezhaRunner unregisterFactory(Class<?> operatorClass) {
         open("unregisterFactory()");
-        Class<? extends Operative> operative = operativeOf(operativeClass, "unregisterFactory()");
-        return isWorkflow(operative)
-                ? remove(workflow, operative.asSubclass(WorkflowOperative.class))
-                : remove(stream, operative.asSubclass(StreamOperative.class));
+        Class<? extends Operator> operator = operatorOf(operatorClass, "unregisterFactory()");
+        return isBounded(operator)
+                ? remove(bounded, operator.asSubclass(BoundedOperator.class))
+                : remove(stream, operator.asSubclass(UnboundedOperator.class));
     }
 
     /**
-     * The operative a registration names: the class itself when it is one, or the operative the
+     * The operator a registration names: the class itself when it is one, or the operator the
      * annotation processor generated from a short form, resolved by the processor's naming rule.
      */
-    private static Class<? extends Operative> operativeOf(Class<?> declared, String what) {
+    private static Class<? extends Operator> operatorOf(Class<?> declared, String what) {
         if (declared == null) {
-            throw new IllegalArgumentException(what + ": the operative class must not be null");
+            throw new IllegalArgumentException(what + ": the operator class must not be null");
         }
-        if (Operative.class.isAssignableFrom(declared)) {
-            return declared.asSubclass(Operative.class);
+        if (Operator.class.isAssignableFrom(declared)) {
+            return declared.asSubclass(Operator.class);
         }
-        Class<? extends Operative> kind;
-        if (declared.isAnnotationPresent(com.flezha.sdk.authoring.StreamOperative.class)) {
-            kind = StreamOperative.class;
-        } else if (declared.isAnnotationPresent(com.flezha.sdk.authoring.WorkflowOperative.class)) {
-            kind = WorkflowOperative.class;
+        Class<? extends Operator> kind;
+        if (declared.isAnnotationPresent(com.flezha.sdk.authoring.UnboundedOperator.class)) {
+            kind = UnboundedOperator.class;
+        } else if (declared.isAnnotationPresent(com.flezha.sdk.authoring.BoundedOperator.class)) {
+            kind = BoundedOperator.class;
         } else {
-            throw new IllegalArgumentException("UnknownOperativeKind: " + declared.getName()
-                    + " implements neither StreamOperative nor WorkflowOperative, and is annotated with"
-                    + " neither @StreamOperative nor @WorkflowOperative");
+            throw new IllegalArgumentException("UnknownOperatorKind: " + declared.getName()
+                    + " implements neither UnboundedOperator nor BoundedOperator, and is annotated with"
+                    + " neither @UnboundedOperator nor @BoundedOperator");
         }
         String simpleName = declared.getSimpleName() + kind.getSimpleName();
         String generated =
@@ -165,7 +165,7 @@ public final class FlezhaRunner implements AutoCloseable {
         } catch (ClassNotFoundException e) {
             throw new IllegalArgumentException(
                     declared.getName() + " is annotated @" + kind.getSimpleName() + ", but " + generated
-                            + ", the operative the annotation processor generates from it, is not"
+                            + ", the operator the annotation processor generates from it, is not"
                             + " on the class path: put flezha-sdk-processor on the annotation processor path",
                     e);
         }
@@ -176,18 +176,18 @@ public final class FlezhaRunner implements AutoCloseable {
      * or of neither, is refused by the contract's name for it
      * ({@code docs/sdk/authoring_contract.md} §5.1).
      */
-    private static boolean isWorkflow(Class<? extends Operative> operativeClass) {
-        boolean isStream = StreamOperative.class.isAssignableFrom(operativeClass);
-        boolean isWorkflow = WorkflowOperative.class.isAssignableFrom(operativeClass);
-        if (isStream && isWorkflow) {
-            throw new IllegalArgumentException("AmbiguousOperativeKind: " + operativeClass.getName()
-                    + " implements both StreamOperative and WorkflowOperative, so its kind cannot be read");
+    private static boolean isBounded(Class<? extends Operator> operatorClass) {
+        boolean isUnbounded = UnboundedOperator.class.isAssignableFrom(operatorClass);
+        boolean isBounded = BoundedOperator.class.isAssignableFrom(operatorClass);
+        if (isUnbounded && isBounded) {
+            throw new IllegalArgumentException("AmbiguousOperatorKind: " + operatorClass.getName()
+                    + " implements both UnboundedOperator and BoundedOperator, so its kind cannot be read");
         }
-        if (!isStream && !isWorkflow) {
-            throw new IllegalArgumentException("UnknownOperativeKind: " + operativeClass.getName()
-                    + " implements neither StreamOperative nor WorkflowOperative");
+        if (!isUnbounded && !isBounded) {
+            throw new IllegalArgumentException("UnknownOperatorKind: " + operatorClass.getName()
+                    + " implements neither UnboundedOperator nor BoundedOperator");
         }
-        return isWorkflow;
+        return isBounded;
     }
 
     /**
@@ -219,7 +219,7 @@ public final class FlezhaRunner implements AutoCloseable {
         return this;
     }
 
-    private <C extends Operative> FlezhaRunner remove(RegistryCore<C> core, Class<? extends C> cls) {
+    private <C extends Operator> FlezhaRunner remove(RegistryCore<C> core, Class<? extends C> cls) {
         String factoryId = core.definedFactoryIdOf(cls);
         RunnerHandle h = handle.get();
         if (h != null) {
@@ -242,7 +242,7 @@ public final class FlezhaRunner implements AutoCloseable {
      * controller is reachable), never for the runner's ongoing lifetime.
      * Claims the JVM-wide singleton slot by compare-and-set; the loser fails
      * WITHOUT connecting, mutating shared state, or spawning a thread.
-     * Starting with zero declared operative types is legal — the init frame
+     * Starting with zero declared operator types is legal — the init frame
      * carries an empty factory list, and types may be defined later.
      *
      * @throws IllegalStateException if a runner is already running in this JVM
@@ -287,10 +287,10 @@ public final class FlezhaRunner implements AutoCloseable {
 
     /**
      * Administer this namespace from ordinary application code: start, stop
-     * and feed operatives, enable and disable plugins, read what is running.
+     * and feed operators, enable and disable plugins, read what is running.
      *
      * <p>The controller judges every call as the identity this connection
-     * proved, so no credential is held here and nothing expires. An operator
+     * proved, so no credential is held here and nothing expires. A user
      * grants a namespace's applications the authority once, with
      * {@code flz role bind runner@<namespace> app <namespace>}; until then
      * every call is refused.
@@ -303,14 +303,14 @@ public final class FlezhaRunner implements AutoCloseable {
     }
 
     /**
-     * Returns a snapshot of currently-spawned Operative instances keyed by
-     * what the wire calls {@code operative_id}.
+     * Returns a snapshot of currently-spawned Operator instances keyed by
+     * what the wire calls {@code operator_id}.
      *
      * @throws IllegalStateException on a never-started runner.
      */
     @Nonnull
-    public Map<String, ?> getOperatives() {
-        return started("getOperatives()").operatives();
+    public Map<String, ?> getOperators() {
+        return started("getOperators()").operators();
     }
 
     /**
@@ -362,10 +362,10 @@ public final class FlezhaRunner implements AutoCloseable {
         }
     }
 
-    /** This runner's full current factory set: stream first, then workflow. */
+    /** This runner's full current factory set: stream first, then bounded operator. */
     private List<String> declaredFactoryIds() {
         List<String> ids = new ArrayList<>(stream.factoryIds());
-        ids.addAll(workflow.factoryIds());
+        ids.addAll(bounded.factoryIds());
         return ids;
     }
 

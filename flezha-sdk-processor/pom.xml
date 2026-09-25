@@ -13,7 +13,7 @@
     <artifactId>flezha-sdk-processor</artifactId>
     <packaging>jar</packaging>
     <name>Flezha SDK Annotation Processor</name>
-    <description>Generates Tasklet and short-form operative implementations from @Tasklet / @StreamOperative / @WorkflowOperative / @State authoring annotations.</description>
+    <description>Generates Tasklet and short-form operator implementations from @Tasklet / @UnboundedOperator / @BoundedOperator / @State authoring annotations.</description>
 
     <dependencies>
         <dependency>

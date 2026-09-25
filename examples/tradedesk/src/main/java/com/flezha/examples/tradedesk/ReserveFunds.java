@@ -1,6 +1,6 @@
 package com.flezha.examples.tradedesk;
 
-import com.flezha.examples.tradedesk.PaperOrderOperative.OrderTicket;
+import com.flezha.examples.tradedesk.PaperOrderOperator.OrderTicket;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -17,7 +17,7 @@ import java.util.Optional;
  * <p>A step that keeps state or has something to undo implements {@link Tasklet} directly, and
  * this one does both. The six type arguments are, in order, the input, the state, the output, the
  * change, the clock and the configuration. The desk's stateless steps take the
- * {@code @Tasklet} short form instead, which is why the operative wires some classes by their
+ * {@code @Tasklet} short form instead, which is why the operator wires some classes by their
  * own name and others by a generated one.
  */
 public final class ReserveFunds
@@ -66,7 +66,7 @@ public final class ReserveFunds
     }
 
     /**
-     * The undo. The workflow driver calls it only when the instance ends abnormally, in reverse
+     * The undo. The bounded driver calls it only when the instance ends abnormally, in reverse
      * order of the steps that finished. It has to be safe to call twice: a crash part way through
      * a rollback runs it again.
      *

@@ -28,7 +28,7 @@ import java.lang.annotation.Target;
  * </ul>
  *
  * <p>The annotation declares a tasklet and nothing else. A class whose one tasklet is a whole
- * operative is annotated {@link StreamOperative} or {@link WorkflowOperative} instead, which take
+ * operator is annotated {@link UnboundedOperator} or {@link BoundedOperator} instead, which take
  * the same {@code run} shapes.
  */
 @Retention(RetentionPolicy.SOURCE)

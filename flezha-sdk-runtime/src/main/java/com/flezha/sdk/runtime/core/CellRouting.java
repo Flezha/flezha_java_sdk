@@ -1,10 +1,10 @@
 package com.flezha.sdk.runtime.core;
 
 import com.flezha.sdk.channel.ChannelKind;
-import com.flezha.sdk.runtime.operative.ChannelDescriptor;
-import com.flezha.sdk.runtime.operative.ConsumerEdge;
-import com.flezha.sdk.runtime.operative.StreamOperativeTopology;
-import com.flezha.sdk.runtime.operative.TaskletDescriptor;
+import com.flezha.sdk.runtime.operator.ChannelDescriptor;
+import com.flezha.sdk.runtime.operator.ConsumerEdge;
+import com.flezha.sdk.runtime.operator.TaskletDescriptor;
+import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.state.EventTimeFrom;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -23,11 +23,11 @@ import javax.annotation.Nullable;
  * for the channel's kind and evaluate the consumer edge.
  *
  * <p>Nothing here outlives the call it is made in, which is why one instance
- * per operative is built at materialization and reused for every activation.
+ * per operator is built at materialization and reused for every activation.
  */
 final class CellRouting {
 
-    private final StreamOperativeTopology topology;
+    private final UnboundedOperatorTopology topology;
 
     /** Per-Tasklet routing instances — {@code cellsFor} / {@code eventTime} only. */
     @SuppressWarnings("rawtypes")
@@ -36,22 +36,22 @@ final class CellRouting {
     private final KryoCodec edgeCodec;
 
     /** Whether this class's producers release their values untransformed. */
-    private final boolean structuredWorkflow;
+    private final boolean structuredBounded;
 
     @SuppressWarnings("rawtypes")
     CellRouting(
-            StreamOperativeTopology topology, List<Tasklet> routers, KryoCodec edgeCodec, boolean structuredWorkflow) {
+            UnboundedOperatorTopology topology, List<Tasklet> routers, KryoCodec edgeCodec, boolean structuredBounded) {
         this.topology = topology;
         this.routers = routers;
         this.edgeCodec = edgeCodec;
-        this.structuredWorkflow = structuredWorkflow;
+        this.structuredBounded = structuredBounded;
     }
 
     /**
      * Decode an input payload and keep only the values that route to this
      * Cell, applying the consumer edge's transform chain when — and only
      * when — the payload reached here untransformed: an entry payload, whose
-     * producer is the wire, or a workflow stage's released value. A stream
+     * producer is the wire, or a bounded stage's released value. An unbounded
      * producer evaluated the edge when its activation completed, so applying
      * it again would compose the chain with itself.
      */
@@ -71,7 +71,7 @@ final class CellRouting {
         if (edge == null) {
             return List.of(base);
         }
-        return channel.kind() == ChannelKind.ENTRY || structuredWorkflow
+        return channel.kind() == ChannelKind.ENTRY || structuredBounded
                 ? EdgeTransforms.valuesOf(edge, base)
                 : List.of(base);
     }

@@ -24,6 +24,6 @@ package com.flezha.sdk.channel;
  *
  * <p>Like {@link Stream}, this handle is usable only inside {@code channels()}. The graph freezes
  * at registration, and a retained handle used afterwards throws {@link IllegalStateException}
- * naming the operative.
+ * naming the operator.
  */
 public interface EntryChannel<T> extends EdgeStream<T> {}

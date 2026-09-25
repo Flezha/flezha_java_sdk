@@ -12,7 +12,7 @@ import javax.annotation.Nonnull;
  * no native calls, which is what makes the whole typed layer unit-testable
  * without the core. The only impurity is the api-side {@code SpawnRequests}
  * static, reached through {@code TaskletCtx}'s default
- * {@code spawnWorkflow}.
+ * {@code spawnBounded}.
  *
  * <p>The core guarantees per-Cell exclusivity — it never hands out a second
  * activation for the same Cell until the first completes — so there is no
@@ -23,11 +23,11 @@ public final class ActivationDispatcher {
 
     private static final Logger LOG = Flezha.log();
 
-    private final ConcurrentHashMap<String, OperativeInstance> instances = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, OperatorInstance> instances = new ConcurrentHashMap<>();
 
-    /** Live operative instances keyed by operative id — the {@code operatives()} view. */
+    /** Live operator instances keyed by operator id — the {@code operators()} view. */
     @Nonnull
-    public Map<String, OperativeInstance> instances() {
+    public Map<String, OperatorInstance> instances() {
         return instances;
     }
 
@@ -39,21 +39,21 @@ public final class ActivationDispatcher {
     @Nonnull
     public ActivationResult dispatch(@Nonnull Activation activation) {
         try {
-            // Keyed by operative id, but the FACTORY the activation names is what
-            // decides which class runs: an operative id rebound to a different
+            // Keyed by operator id, but the FACTORY the activation names is what
+            // decides which class runs: an operator id rebound to a different
             // factory — a deploy putting the next version of a class behind the
             // same id — must not keep running the class we materialized first.
-            OperativeInstance instance = instances.compute(
-                    activation.target().operative(),
+            OperatorInstance instance = instances.compute(
+                    activation.target().operator(),
                     (id, existing) -> existing != null && existing.factoryId().equals(activation.factory())
                             ? existing
-                            : OperativeInstance.materialize(id, activation.factory()));
+                            : OperatorInstance.materialize(id, activation.factory()));
             return new ActivationResult(activation.token(), instance.dispatch(activation));
         } catch (Throwable t) {
             String message = t.getMessage() == null ? t.toString() : t.getMessage();
             LOG.error(
                     "activation dispatch failed for `{}`: {}",
-                    activation.target().operative(),
+                    activation.target().operator(),
                     message);
             return new ActivationResult(activation.token(), new ActivationOutcome.Failed(new WorkError(message, true)));
         }

@@ -2,7 +2,7 @@ package com.flezha.sdk.runtime.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
+import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
@@ -20,7 +20,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("a transform chain is one fused closure; KeyRequest answers the key of the MAPPED value")
     void transformChainAndKeyRequest() {
-        StreamOperativeClassRegistry.registerClass(DynamicChainOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(DynamicChainOperator.class);
 
         ActivationOutcome prepared = outcome(command(
                 "dyn_chain",
@@ -52,7 +52,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("a filtered-out payload consumes its offset with no invocation")
     void filteredPayloadStillAcks() {
-        StreamOperativeClassRegistry.registerClass(DynamicChainOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(DynamicChainOperator.class);
         ItemEffect effect = soleEffect(
                 work("dyn_chain", 0, Optional.of("AAPL"), 0, input(0, "#comment", 1, OptionalLong.of(4), false)));
         assertThat(effect.verdict()).isInstanceOf(Verdict.Ok.class);
@@ -63,7 +63,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("flatMap fans one payload across keys; each Cell receives only its own slot")
     void fanOutKeysEveryYieldedValue() {
-        StreamOperativeClassRegistry.registerClass(FanOutOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(FanOutOperator.class);
 
         ActivationOutcome prepared = outcome(command(
                 "fan_out",
@@ -84,7 +84,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("static mode: cellsFor routes, and each Cell runs its OWN Tasklet instance")
     void staticCellsUsePerCellInstances() {
-        StreamOperativeClassRegistry.registerClass(StaticOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(StaticOperator.class);
 
         soleEffect(work("static_op", 0, Optional.of("a"), 0, input(0, "a:1", 1)));
         soleEffect(work("static_op", 0, Optional.of("a"), 0, input(0, "a:2", 2)));
@@ -108,7 +108,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("merged entry channels each apply their own mapping at delivery")
     void mergedInputAppliesEdgeMapping() {
-        StreamOperativeClassRegistry.registerClass(MergeOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(MergeOperator.class);
         soleEffect(work("merge_op", 0, Optional.empty(), 0, input(0, "x", 1)));
         soleEffect(work("merge_op", 0, Optional.empty(), 0, input(1, "y", 2)));
         assertThat(RECORDED).containsExactly("=A:x", "=B:y");
@@ -117,7 +117,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("an inter-task emit becomes per-consumer Edge outputs carrying the post-transform value")
     void interTaskEmitBecomesEdgeOutputs() {
-        StreamOperativeClassRegistry.registerClass(PipelineOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(PipelineOperator.class);
         ItemEffect effect = soleEffect(work("pipeline_op", 0, Optional.empty(), 0, input(0, "v", 1)));
 
         assertThat(effect.outputs()).hasSize(1);
@@ -138,9 +138,9 @@ class CellRoutingTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("a STREAM inter-task edge map applies exactly once, producer-side")
+    @DisplayName("an UNBOUNDED inter-task edge map applies exactly once, producer-side")
     void interTaskEdgeMapAppliesOnce() {
-        StreamOperativeClassRegistry.registerClass(MappedPipelineOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(MappedPipelineOperator.class);
         ItemEffect produced = soleEffect(work("mapped_pipeline_op", 0, Optional.empty(), 0, input(0, "v", 1)));
         Output edge = produced.outputs().get(0);
         soleEffect(work(
@@ -160,8 +160,8 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("an inter-task consumer narrows on the once-transformed value, by key and by cellsFor")
     void interTaskConsumersNarrowOnTheTransformedValue() {
-        StreamOperativeClassRegistry.registerClass(MappedStaticPipelineOperative.class);
-        StreamOperativeClassRegistry.registerClass(MappedKeyedPipelineOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(MappedStaticPipelineOperator.class);
+        UnboundedOperatorClassRegistry.registerClass(MappedKeyedPipelineOperator.class);
 
         // cellsFor: the core cannot narrow an unkeyed edge output to a
         // static Cell, so it fans and delivery narrows. `a:mid:1` names
@@ -198,7 +198,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("KeyRequest answers the extractor's event time; a failing parse is a per-payload Err")
     void prepareEventTimeAndPerPayloadFailure() {
-        StreamOperativeClassRegistry.registerClass(TimerOperative.class);
+        UnboundedOperatorClassRegistry.registerClass(TimerOperator.class);
         ActivationOutcome prepared = outcome(command(
                 "timer_op",
                 0,

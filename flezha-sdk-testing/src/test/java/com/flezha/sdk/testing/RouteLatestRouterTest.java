@@ -3,10 +3,10 @@ package com.flezha.sdk.testing;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.channel.RoutedDocument;
-import com.flezha.sdk.runtime.operative.builder.LatestDocumentRouter;
-import com.flezha.sdk.runtime.operative.builder.LatestDocumentRouter.Input;
-import com.flezha.sdk.runtime.operative.builder.LatestDocumentRouter.RouterChange;
-import com.flezha.sdk.runtime.operative.builder.LatestDocumentRouter.RouterState;
+import com.flezha.sdk.runtime.operator.builder.LatestDocumentRouter;
+import com.flezha.sdk.runtime.operator.builder.LatestDocumentRouter.Input;
+import com.flezha.sdk.runtime.operator.builder.LatestDocumentRouter.RouterChange;
+import com.flezha.sdk.runtime.operator.builder.LatestDocumentRouter.RouterState;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -45,7 +45,7 @@ final class RouteLatestRouterTest {
 
     /**
      * fails when: a changed document stops reaching a key on that key's own next
-     * traffic item — every per-key consumer of an operative-wide document would
+     * traffic item — every per-key consumer of an operator-wide document would
      * keep computing against a stale one, silently.
      */
     @Test

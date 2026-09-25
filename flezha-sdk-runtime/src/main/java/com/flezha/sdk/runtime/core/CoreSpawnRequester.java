@@ -6,7 +6,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * The {@link SpawnRequests.Requester} behind {@code ctx.spawnWorkflow}: the poll core's two spawn
+ * The {@link SpawnRequests.Requester} behind {@code ctx.spawnBounded}: the poll core's two spawn
  * entries over one context. The request never waits, and the core holds the handle, so a read runs
  * on the thread that asks. Installed by the runtime at {@code start()}.
  */

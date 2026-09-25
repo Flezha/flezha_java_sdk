@@ -8,4 +8,4 @@ import javax.annotation.Nonnull;
  * for pre-keying work ({@link ActivationKind.KeyRequest}), where the key is
  * what's being computed.
  */
-public record CellRef(@Nonnull String operative, int tasklet, @Nonnull Optional<String> cellKey) {}
+public record CellRef(@Nonnull String operator, int tasklet, @Nonnull Optional<String> cellKey) {}

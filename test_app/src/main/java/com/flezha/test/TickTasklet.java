@@ -9,7 +9,7 @@ import com.flezha.sdk.state.WallClock;
 import java.util.List;
 import java.util.Optional;
 
-/** Tasklet backing {@link CoalescingCounterStreamOperative}: folds one {@link TickInput}. */
+/** Tasklet backing {@link CoalescingCounterUnboundedOperator}: folds one {@link TickInput}. */
 public final class TickTasklet
         implements Tasklet<TickInput, TickTasklet.State, Void, TickChange, WallClock, Void> {
 

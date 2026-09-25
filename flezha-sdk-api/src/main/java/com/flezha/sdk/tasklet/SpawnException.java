@@ -1,7 +1,7 @@
 package com.flezha.sdk.tasklet;
 
 /**
- * Why a {@link TaskletCtx#spawnWorkflow} request reached no instance. None of these fault the
+ * Why a {@link TaskletCtx#spawnBounded} request reached no instance. None of these fault the
  * requesting tasklet: they are thrown by a read of its {@link SpawnHandle}. Each carries the
  * core's own sentence as its message.
  */
@@ -16,7 +16,7 @@ public class SpawnException extends Exception {
         return switch (kind) {
             case "already_running" -> new AlreadyRunning(message);
             case "factory_unknown" -> new FactoryUnknown(message);
-            case "factory_not_workflow" -> new FactoryNotWorkflow(message);
+            case "factory_not_bounded" -> new FactoryNotBounded(message);
             case "timeout" -> new Timeout(message);
             case "unavailable" -> new Unavailable(message);
             default -> new Refused(message);
@@ -37,9 +37,9 @@ public class SpawnException extends Exception {
         }
     }
 
-    /** The requested factory is registered, but as a stream: only a workflow can be spawned. */
-    public static final class FactoryNotWorkflow extends SpawnException {
-        public FactoryNotWorkflow(String message) {
+    /** The requested factory is registered, but as an unbounded operator: only a bounded operator can be spawned. */
+    public static final class FactoryNotBounded extends SpawnException {
+        public FactoryNotBounded(String message) {
             super(message);
         }
     }

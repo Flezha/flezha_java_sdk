@@ -1,7 +1,7 @@
 package com.flezha.sdk.channel;
 
 /**
- * One delivery made by {@link ChannelBuilder#routeLatest}: the operative-wide
+ * One delivery made by {@link ChannelBuilder#routeLatest}: the operator-wide
  * document, paired with the key whose own traffic earned it.
  *
  * <p>The pair is what the consumer keys by

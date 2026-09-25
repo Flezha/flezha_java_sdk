@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Step classes for the {@code mix bench.workflow} Java fixtures — the mirror of
+ * Step classes for the {@code mix bench.bounded} Java fixtures — the mirror of
  * the Rust test app's {@code BenchS0..BenchS15} and {@code BenchTurn}. Each
  * chain position needs a distinct {@link Tasklet}
  * class, so the durable pass-through steps are enumerated; every one is the

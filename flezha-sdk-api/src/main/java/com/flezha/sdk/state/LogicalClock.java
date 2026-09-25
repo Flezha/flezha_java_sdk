@@ -6,7 +6,7 @@ package com.flezha.sdk.state;
  * value as the invocation it replays.
  *
  * <p>Requires a non-{@code NoChange} Change: a stateless Tasklet has no
- * durable seq to serve, and declaring this clock without one fails Operative
+ * durable seq to serve, and declaring this clock without one fails Operator
  * registration with {@code UnservableClock}.
  */
 public final class LogicalClock implements Clock {}

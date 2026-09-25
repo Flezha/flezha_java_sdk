@@ -1,6 +1,6 @@
 package com.flezha.sdk.internal;
 
-import com.flezha.sdk.operative.Operative;
+import com.flezha.sdk.operator.Operator;
 import java.lang.reflect.InvocationTargetException;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -9,7 +9,7 @@ import javax.annotation.Nonnull;
 
 /**
  * The ONE implementation behind a {@code FlezhaRunner}'s two declared factory
- * sets (stream + workflow). Instance-scoped: each runner carries its own
+ * sets (stream + bounded operator). Instance-scoped: each runner carries its own
  * cores, so a later runner starts with an empty declared set (generation 2
  * must re-define its types); the runtime-side class registries reached via
  * {@link RuntimeBridge} stay process-global and overwrite on insert.
@@ -19,7 +19,7 @@ import javax.annotation.Nonnull;
  *
  * @param <C> the authoring interface the registry holds classes of
  */
-public final class RegistryCore<C extends Operative> {
+public final class RegistryCore<C extends Operator> {
 
     private final Object lock = new Object();
     private final Map<String, Class<? extends C>> entries = new LinkedHashMap<>();
@@ -30,7 +30,7 @@ public final class RegistryCore<C extends Operative> {
      * @param runtimeRegistryFqn the runtime-side class registry reached via
      *     {@link RuntimeBridge} ({@code registerClass(Class)} /
      *     {@code unregisterClass(String)} / {@code reset()})
-     * @param kindLabel {@code "operative"} / {@code "workflow"} — used in error
+     * @param kindLabel {@code "operator"} / {@code "bounded"} — used in error
      *     messages
      */
     public RegistryCore(String runtimeRegistryFqn, String kindLabel) {

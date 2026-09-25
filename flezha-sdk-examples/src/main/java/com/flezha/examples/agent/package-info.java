@@ -5,8 +5,8 @@
  * redeployment, or an arbitrary period of silence. Nothing runs between messages; the instance
  * parks holding its journal and is resumed when addressed.
  *
- * <p>{@link com.flezha.examples.agent.ChatOperative} declares the two properties that make this a
- * loop rather than a single pass. {@link com.flezha.sdk.operative.LoopMode} of {@code PER_INPUT}
+ * <p>{@link com.flezha.examples.agent.ChatOperator} declares the two properties that make this a
+ * loop rather than a single pass. {@link com.flezha.sdk.operator.LoopMode} of {@code PER_INPUT}
  * gives one durable iteration per inbound message. An agent that should also act without being
  * addressed, for a nudge, a summary or a follow-up, has a tasklet register a timer with
  * {@code ctx.timerAfter} and handle it in {@code onTimer}: the sleeping instance wakes at it.

@@ -3,8 +3,8 @@ package com.flezha.test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.flezha.sdk.Flezha;
-import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
-import com.flezha.sdk.runtime.workflow.WorkflowOperativeClassRegistry;
+import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
+import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
 import java.util.HashSet;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,41 +29,41 @@ class FactoryIdsTest {
             "bench_echo",
             "bench_keyed",
             "bench_keyed_nopersist",
-            "bench_loop_workflow",
+            "bench_loop_bounded",
             "bounded_mailbox_drop_nothing",
             "bounded_mailbox_drop_newest",
             "bounded_mailbox_drop_oldest",
-            "branch_workflow",
+            "branch_bounded",
             "candle",
-            "chat_loop_workflow",
-            "chat_rewind_workflow",
+            "chat_loop_bounded",
+            "chat_rewind_bounded",
             "checkpoint_batched_store",
             "checkpoint_store",
             "coalescing_counter",
-            "commit_block_workflow",
+            "commit_block_bounded",
             "compare_filter",
-            "diamond_workflow",
+            "diamond_bounded",
             "do_nothing",
             "dynamic_cell",
-            "echo_workflow",
-            "event_timer_workflow",
-            "failed_stage_workflow",
+            "echo_bounded",
+            "event_timer_bounded",
+            "failed_stage_bounded",
             "cell_stress",
             "hybrid_channel",
-            "keyed_block_workflow",
-            "keyed_loop_workflow",
-            "keyed_saga_workflow",
+            "keyed_block_bounded",
+            "keyed_loop_bounded",
+            "keyed_saga_bounded",
             "merged_input",
-            "mixed_operative",
+            "mixed_operator",
             "optout_commit_block",
-            "outbox_block_workflow",
+            "outbox_block_bounded",
             "partition_relay",
             "persistence_off_counter",
             "poison_probe",
-            "reply_block_loop_workflow",
+            "reply_block_loop_bounded",
             "resume_probe",
-            "retry_workflow",
-            "saga_block_workflow",
+            "retry_bounded",
+            "saga_block_bounded",
             "schema_evolution_v1",
             "schema_evolution_v2",
             "session_timeout",
@@ -71,30 +71,30 @@ class FactoryIdsTest {
             "spawn_once_requester",
             "spawn_requester",
             "stateful_counter",
-            "stateless_loop_workflow",
+            "stateless_loop_bounded",
             "static_cell",
-            "static_cell_workflow",
+            "static_cell_bounded",
             "store_input",
             "sugar_do_nothing",
             "sugar_named_input",
             "sugar_state_only",
             "sugar_static_cell",
             "sugar_store_input",
-            "sugar_workflow",
-            "sugar_workflow_per_input",
-            "sync_durable_workflow",
-            "tier_commit_block_workflow",
+            "sugar_bounded",
+            "sugar_bounded_per_input",
+            "sync_durable_bounded",
+            "tier_commit_block_bounded",
             "tier_store",
-            "timer_loop_workflow",
+            "timer_loop_bounded",
             "transform_chain",
-            "typed_once_workflow",
-            "undo_outbox_workflow",
+            "typed_once_bounded",
+            "undo_outbox_bounded",
             "wedge_probe");
 
     @BeforeEach
     void reset() {
-        StreamOperativeClassRegistry.reset();
-        WorkflowOperativeClassRegistry.reset();
+        UnboundedOperatorClassRegistry.reset();
+        BoundedOperatorClassRegistry.reset();
     }
 
     @Test
@@ -102,8 +102,8 @@ class FactoryIdsTest {
     void sameIds() {
         Main.define(Flezha.createRunner("factory_ids_ns"));
 
-        Set<String> live = new HashSet<>(StreamOperativeClassRegistry.factoryIds());
-        live.addAll(WorkflowOperativeClassRegistry.factoryIds());
+        Set<String> live = new HashSet<>(UnboundedOperatorClassRegistry.factoryIds());
+        live.addAll(BoundedOperatorClassRegistry.factoryIds());
         assertEquals(RUST_FACTORY_IDS, live);
     }
 }

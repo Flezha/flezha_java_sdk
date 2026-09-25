@@ -4,13 +4,13 @@ The toy trader the [Part 2 guides](../../../../docs/guides/guides.md) build, as 
 standalone project. Nothing here depends on the Flezha source tree: the
 `pom.xml` names one released coordinate, the way your own project would.
 
-So far it holds the runner and the paper-order workflow. The guides add an
-operative at a time, and each one is registered in `Main.java` before `start()`.
+So far it holds the runner and the paper-order bounded operator. The guides add an
+operator at a time, and each one is registered in `Main.java` before `start()`.
 
 | File | What is in it |
 |---|---|
-| `Main.java` | the runner: this process joins the `trading` namespace and serves the desk's operatives |
-| `PaperOrderOperative.java` | the workflow: the entry channel, the three steps in order, and the channels their output leaves on. The order an instance is started with is the `OrderTicket` record here |
+| `Main.java` | the runner: this process joins the `trading` namespace and serves the desk's operators |
+| `PaperOrderOperator.java` | the bounded operator: the entry channel, the three steps in order, and the channels their output leaves on. The order an instance is started with is the `OrderTicket` record here |
 | `ReserveFunds.java` | step one: puts the money aside, and releases it again if the order is undone |
 | `PlaceOrder.java` | step two: places the paper order, and cancels it if the order is undone |
 | `ConfirmFill.java` | step three: books the fill, and refuses an order above the desk's limit |
@@ -39,16 +39,16 @@ From another terminal, the controller lists it:
 flz runner list --namespace trading
 ```
 
-## Start the workflow
+## Start the bounded operator
 
 One instance is one order. `--text` carries the order on the `order` channel;
 `--init-values` would set a tasklet's starting state. The file sink attached at
 the start writes down everything the instance emits:
 
 ```sh
-flz operative start paper_order --id order_1 --namespace trading \
+flz operator start paper_order --id order_1 --namespace trading \
   --text '{"symbol": "AAPL", "quantity": 10}' --channel order \
-  --plugins '[{"id":"order_1_writer","provider":"operative_file_sink","operative_id":"order_1","opts":{"path":"order_1.txt"},"hooks":[["on_output",{}]]}]'
+  --plugins '[{"id":"order_1_writer","provider":"operator_file_sink","operator_id":"order_1","opts":{"path":"order_1.txt"},"hooks":[["on_output",{}]]}]'
 ```
 
 ```sh
@@ -63,7 +63,7 @@ filled: AAPL 10
 
 One line per step: the money is reserved, the order is placed, the fill is
 booked. The instance then completes on its own, which is why
-`flz operative list` no longer shows it and `flz operative listen` has nothing
+`flz operator list` no longer shows it and `flz operator listen` has nothing
 left to attach to.
 
 ## Watch it undo itself
@@ -72,9 +72,9 @@ The desk books at most 100 at a time, so a larger order is refused by the last
 step. Start one the same way, with a quantity above the limit:
 
 ```sh
-flz operative start paper_order --id order_2 --namespace trading \
+flz operator start paper_order --id order_2 --namespace trading \
   --text '{"symbol": "AAPL", "quantity": 500}' --channel order \
-  --plugins '[{"id":"order_2_writer","provider":"operative_file_sink","operative_id":"order_2","opts":{"path":"order_2.txt"},"hooks":[["on_output",{}]]}]'
+  --plugins '[{"id":"order_2_writer","provider":"operator_file_sink","operator_id":"order_2","opts":{"path":"order_2.txt"},"hooks":[["on_output",{}]]}]'
 ```
 
 ```sh
@@ -94,7 +94,7 @@ undone, in reverse: the order was cancelled, then the money was released. The
 runner's terminal shows the retries that came first:
 
 ```
-[flezha] workflow order_2 tasklet confirm_fill cell - attempt 1/3 failed (retrying in 386 ms): the desk books at most 100 a time, and this is 500
+[flezha] bounded operator order_2 tasklet confirm_fill cell - attempt 1/3 failed (retrying in 386 ms): the desk books at most 100 a time, and this is 500
 ```
 
 ## Building from a checkout
@@ -114,4 +114,4 @@ above is all you need.
 
 The echo in [`../echo`](../echo/README.md) is the Part 1 project, and
 [`docs/guides/runner_deployment.md`](../../../../docs/guides/runner_deployment.md)
-walks through what a tasklet, an operative and a runner each are.
+walks through what a tasklet, an operator and a runner each are.

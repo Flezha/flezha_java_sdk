@@ -1,6 +1,6 @@
 package com.flezha.examples.tradedesk;
 
-import com.flezha.examples.tradedesk.PaperOrderOperative.OrderTicket;
+import com.flezha.examples.tradedesk.PaperOrderOperator.OrderTicket;
 import com.flezha.examples.tradedesk.ReserveFunds.Reserved;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletCtx;

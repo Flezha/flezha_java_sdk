@@ -16,9 +16,9 @@
 # SCOPE is every `#### Scenario:` under every `### Requirement:` in
 # openspec/specs/java-sdk/spec.md. It is computed from the live spec tree on
 # every run, so it cannot rot: an earlier wording scoped the rule to the
-# requirements "added by operative-state-persistence-java", and most of those
+# requirements "added by operator-state-persistence-java", and most of those
 # titles no longer exist — they were renamed when Shard/Relay became
-# Tasklet/Operative, and the scope stopped resolving against anything.
+# Tasklet/Operator, and the scope stopped resolving against anything.
 #
 # MATCHING reuses the annotation the suite already carries. A scenario is
 # covered when its title, reduced to lower-case letters and digits, appears

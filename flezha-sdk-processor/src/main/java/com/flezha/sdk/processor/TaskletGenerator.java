@@ -1,12 +1,12 @@
 package com.flezha.sdk.processor;
 
+import com.flezha.sdk.authoring.BoundedOperator;
 import com.flezha.sdk.authoring.CellKey;
 import com.flezha.sdk.authoring.CellsFor;
 import com.flezha.sdk.authoring.InitState;
-import com.flezha.sdk.authoring.StreamOperative;
 import com.flezha.sdk.authoring.Tasklet;
-import com.flezha.sdk.authoring.WorkflowOperative;
-import com.flezha.sdk.operative.LoopMode;
+import com.flezha.sdk.authoring.UnboundedOperator;
+import com.flezha.sdk.operator.LoopMode;
 import com.flezha.sdk.processor.TaskletModel.Declares;
 import com.flezha.sdk.processor.TaskletModel.Output;
 import com.flezha.sdk.processor.TaskletModel.StateShape;
@@ -34,8 +34,8 @@ import javax.lang.model.type.TypeMirror;
 
 /**
  * Generates {@code <Name>Tasklet} from a {@code @Tasklet} class, and from a
- * {@code @StreamOperative} or {@code @WorkflowOperative} class also the §5 short form's
- * single-tasklet {@code <Name>StreamOperative} or {@code <Name>WorkflowOperative}. Resolution
+ * {@code @UnboundedOperator} or {@code @BoundedOperator} class also the §5 short form's
+ * single-tasklet {@code <Name>UnboundedOperator} or {@code <Name>BoundedOperator}. Resolution
  * reads the {@code run} signature and the annotation and reports every refusal; rendering is a pure
  * function of the {@link TaskletModel}.
  */
@@ -43,14 +43,14 @@ final class TaskletGenerator {
 
     /** The three annotations a class declares itself with, one per class. */
     static final Set<Class<? extends Annotation>> DECLARATIONS =
-            Set.of(Tasklet.class, StreamOperative.class, WorkflowOperative.class);
+            Set.of(Tasklet.class, UnboundedOperator.class, BoundedOperator.class);
 
     private static final String STATE_HANDLE = "com.flezha.sdk.state.StateHandle";
     private static final String TASKLET_CTX = "com.flezha.sdk.tasklet.TaskletCtx";
-    private static final String OPERATIVE_PACKAGE = "com.flezha.sdk.operative.";
+    private static final String OPERATOR_PACKAGE = "com.flezha.sdk.operator.";
 
-    /** Members that describe an operative rather than a tasklet, refused by name on {@code @Tasklet}. */
-    private static final List<String> OPERATIVE_MEMBERS = List.of("kind", "sink", "input", "onFull");
+    /** Members that describe an operator rather than a tasklet, refused by name on {@code @Tasklet}. */
+    private static final List<String> OPERATOR_MEMBERS = List.of("kind", "sink", "input", "onFull");
 
     /** The entry channel's overflow policies, each its {@code OverflowPolicy} constant in lower case. */
     private static final List<String> OVERFLOW_POLICIES = List.of("drop_nothing", "drop_newest", "drop_oldest");
@@ -70,7 +70,7 @@ final class TaskletGenerator {
         this.states = states;
     }
 
-    /** Writes the tasklet and, for an operative annotation, the short form's operative of its kind. */
+    /** Writes the tasklet and, for an operator annotation, the short form's operator of its kind. */
     void generate(TypeElement type) {
         Declaration d = declarationOf(type);
         if (d == null || !annotationAgrees(d)) {
@@ -81,8 +81,8 @@ final class TaskletGenerator {
             return;
         }
         out.write(TypeMirrors.qualify(model.pkg(), model.taskletSimple()), renderTasklet(model), type);
-        if (model.declares() != Declares.TASKLET && operativeAgrees(model, type)) {
-            out.write(TypeMirrors.qualify(model.pkg(), model.operativeSimple()), renderShortFormOperative(model), type);
+        if (model.declares() != Declares.TASKLET && operatorAgrees(model, type)) {
+            out.write(TypeMirrors.qualify(model.pkg(), model.operatorSimple()), renderShortFormOperator(model), type);
         }
     }
 
@@ -127,11 +127,11 @@ final class TaskletGenerator {
                     "",
                     LoopMode.ONCE));
         }
-        StreamOperative s = type.getAnnotation(StreamOperative.class);
+        UnboundedOperator s = type.getAnnotation(UnboundedOperator.class);
         if (s != null) {
             found.add(new Declaration(
                     type,
-                    Declares.STREAM,
+                    Declares.UNBOUNDED,
                     s.id(),
                     s.sink(),
                     s.input(),
@@ -142,11 +142,11 @@ final class TaskletGenerator {
                     s.onFull(),
                     LoopMode.ONCE));
         }
-        WorkflowOperative w = type.getAnnotation(WorkflowOperative.class);
+        BoundedOperator w = type.getAnnotation(BoundedOperator.class);
         if (w != null) {
             found.add(new Declaration(
                     type,
-                    Declares.WORKFLOW,
+                    Declares.BOUNDED,
                     w.id(),
                     w.sink(),
                     w.input(),
@@ -161,32 +161,32 @@ final class TaskletGenerator {
             out.error(
                     type,
                     found.stream().map(Declaration::annotation).collect(Collectors.joining(" and "))
-                            + ": a class declares one tasklet or one operative; keep one annotation");
+                            + ": a class declares one tasklet or one operator; keep one annotation");
             return null;
         }
         return found.get(0);
     }
 
     /**
-     * The annotation's own rules: {@code @Tasklet} carries no operative member, and a §5 short
+     * The annotation's own rules: {@code @Tasklet} carries no operator member, and a §5 short
      * form writes its factory id, never derived, and declares no topology body beside its tasklet
      * body. A refusal with a contract name begins with it ({@code docs/sdk/authoring_contract.md}
      * §5.2).
      */
     private boolean annotationAgrees(Declaration d) {
         if (d.declares() == Declares.TASKLET) {
-            return declaresNoOperative(d.type());
+            return declaresNoOperator(d.type());
         }
         if (d.id().isEmpty()) {
             out.error(
                     d.type(),
-                    d.annotation() + " requires `id`: an operative's factory id is an address an operator"
+                    d.annotation() + " requires `id`: an operator's factory id is an address a user"
                             + " types, so write it as `id = \"...\"` rather than deriving it from the class name");
             return false;
         }
         List<String> topology = new ArrayList<>();
-        for (Declares kind : List.of(Declares.STREAM, Declares.WORKFLOW)) {
-            if (mirrors.isSubtypeOf(d.type().asType(), OPERATIVE_PACKAGE + kind.simpleName)) {
+        for (Declares kind : List.of(Declares.UNBOUNDED, Declares.BOUNDED)) {
+            if (mirrors.isSubtypeOf(d.type().asType(), OPERATOR_PACKAGE + kind.simpleName)) {
                 topology.add(kind.simpleName);
             }
         }
@@ -195,7 +195,7 @@ final class TaskletGenerator {
         }
         out.error(
                 d.type(),
-                "ShortFormWithTopology: " + d.annotation() + " makes this class's `run` a whole operative, and"
+                "ShortFormWithTopology: " + d.annotation() + " makes this class's `run` a whole operator, and"
                         + " the class also implements " + String.join(" and ", topology)
                         + ", which declares a topology body; write the short form or the full form, not both");
         return false;
@@ -206,14 +206,14 @@ final class TaskletGenerator {
      * the compiler drops a written one before the model sees it and names only a missing symbol. The
      * source tree still carries it, which lets the refusal name the annotations it belongs on.
      */
-    private boolean declaresNoOperative(TypeElement type) {
+    private boolean declaresNoOperator(TypeElement type) {
         boolean agrees = true;
         for (String member : writtenMembers(type, Tasklet.class)) {
-            if (OPERATIVE_MEMBERS.contains(member)) {
+            if (OPERATOR_MEMBERS.contains(member)) {
                 out.error(
                         type,
-                        "@Tasklet declares a tasklet; `" + member + "` belongs to an operative declaration:"
-                                + " write the short form as @StreamOperative(...) or @WorkflowOperative(...)");
+                        "@Tasklet declares a tasklet; `" + member + "` belongs to an operator declaration:"
+                                + " write the short form as @UnboundedOperator(...) or @BoundedOperator(...)");
                 agrees = false;
             }
         }
@@ -580,10 +580,10 @@ final class TaskletGenerator {
     }
 
     /**
-     * The short form's operative rules, which read the resolved body: a {@code sink} needs an output
+     * The short form's operator rules, which read the resolved body: a {@code sink} needs an output
      * to feed, and {@code onFull} names one of the entry channel's overflow policies.
      */
-    private boolean operativeAgrees(TaskletModel m, TypeElement type) {
+    private boolean operatorAgrees(TaskletModel m, TypeElement type) {
         if (!m.sink().isEmpty() && !m.hasOutput()) {
             out.error(
                     type,
@@ -601,31 +601,31 @@ final class TaskletGenerator {
     }
 
     /**
-     * The §5 short form's operative: one entry channel into this tasklet and, with a
+     * The §5 short form's operator: one entry channel into this tasklet and, with a
      * {@code sink}, this tasklet to that plugin sink, with a written loop mode and every other
-     * operative method at its interface default. The two kinds differ only in the interface they
+     * operator method at its interface default. The two kinds differ only in the interface they
      * state, because both declare their graph in {@code channels} on the same builder.
      */
-    private String renderShortFormOperative(TaskletModel m) {
-        String operativeInterface = m.declares().simpleName;
+    private String renderShortFormOperator(TaskletModel m) {
+        String operatorInterface = m.declares().simpleName;
 
         StringBuilder b = FlezhaProcessor.source(m.pkg());
         b.append("import com.flezha.sdk.channel.ChannelBuilder;\n");
-        b.append("import com.flezha.sdk.operative.").append(operativeInterface).append(";\n\n");
-        b.append("/** Generated single-tasklet short-form operative for ")
+        b.append("import com.flezha.sdk.operator.").append(operatorInterface).append(";\n\n");
+        b.append("/** Generated single-tasklet short-form operator for ")
                 .append(m.taskletSimple())
                 .append(". */\n");
         b.append("public final class ")
-                .append(m.operativeSimple())
+                .append(m.operatorSimple())
                 .append(" implements ")
-                .append(operativeInterface)
+                .append(operatorInterface)
                 .append(" {\n");
         b.append("    @Override public String factoryId() { return ")
                 .append(mirrors.literal(m.id()))
                 .append("; }\n");
         if (m.loopMode() != LoopMode.ONCE) {
-            b.append("    @Override public com.flezha.sdk.operative.LoopMode loopMode() { return ")
-                    .append("com.flezha.sdk.operative.LoopMode.")
+            b.append("    @Override public com.flezha.sdk.operator.LoopMode loopMode() { return ")
+                    .append("com.flezha.sdk.operator.LoopMode.")
                     .append(m.loopMode().name())
                     .append("; }\n");
         }

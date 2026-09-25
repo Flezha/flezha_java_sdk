@@ -7,7 +7,7 @@ import javax.annotation.Nonnull;
 
 /**
  * A tasklet's output stream handle, returned by {@code .into(Task.class)}:
- * a lightweight reference into the operative's topology builder.
+ * a lightweight reference into the operator's topology builder.
  *
  * <ul>
  *   <li>{@code stream.into(Next.class)} wires Next as a consumer of this
@@ -58,7 +58,7 @@ import javax.annotation.Nonnull;
  *
  * <p>Handles are only usable inside {@code channels()}:
  * the topology freezes at registration and a retained handle used afterwards
- * throws {@link IllegalStateException} naming the operative.
+ * throws {@link IllegalStateException} naming the operator.
  *
  * <p>This is an abstract class rather than an interface so {@link #branch}
  * can be a {@code final} {@link SafeVarargs} method (interfaces cannot carry
@@ -73,7 +73,7 @@ public abstract class Stream<T> implements EdgeStream<T> {
      * This is how a channel with no {@link #sink(String)} to name it is named;
      * using both on one channel fails registration, naming both declarations.
      * Derived, sink-supplied, overridden, and entry names share one
-     * per-operative namespace with a duplicate check at registration.
+     * per-operator namespace with a duplicate check at registration.
      */
     @Nonnull
     public abstract Stream<T> named(String name);

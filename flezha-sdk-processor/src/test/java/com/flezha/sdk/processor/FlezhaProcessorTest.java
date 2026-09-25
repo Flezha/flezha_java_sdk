@@ -145,7 +145,7 @@ class FlezhaProcessorTest {
     /**
      * The generator used to write {@code .named(x).sink(x)} because a sink
      * named a plugin rather than a channel, so sugared and hand-written code
-     * shipped different wire names for the same operative.
+     * shipped different wire names for the same operator.
      */
     @Test
     void theGeneratedChannelsNamesTheChannelWithTheSinkAndNothingElse() {
@@ -153,12 +153,12 @@ class FlezhaProcessorTest {
                 """
                 package t;
                 import com.flezha.sdk.authoring.*;
-                @StreamOperative(id = "sugar", sink = "items_output")
+                @UnboundedOperator(id = "sugar", sink = "items_output")
                 public class Sugared {
                     public String run(String in) { return in; }
                 }
                 """;
-        String source = generated("t.Sugared", "t.SugaredStreamOperative", code);
+        String source = generated("t.Sugared", "t.SugaredUnboundedOperator", code);
 
         assertThat(source).contains(".sink(\"items_output\")");
         assertThat(source).doesNotContain(".named(");
@@ -299,12 +299,12 @@ class FlezhaProcessorTest {
                 """
                 package t;
                 import com.flezha.sdk.authoring.*;
-                @StreamOperative(id = "default_entry", sink = "echo")
+                @UnboundedOperator(id = "default_entry", sink = "echo")
                 public class DefaultEntry {
                     public String run(String in) { return in; }
                 }
                 """;
-        assertThat(generated("t.DefaultEntry", "t.DefaultEntryStreamOperative", code))
+        assertThat(generated("t.DefaultEntry", "t.DefaultEntryUnboundedOperator", code))
                 .contains("c.input(java.lang.String.class, \"input\")");
     }
 
@@ -314,12 +314,12 @@ class FlezhaProcessorTest {
                 """
                 package t;
                 import com.flezha.sdk.authoring.*;
-                @StreamOperative(id = "named_entry", sink = "echo", input = "prices")
+                @UnboundedOperator(id = "named_entry", sink = "echo", input = "prices")
                 public class NamedEntry {
                     public String run(String in) { return in; }
                 }
                 """;
-        assertThat(generated("t.NamedEntry", "t.NamedEntryStreamOperative", code))
+        assertThat(generated("t.NamedEntry", "t.NamedEntryUnboundedOperator", code))
                 .contains("c.input(java.lang.String.class, \"prices\")");
     }
 
@@ -329,18 +329,18 @@ class FlezhaProcessorTest {
                 """
                 package t;
                 import com.flezha.sdk.authoring.*;
-                @StreamOperative(id = "counter", input = "ticks")
+                @UnboundedOperator(id = "counter", input = "ticks")
                 public class Counter {
                     public void run(String in) {}
                 }
                 """;
-        String source = generated("t.Counter", "t.CounterStreamOperative", code);
+        String source = generated("t.Counter", "t.CounterUnboundedOperator", code);
         assertThat(source).contains("c.input(java.lang.String.class, \"ticks\").into(CounterTasklet.class);");
         assertThat(source).doesNotContain(".sink(");
     }
 
     @ParameterizedTest(name = "{0} with no id is refused")
-    @ValueSource(strings = {"@StreamOperative(sink = \"out\")", "@WorkflowOperative(id = \"\", sink = \"out\")"})
+    @ValueSource(strings = {"@UnboundedOperator(sink = \"out\")", "@BoundedOperator(id = \"\", sink = \"out\")"})
     void anAnnotationWithNoIdIsRefused(String annotation) {
         String code =
                 """
@@ -356,20 +356,20 @@ class FlezhaProcessorTest {
     }
 
     @Test
-    void anAnnotatedClassImplementingAnOperativeInterfaceIsRefused() {
+    void anAnnotatedClassImplementingAnOperatorInterfaceIsRefused() {
         String code =
                 """
                 package t;
                 import com.flezha.sdk.channel.ChannelBuilder;
-                @com.flezha.sdk.authoring.StreamOperative(id = "both", sink = "out")
-                public class Both implements com.flezha.sdk.operative.StreamOperative {
+                @com.flezha.sdk.authoring.UnboundedOperator(id = "both", sink = "out")
+                public class Both implements com.flezha.sdk.operator.UnboundedOperator {
                     @Override public String factoryId() { return "both"; }
                     @Override public void channels(ChannelBuilder c) {}
                     public String run(String in) { return in; }
                 }
                 """;
         assertThat(diagnose("t.Both", code))
-                .anyMatch(m -> m.startsWith("ShortFormWithTopology") && m.contains("implements StreamOperative"));
+                .anyMatch(m -> m.startsWith("ShortFormWithTopology") && m.contains("implements UnboundedOperator"));
     }
 
     @Test
@@ -378,7 +378,7 @@ class FlezhaProcessorTest {
                 """
                 package t;
                 import com.flezha.sdk.authoring.*;
-                @StreamOperative(id = "drain", sink = "out")
+                @UnboundedOperator(id = "drain", sink = "out")
                 public class Drain {
                     public void run(String in) {}
                 }
@@ -388,7 +388,7 @@ class FlezhaProcessorTest {
 
     @ParameterizedTest(name = "`{0}` on @Tasklet is refused")
     @ValueSource(strings = {"sink = \"echo\"", "input = \"prices\"", "kind = \"stream\"", "onFull = \"drop_oldest\""})
-    void anOperativeMemberOnATaskletIsRefused(String member) {
+    void anOperatorMemberOnATaskletIsRefused(String member) {
         String code =
                 """
                 package t;
@@ -402,13 +402,13 @@ class FlezhaProcessorTest {
         String name = member.substring(0, member.indexOf(' '));
         assertThat(diagnose("t.DoNothing", code))
                 .anyMatch(m -> m.contains("`" + name + "`")
-                        && m.contains("@StreamOperative")
-                        && m.contains("@WorkflowOperative"));
+                        && m.contains("@UnboundedOperator")
+                        && m.contains("@BoundedOperator"));
     }
 
     /** fails when: a short form's entry-channel or tasklet setting stops reaching what it describes. */
     @ParameterizedTest(name = "{0} carries capacity and onFull")
-    @ValueSource(strings = {"StreamOperative", "WorkflowOperative"})
+    @ValueSource(strings = {"UnboundedOperator", "BoundedOperator"})
     void aShortFormCarriesItsEntryAndTaskletSettings(String kind) {
         String code =
                 """
@@ -452,7 +452,7 @@ class FlezhaProcessorTest {
         String echo = "public String run(String in) { return in; }";
         String keyOf = "public static String k(String out) { return out; } ";
         List<Arguments> rows = new ArrayList<>();
-        for (String annotation : List.of("@Tasklet", "@StreamOperative", "@WorkflowOperative")) {
+        for (String annotation : List.of("@Tasklet", "@UnboundedOperator", "@BoundedOperator")) {
             rows.add(Arguments.of(
                     annotation,
                     "",
@@ -518,27 +518,27 @@ class FlezhaProcessorTest {
                 package t;
                 import com.flezha.sdk.authoring.*;
                 @Tasklet(id = "twice")
-                @StreamOperative(id = "twice", sink = "out")
+                @UnboundedOperator(id = "twice", sink = "out")
                 public class Twice {
                     public String run(String in) { return in; }
                 }
                 """;
-        assertThat(diagnose("t.Twice", code)).anyMatch(m -> m.contains("@Tasklet") && m.contains("@StreamOperative"));
+        assertThat(diagnose("t.Twice", code)).anyMatch(m -> m.contains("@Tasklet") && m.contains("@UnboundedOperator"));
     }
 
     @Test
-    void aWorkflowShortFormGeneratesAWorkflowOperative() {
+    void aBoundedShortFormGeneratesABoundedOperator() {
         String code =
                 """
                 package t;
                 import com.flezha.sdk.authoring.*;
-                @WorkflowOperative(id = "place", sink = "placed", input = "order")
+                @BoundedOperator(id = "place", sink = "placed", input = "order")
                 public class Place {
                     public String run(String in) { return in; }
                 }
                 """;
-        String source = generated("t.Place", "t.PlaceWorkflowOperative", code);
-        assertThat(source).contains("implements WorkflowOperative");
+        String source = generated("t.Place", "t.PlaceBoundedOperator", code);
+        assertThat(source).contains("implements BoundedOperator");
         assertThat(source).contains("public void channels(ChannelBuilder c)");
         assertThat(source)
                 .contains("c.input(java.lang.String.class, \"order\").into(PlaceTasklet.class).sink(\"placed\");");
@@ -548,20 +548,20 @@ class FlezhaProcessorTest {
     }
 
     @Test
-    void aShortFormWorkflowDeclaresItsLoopMode() {
+    void aShortFormBoundedDeclaresItsLoopMode() {
         String code =
                 """
                 package t;
                 import com.flezha.sdk.authoring.*;
-                import com.flezha.sdk.operative.LoopMode;
-                @WorkflowOperative(id = "chat", sink = "replies", loopMode = LoopMode.PER_INPUT)
+                import com.flezha.sdk.operator.LoopMode;
+                @BoundedOperator(id = "chat", sink = "replies", loopMode = LoopMode.PER_INPUT)
                 public class Chat {
                     public String run(String in) { return in; }
                 }
                 """;
-        assertThat(generated("t.Chat", "t.ChatWorkflowOperative", code))
-                .contains("public com.flezha.sdk.operative.LoopMode loopMode() {"
-                        + " return com.flezha.sdk.operative.LoopMode.PER_INPUT; }");
+        assertThat(generated("t.Chat", "t.ChatBoundedOperator", code))
+                .contains("public com.flezha.sdk.operator.LoopMode loopMode() {"
+                        + " return com.flezha.sdk.operator.LoopMode.PER_INPUT; }");
     }
 
     @Test
@@ -570,17 +570,17 @@ class FlezhaProcessorTest {
                 """
                 package t;
                 import com.flezha.sdk.authoring.*;
-                @StreamOperative(id = "alone", sink = "out")
+                @UnboundedOperator(id = "alone", sink = "out")
                 public class Alone {
                     public String run(String in) { return in; }
                 }
                 """;
         assertThat(generatedFiles("t.Alone", code))
-                .containsExactlyInAnyOrder("t/AloneTasklet.java", "t/AloneStreamOperative.java");
+                .containsExactlyInAnyOrder("t/AloneTasklet.java", "t/AloneUnboundedOperator.java");
     }
 
     @Test
-    void aTaskletGeneratesNoOperative() {
+    void aTaskletGeneratesNoOperator() {
         String code =
                 """
                 package t;
@@ -599,12 +599,12 @@ class FlezhaProcessorTest {
                 """
                 package t;
                 import com.flezha.sdk.authoring.*;
-                @StreamOperative(id = "p\\"id", sink = "s\\"sink", input = "i\\"in")
+                @UnboundedOperator(id = "p\\"id", sink = "s\\"sink", input = "i\\"in")
                 public class Quoted {
                     public String run(String in) { return in; }
                 }
                 """;
-        assertThat(stringLiterals(generated("t.Quoted", "t.QuotedStreamOperative", code)))
+        assertThat(stringLiterals(generated("t.Quoted", "t.QuotedUnboundedOperator", code)))
                 .contains("p\"id", "s\"sink", "i\"in");
     }
 
@@ -614,12 +614,12 @@ class FlezhaProcessorTest {
                 """
                 package t;
                 import com.flezha.sdk.authoring.*;
-                @StreamOperative(id = "p\\\\nid", sink = "s\\\\nsink", input = "i\\\\nin")
+                @UnboundedOperator(id = "p\\\\nid", sink = "s\\\\nsink", input = "i\\\\nin")
                 public class Backslashed {
                     public String run(String in) { return in; }
                 }
                 """;
-        assertThat(stringLiterals(generated("t.Backslashed", "t.BackslashedStreamOperative", code)))
+        assertThat(stringLiterals(generated("t.Backslashed", "t.BackslashedUnboundedOperator", code)))
                 .contains("p\\nid", "s\\nsink", "i\\nin");
     }
 
@@ -645,8 +645,8 @@ class FlezhaProcessorTest {
     @ValueSource(
             strings = {
                 "@Tasklet(id = \"sugar_store_input\")",
-                "@StreamOperative(id = \"sugar_store_input\", sink = \"sugar_store_sink\")",
-                "@WorkflowOperative(id = \"sugar_store_input\")"
+                "@UnboundedOperator(id = \"sugar_store_input\", sink = \"sugar_store_sink\")",
+                "@BoundedOperator(id = \"sugar_store_input\")"
             })
     void namesTheTaskletAfterTheWrittenId(String annotation) {
         String code =

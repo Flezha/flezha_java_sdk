@@ -3,8 +3,8 @@ package com.flezha.examples;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.flezha.examples.local.WordCountOperative;
-import com.flezha.sdk.LocalOperative;
+import com.flezha.examples.local.WordCountOperator;
+import com.flezha.sdk.LocalOperator;
 import com.flezha.sdk.SinkOutput;
 import com.flezha.sdk.runtime.RepositoryFixture;
 import java.io.IOException;
@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The Java SDK's local mode, driven exactly as {@link com.flezha.examples.local.Main#main} does
- * it: the user's own operative class, its declared two-tasklet graph, and no
+ * it: the user's own operator class, its declared two-tasklet graph, and no
  * controller anywhere.
  *
  * <p>The lines to feed and the output to release are read from
@@ -39,7 +39,7 @@ class LocalModeTest {
         Map<String, Integer> expected = multiset(scenarioRows("totals: "));
 
         ConcurrentLinkedQueue<SinkOutput> released = new ConcurrentLinkedQueue<>();
-        try (LocalOperative run = LocalOperative.start(WordCountOperative.class)) {
+        try (LocalOperator run = LocalOperator.start(WordCountOperator.class)) {
             run.onSink("totals", released::add);
             lines.forEach(line -> run.feed("lines", line));
             run.runUntilIdle(Duration.ofSeconds(20));
@@ -56,7 +56,7 @@ class LocalModeTest {
 
     @Test
     void a_channel_the_class_does_not_declare_is_refused_by_name() {
-        try (LocalOperative run = LocalOperative.start(WordCountOperative.class)) {
+        try (LocalOperator run = LocalOperator.start(WordCountOperator.class)) {
             assertThatThrownBy(() -> run.feed("nope", "x"))
                     .hasMessageContaining("nope")
                     .hasMessageContaining("lines");

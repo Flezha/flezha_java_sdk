@@ -5,12 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.flezha.sdk.LocalOperative;
+import com.flezha.sdk.LocalOperator;
 import com.flezha.sdk.SinkOutput;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.OverflowPolicy;
-import com.flezha.sdk.operative.StreamOperative;
-import com.flezha.sdk.runtime.operative.StatelessTestTasklet;
+import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.runtime.operator.StatelessTestTasklet;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.RestoreInitPayload;
@@ -38,12 +38,12 @@ import org.junit.jupiter.api.Test;
  * passes end to end are not two different graphs.
  *
  * <p>The other ten capabilities in the vocabulary are the controller's: persistence,
- * effectively-once, correction, partitioning, workflows, liveness, restarts. Local mode refuses them
+ * effectively-once, correction, partitioning, bounded operators, liveness, restarts. Local mode refuses them
  * by name rather than approximating them.
  *
  * <p>What each test can assert is what a run with no controller can see. A durable write reaches a
  * null sink, a parked payload has nowhere to park, and a partition member's key range arrives with
- * {@code AddOperative}, so the assertions here are the output side of each capability, which is the
+ * {@code AddOperator}, so the assertions here are the output side of each capability, which is the
  * half the language layer produces.
  *
  * <p>The classes are DECLARED HERE rather than imported, which the other SDKs' local-mode suites do
@@ -73,7 +73,7 @@ class LocalModeCapabilitiesTest {
         declares("shorthand", "sugar_do_nothing");
 
         List<SinkOutput> released = release(
-                SugarDoNothingStreamOperative.class, "input", "sugar_do_nothing_echo", List.of("alpha", "beta"));
+                SugarDoNothingUnboundedOperator.class, "input", "sugar_do_nothing_echo", List.of("alpha", "beta"));
 
         assertThat(payloads(released))
                 .as("the builder produced a graph the core ran, in order")
@@ -84,13 +84,13 @@ class LocalModeCapabilitiesTest {
     @DisplayName("keyed_channels: a keyed sink stamps the key the class resolved")
     void aKeyedSinkStampsTheKeyTheClassResolved() {
         // `partition_relay` is the manifest's only keyed-channel class. Partitioning itself is the
-        // controller's (a member's key-group range arrives with `AddOperative`), so what is asserted
+        // controller's (a member's key-group range arrives with `AddOperator`), so what is asserted
         // here is the half the language layer owns: the key it resolves and the stamps it puts on
         // the released value.
         declares("keyed_channels", "partition_relay");
 
         List<SinkOutput> released =
-                release(PartitionRelayStreamOperative.class, "in", "input", List.of("a:1", "b:1", "a:2"));
+                release(PartitionRelayUnboundedOperator.class, "in", "input", List.of("a:1", "b:1", "a:2"));
 
         assertThat(payloads(released)).containsExactlyInAnyOrder("a:1", "b:1", "a:2");
         assertThat(payloadsOfKey(released, "a")).containsExactly("a:1", "a:2");
@@ -111,7 +111,7 @@ class LocalModeCapabilitiesTest {
         declares("dynamic_cell", "dynamic_cell");
 
         List<SinkOutput> released =
-                release(DynamicCellStreamOperative.class, "input", "kafka", List.of("a:1", "b:1", "drop", "a:2"));
+                release(DynamicCellUnboundedOperator.class, "input", "kafka", List.of("a:1", "b:1", "drop", "a:2"));
 
         assertThat(payloads(released))
                 .as("the filter dropped `drop` before it was keyed, and every other value reached its Cell")
@@ -133,7 +133,7 @@ class LocalModeCapabilitiesTest {
 
         List<String> inputs = IntStream.range(0, 24).mapToObj(at -> "n" + at).toList();
         List<SinkOutput> released = release(
-                BoundedMailboxDropNothingStreamOperative.class, "drop_nothing_input", "drop_nothing_echo", inputs);
+                BoundedMailboxDropNothingUnboundedOperator.class, "drop_nothing_input", "drop_nothing_echo", inputs);
 
         assertThat(payloads(released))
                 .as("the mailbox holds 4 and 24 were fed: under `drop_nothing` the feed waits, in order")
@@ -145,7 +145,7 @@ class LocalModeCapabilitiesTest {
     void aDeclaredTimerFiresLocallyWithItsScheduledTime() {
         declares("cell_timers", "session_timeout");
 
-        List<SinkOutput> released = release(SessionTimeoutStreamOperative.class, "input", "kafka", List.of("open"));
+        List<SinkOutput> released = release(SessionTimeoutUnboundedOperator.class, "input", "kafka", List.of("open"));
 
         assertThat(payloads(released))
                 .as("the timer fired exactly once, carrying the timestamp it was scheduled for")
@@ -161,7 +161,7 @@ class LocalModeCapabilitiesTest {
         // instead of running the graph.
         declares("effectively_once", "tier_store");
 
-        assertThatThrownBy(() -> LocalOperative.start(TierStoreStreamOperative.class))
+        assertThatThrownBy(() -> LocalOperator.start(TierStoreUnboundedOperator.class))
                 .hasMessageContaining("effectively_once")
                 .hasMessageContaining("requires a controller");
     }
@@ -174,9 +174,9 @@ class LocalModeCapabilitiesTest {
      * the released values over.
      */
     private static List<SinkOutput> release(
-            Class<? extends StreamOperative> operative, String channel, String sink, List<String> inputs) {
+            Class<? extends UnboundedOperator> operator, String channel, String sink, List<String> inputs) {
         ConcurrentLinkedQueue<SinkOutput> released = new ConcurrentLinkedQueue<>();
-        try (LocalOperative run = LocalOperative.start(operative)) {
+        try (LocalOperator run = LocalOperator.start(operator)) {
             run.onSink(sink, released::add);
             inputs.forEach(input -> run.feed(channel, input));
             run.runUntilIdle(BUDGET);
@@ -225,7 +225,7 @@ class LocalModeCapabilitiesTest {
         return at < 0 ? input : input.substring(0, at);
     }
 
-    /** Releases the input's bytes on the operative's sink. */
+    /** Releases the input's bytes on the operator's sink. */
     abstract static class EchoTasklet extends StatelessTestTasklet<String, Object, byte[]> {
 
         @Override
@@ -246,8 +246,8 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    /** The graph the test app's {@code @StreamOperative}-annotated {@code SugarDoNothing} short form generates. */
-    public static final class SugarDoNothingStreamOperative implements StreamOperative {
+    /** The graph the test app's {@code @UnboundedOperator}-annotated {@code SugarDoNothing} short form generates. */
+    public static final class SugarDoNothingUnboundedOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "sugar_do_nothing";
@@ -277,7 +277,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class PartitionRelayStreamOperative implements StreamOperative {
+    public static final class PartitionRelayUnboundedOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "partition_relay";
@@ -286,7 +286,7 @@ class LocalModeCapabilitiesTest {
         @Override
         public void channels(ChannelBuilder c) {
             // The entry channel is `in` and the sink `input` because a forwarded frame keeps its
-            // producing channel's name, and that is what selects the receiving operative's channel.
+            // producing channel's name, and that is what selects the receiving operator's channel.
             c.input(String.class, "in")
                     .keyBy(LocalModeCapabilitiesTest::key)
                     .into(PartitionRelayTasklet.class)
@@ -302,7 +302,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class DynamicCellStreamOperative implements StreamOperative {
+    public static final class DynamicCellUnboundedOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "dynamic_cell";
@@ -331,7 +331,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class BoundedMailboxDropNothingStreamOperative implements StreamOperative {
+    public static final class BoundedMailboxDropNothingUnboundedOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "bounded_mailbox_drop_nothing";
@@ -374,7 +374,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class SessionTimeoutStreamOperative implements StreamOperative {
+    public static final class SessionTimeoutUnboundedOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "session_timeout";
@@ -422,7 +422,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class TierStoreStreamOperative implements StreamOperative {
+    public static final class TierStoreUnboundedOperator implements UnboundedOperator {
         @Override
         public String factoryId() {
             return "tier_store";

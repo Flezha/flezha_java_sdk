@@ -6,7 +6,7 @@
  * feed another tasklet exactly as readily as it can feed a sink, so a chain of stages is the
  * normal shape rather than a special case.
  *
- * <p>{@link com.flezha.examples.pipeline.PipelineOperative} holds the entire lesson in one
+ * <p>{@link com.flezha.examples.pipeline.PipelineOperator} holds the entire lesson in one
  * expression: an entry channel feeds {@link com.flezha.examples.pipeline.Normalize}, whose output
  * is labelled and feeds {@link com.flezha.examples.pipeline.Shout}, whose output reaches a sink.
  * The two tasklets are deliberately trivial so that nothing distracts from the wiring.

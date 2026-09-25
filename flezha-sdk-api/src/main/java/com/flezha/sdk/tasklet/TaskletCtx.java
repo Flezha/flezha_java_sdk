@@ -16,7 +16,7 @@ import javax.annotation.Nonnull;
  *     public void run(Order order, CartHandle cart, TaskletCtx ctx) throws TaskletException {
  *         cart.pushItems(order.item());
  *         cart.setUpdatedMs(ctx.now());          // ctx.now(), never System.currentTimeMillis()
- *         ctx.emit("added " + order.item());     // where this goes is the operative's business
+ *         ctx.emit("added " + order.item());     // where this goes is the operator's business
  *     }
  * }
  * }</pre>
@@ -24,7 +24,7 @@ import javax.annotation.Nonnull;
  * <p>The three members worth knowing before anything else:
  *
  * <ul>
- *   <li>{@link #emit} sends a value onward. The destination is declared by the operative, not here,
+ *   <li>{@link #emit} sends a value onward. The destination is declared by the operator, not here,
  *       so a graph can be rewired without touching the tasklet.
  *   <li>{@link #now()} is the invocation's time, computed once by the runtime from the tasklet's
  *       declared clock and served identically on a replay. Reading the system clock instead makes
@@ -80,22 +80,22 @@ public interface TaskletCtx {
      * window, a completed batch). The interval you leave open is the work a
      * crash replays and the work the controller's input log retains.
      *
-     * <p>A no-op unless the Operative declared {@code checkpointAck()}.
+     * <p>A no-op unless the Operator declared {@code checkpointAck()}.
      */
     void checkpoint();
 
     /**
-     * End the workflow this tasklet runs in, with {@code result}. The call does not stop the
+     * End the bounded operator this tasklet runs in, with {@code result}. The call does not stop the
      * iteration: its remaining tasklets still run and commit, and the instance then ends with
      * status {@code ok} and this result instead of waiting for its next input, re-seeding a chained
-     * loop or parking. In a {@code ONCE} workflow it is the result the single pass ends with.
+     * loop or parking. In a {@code ONCE} bounded operator it is the result the single pass ends with.
      *
      * <p>A later call in the same invocation replaces an earlier one. When several cells call it
      * in one iteration, the instance ends once, with the result of the tasklet latest in the
      * chain and, within it, of the greatest cell key.
      *
-     * <p>A stream never completes: a stream tasklet calling this fails its input with a
-     * non-retryable {@code CompleteOutsideWorkflow} error.
+     * <p>An unbounded operator never completes: an unbounded tasklet calling this fails its input with a
+     * non-retryable {@code CompleteOutsideBounded} error.
      */
     void complete(byte[] result);
 
@@ -105,7 +105,7 @@ public interface TaskletCtx {
     }
 
     /**
-     * Ask the controller for a new workflow instance of {@code factoryId}, under an id it
+     * Ask the controller for a new bounded instance of {@code factoryId}, under an id it
      * generates, with {@code payload} as the instance's first input.
      *
      * <p>Returns a handle at once. The request cannot fault this tasklet: a refusal, an
@@ -117,7 +117,7 @@ public interface TaskletCtx {
      * spawn reissued after a lost or timed-out answer starts a second instance, and a replayed
      * invocation answers an empty id, because the generated one existed only in the live run's
      * answer. A caller who needs at most one instance, or the id on replay, passes its own id
-     * through {@link #spawnWorkflow(String, byte[], SpawnOptions)}.
+     * through {@link #spawnBounded(String, byte[], SpawnOptions)}.
      *
      * <p>Spawning is a side effect of <b>live</b> processing. Replayed input (a crash-resume or a
      * late-input correction re-running this invocation) issues no request and answers
@@ -128,12 +128,12 @@ public interface TaskletCtx {
      * live run never had.
      */
     @Nonnull
-    default SpawnHandle spawnWorkflow(String factoryId, byte[] payload) {
+    default SpawnHandle spawnBounded(String factoryId, byte[] payload) {
         return SpawnRequests.request(activationToken(), factoryId, "", payload, IfRunning.DELIVER, replaying());
     }
 
     /**
-     * Ask the controller for the workflow instance {@code options} names: start {@code factoryId}
+     * Ask the controller for the bounded instance {@code options} names: start {@code factoryId}
      * under that id if it is free, otherwise apply its {@link IfRunning} policy
      * ({@link IfRunning#DELIVER}, the default, feeds the running instance; {@link IfRunning#ERROR}
      * reports {@link SpawnException.AlreadyRunning}). {@code payload} is the instance's first input
@@ -142,17 +142,17 @@ public interface TaskletCtx {
      * <p>Concurrent requests for one id resolve controller-side: exactly one spawns and every other
      * payload is delivered to it. A replayed invocation answers
      * {@link SpawnOutcome#SKIPPED_ON_REPLAY} with that id. The handle, the failures and the replay
-     * rule are those of {@link #spawnWorkflow(String, byte[])}.
+     * rule are those of {@link #spawnBounded(String, byte[])}.
      */
     @Nonnull
-    default SpawnHandle spawnWorkflow(String factoryId, byte[] payload, SpawnOptions options) {
+    default SpawnHandle spawnBounded(String factoryId, byte[] payload, SpawnOptions options) {
         return SpawnRequests.request(activationToken(), factoryId, options.id, payload, options.ifRunning, replaying());
     }
 
     /**
      * Whether this invocation is re-running already-processed input. Runtime
      * detail: the dispatcher overrides it, and it is what makes
-     * {@link #spawnWorkflow} a live-processing-only side effect.
+     * {@link #spawnBounded} a live-processing-only side effect.
      */
     default boolean replaying() {
         return false;
@@ -202,7 +202,7 @@ public interface TaskletCtx {
      * <p>The anchor is {@code ctx.now()} — the declared Clock — not an ambient
      * read, which is what makes a replayed invocation register the same absolute
      * timestamp the live one did. Under an {@code EventTimeFrom} clock the
-     * anchor is therefore the input's event time: a stream that is caught up
+     * anchor is therefore the input's event time: an unbounded operator that is caught up
      * schedules the same instant a wall clock would, and one replaying history
      * schedules a past instant, which fires at once.
      */
@@ -247,7 +247,7 @@ public interface TaskletCtx {
 
     /**
      * Emit a typed value on this Tasklet's declared output channel. The channel
-     * id was resolved once, when the operative's wiring was registered, so this
+     * id was resolved once, when the operator's wiring was registered, so this
      * call performs no name lookups.
      *
      * <p>Inter-tasklet channels: the value is passed by reference to consumer

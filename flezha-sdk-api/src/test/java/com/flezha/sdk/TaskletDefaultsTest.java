@@ -3,7 +3,7 @@ package com.flezha.sdk;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.flezha.sdk.operative.StreamOperativeConfigurationException;
+import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateHandle;
@@ -111,7 +111,7 @@ class TaskletDefaultsTest {
     @Test
     void anUnresolvableTokenFailsNamingTheClassAndParameter() {
         assertThatThrownBy(() -> new StillGeneric<String>().inputType())
-                .isInstanceOf(StreamOperativeConfigurationException.class)
+                .isInstanceOf(UnboundedOperatorConfigurationException.class)
                 .hasMessageContaining(StillGeneric.class.getName())
                 .hasMessageContaining("Input")
                 .hasMessageContaining("inputType");

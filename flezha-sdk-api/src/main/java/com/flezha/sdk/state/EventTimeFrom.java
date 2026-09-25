@@ -7,7 +7,7 @@ package com.flezha.sdk.state;
  *
  * <p>Rust binds the extractor at compile time
  * ({@code EventTimeFrom<F: TimeExtractor<Input>>}); Java's erasure precludes
- * that, so a missing override fails Operative registration instead.
+ * that, so a missing override fails Operator registration instead.
  *
  * <p>This is the clock the stream late-input correction rests on — the
  * event time it reports is what the controller maps back to an input offset.

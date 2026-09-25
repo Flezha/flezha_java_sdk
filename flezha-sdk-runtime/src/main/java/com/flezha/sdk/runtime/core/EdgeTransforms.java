@@ -1,7 +1,7 @@
 package com.flezha.sdk.runtime.core;
 
-import com.flezha.sdk.runtime.operative.ConsumerEdge;
-import com.flezha.sdk.runtime.operative.EdgeYield;
+import com.flezha.sdk.runtime.operator.ConsumerEdge;
+import com.flezha.sdk.runtime.operator.EdgeYield;
 import java.util.List;
 
 /**
@@ -11,7 +11,7 @@ import java.util.List;
  * <p>Three callers evaluate this rule — {@link CellRouting#valuesForCell}
  * at delivery, {@link CellRouting#prepare} when the core asks a payload for
  * its keys or its event time, and {@link EmitContext} producer-side. The value
- * a handler sees has crossed the chain exactly once: a stream producer
+ * a handler sees has crossed the chain exactly once: an unbounded producer
  * evaluates the edge as its activation completes, and delivery evaluates it
  * only for the payloads no producer transformed. The prepare crossing answers
  * a question about a payload and hands no value on.

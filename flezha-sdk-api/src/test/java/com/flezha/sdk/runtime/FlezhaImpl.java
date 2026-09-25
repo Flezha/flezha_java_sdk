@@ -1,6 +1,6 @@
 package com.flezha.sdk.runtime;
 
-import com.flezha.sdk.OperativeTypeInUseException;
+import com.flezha.sdk.OperatorTypeInUseException;
 import com.flezha.sdk.internal.RunnerHandle;
 import java.util.ArrayList;
 import java.util.List;
@@ -80,7 +80,7 @@ public final class FlezhaImpl implements RunnerHandle {
 
     @Override
     @Nonnull
-    public Map<String, ?> operatives() {
+    public Map<String, ?> operators() {
         return Map.of();
     }
 
@@ -93,10 +93,10 @@ public final class FlezhaImpl implements RunnerHandle {
     public void removeType(@Nonnull String factoryId) {
         int live = LIVE_INSTANCES.getOrDefault(factoryId, 0);
         if (live > 0) {
-            throw new OperativeTypeInUseException("factory '" + factoryId + "' has " + live
-                    + " live operative instance(s); stop them before removing the type");
+            throw new OperatorTypeInUseException("factory '" + factoryId + "' has " + live
+                    + " live operator instance(s); stop them before removing the type");
         }
-        com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry.unregisterClass(factoryId);
+        com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry.unregisterClass(factoryId);
     }
 
     @Override

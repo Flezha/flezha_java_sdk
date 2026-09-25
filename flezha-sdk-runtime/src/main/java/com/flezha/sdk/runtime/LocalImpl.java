@@ -5,14 +5,14 @@ import com.flezha.sdk.Logger;
 import com.flezha.sdk.SinkOutput;
 import com.flezha.sdk.internal.LocalRunHandle;
 import com.flezha.sdk.native_.FlzCore;
-import com.flezha.sdk.operative.StreamOperative;
+import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.runtime.config.FlezhaEnv;
 import com.flezha.sdk.runtime.core.ActivationCodec;
 import com.flezha.sdk.runtime.core.ActivationDispatcher;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.core.Output;
 import com.flezha.sdk.runtime.core.OutputTarget;
-import com.flezha.sdk.runtime.operative.StreamOperativeClassRegistry;
+import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,7 +23,7 @@ import javax.annotation.Nonnull;
 
 /**
  * Runtime implementation of {@link LocalRunHandle}, resolved by reflection
- * from the public {@code LocalOperative}. The local twin of
+ * from the public {@code LocalOperator}. The local twin of
  * {@link FlezhaImpl}: it declares the class exactly as a deployed runner
  * does and brings the same {@link PollHost} threads, and differs in one call
  * — {@code localStart} instead of {@code start}, so nothing dials a
@@ -51,10 +51,10 @@ public final class LocalImpl implements LocalRunHandle {
         this.outputs.setDaemon(true);
     }
 
-    /** Entry point invoked by reflection from {@code LocalOperative.start}. */
+    /** Entry point invoked by reflection from {@code LocalOperator.start}. */
     @Nonnull
-    public static LocalRunHandle start(@Nonnull Class<? extends StreamOperative> type) {
-        String factoryId = StreamOperativeClassRegistry.registerClass(type);
+    public static LocalRunHandle start(@Nonnull Class<? extends UnboundedOperator> type) {
+        String factoryId = UnboundedOperatorClassRegistry.registerClass(type);
         long core = FlzCore.newContext();
         try {
             FlzCore.declareClass(core, HostClassDeclaration.forFactory(factoryId));

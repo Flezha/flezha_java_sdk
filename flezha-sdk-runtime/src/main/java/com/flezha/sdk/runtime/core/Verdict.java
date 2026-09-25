@@ -19,8 +19,8 @@ public sealed interface Verdict {
 
     /**
      * Discriminant 3: the entry channel's decoder, or a transform on its edge,
-     * rejected the payload before any tasklet ran. A stream parks the item as
-     * a non-retryable error would; a workflow parks the message under the entry
+     * rejected the payload before any tasklet ran. An unbounded operator parks the item as
+     * a non-retryable error would; a bounded operator parks the message under the entry
      * channel once the stage's ladder exhausts, and goes on waiting instead of
      * ending.
      */
