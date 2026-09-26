@@ -9,7 +9,7 @@ import com.flezha.sdk.tasklet.TaskletException;
  * Asks the exchange whether the order filled, on one arm of the fan-out. The paper exchange
  * rejects anything above its own size, which is what makes this the step that fails.
  *
- * <p>It remembers nothing and has nothing to undo, so it is written with {@code @Tasklet}. It
+ * <p>It remembers nothing and has nothing to undo, so it declares only {@code run}. It
  * ends the instance with a result rather than emitting one: the order's outcome is the instance's
  * own answer, which {@code flz operator info} reads back, so the desk needs no sink here.
  *

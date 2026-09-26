@@ -4,19 +4,24 @@ The toy trader the [Part 2 guides](../../../../docs/guides/guides.md) build, as 
 standalone project. Nothing here depends on the Flezha source tree: the
 `pom.xml` names one released coordinate, the way your own project would.
 
-So far it holds the runner and the paper-order bounded operator. The guides add an
-operator at a time, and each one is registered in `Main.java` before `start()`.
+It holds the desk's two operators and the runner that serves them. The guides
+write them one tasklet at a time.
 
 | File | What is in it |
 |---|---|
-| `Main.java` | the runner: this process joins the `trading` namespace and serves the desk's operators |
-| `PaperOrderOperator.java` | the bounded operator: the entry channel, the three steps in order, and the channels their output leaves on. The order an instance is started with is the `OrderTicket` record here |
+| `Main.java` | the runner: this process joins the `trading` namespace and registers both factories |
+| `PricesOperator.java` | the ETL stream, an unbounded operator: trades in, a cell per symbol, buy signals out |
+| `TrackPrices.java` | keeps each symbol's last ten prices, and compares a new price with their average |
+| `BuyAboveAverage.java` | starts an order when a price is 2 % or more above its average |
+| `PaperOrderOperator.java` | the workflow, a bounded operator: two steps in order, then two side by side. The order an instance is started with is the `OrderTicket` record here |
 | `ReserveFunds.java` | step one: puts the money aside, and releases it again if the order is undone |
 | `PlaceOrder.java` | step two: places the paper order, and cancels it if the order is undone |
-| `ConfirmFill.java` | step three: books the fill, and refuses an order above the desk's limit |
+| `ConfirmFill.java` | confirms the fill and ends the order with its result, and refuses an order above the exchange's limit |
+| `RecordOrder.java` | books the placed order, and has nothing to undo |
 
-What a step remembers, and the change that records it, sit inside the step's own
-class, because nothing else uses them.
+Every tasklet is a class annotated `@Tasklet`. What a tasklet remembers, and the
+records it takes and hands on, sit inside its own class, because nothing else
+uses them.
 
 ## Run it
 
@@ -39,62 +44,68 @@ From another terminal, the controller lists it:
 flz runner list --namespace trading
 ```
 
-## Start the bounded operator
+## Start an order by hand
 
-One instance is one order. `--text` carries the order on the `order` channel;
-`--init-values` would set a tasklet's starting state. The file sink attached at
-the start writes down everything the instance emits:
+One instance of `paper_order` is one order. `--text` carries the order on the
+`order` channel:
 
 ```sh
 flz operator start paper_order --id order_1 --namespace trading \
-  --text '{"symbol": "AAPL", "quantity": 10}' --channel order \
-  --plugins '[{"id":"order_1_writer","provider":"operator_file_sink","operator_id":"order_1","opts":{"path":"order_1.txt"},"hooks":[["on_output",{}]]}]'
+  --text '{"symbol": "EUR/USD", "quantity": 10}' --channel order
 ```
+
+The runner's terminal shows the order being booked. The ids come from
+`ctx.stableId()`, so yours differ:
+
+```
+[book] EUR/USD 10 as ord-6b2e13f521b6781afd9f710152cd2f25
+```
+
+The instance then ends on its own, and `flz operator info` shows how:
 
 ```sh
-cat app_data/files/order_1.txt
+flz operator info order_1 --namespace trading
 ```
 
 ```
-res-1: AAPL 10
-ord-2: AAPL 10
-filled: AAPL 10
+Operator: order_1
+  Kind: bounded
+  Phase: finished
+  Status: ok
 ```
-
-One line per step: the money is reserved, the order is placed, the fill is
-booked. The instance then completes on its own, which is why
-`flz operator list` no longer shows it and `flz operator listen` has nothing
-left to attach to.
 
 ## Watch it undo itself
 
-The desk books at most 100 at a time, so a larger order is refused by the last
-step. Start one the same way, with a quantity above the limit:
+The paper exchange fills at most 100 at a time, so `confirm_fill` refuses a
+larger order. Start one the same way, with a quantity above the limit:
 
 ```sh
 flz operator start paper_order --id order_2 --namespace trading \
-  --text '{"symbol": "AAPL", "quantity": 500}' --channel order \
-  --plugins '[{"id":"order_2_writer","provider":"operator_file_sink","operator_id":"order_2","opts":{"path":"order_2.txt"},"hooks":[["on_output",{}]]}]'
+  --text '{"symbol": "EUR/USD", "quantity": 500}' --channel order
+```
+
+`confirm_fill` is tried three times, and then the order ends in failure. Every
+step that had finished is undone, in reverse: the order is cancelled, then the
+money is released. `record_order` has no undo, so the booking stays:
+
+```
+[book] EUR/USD 500 as ord-0e7ee9553cfe5eac606fd232fd7ab33c
+[flezha] tasklet confirm_fill attempt 1/3 failed (retrying in 50 ms): the exchange fills at most 100 a time, and this is 500
+[flezha] tasklet confirm_fill attempt 2/3 failed (retrying in 73 ms): the exchange fills at most 100 a time, and this is 500
+[undo] cancelled ord-0e7ee9553cfe5eac606fd232fd7ab33c
+[undo] released res-54e4641a002cc27f8d030507d8d5aea5
 ```
 
 ```sh
-cat app_data/files/order_2.txt
+flz operator info order_2 --namespace trading
 ```
 
 ```
-res-4: AAPL 500
-ord-5: AAPL 500
-cancelled ord-5
-released res-4
-```
-
-The first two steps ran, the third refused the order, and after its retries
-were spent the instance ended abnormally. Every step that had finished was then
-undone, in reverse: the order was cancelled, then the money was released. The
-runner's terminal shows the retries that came first:
-
-```
-[flezha] bounded operator order_2 tasklet confirm_fill cell - attempt 1/3 failed (retrying in 386 ms): the desk books at most 100 a time, and this is 500
+Operator: order_2
+  Kind: bounded
+  Phase: finished
+  Status: error
+  Error: the exchange fills at most 100 a time, and this is 500
 ```
 
 ## Building from a checkout

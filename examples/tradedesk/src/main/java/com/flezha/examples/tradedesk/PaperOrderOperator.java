@@ -22,7 +22,7 @@ public final class PaperOrderOperator implements BoundedOperator {
 
     /**
      * The order an instance is started with. The entry channel declares this type, so the first
-     * message is decoded into it: {@code --text '{"symbol": "AAPL", "quantity": 10}' --channel order}.
+     * message is decoded into it: {@code --text '{"symbol": "EUR/USD", "quantity": 10}' --channel order}.
      */
     public record OrderTicket(String symbol, int quantity) {}
 
@@ -57,8 +57,8 @@ public final class PaperOrderOperator implements BoundedOperator {
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
         c.input(OrderTicket.class, "order")
-                .into(ReserveFunds.class)
-                .into(PlaceOrder.class)
+                .into(ReserveFundsTasklet.class)
+                .into(PlaceOrderTasklet.class)
                 .branch(
                         fill -> fill.into(ConfirmFillTasklet.class),
                         book -> book.into(RecordOrderTasklet.class));

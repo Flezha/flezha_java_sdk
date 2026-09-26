@@ -1,68 +1,36 @@
 package com.flezha.examples.tradedesk;
 
 import com.flezha.examples.tradedesk.PaperOrderOperator.OrderTicket;
-import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.authoring.State;
+import com.flezha.sdk.authoring.Tasklet;
 import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.WallClock;
 import java.util.List;
-import java.util.Optional;
 
 /**
- * Step one: put the money for the order aside.
+ * Step one: put the money for the order aside, and release it again if the order is undone.
  *
- * <p>A step that keeps state or has something to undo implements {@link Tasklet} directly, and
- * this one does both. The six type arguments are, in order, the input, the state, the output, the
- * change, the clock and the configuration. The desk's stateless steps take the
- * {@code @Tasklet} short form instead, which is why the operator wires some classes by their
- * own name and others by a generated one.
+ * <p>{@code run} takes the context because the reservation id comes from {@code ctx.stableId()},
+ * so it returns nothing and {@code emits} declares what it hands on.
  */
-public final class ReserveFunds
-        implements Tasklet<OrderTicket, ReserveFunds.Reservation, ReserveFunds.Reserved, ReserveFunds.Taken, WallClock, Void> {
-
-    /** What this step remembers. The undo handle belongs here: state survives a restart, output does not. */
-    public static final class Reservation {
-        public String id = "";
-    }
-
-    /** The one change it records. Applying it twice leaves the same id, which a resume needs. */
-    public record Taken(String id) implements Change {}
+@Tasklet(id = "reserve_funds", emits = ReserveFunds.Reserved.class)
+public final class ReserveFunds {
 
     /** What it hands on: the order, and the reservation holding the money for it. */
     public record Reserved(OrderTicket order, String reservationId) {}
 
-    @Override
-    public String name() {
-        return "reserve_funds";
+    /** What this step remembers. The undo handle belongs here: state survives a restart, output does not. */
+    @State
+    public static class Reservation {
+        public String id = "";
     }
 
-    /** The journal has to know how to write the state and its changes. */
-    @Override
-    public List<Class<?>> kryoTypes() {
-        return List.of(Reservation.class, Taken.class);
-    }
-
-    @Override
-    public Reservation initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-        return new Reservation();
-    }
-
-    @Override
-    public void applyChange(Reservation state, Taken change) {
-        state.id = change.id();
-    }
-
-    @Override
-    public void run(OrderTicket order, StateHandle<Reservation, Taken> state, TaskletCtx ctx)
-            throws TaskletException {
+    public void run(OrderTicket order, ReservationHandle reservation, TaskletCtx ctx) throws TaskletException {
         // ctx.stableId(), not a random id: a re-executed step derives the same one, so the ledger
         // sees a retry rather than a second sum put aside.
-        String reservationId = "res-" + ctx.stableId();
-        state.apply(new Taken(reservationId));
-        ctx.emit(new Reserved(order, reservationId));
+        String id = "res-" + ctx.stableId();
+        reservation.setId(id);
+        ctx.emit(new Reserved(order, id));
     }
 
     /**
@@ -73,9 +41,7 @@ public final class ReserveFunds
      * <p>The id comes from the state, not from {@code completedOutput}: state is restored on
      * resume and emitted output is not, so after a crash-resumed rollback that list can be empty.
      */
-    @Override
-    public void compensate(List<Reserved> completedOutput, StateHandle<Reservation, Taken> state, TaskletCtx ctx)
-            throws TaskletException {
-        System.out.println("[undo] released " + state.get().id);
+    public void compensate(List<Reserved> completedOutput, ReservationHandle reservation) {
+        System.out.println("[undo] released " + reservation.get().id);
     }
 }
