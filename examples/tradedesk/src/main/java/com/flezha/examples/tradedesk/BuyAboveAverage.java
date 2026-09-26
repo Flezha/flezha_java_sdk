@@ -1,6 +1,5 @@
 package com.flezha.examples.tradedesk;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.examples.tradedesk.PaperOrderOperator.OrderTicket;
 import com.flezha.examples.tradedesk.TrackPrices.Move;
 import com.flezha.sdk.authoring.Tasklet;
@@ -21,8 +20,6 @@ import com.flezha.sdk.tasklet.TaskletException;
 @Tasklet(id = "buy_above_average", emits = String.class)
 public final class BuyAboveAverage {
 
-    private static final ObjectMapper JSON = new ObjectMapper();
-
     /** How far above its average a price has to be before the desk buys, in percent. */
     private static final double BUY_ABOVE_PCT = 2.0;
 
@@ -35,16 +32,10 @@ public final class BuyAboveAverage {
             return;
         }
 
-        byte[] ticket;
-        try {
-            ticket = JSON.writeValueAsBytes(new OrderTicket(move.symbol(), LOT));
-        } catch (Exception unserializable) {
-            throw new TaskletException("could not encode the order: " + unserializable.getMessage());
-        }
-
         // No id: the controller names the instance. A replay of this invocation issues no request,
-        // so re-running an input never places a second order.
-        ctx.spawnBounded("paper_order", ticket);
+        // so re-running an input never places a second order. The ticket travels as JSON, which
+        // the order's entry channel decodes back into an OrderTicket.
+        ctx.spawnBounded("paper_order", new OrderTicket(move.symbol(), LOT));
 
         ctx.emit(String.format(
                 "%s %.2f is %.2f%% above its average of %.2f, buying %d",

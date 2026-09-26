@@ -7,6 +7,7 @@ import com.flezha.sdk.channel.EdgeStream;
 import com.flezha.sdk.channel.EntryChannel;
 import com.flezha.sdk.channel.Merge;
 import com.flezha.sdk.channel.OverflowPolicy;
+import com.flezha.sdk.channel.PlainPayload;
 import com.flezha.sdk.channel.RetryPolicy;
 import com.flezha.sdk.channel.RoutedDocument;
 import com.flezha.sdk.channel.Stream;
@@ -160,7 +161,7 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
     public <T> EntryChannel<T> input(@Nonnull Class<T> type, @Nonnull String name) {
         checkMutable();
         boolean parsed = type != byte[].class && type != String.class;
-        return declareEntry(type, name, PayloadCodecs.defaultEntryParser(type), parsed);
+        return declareEntry(type, name, bytes -> PlainPayload.decode(bytes, type), parsed);
     }
 
     @Override

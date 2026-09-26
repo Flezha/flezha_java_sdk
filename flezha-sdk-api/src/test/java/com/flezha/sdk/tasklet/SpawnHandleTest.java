@@ -58,6 +58,34 @@ class SpawnHandleTest {
         assertThat(core.requests).containsExactly("42/worker/w1/p/deliver/false", "42/worker/w1/p/error/false");
     }
 
+    record Ticket(String symbol, int quantity) {}
+
+    @Test
+    @DisplayName("a payload is encoded as a sink with no encoder encodes it: a string as UTF-8, a record as JSON")
+    void aPayloadIsEncodedAsASinkWithNoEncoder() {
+        SpawnRequests.install(core);
+        TaskletCtx ctx = new StubCtx(false, 42);
+
+        ctx.spawnBounded("worker", "p");
+        ctx.spawnBounded("worker", new Ticket("AAPL", 10), SpawnOptions.id("w1"));
+
+        assertThat(core.requests)
+                .containsExactly(
+                        "42/worker//p/deliver/false",
+                        "42/worker/w1/{\"symbol\":\"AAPL\",\"quantity\":10}/deliver/false");
+    }
+
+    @Test
+    @DisplayName("complete encodes its result by the same rule: a string as UTF-8, a record as JSON")
+    void completeEncodesItsResultByTheSameRule() {
+        StubCtx ctx = new StubCtx(false, 42);
+
+        ctx.complete("filled");
+        ctx.complete(new Ticket("AAPL", 10));
+
+        assertThat(ctx.completed()).containsExactly("filled", "{\"symbol\":\"AAPL\",\"quantity\":10}");
+    }
+
     @Test
     @DisplayName("the error policy comes back as already running, in the core's own words")
     void theErrorPolicyComesBackAsAlreadyRunning() {
@@ -242,8 +270,12 @@ class SpawnHandleTest {
         }
     }
 
-    /** Only the members {@code spawnBounded}'s default implementation reads. */
-    private record StubCtx(boolean replay, long token) implements TaskletCtx {
+    /** Only the members the defaults of {@code spawnBounded} and {@code complete} read. */
+    private record StubCtx(boolean replay, long token, List<String> completed) implements TaskletCtx {
+        StubCtx(boolean replay, long token) {
+            this(replay, token, new CopyOnWriteArrayList<>());
+        }
+
         @Override
         public boolean replaying() {
             return replay;
@@ -268,7 +300,9 @@ class SpawnHandleTest {
         public void checkpoint() {}
 
         @Override
-        public void complete(byte[] result) {}
+        public void complete(byte[] result) {
+            completed.add(new String(result, StandardCharsets.UTF_8));
+        }
 
         @Override
         public <C> void emitKeyed(String key, C value) {}

@@ -3,6 +3,7 @@ package com.flezha.sdk.runtime.operator.builder;
 import com.flezha.sdk.channel.Channel;
 import com.flezha.sdk.channel.EdgeStream;
 import com.flezha.sdk.channel.OverflowPolicy;
+import com.flezha.sdk.channel.PlainPayload;
 import com.flezha.sdk.channel.Stream;
 import com.flezha.sdk.runtime.core.HostLink;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.ChannelEntry;
@@ -153,7 +154,7 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
     @Override
     @Nonnull
     public Stream<T> sink(@Nonnull String channel) {
-        return attachSink(channel, PayloadCodecs.defaultSerializer(payloadType()));
+        return attachSink(channel, PlainPayload::encode);
     }
 
     @Override
@@ -165,7 +166,7 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
     @Override
     @Nonnull
     public Stream<T> sink() {
-        return attachSink(null, PayloadCodecs.defaultSerializer(payloadType()));
+        return attachSink(null, PlainPayload::encode);
     }
 
     private Stream<T> attachSink(@Nullable String channel, Function<T, byte[]> serializer) {
@@ -190,12 +191,6 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
     public Channel<T> sealed() {
         owner.checkMutable();
         return new Channel<>();
-    }
-
-    /** The producer node's declared output type: this stream's payload type. */
-    @SuppressWarnings("unchecked")
-    private Class<T> payloadType() {
-        return (Class<T>) owner.tasklet(node).outputType;
     }
 
     @SuppressWarnings("unchecked")

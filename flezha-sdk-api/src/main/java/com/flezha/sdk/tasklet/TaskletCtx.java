@@ -1,6 +1,6 @@
 package com.flezha.sdk.tasklet;
 
-import java.nio.charset.StandardCharsets;
+import com.flezha.sdk.channel.PlainPayload;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
@@ -99,14 +99,19 @@ public interface TaskletCtx {
      */
     void complete(byte[] result);
 
-    /** {@link #complete(byte[])} with the UTF-8 bytes of {@code result}. */
-    default void complete(String result) {
-        complete(result.getBytes(StandardCharsets.UTF_8));
+    /**
+     * {@link #complete(byte[])} with {@code result} encoded as a sink with no encoder encodes a
+     * value ({@link PlainPayload}): a {@code String} as UTF-8, anything else as JSON.
+     */
+    default void complete(Object result) {
+        complete(PlainPayload.encode(result));
     }
 
     /**
      * Ask the controller for a new bounded instance of {@code factoryId}, under an id it
-     * generates, with {@code payload} as the instance's first input.
+     * generates, with {@code payload} as the instance's first input. The payload is encoded as a
+     * sink with no encoder encodes a value ({@link PlainPayload}): a {@code byte[]} as it is, a
+     * {@code String} as UTF-8, anything else as JSON, which the instance's entry channel decodes.
      *
      * <p>Returns a handle at once. The request cannot fault this tasklet: a refusal, an
      * unreachable controller or an unknown factory is reported only by a read of the returned
@@ -117,7 +122,7 @@ public interface TaskletCtx {
      * spawn reissued after a lost or timed-out answer starts a second instance, and a replayed
      * invocation answers an empty id, because the generated one existed only in the live run's
      * answer. A caller who needs at most one instance, or the id on replay, passes its own id
-     * through {@link #spawnBounded(String, byte[], SpawnOptions)}.
+     * through {@link #spawnBounded(String, Object, SpawnOptions)}.
      *
      * <p>Spawning is a side effect of <b>live</b> processing. Replayed input (a crash-resume or a
      * late-input correction re-running this invocation) issues no request and answers
@@ -128,8 +133,9 @@ public interface TaskletCtx {
      * live run never had.
      */
     @Nonnull
-    default SpawnHandle spawnBounded(String factoryId, byte[] payload) {
-        return SpawnRequests.request(activationToken(), factoryId, "", payload, IfRunning.DELIVER, replaying());
+    default SpawnHandle spawnBounded(String factoryId, Object payload) {
+        return SpawnRequests.request(
+                activationToken(), factoryId, "", PlainPayload.encode(payload), IfRunning.DELIVER, replaying());
     }
 
     /**
@@ -142,11 +148,12 @@ public interface TaskletCtx {
      * <p>Concurrent requests for one id resolve controller-side: exactly one spawns and every other
      * payload is delivered to it. A replayed invocation answers
      * {@link SpawnOutcome#SKIPPED_ON_REPLAY} with that id. The handle, the failures and the replay
-     * rule are those of {@link #spawnBounded(String, byte[])}.
+     * rule are those of {@link #spawnBounded(String, Object)}.
      */
     @Nonnull
-    default SpawnHandle spawnBounded(String factoryId, byte[] payload, SpawnOptions options) {
-        return SpawnRequests.request(activationToken(), factoryId, options.id, payload, options.ifRunning, replaying());
+    default SpawnHandle spawnBounded(String factoryId, Object payload, SpawnOptions options) {
+        return SpawnRequests.request(
+                activationToken(), factoryId, options.id, PlainPayload.encode(payload), options.ifRunning, replaying());
     }
 
     /**
