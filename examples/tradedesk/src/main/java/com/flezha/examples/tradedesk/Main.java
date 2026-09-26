@@ -12,8 +12,9 @@ import com.flezha.sdk.FlezhaRunner;
  * its namespace with that namespace's key, read from {@code FLEZHA_NAMESPACE_SECRET}.
  *
  * <p>The guides write the desk's operators one at a time, and each is registered here before
- * {@code start()}. {@code registerFactory(...)} is the same call for both kinds, the stream that
- * tracks prices and the bounded operator that places one order.
+ * {@code start()}. Registering a factory starts nothing: it offers the controller operators of
+ * that type, which are started from it later. {@code registerFactory(...)} is the same call for
+ * both kinds, the stream that tracks prices and the bounded operator that places one order.
  */
 public final class Main {
 

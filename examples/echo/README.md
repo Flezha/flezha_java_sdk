@@ -10,7 +10,7 @@ Three files, one for each part the guides describe:
 |---|---|---|
 | `Echo.java` | the tasklet | the processing stage: prefixes each message |
 | `EchoOperator.java` | the operator | the graph: `in` feeds the tasklet, output lands on `out` |
-| `Main.java` | the runner | this process: offers the operator and waits |
+| `Main.java` | the runner | this process: registers the echo factory and waits |
 
 ## Run it
 

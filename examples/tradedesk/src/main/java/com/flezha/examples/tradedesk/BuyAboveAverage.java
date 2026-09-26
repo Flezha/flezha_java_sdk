@@ -2,7 +2,7 @@ package com.flezha.examples.tradedesk;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.examples.tradedesk.PaperOrderOperator.OrderTicket;
-import com.flezha.examples.tradedesk.PricesOperator.Move;
+import com.flezha.examples.tradedesk.TrackPrices.Move;
 import com.flezha.sdk.authoring.Tasklet;
 import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
