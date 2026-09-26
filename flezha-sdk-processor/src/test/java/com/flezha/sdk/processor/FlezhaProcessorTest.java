@@ -205,6 +205,100 @@ class FlezhaProcessorTest {
     }
 
     @Test
+    void aWrittenCompensateIsPassedTheStateRunTakes() {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.State;
+                import com.flezha.sdk.authoring.Tasklet;
+                import com.flezha.sdk.tasklet.TaskletCtx;
+                import java.util.List;
+                @Tasklet(id = "reserve", emits = String.class)
+                public class Reserve {
+                    @State
+                    public static class Reservation { public String id = ""; }
+                    public void run(String in, ReservationHandle reservation, TaskletCtx ctx) {
+                        reservation.setId(in);
+                        ctx.emit(in);
+                    }
+                    public void compensate(List<String> done, ReservationHandle reservation, TaskletCtx ctx) {}
+                }
+                """;
+        String tasklet = generated("t.Reserve", "t.ReserveTasklet", code);
+        assertThat(tasklet)
+                .contains("@Override public void compensate(List<java.lang.String> completedOutput,"
+                        + " StateHandle<t.Reserve.Reservation, t.ReservationChange> state, TaskletCtx ctx)")
+                .contains("impl.compensate(completedOutput, new t.ReservationHandle(state), ctx);");
+
+        String stateless =
+                """
+                package t;
+                import com.flezha.sdk.authoring.Tasklet;
+                import java.util.List;
+                @Tasklet(id = "notify")
+                public class Notify {
+                    public String run(String in) { return in; }
+                    public void compensate(List<String> done) {}
+                }
+                """;
+        assertThat(generated("t.Notify", "t.NotifyTasklet", stateless)).contains("impl.compensate(completedOutput);");
+    }
+
+    // Writing the hook is what declares it, so a tasklet without one must not
+    // gain an override that would register it as compensable.
+    @Test
+    void aTaskletWithoutCompensateGeneratesNone() {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.Tasklet;
+                @Tasklet(id = "plain")
+                public class Plain {
+                    public String run(String in) { return in; }
+                }
+                """;
+        assertThat(generated("t.Plain", "t.PlainTasklet", code)).doesNotContain("compensate");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("compensateShapes")
+    void aCompensateOfTheWrongShapeIsRefused(String why, String methods) {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.Tasklet;
+                import com.flezha.sdk.state.NoChange;
+                import com.flezha.sdk.state.StateHandle;
+                import java.util.List;
+                @Tasklet(id = "undo")
+                public class Undo {
+                    public String run(String in, StateHandle<String, NoChange> state) { return in; }
+                    %s
+                }
+                """
+                        .formatted(methods);
+        assertThat(diagnose("t.Undo", code))
+                .anySatisfy(m -> assertThat(m).startsWith("@Tasklet").contains("`compensate`"));
+    }
+
+    static Stream<Arguments> compensateShapes() {
+        return Stream.of(
+                Arguments.of(
+                        "a list of another type",
+                        "public void compensate(List<Integer> done, StateHandle<String, NoChange> state) {}"),
+                Arguments.of("no state parameter", "public void compensate(List<String> done) {}"),
+                Arguments.of(
+                        "a return value",
+                        "public String compensate(List<String> done, StateHandle<String, NoChange> state) {"
+                                + " return \"\"; }"),
+                Arguments.of(
+                        "two of them",
+                        "public void compensate(List<String> done, StateHandle<String, NoChange> state) {}\n"
+                                + "public void compensate(List<String> done, StateHandle<String, NoChange> s,"
+                                + " com.flezha.sdk.tasklet.TaskletCtx ctx) {}"));
+    }
+
+    @Test
     void flatDequeFieldsGetSlidingWindowMutators() {
         String code =
                 """

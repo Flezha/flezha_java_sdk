@@ -7,6 +7,7 @@ import com.flezha.sdk.authoring.InitState;
 import com.flezha.sdk.authoring.Tasklet;
 import com.flezha.sdk.authoring.UnboundedOperator;
 import com.flezha.sdk.operator.LoopMode;
+import com.flezha.sdk.processor.TaskletModel.Compensate;
 import com.flezha.sdk.processor.TaskletModel.Declares;
 import com.flezha.sdk.processor.TaskletModel.Output;
 import com.flezha.sdk.processor.TaskletModel.StateShape;
@@ -19,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.lang.model.element.AnnotationMirror;
@@ -36,8 +38,8 @@ import javax.lang.model.type.TypeMirror;
  * Generates {@code <Name>Tasklet} from a {@code @Tasklet} class, and from a
  * {@code @UnboundedOperator} or {@code @BoundedOperator} class also the §5 short form's
  * single-tasklet {@code <Name>UnboundedOperator} or {@code <Name>BoundedOperator}. Resolution
- * reads the {@code run} signature and the annotation and reports every refusal; rendering is a pure
- * function of the {@link TaskletModel}.
+ * reads the {@code run} and {@code compensate} signatures and the annotation and reports every
+ * refusal; rendering is a pure function of the {@link TaskletModel}.
  */
 final class TaskletGenerator {
 
@@ -46,6 +48,7 @@ final class TaskletGenerator {
             Set.of(Tasklet.class, UnboundedOperator.class, BoundedOperator.class);
 
     private static final String STATE_HANDLE = "com.flezha.sdk.state.StateHandle";
+    private static final String LIST = "java.util.List";
     private static final String TASKLET_CTX = "com.flezha.sdk.tasklet.TaskletCtx";
     private static final String OPERATOR_PACKAGE = "com.flezha.sdk.operator.";
 
@@ -241,16 +244,16 @@ final class TaskletGenerator {
 
     /** The {@code run} signature half; hands the annotation half on. {@code null} once refused. */
     private TaskletModel resolve(Declaration d) {
-        ExecutableElement run = findRun(d.type());
-        if (run == null) {
+        List<ExecutableElement> runs = publicMethods(d.type(), "run");
+        if (runs.size() != 1) {
             out.error(d.type(), d.annotation() + " requires exactly one public method named `run`");
             return null;
         }
+        ExecutableElement run = runs.get(0);
         List<? extends VariableElement> params = run.getParameters();
         // A trailing `TaskletCtx` is the multi-emit shape: the body owns every
         // emit. It sits beside the value parameters, which are counted as before.
-        boolean ctxParam = !params.isEmpty()
-                && mirrors.erasesTo(params.get(params.size() - 1).asType(), TASKLET_CTX);
+        boolean ctxParam = endsWithCtx(params);
         int valueParams = params.size() - (ctxParam ? 1 : 0);
         if (valueParams < 1 || valueParams > 2) {
             out.error(
@@ -291,6 +294,10 @@ final class TaskletGenerator {
         if (outputType == null) {
             return null;
         }
+        Compensate compensate = resolveCompensate(d, run, outputType, stateful);
+        if (compensate == null) {
+            return null;
+        }
         String simple = d.type().getSimpleName().toString();
         // A short form's written id is both its factory id and its tasklet's
         // name, verbatim, so its cells keep their state path when it grows
@@ -311,6 +318,7 @@ final class TaskletGenerator {
                 cellsFor == null ? null : cellsFor.getSimpleName().toString(),
                 d.keys(),
                 d.key(),
+                compensate,
                 id,
                 d.declares(),
                 d.sink(),
@@ -450,6 +458,53 @@ final class TaskletGenerator {
         return outputType;
     }
 
+    /**
+     * Whether the class writes a {@code compensate}, and in which shape; {@code null} once refused.
+     * The author's method takes the outputs, then the state parameter {@code run} takes, then
+     * optionally a {@code TaskletCtx}, so an undo reads the state exactly as the step wrote it.
+     */
+    private Compensate resolveCompensate(Declaration d, ExecutableElement run, String outputType, boolean stateful) {
+        List<ExecutableElement> found = publicMethods(d.type(), "compensate");
+        if (found.isEmpty()) {
+            return Compensate.NONE;
+        }
+        if (found.size() > 1) {
+            out.error(d.type(), d.annotation() + " allows at most one public method named `compensate`");
+            return null;
+        }
+        ExecutableElement compensate = found.get(0);
+        List<? extends VariableElement> params = compensate.getParameters();
+        boolean ctx = endsWithCtx(params);
+        int expected = (stateful ? 2 : 1) + (ctx ? 1 : 0);
+        boolean agrees = compensate.getReturnType().getKind() == TypeKind.VOID
+                && params.size() == expected
+                && mirrors.erasesTo(params.get(0).asType(), LIST)
+                && mirrors.typeArguments(params.get(0).asType()).stream()
+                        .map(TypeMirror::toString)
+                        .toList()
+                        .equals(List.of(outputType))
+                && (!stateful
+                        || params.get(1)
+                                .asType()
+                                .toString()
+                                .equals(run.getParameters().get(1).asType().toString()));
+        if (!agrees) {
+            out.error(
+                    compensate,
+                    d.annotation() + " `compensate` must be `void compensate(List<" + outputType + ">)`, followed"
+                            + " by the state parameter `run` takes when it takes one, and optionally by a"
+                            + " `TaskletCtx ctx` parameter");
+            return null;
+        }
+        return ctx ? Compensate.WITH_CTX : Compensate.WITHOUT_CTX;
+    }
+
+    /** Whether a parameter list ends with a {@code TaskletCtx}, the one optional trailing parameter. */
+    private boolean endsWithCtx(List<? extends VariableElement> params) {
+        return !params.isEmpty()
+                && mirrors.erasesTo(params.get(params.size() - 1).asType(), TASKLET_CTX);
+    }
+
     /** The {@code <Name>Tasklet} source: the interface clause, the overrides, and the {@code run} wrapper. */
     private String renderTasklet(TaskletModel m) {
         StringBuilder b = FlezhaProcessor.source(m.pkg());
@@ -498,6 +553,7 @@ final class TaskletGenerator {
         renderStateOverrides(b, m);
         renderCellOverrides(b, m);
         renderRun(b, m);
+        renderCompensate(b, m);
         b.append("}\n");
         return b.toString();
     }
@@ -540,16 +596,8 @@ final class TaskletGenerator {
 
     /** The wrapper {@code run}: call the author's method, then emit what it returned. */
     private static void renderRun(StringBuilder b, TaskletModel m) {
-        b.append("\n    @Override public void run(")
-                .append(m.inputType())
-                .append(" input, StateHandle<")
-                .append(m.stateType())
-                .append(", ")
-                .append(m.changeType())
-                .append("> state, TaskletCtx ctx) throws TaskletException {\n");
-        String ctxArg = m.ctxParam() ? ", ctx" : "";
-        String call =
-                m.stateful() ? "impl.run(input, " + m.handleArg() + ctxArg + ")" : "impl.run(input" + ctxArg + ")";
+        openOverride(b, m, "run", m.inputType() + " input");
+        String call = implCall(m, "run", "input", m.ctxParam());
         // `key = "m"` routes the emit through emitKeyed — the only form a
         // `.keyed()` channel accepts — keeping keyed sinks reachable from the sugar.
         String emitPresent = m.emitKey().isEmpty()
@@ -577,6 +625,36 @@ final class TaskletGenerator {
                     .append(" }\n");
         }
         b.append("    }\n");
+    }
+
+    /** The wrapper {@code compensate}, only when the author wrote one: writing it is what declares the hook. */
+    private static void renderCompensate(StringBuilder b, TaskletModel m) {
+        if (m.compensate() == Compensate.NONE) {
+            return;
+        }
+        openOverride(b, m, "compensate", "List<" + m.outputType() + "> completedOutput");
+        b.append("        ")
+                .append(implCall(m, "compensate", "completedOutput", m.compensate() == Compensate.WITH_CTX))
+                .append(";\n");
+        b.append("    }\n");
+    }
+
+    /** Opens a {@code Tasklet} method override whose first parameter is {@code first}, followed by the state and context. */
+    private static void openOverride(StringBuilder b, TaskletModel m, String method, String first) {
+        b.append("\n    @Override public void ")
+                .append(method)
+                .append("(")
+                .append(first)
+                .append(", StateHandle<")
+                .append(m.stateType())
+                .append(", ")
+                .append(m.changeType())
+                .append("> state, TaskletCtx ctx) throws TaskletException {\n");
+    }
+
+    /** The wrapper's call into the author's method: {@code first}, then the state when it is stateful, then the context. */
+    private static String implCall(TaskletModel m, String method, String first, boolean ctx) {
+        return "impl." + method + "(" + first + (m.stateful() ? ", " + m.handleArg() : "") + (ctx ? ", ctx" : "") + ")";
     }
 
     /**
@@ -664,29 +742,30 @@ final class TaskletGenerator {
         return mirror.getKind() == TypeKind.VOID ? null : mirror.toString();
     }
 
-    private static ExecutableElement findRun(TypeElement tasklet) {
-        ExecutableElement found = null;
-        for (Element e : tasklet.getEnclosedElements()) {
-            if (e.getKind() == ElementKind.METHOD
-                    && e.getSimpleName().contentEquals("run")
-                    && e.getModifiers().contains(Modifier.PUBLIC)
-                    && !e.getModifiers().contains(Modifier.STATIC)) {
-                if (found != null) {
-                    return null;
-                }
-                found = (ExecutableElement) e;
-            }
-        }
-        return found;
+    /** The public instance methods named {@code name}, in declaration order. */
+    private static List<ExecutableElement> publicMethods(TypeElement tasklet, String name) {
+        return methods(
+                tasklet,
+                e -> e.getSimpleName().contentEquals(name)
+                        && e.getModifiers().contains(Modifier.PUBLIC)
+                        && !e.getModifiers().contains(Modifier.STATIC));
     }
 
     private static ExecutableElement findAnnotated(TypeElement tasklet, Class<? extends Annotation> ann) {
+        return methods(tasklet, e -> e.getAnnotation(ann) != null).stream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** The methods {@code tasklet} declares that {@code filter} accepts, in declaration order. */
+    private static List<ExecutableElement> methods(TypeElement tasklet, Predicate<Element> filter) {
+        List<ExecutableElement> found = new ArrayList<>();
         for (Element e : tasklet.getEnclosedElements()) {
-            if (e.getKind() == ElementKind.METHOD && e.getAnnotation(ann) != null) {
-                return (ExecutableElement) e;
+            if (e.getKind() == ElementKind.METHOD && filter.test(e)) {
+                found.add((ExecutableElement) e);
             }
         }
-        return null;
+        return found;
     }
 
     private static String snake(String s) {

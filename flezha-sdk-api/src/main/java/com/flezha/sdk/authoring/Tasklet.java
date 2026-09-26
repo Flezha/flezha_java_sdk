@@ -27,6 +27,11 @@ import java.lang.annotation.Target;
  *   <li>A {@code void} return declares no output channel.</li>
  * </ul>
  *
+ * <p>A public {@code void compensate(List<Output> completedOutput)} beside {@code run} declares
+ * the step's undo in a bounded operator. It takes the same state parameter {@code run} takes, and
+ * optionally a trailing {@code TaskletCtx}; the state is where an undo finds what to undo, because
+ * after a crash {@code completedOutput} can be empty.
+ *
  * <p>The annotation declares a tasklet and nothing else. A class whose one tasklet is a whole
  * operator is annotated {@link UnboundedOperator} or {@link BoundedOperator} instead, which take
  * the same {@code run} shapes.

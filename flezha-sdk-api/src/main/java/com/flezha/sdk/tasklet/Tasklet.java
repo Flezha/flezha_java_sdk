@@ -22,8 +22,7 @@ import javax.annotation.Nonnull;
  * {@link com.flezha.sdk.authoring.Tasklet @Tasklet}, from whose {@code run} method the
  * annotation processor generates this interface's implementation, {@code <Class>Tasklet}.
  * Implement the interface directly for what the annotation does not express: a hand-written
- * {@link Change}, a clock other than {@link WallClock}, a configuration type, {@link #onTimer} or
- * {@link #compensate}.
+ * {@link Change}, a clock other than {@link WallClock}, a configuration type or {@link #onTimer}.
  *
  * <p>A stateless tasklet declares {@link NoChange} and is a plain function of its input:
  *

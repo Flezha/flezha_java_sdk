@@ -6,8 +6,8 @@ import java.util.List;
 /**
  * What a {@code @Tasklet}, {@code @UnboundedOperator} or {@code @BoundedOperator} class resolves
  * to: the source to write, the five type arguments its {@code implements Tasklet<…>} clause
- * states, and the shape of the {@code run} wrapper. Every string is already the text the renderer
- * emits, so rendering reads no {@code javax.lang.model} type.
+ * states, and the shape of the {@code run} and {@code compensate} wrappers. Every string is
+ * already the text the renderer emits, so rendering reads no {@code javax.lang.model} type.
  */
 record TaskletModel(
         String pkg,
@@ -22,6 +22,7 @@ record TaskletModel(
         String cellsForName,
         List<String> cellKeys,
         String emitKey,
+        Compensate compensate,
         String id,
         Declares declares,
         String sink,
@@ -65,6 +66,13 @@ record TaskletModel(
         String annotation() {
             return "@" + simpleName;
         }
+    }
+
+    /** Whether the class writes a {@code compensate}, and whether it takes the context. */
+    enum Compensate {
+        NONE,
+        WITHOUT_CTX,
+        WITH_CTX
     }
 
     /** What the {@code run} return type declares: whether it emits, and of what. */
