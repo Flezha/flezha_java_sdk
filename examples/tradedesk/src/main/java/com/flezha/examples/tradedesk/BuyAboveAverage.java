@@ -23,22 +23,26 @@ public final class BuyAboveAverage {
     /** How far above its average a price has to be before the desk buys, in percent. */
     private static final double BUY_ABOVE_PCT = 2.0;
 
-    /** What the desk buys when it buys. */
-    private static final int LOT = 10;
+    /**
+     * How much the desk buys for each percent a price is above its average: a stronger move buys
+     * more, and a big enough one asks for more than the paper exchange fills.
+     */
+    private static final int UNITS_PER_PERCENT = 10;
 
     public void run(Move move, TaskletCtx ctx) throws TaskletException {
         double percent = (move.price() - move.average()) / move.average() * 100.0;
         if (percent < BUY_ABOVE_PCT) {
             return;
         }
+        int quantity = (int) Math.round(percent * UNITS_PER_PERCENT);
 
         // No id: the controller names the instance. A replay of this invocation issues no request,
         // so re-running an input never places a second order. The ticket travels as JSON, which
         // the order's entry channel decodes back into an OrderTicket.
-        ctx.spawnBounded("paper_order", new OrderTicket(move.symbol(), LOT));
+        ctx.spawnBounded("paper_order", new OrderTicket(move.symbol(), quantity));
 
         ctx.emit(String.format(
                 "%s %.4f is %.2f%% above its average of %.4f, buying %d",
-                move.symbol(), move.price(), percent, move.average(), LOT));
+                move.symbol(), move.price(), percent, move.average(), quantity));
     }
 }
