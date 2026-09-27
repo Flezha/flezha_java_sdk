@@ -428,6 +428,7 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
         entry.taskletClass = taskletClass;
         entry.name = identity;
         entry.named = nodeName != null;
+        entry.uninstantiable = probe == UNINSTANTIABLE;
         int id = tasklets.size();
         tasklets.add(entry);
         taskletNameToId.put(identity, id);
@@ -741,7 +742,10 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
             ChannelEntry channel, TaskletEntry tasklet, Class<?> deliveredTypeOverride, Class<?> chainType) {
         Class<?> declared = deliveredTypeOverride != null ? deliveredTypeOverride : chainType;
         Class<?> deliveredType = declared != null ? declared : channel.payloadType;
-        if (deliveredType.equals(tasklet.inputType)) {
+        // A placeholder's types are not the author's: its construction is already refused.
+        boolean placeholderProducer =
+                declared == null && channel.producer != null && tasklets.get(channel.producer).uninstantiable;
+        if (deliveredType.equals(tasklet.inputType) || tasklet.uninstantiable || placeholderProducer) {
             return;
         }
         String producedBy = deliveredTypeOverride != null
@@ -822,6 +826,9 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
 
         /** Whether this node was created with an explicit node name. */
         boolean named;
+
+        /** Whether its class could not be constructed and a placeholder stands in. */
+        boolean uninstantiable;
 
         Class<? extends Tasklet<?, ?, ?, ?, ?, ?>> taskletClass;
         public List<String> cellKeys;

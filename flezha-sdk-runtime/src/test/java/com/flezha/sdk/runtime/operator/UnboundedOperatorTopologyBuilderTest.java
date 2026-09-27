@@ -98,7 +98,8 @@ class UnboundedOperatorTopologyBuilderTest {
                     .hasMessageStartingWith("topology rejected [Declaration, Declaration")
                     .hasMessageContaining("`no_extractor` declares the EventTimeFrom clock")
                     .hasMessageContaining(ThrowingConstructorTasklet.REFUSAL)
-                    .hasMessageNotContaining("no-arg constructor");
+                    .hasMessageNotContaining("no-arg constructor")
+                    .hasMessageNotContaining("does not match");
         }
 
         @Test
