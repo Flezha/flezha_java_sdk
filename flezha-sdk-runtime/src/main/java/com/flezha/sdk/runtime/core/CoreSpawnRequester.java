@@ -25,8 +25,9 @@ public final class CoreSpawnRequester implements SpawnRequests.Requester {
             @Nonnull String id,
             @Nonnull byte[] payload,
             @Nonnull String ifRunning,
-            boolean replay) {
-        return FlzCore.spawnRequest(ctx, token, factoryId, id, payload, ifRunning, replay);
+            boolean replay,
+            long offset) {
+        return FlzCore.spawnRequest(ctx, token, factoryId, id, payload, ifRunning, replay, offset);
     }
 
     @Override

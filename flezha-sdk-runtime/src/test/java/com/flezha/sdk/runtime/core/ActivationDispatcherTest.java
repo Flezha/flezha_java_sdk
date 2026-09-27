@@ -77,14 +77,20 @@ class ActivationDispatcherTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("a spawn carries the activation's token and the item's replay flag to the core")
-    void aSpawnCarriesTheTokenAndTheReplayFlag() {
+    @DisplayName("a spawn carries the activation's token and the item's replay flag and offset to the core")
+    void aSpawnCarriesTheTokenAndTheReplayFlagAndOffset() {
         UnboundedOperatorClassRegistry.registerClass(SpawnProbeOperator.class);
         SpawnRequests.install(new SpawnRequests.Requester() {
             @Override
             public long request(
-                    long token, String factoryId, String id, byte[] payload, String ifRunning, boolean replay) {
-                RECORDED.add(token + "/" + factoryId + "/" + id + "/" + replay);
+                    long token,
+                    String factoryId,
+                    String id,
+                    byte[] payload,
+                    String ifRunning,
+                    boolean replay,
+                    long offset) {
+                RECORDED.add(token + "/" + factoryId + "/" + id + "/" + replay + "/" + offset);
                 return 1;
             }
 
@@ -95,10 +101,11 @@ class ActivationDispatcherTest extends DispatchTestBase {
         });
         try {
             for (boolean replay : new boolean[] {false, true}) {
+                OptionalLong offset = replay ? OptionalLong.empty() : OptionalLong.of(7);
                 outcome(new Activation(
                         42,
                         new CellRef(OP, 0, Optional.empty()),
-                        new ActivationKind.Work(List.of(input(0, "w1", 1, OptionalLong.empty(), replay))),
+                        new ActivationKind.Work(List.of(input(0, "w1", 1, offset, replay))),
                         0,
                         "spawn_probe"));
             }
@@ -106,7 +113,8 @@ class ActivationDispatcherTest extends DispatchTestBase {
             SpawnRequests.uninstall();
         }
         assertThat(RECORDED)
-                .containsExactly("42/worker//false", "42/worker/w1/false", "42/worker//true", "42/worker/w1/true");
+                .containsExactly(
+                        "42/worker//false/7", "42/worker/w1/false/7", "42/worker//true/-1", "42/worker/w1/true/-1");
     }
 
     @Test

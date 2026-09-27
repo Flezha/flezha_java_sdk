@@ -20,7 +20,8 @@ public final class SpawnRequests {
     /** The core's two spawn entries. */
     public interface Requester {
         /** Ship one request from the activation {@code token}; the core's handle number, at once. */
-        long request(long token, String factoryId, String id, byte[] payload, String ifRunning, boolean replay);
+        long request(
+                long token, String factoryId, String id, byte[] payload, String ifRunning, boolean replay, long offset);
 
         /** Read {@code handle}, waiting up to {@code timeoutMs}: its answer as JSON, {@code null} while pending. */
         @Nullable
@@ -44,11 +45,12 @@ public final class SpawnRequests {
     /**
      * Issue the request; an empty {@code id} asks the controller to generate one. With no requester
      * installed there is no core to ask, so the handle answers what the core would: skipped on
-     * replay, otherwise unavailable, with one warning here because no core reports it unread.
+     * replay, otherwise unavailable, with one warning here because no core reports it unread. {@code
+     * offset} is the input-log offset of the item the request runs under, or -1 for none.
      */
     @Nonnull
     public static SpawnHandle request(
-            long token, String factoryId, String id, byte[] payload, IfRunning ifRunning, boolean replay) {
+            long token, String factoryId, String id, byte[] payload, IfRunning ifRunning, boolean replay, long offset) {
         Requester current = requester;
         if (current == null) {
             ObjectNode answer = JsonNodeFactory.instance.objectNode().put("id", id);
@@ -62,7 +64,7 @@ public final class SpawnRequests {
             String json = answer.toString();
             return new SpawnHandle(timeoutMs -> json);
         }
-        long handle = current.request(token, factoryId, id, payload, ifRunning.wire(), replay);
+        long handle = current.request(token, factoryId, id, payload, ifRunning.wire(), replay, offset);
         return new SpawnHandle(timeoutMs -> current.result(handle, timeoutMs));
     }
 }

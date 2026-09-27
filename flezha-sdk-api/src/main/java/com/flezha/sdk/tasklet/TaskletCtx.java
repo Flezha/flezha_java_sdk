@@ -135,7 +135,13 @@ public interface TaskletCtx {
     @Nonnull
     default SpawnHandle spawnBounded(String factoryId, Object payload) {
         return SpawnRequests.request(
-                activationToken(), factoryId, "", PlainPayload.encode(payload), IfRunning.DELIVER, replaying());
+                activationToken(),
+                factoryId,
+                "",
+                PlainPayload.encode(payload),
+                IfRunning.DELIVER,
+                replaying(),
+                inputOffset());
     }
 
     /**
@@ -153,7 +159,13 @@ public interface TaskletCtx {
     @Nonnull
     default SpawnHandle spawnBounded(String factoryId, Object payload, SpawnOptions options) {
         return SpawnRequests.request(
-                activationToken(), factoryId, options.id, PlainPayload.encode(payload), options.ifRunning, replaying());
+                activationToken(),
+                factoryId,
+                options.id,
+                PlainPayload.encode(payload),
+                options.ifRunning,
+                replaying(),
+                inputOffset());
     }
 
     /**
@@ -171,6 +183,15 @@ public interface TaskletCtx {
      */
     default long activationToken() {
         return 0;
+    }
+
+    /**
+     * The input-log offset of the item this invocation runs, which a spawn request carries so a
+     * crash re-run of the same input resolves to the worker the first run spawned. Runtime detail:
+     * the dispatcher overrides it; -1 names none (a timer firing, a class without durable input).
+     */
+    default long inputOffset() {
+        return -1;
     }
 
     /**

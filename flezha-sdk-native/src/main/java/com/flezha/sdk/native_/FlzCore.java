@@ -149,12 +149,20 @@ public final class FlzCore {
      * returning the handle number at once. An empty {@code id} asks the
      * controller to generate one; {@code ifRunning} is the wire string
      * {@code "deliver"} or {@code "error"}; {@code replay} sends nothing and
-     * resolves the handle as skipped. A refusal reaches only
-     * {@link #spawnResult}. Throws for an unreadable argument or a token that
-     * is not outstanding.
+     * resolves the handle as skipped; {@code offset} is the input-log offset
+     * of the item the request runs under, or -1 for none. A refusal reaches
+     * only {@link #spawnResult}. Throws for an unreadable argument or a token
+     * that is not outstanding.
      */
     public static native long spawnRequest(
-            long ctx, long token, String factoryId, String id, byte[] payload, String ifRunning, boolean replay);
+            long ctx,
+            long token,
+            String factoryId,
+            String id,
+            byte[] payload,
+            String ifRunning,
+            boolean replay,
+            long offset);
 
     /**
      * Read a spawn handle, waiting up to {@code timeoutMs} (0 never waits):

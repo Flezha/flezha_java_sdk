@@ -36,6 +36,7 @@ final class EmitContext implements TaskletCtx {
     private final long invocationSeq;
     private final long now;
     private final boolean replay;
+    private final long offset;
 
     final List<Output> outputs = new ArrayList<>();
     boolean checkpointed;
@@ -48,13 +49,21 @@ final class EmitContext implements TaskletCtx {
     private int stableIdOrdinal;
     private int emitOrdinal;
 
-    EmitContext(OperatorInstance instance, Cell cell, long token, long invocationSeq, long now, boolean replay) {
+    EmitContext(
+            OperatorInstance instance,
+            Cell cell,
+            long token,
+            long invocationSeq,
+            long now,
+            boolean replay,
+            long offset) {
         this.instance = instance;
         this.cell = cell;
         this.token = token;
         this.invocationSeq = invocationSeq;
         this.now = now;
         this.replay = replay;
+        this.offset = offset;
     }
 
     @Override
@@ -89,6 +98,11 @@ final class EmitContext implements TaskletCtx {
     @Override
     public long activationToken() {
         return token;
+    }
+
+    @Override
+    public long inputOffset() {
+        return offset;
     }
 
     @Override

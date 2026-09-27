@@ -251,7 +251,14 @@ class SpawnHandleTest {
         volatile String answer;
 
         @Override
-        public long request(long token, String factoryId, String id, byte[] payload, String ifRunning, boolean replay) {
+        public long request(
+                long token,
+                String factoryId,
+                String id,
+                byte[] payload,
+                String ifRunning,
+                boolean replay,
+                long offset) {
             requests.add(String.join(
                     "/",
                     String.valueOf(token),

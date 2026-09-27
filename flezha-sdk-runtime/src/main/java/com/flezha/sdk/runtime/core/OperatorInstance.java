@@ -155,7 +155,8 @@ public final class OperatorInstance {
         OptionalLong offset = item instanceof WorkItem.Input in ? in.consumedOffset() : OptionalLong.empty();
         boolean replay = item instanceof WorkItem.Input in && in.replay();
 
-        EmitContext ctx = new EmitContext(this, cell, activation.token(), activation.changeSeq(), now, replay);
+        EmitContext ctx =
+                new EmitContext(this, cell, activation.token(), activation.changeSeq(), now, replay, offset.orElse(-1));
         TimerSession session = item instanceof WorkItem.Timer timer
                 ? cell.timerPolicy.firingSession(new PendingTimers(), timer.scheduledAt(), timer.kind())
                 : cell.timerPolicy.session(new PendingTimers(), now);
@@ -278,7 +279,7 @@ public final class OperatorInstance {
         // author contract) and carries no timer session — structural, the
         // same refusal the pre-core adapter enforced.
         EmitContext ctx = new EmitContext(
-                this, cell, activation.token(), activation.changeSeq(), System.currentTimeMillis(), false);
+                this, cell, activation.token(), activation.changeSeq(), System.currentTimeMillis(), false, -1);
         List<Change> buffer = new ArrayList<>();
         Tasklet tasklet = cell.tasklet;
         StateHandle<Object, Change> handle = handleOver(cell, buffer);
