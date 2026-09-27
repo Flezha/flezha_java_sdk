@@ -142,6 +142,21 @@ class FlezhaProcessorTest {
         assertThat(generated("t.Keyed", "t.KeyedTasklet", keyed)).contains("ctx.emitKeyed(t.Keyed.k(out), out);");
     }
 
+    @Test
+    void aPrimitiveReturnIsBoxedInTheTaskletTypeArguments() {
+        String code =
+                """
+                package t;
+                import com.flezha.sdk.authoring.Tasklet;
+                @Tasklet(id = "count")
+                public class Count {
+                    public long run(String in) { return in.length(); }
+                }
+                """;
+        assertThat(generated("t.Count", "t.CountTasklet", code))
+                .contains("implements Tasklet<java.lang.String, com.flezha.sdk.state.Stateless, java.lang.Long,");
+    }
+
     /**
      * The generator used to write {@code .named(x).sink(x)} because a sink
      * named a plugin rather than a channel, so sugared and hand-written code

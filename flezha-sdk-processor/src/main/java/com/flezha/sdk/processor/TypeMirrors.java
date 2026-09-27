@@ -4,6 +4,7 @@ import java.util.List;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.PrimitiveType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
@@ -47,6 +48,13 @@ final class TypeMirrors {
     /** The {@code O} of an {@code Optional<O>}, or {@code null} when it is raw. */
     TypeMirror optionalElement(TypeMirror ty) {
         return onlyArgument(ty, "java.util.Optional");
+    }
+
+    /** {@code ty} spelled as a type argument: a primitive as its box. */
+    String asTypeArgument(TypeMirror ty) {
+        return ty.getKind().isPrimitive()
+                ? types.boxedClass((PrimitiveType) ty).getQualifiedName().toString()
+                : ty.toString();
     }
 
     /** Whether the erasure of {@code ty} is exactly {@code fqn}. */

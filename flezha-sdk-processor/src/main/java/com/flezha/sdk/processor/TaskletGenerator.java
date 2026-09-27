@@ -341,7 +341,7 @@ final class TaskletGenerator {
             return new Output(false, false, "java.lang.Void");
         }
         if (!mirrors.isOptional(returnType)) {
-            return new Output(true, false, returnType.toString());
+            return new Output(true, false, mirrors.asTypeArgument(returnType));
         }
         TypeMirror element = mirrors.optionalElement(returnType);
         if (element == null) {
