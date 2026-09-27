@@ -15,6 +15,6 @@ public final class AlertDetectorOperator implements UnboundedOperator {
 
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
-        c.input(String.class, "events").into(DetectTasklet.class).sink("alerts");
+        c.input(String.class, "events").into(Detect.class).sink("alerts");
     }
 }

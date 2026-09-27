@@ -13,7 +13,7 @@ import java.util.Optional;
  * {@code RestoreInitState} on a rehydrating bind — the instance's task-journal
  * reaches the driver only if it rides the bind itself.
  */
-public final class StatelessLoopBoundedOperator implements BoundedOperator {
+public final class NoStateLoopBoundedOperator implements BoundedOperator {
 
     @Override
     public String factoryId() {

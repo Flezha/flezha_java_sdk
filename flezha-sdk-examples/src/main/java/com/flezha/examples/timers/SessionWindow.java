@@ -1,11 +1,9 @@
 package com.flezha.examples.timers;
 
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
+import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.TimerKind;
-import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -16,11 +14,11 @@ import javax.annotation.Nonnull;
 /**
  * One user's session, closed once it has been quiet for a while.
  *
- * <p>This implements {@link Tasklet} directly rather than through {@code @Tasklet}, because
- * {@link #onTimer} is a method of the interface, which an annotated class has no way to supply.
+ * <p>{@link #onTimer} is the second entry point beside {@link #run}. It gets the same context, so a
+ * timer expiry records a change and emits exactly as a message does.
  */
-public final class SessionWindow
-        implements Tasklet<String, SessionWindow.SessionState, ClosedSession, SessionChange, WallClock, Void> {
+@Tasklet.Spec(name = "session_window")
+public final class SessionWindow implements Tasklet<String, SessionWindow.SessionState, ClosedSession> {
 
     /** How long a session may stay quiet before it is closed. */
     private static final Duration IDLE = Duration.ofSeconds(30);
@@ -31,47 +29,40 @@ public final class SessionWindow
         public boolean closed;
     }
 
+    /** The user clicked a page. */
+    public record Clicked(String page) implements Change<SessionState> {
+        @Override
+        public void applyTo(SessionState session) {
+            session.clicks.add(page);
+        }
+    }
+
+    /** The idle timer closed the session. */
+    public record Closed(long at) implements Change<SessionState> {
+        @Override
+        public void applyTo(SessionState session) {
+            session.closed = true;
+        }
+    }
+
     /**
      * The deadline currently pending, so each click can retract the last one. A plain field is
      * fine here: the runtime holds one tasklet instance per cell, and a restart re-arms.
      */
     private long deadline = -1L;
 
+    /** A new session starts out knowing its user, which is the cell's key. */
     @Override
     @Nonnull
-    public String name() {
-        return "session_window";
-    }
-
-    @Override
-    @Nonnull
-    public List<Class<?>> kryoTypes() {
-        return List.of(SessionChange.class, SessionState.class, ArrayList.class);
-    }
-
-    @Override
-    @Nonnull
-    public SessionState initState(
-            @Nonnull Optional<String> cellKey, @Nonnull Optional<RestoreInitPayload> initPayload) {
+    public SessionState initState(Optional<String> cellKey) {
         SessionState state = new SessionState();
         state.user = cellKey.orElse("");
         return state;
     }
 
     @Override
-    public void applyChange(@Nonnull SessionState state, @Nonnull SessionChange change) {
-        if (change.closedAt() >= 0) {
-            state.closed = true;
-        } else {
-            state.clicks.add(change.clicked());
-        }
-    }
-
-    @Override
-    public void run(
-            @Nonnull String click, @Nonnull StateHandle<SessionState, SessionChange> state, @Nonnull TaskletCtx ctx)
-            throws TaskletException {
-        state.apply(SessionChange.clicked(click));
+    public void run(String click, Ctx<SessionState, ClosedSession> ctx) throws TaskletException {
+        ctx.change(new Clicked(click));
 
         // The pattern: retract the deadline you set last time, then set a new one. Without the
         // cancel you would accumulate one live timer per click and close the session early.
@@ -82,16 +73,11 @@ public final class SessionWindow
     }
 
     @Override
-    public void onTimer(
-            long firedAt,
-            @Nonnull TimerKind kind,
-            @Nonnull StateHandle<SessionState, SessionChange> state,
-            @Nonnull TaskletCtx ctx)
-            throws TaskletException {
+    public void onTimer(long firedAt, TimerKind kind, Ctx<SessionState, ClosedSession> ctx) throws TaskletException {
         deadline = -1L;
-        SessionState session = state.get();
+        SessionState session = ctx.state();
         int clicks = session.clicks.size();
-        state.apply(SessionChange.closed(firedAt));
+        ctx.change(new Closed(firedAt));
         ctx.emit(new ClosedSession(session.user, clicks, firedAt));
     }
 }

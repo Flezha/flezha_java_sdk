@@ -4,13 +4,14 @@ import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.runtime.operator.ChannelDescriptor;
 import com.flezha.sdk.runtime.operator.ConsumerEdge;
 import com.flezha.sdk.runtime.operator.TaskletDescriptor;
+import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.runtime.state.TimerSession;
-import com.flezha.sdk.state.EventTimeFrom;
+import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.TimerKind;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.EmitKeys;
 import com.flezha.sdk.tasklet.StableId;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -23,12 +24,13 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Per-invocation {@link TaskletCtx}: serves the item's core-evaluated
- * clock, the replay-stable id, and evaluates emits producer-side into
- * schema {@link Output}s — edge transforms, keys and the consumer's
- * event-time extractor run here, so live delivery and replay cannot drift.
+ * Per-invocation {@link Ctx}: holds the cell's state and the changes this
+ * invocation records, serves the item's core-evaluated clock and the
+ * replay-stable id, and evaluates emits producer-side into schema
+ * {@link Output}s — edge transforms, keys and the consumer's event-time
+ * extractor run here, so live delivery and replay cannot drift.
  */
-final class EmitContext implements TaskletCtx {
+final class EmitContext implements Ctx<Object, Object> {
 
     private final OperatorInstance instance;
     private final Cell cell;
@@ -39,6 +41,7 @@ final class EmitContext implements TaskletCtx {
     private final long offset;
 
     final List<Output> outputs = new ArrayList<>();
+    final List<Change<Object>> changes = new ArrayList<>();
     boolean checkpointed;
     Optional<byte[]> completion = Optional.empty();
 
@@ -64,6 +67,16 @@ final class EmitContext implements TaskletCtx {
         this.now = now;
         this.replay = replay;
         this.offset = offset;
+    }
+
+    @Override
+    public Object state() {
+        return cell.state;
+    }
+
+    @Override
+    public void change(@Nonnull Change<Object> change) {
+        instance.topology.tasklet(cell.taskletId).model().record(change, cell.state, changes);
     }
 
     @Override
@@ -141,7 +154,7 @@ final class EmitContext implements TaskletCtx {
     }
 
     @Override
-    public <C> void emit(@Nonnull C value) throws TaskletException {
+    public void emit(@Nonnull Object value) throws TaskletException {
         doEmit(defaultOutputChannel(), value, null, null);
     }
 
@@ -151,7 +164,7 @@ final class EmitContext implements TaskletCtx {
     }
 
     @Override
-    public <C> void emitWithMeta(@Nonnull C value, @Nonnull Map<String, String> meta) throws TaskletException {
+    public void emitWithMeta(@Nonnull Object value, @Nonnull Map<String, String> meta) throws TaskletException {
         doEmit(defaultOutputChannel(), value, meta, null);
     }
 
@@ -162,12 +175,12 @@ final class EmitContext implements TaskletCtx {
     }
 
     @Override
-    public <C> void emitKeyed(@Nonnull String key, @Nonnull C value) throws TaskletException {
+    public void emitKeyed(@Nonnull String key, @Nonnull Object value) throws TaskletException {
         doEmit(defaultOutputChannel(), value, null, key);
     }
 
     @Override
-    public <C> void emitKeyedWithMeta(@Nonnull String key, @Nonnull C value, @Nonnull Map<String, String> meta)
+    public void emitKeyedWithMeta(@Nonnull String key, @Nonnull Object value, @Nonnull Map<String, String> meta)
             throws TaskletException {
         doEmit(defaultOutputChannel(), value, meta, key);
     }
@@ -207,7 +220,7 @@ final class EmitContext implements TaskletCtx {
         key = EmitKeys.resolve(descriptor.name(), descriptor.keyed(), key, cellKey());
         if (meta != null) {
             for (String k : meta.keySet()) {
-                if (k.startsWith(TaskletCtx.RESERVED_METADATA_PREFIX)) {
+                if (k.startsWith(Ctx.RESERVED_METADATA_PREFIX)) {
                     throw new TaskletException.ReservedMetadataKey(k);
                 }
             }
@@ -272,7 +285,7 @@ final class EmitContext implements TaskletCtx {
         for (ConsumerEdge edge : descriptor.consumers()) {
             List<Object> values = EdgeTransforms.valuesOf(edge, value);
             TaskletDescriptor consumer = instance.topology.tasklet(edge.tasklet());
-            boolean eventTimeClocked = consumer != null && consumer.clockType() == EventTimeFrom.class;
+            boolean eventTimeClocked = consumer != null && consumer.clock() == ClockKind.EVENT_TIME;
             for (Object v : values) {
                 OptionalLong eventTime = OptionalLong.empty();
                 if (eventTimeClocked) {

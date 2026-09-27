@@ -2,15 +2,12 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.state.Change;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.WallClock;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Mirror of the Rust test app's {@code ResumeProbeOperator}: a stateful counter
@@ -32,46 +29,37 @@ public final class ResumeProbeUnboundedOperator implements UnboundedOperator {
         c.input(String.class, "input").into(ResumeProbeTasklet.class).sink("total");
     }
 
-    public static final class ResumeProbeTasklet
-            implements Tasklet<String, ResumeProbeTasklet.State, byte[], CounterChange, WallClock, Void> {
+    @Tasklet.Spec(name = "resume_probe_tasklet")
+    public static final class ResumeProbeTasklet implements Tasklet<String, ResumeProbeTasklet.State, byte[]> {
 
+        /** The running total; a new Cell starts at zero and replaying its changes rebuilds it. */
         public static final class State {
             public long total;
         }
 
-        @Override
-        public String name() {
-            return "resume_probe_tasklet";
-        }
-
-        @Override
-        public State initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            // Default + change replay rebuilds the total on restore (same
-            // pattern as stateful_counter); no snapshot fast-path needed.
-            return new State();
-        }
-
-        @Override
-        public void applyChange(State state, CounterChange change) {
-            state.total += change.delta();
+        /** A delta added to the running total. */
+        public record Added(long delta) implements Change<State> {
+            @Override
+            public void applyTo(State state) {
+                state.total += delta;
+            }
         }
 
         @Override
         public List<Class<?>> kryoTypes() {
-            return List.of(State.class, CounterChange.class);
+            return List.of(State.class, Added.class);
         }
 
         @Override
-        public void run(String input, StateHandle<State, CounterChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<State, byte[]> ctx) throws TaskletException {
             long delta;
             try {
                 delta = Long.parseLong(input);
             } catch (NumberFormatException e) {
                 delta = 0L;
             }
-            long newTotal = state.get().total + delta;
-            state.apply(new CounterChange(delta));
+            long newTotal = ctx.state().total + delta;
+            ctx.change(new Added(delta));
             ctx.emit(Long.toString(newTotal).getBytes(StandardCharsets.UTF_8));
         }
     }

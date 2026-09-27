@@ -1,9 +1,9 @@
 package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.operator.BoundedOperator;
 import java.nio.charset.StandardCharsets;
 
@@ -34,17 +34,11 @@ public final class TierCommitBlockBoundedOperator implements BoundedOperator {
     }
 
     /** Task A: commits durable state and re-emits deterministically under a stable key. */
+    @Tasklet.Spec(name = "tier_commit_a")
     public static final class TierCommitA extends DurableStep {
-
         @Override
-        public String name() {
-            return "tier_commit_a";
-        }
-
-        @Override
-        public void run(String input, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
-                throws TaskletException {
-            state.apply(new Insert(name()));
+        public void run(String input, Ctx<SeenState, String> ctx) throws TaskletException {
+            ctx.change(new Insert(name()));
             ctx.emitKeyed("job", "committed:" + input);
         }
     }

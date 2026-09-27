@@ -10,15 +10,10 @@ import com.flezha.sdk.SinkOutput;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.operator.UnboundedOperator;
-import com.flezha.sdk.runtime.operator.StatelessTestTasklet;
 import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.state.TimerKind;
-import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -26,7 +21,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
@@ -72,8 +66,8 @@ class LocalModeCapabilitiesTest {
     void aShortFormIsBuiltAndRunWithNoController() {
         declares("shorthand", "sugar_do_nothing");
 
-        List<SinkOutput> released = release(
-                SugarDoNothingUnboundedOperator.class, "input", "sugar_do_nothing_echo", List.of("alpha", "beta"));
+        List<SinkOutput> released =
+                release(SugarDoNothing.class, "input", "sugar_do_nothing_echo", List.of("alpha", "beta"));
 
         assertThat(payloads(released))
                 .as("the builder produced a graph the core ran, in order")
@@ -173,8 +167,7 @@ class LocalModeCapabilitiesTest {
      * run's own delivery thread, which can be behind the graph, and closing is what hands the last of
      * the released values over.
      */
-    private static List<SinkOutput> release(
-            Class<? extends UnboundedOperator> operator, String channel, String sink, List<String> inputs) {
+    private static List<SinkOutput> release(Class<?> operator, String channel, String sink, List<String> inputs) {
         ConcurrentLinkedQueue<SinkOutput> released = new ConcurrentLinkedQueue<>();
         try (LocalOperator run = LocalOperator.start(operator)) {
             run.onSink(sink, released::add);
@@ -226,53 +219,22 @@ class LocalModeCapabilitiesTest {
     }
 
     /** Releases the input's bytes on the operator's sink. */
-    abstract static class EchoTasklet extends StatelessTestTasklet<String, Object, byte[]> {
-
+    abstract static class EchoTasklet implements Tasklet<String, Void, byte[]> {
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) throws TaskletException {
+        public void run(String input, Ctx<Void, byte[]> ctx) throws TaskletException {
             ctx.emit(input.getBytes(StandardCharsets.UTF_8));
         }
     }
 
-    public static final class SugarDoNothingTasklet extends EchoTasklet {
-        @Override
-        public String name() {
-            return "sugar_do_nothing";
-        }
-    }
-
-    /** The graph the test app's {@code @UnboundedOperator}-annotated {@code SugarDoNothing} short form generates. */
-    public static final class SugarDoNothingUnboundedOperator implements UnboundedOperator {
-        @Override
-        public String factoryId() {
-            return "sugar_do_nothing";
-        }
-
-        @Override
-        public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(SugarDoNothingTasklet.class).sink("sugar_do_nothing_echo");
-        }
-    }
+    /** The test app's {@code SugarDoNothing} short form. */
+    @com.flezha.sdk.authoring.UnboundedOperator(id = "sugar_do_nothing", sink = "sugar_do_nothing_echo")
+    public static final class SugarDoNothing extends EchoTasklet {}
 
     /** Releases the input under the key it resolves to, on the class's keyed sink. */
-    public static final class PartitionRelayTasklet extends StatelessTestTasklet<String, Object, String> {
+    @Tasklet.Spec(name = "partition_relay_tasklet")
+    public static final class PartitionRelayTasklet implements Tasklet<String, Void, String> {
         @Override
-        public String name() {
-            return "partition_relay_tasklet";
-        }
-
-        @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             ctx.emitKeyed(key(input), input);
         }
     }
@@ -295,12 +257,8 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class DynamicCellTasklet extends EchoTasklet {
-        @Override
-        public String name() {
-            return "dynamic_cell_tasklet";
-        }
-    }
+    @Tasklet.Spec(name = "dynamic_cell_tasklet")
+    public static final class DynamicCellTasklet extends EchoTasklet {}
 
     public static final class DynamicCellUnboundedOperator implements UnboundedOperator {
         @Override
@@ -319,17 +277,8 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class DropNothingTasklet extends EchoTasklet {
-        @Override
-        public String name() {
-            return "drop_nothing_test_tasklet";
-        }
-
-        @Override
-        public int mailboxCapacity() {
-            return 4;
-        }
-    }
+    @Tasklet.Spec(name = "drop_nothing_test_tasklet", capacity = 4)
+    public static final class DropNothingTasklet extends EchoTasklet {}
 
     public static final class BoundedMailboxDropNothingUnboundedOperator implements UnboundedOperator {
         @Override
@@ -351,25 +300,15 @@ class LocalModeCapabilitiesTest {
      * one. The test app reads the deadline from {@code TIMER_TEST_TIMEOUT_MS} so its e2e can shorten
      * it; a class declared here names the short one outright.
      */
-    public static final class SessionTimeoutTasklet extends StatelessTestTasklet<String, Object, byte[]> {
+    @Tasklet.Spec(name = "session_timeout_tasklet")
+    public static final class SessionTimeoutTasklet implements Tasklet<String, Void, byte[]> {
         @Override
-        public String name() {
-            return "session_timeout_tasklet";
-        }
-
-        @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) throws TaskletException {
+        public void run(String input, Ctx<Void, byte[]> ctx) throws TaskletException {
             ctx.timerAfter(SESSION_TIMEOUT);
         }
 
         @Override
-        public void onTimer(long firedAt, TimerKind kind, StateHandle<Object, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void onTimer(long firedAt, TimerKind kind, Ctx<Void, byte[]> ctx) throws TaskletException {
             ctx.emit(("closed@" + firedAt).getBytes(StandardCharsets.UTF_8));
         }
     }
@@ -387,37 +326,27 @@ class LocalModeCapabilitiesTest {
     }
 
     /**
-     * The tier IS durable state, so a class whose every tasklet declares {@code NoChange} is
+     * The tier IS durable state, so a class whose every tasklet declares {@code Void} state is
      * refused at registration before the local run reaches the capability. This one journals a
-     * Change so the refusal under test is the one local mode owns.
+     * change so the refusal under test is the one local mode owns.
      */
-    public static final class TierStoreTasklet
-            implements Tasklet<String, TierStoreTasklet.Stored, String, TierStoreTasklet.Store, WallClock, Void> {
+    @Tasklet.Spec(name = "tier_store_tasklet")
+    public static final class TierStoreTasklet implements Tasklet<String, TierStoreTasklet.Stored, String> {
 
         public static final class Stored {
             public String value = "";
         }
 
-        public record Store(String value) implements Change {}
-
-        @Override
-        public String name() {
-            return "tier_store_tasklet";
+        public record Store(String value) implements Change<Stored> {
+            @Override
+            public void applyTo(Stored state) {
+                state.value = value;
+            }
         }
 
         @Override
-        public Stored initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new Stored();
-        }
-
-        @Override
-        public void applyChange(Stored state, Store change) {
-            state.value = change.value();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Stored, Store> state, TaskletCtx ctx) throws TaskletException {
-            state.apply(new Store(input));
+        public void run(String input, Ctx<Stored, String> ctx) throws TaskletException {
+            ctx.change(new Store(input));
             ctx.emitKeyed(key(input), input);
         }
     }

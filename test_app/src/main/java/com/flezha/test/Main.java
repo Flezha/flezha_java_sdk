@@ -114,7 +114,7 @@ public final class Main {
                 .registerFactory(UndoOutboxBoundedOperator.class)
                 .registerFactory(FailedStageBoundedOperator.class)
                 .registerFactory(ChatLoopBoundedOperator.class)
-                .registerFactory(StatelessLoopBoundedOperator.class)
+                .registerFactory(NoStateLoopBoundedOperator.class)
                 .registerFactory(KeyedLoopBoundedOperator.class)
                 .registerFactory(ChatRewindBoundedOperator.class)
                 .registerFactory(ReplyBlockLoopBoundedOperator.class)

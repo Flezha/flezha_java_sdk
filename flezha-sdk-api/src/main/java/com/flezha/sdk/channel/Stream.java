@@ -52,7 +52,7 @@ import javax.annotation.Nonnull;
  * }</pre>
  *
  * <p>The channel out of a node is created lazily on first use of the handle
- * and named by the node's identity string (the tasklet's {@code name()}, or
+ * and named by the node's identity string (the tasklet's {@code @Tasklet.Spec} name, or
  * the explicit node name given at wiring time) unless a {@link #sink(String)}
  * name or a {@link #named(String)} override supplies one.
  *

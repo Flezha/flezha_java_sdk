@@ -1,23 +1,23 @@
 package com.flezha.examples.spawn;
 
-import com.flezha.sdk.authoring.Tasklet;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.IfRunning;
 import com.flezha.sdk.tasklet.SpawnOptions;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.nio.charset.StandardCharsets;
 
 /**
  * Watches the stream and asks for a triage worker per subject.
  *
- * <p>{@code run} takes the context because it does more than return a value: it spawns, and it
- * emits only for some inputs. {@code emits} declares the output type, which a {@code void} return
- * cannot.
+ * <p>Spawning and emitting both go through the context, and this tasklet emits only for some
+ * inputs: an input that is not an alert returns without emitting anything.
  */
-@Tasklet(id = "detect", emits = String.class)
-public final class Detect {
+@Tasklet.Spec(name = "detect")
+public final class Detect implements Tasklet<String, Void, String> {
 
-    public void run(String input, TaskletCtx ctx) throws TaskletException {
+    @Override
+    public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
         if (!input.startsWith("alert:")) {
             return;
         }

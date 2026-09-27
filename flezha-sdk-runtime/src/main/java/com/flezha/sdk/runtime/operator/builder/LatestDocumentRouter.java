@@ -3,11 +3,8 @@ package com.flezha.sdk.runtime.operator.builder;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.RoutedDocument;
 import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.util.HashMap;
 import java.util.List;
@@ -37,14 +34,9 @@ import javax.annotation.Nullable;
  * generic map unless the document type is itself a JSON scalar. A crash-resume,
  * a compaction and a rebind all restore through Kryo and are unaffected.
  */
+@Tasklet.Spec(name = LatestDocumentRouter.NODE_NAME)
 public final class LatestDocumentRouter
-        implements Tasklet<
-                LatestDocumentRouter.Input,
-                LatestDocumentRouter.RouterState,
-                RoutedDocument<Object>,
-                LatestDocumentRouter.RouterChange,
-                WallClock,
-                Void> {
+        implements Tasklet<LatestDocumentRouter.Input, LatestDocumentRouter.RouterState, RoutedDocument<Object>> {
 
     /** The node identity, and so the derived channel name, of every router. */
     public static final String NODE_NAME = "route_latest";
@@ -94,7 +86,7 @@ public final class LatestDocumentRouter
      * {@code version}.
      */
     public record RouterChange(@Nonnull Optional<Object> retain, @Nonnull Optional<String> deliveredKey, long version)
-            implements Change {
+            implements Change<RouterState> {
         @Nonnull
         static RouterChange retain(@Nonnull Object document) {
             return new RouterChange(Optional.of(document), Optional.empty(), 0L);
@@ -104,12 +96,16 @@ public final class LatestDocumentRouter
         static RouterChange delivered(@Nonnull String key, long version) {
             return new RouterChange(Optional.empty(), Optional.of(key), version);
         }
-    }
 
-    @Override
-    @Nonnull
-    public String name() {
-        return NODE_NAME;
+        @Override
+        public void applyTo(@Nonnull RouterState state) {
+            if (retain.isPresent()) {
+                state.document = retain.get();
+                state.version += 1;
+                return;
+            }
+            state.delivered.put(deliveredKey.orElseThrow(), version);
+        }
     }
 
     /**
@@ -124,32 +120,15 @@ public final class LatestDocumentRouter
     }
 
     @Override
-    @Nonnull
-    public RouterState initState(@Nonnull Optional<String> cellKey, @Nonnull Optional<RestoreInitPayload> initPayload) {
-        return new RouterState();
-    }
-
-    @Override
-    public void applyChange(@Nonnull RouterState state, @Nonnull RouterChange change) {
-        if (change.retain().isPresent()) {
-            state.document = change.retain().get();
-            state.version += 1;
-            return;
-        }
-        state.delivered.put(change.deliveredKey().orElseThrow(), change.version());
-    }
-
-    @Override
-    public void run(
-            @Nonnull Input input, @Nonnull StateHandle<RouterState, RouterChange> state, @Nonnull TaskletCtx ctx)
+    public void run(@Nonnull Input input, @Nonnull Ctx<RouterState, RoutedDocument<Object>> ctx)
             throws TaskletException {
-        RouterState current = state.get();
+        RouterState current = ctx.state();
         if (input.document().isPresent()) {
             Object document = input.document().get();
             // Version 0 means "nothing retained", so the first document lands at
             // 1 and every key's absent entry is already behind it.
             if (!Objects.equals(current.document, document)) {
-                state.apply(RouterChange.retain(document));
+                ctx.change(RouterChange.retain(document));
             }
             return;
         }
@@ -166,6 +145,6 @@ public final class LatestDocumentRouter
         // Emit first: a failed emit rides the channel's retry ladder, and
         // recording the delivery before it would make the retry silent.
         ctx.emit(new RoutedDocument<>(key, document));
-        state.apply(RouterChange.delivered(key, version));
+        ctx.change(RouterChange.delivered(key, version));
     }
 }

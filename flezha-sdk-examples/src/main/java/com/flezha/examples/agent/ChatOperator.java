@@ -23,6 +23,6 @@ public final class ChatOperator implements BoundedOperator {
 
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
-        c.input(String.class, "message").into(ReplyTasklet.class).sink("reply");
+        c.input(String.class, "message").into(Reply.class).sink("reply");
     }
 }

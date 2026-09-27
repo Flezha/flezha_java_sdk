@@ -1,10 +1,9 @@
 package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.operator.BoundedOperator;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -51,68 +50,43 @@ public final class BranchBoundedOperator implements BoundedOperator {
     }
 
     /** The shared root. */
+    @Tasklet.Spec(name = "branch_a")
     public static final class BranchA extends DurableStep {
-
         @Override
-        public String name() {
-            return "branch_a";
-        }
-
-        @Override
-        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void compensate(List<String> completedOutput, Ctx<SeenState, String> ctx) throws TaskletException {
             ctx.emit("undo-a");
         }
     }
 
     /** The deep branch's upper half. */
+    @Tasklet.Spec(name = "branch_b")
     public static final class BranchB extends DurableStep {
-
         @Override
-        public String name() {
-            return "branch_b";
-        }
-
-        @Override
-        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void compensate(List<String> completedOutput, Ctx<SeenState, String> ctx) throws TaskletException {
             ctx.emit("undo-b");
         }
     }
 
     /** The sibling leaf: emits straight to the sink, and its undo does too. */
+    @Tasklet.Spec(name = "branch_c")
     public static final class BranchC extends DurableStep {
-
         @Override
-        public String name() {
-            return "branch_c";
-        }
-
-        @Override
-        public void run(String input, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
-                throws TaskletException {
-            state.apply(new Insert(name()));
+        public void run(String input, Ctx<SeenState, String> ctx) throws TaskletException {
+            ctx.change(new Insert(name()));
             ctx.emit("c:" + input);
         }
 
         @Override
-        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void compensate(List<String> completedOutput, Ctx<SeenState, String> ctx) throws TaskletException {
             ctx.emit("undo-c");
         }
     }
 
     /** The deep leaf under BranchB: blocks (crash-resume), or fails (compensation). */
-    public static final class BranchD extends StatelessStep {
-
+    @Tasklet.Spec(name = "branch_d")
+    public static final class BranchD extends NoStateStep {
         @Override
-        public String name() {
-            return "branch_d";
-        }
-
-        @Override
-        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             if (System.getenv(BRANCH_FAIL_ENV) != null) {
                 throw new TaskletException("branch_d failed");
             }

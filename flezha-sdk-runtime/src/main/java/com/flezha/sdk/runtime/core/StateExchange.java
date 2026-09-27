@@ -4,10 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.Stateless;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.function.BiFunction;
 
 /**
@@ -34,7 +31,7 @@ final class StateExchange {
         }
         for (ActivationKind.RestoreBody body : fold.changes()) {
             Change change = read(body, cell, Change.class, cell.tasklet::migrateChange);
-            cell.tasklet.applyChange(cell.state, change);
+            change.applyTo(cell.state);
         }
     }
 
@@ -52,14 +49,10 @@ final class StateExchange {
     }
 
     static byte[] stateJson(Cell cell) {
-        // A stateless tasklet has nothing to ship. Jackson refuses an
-        // empty bean, and that refusal is RIGHT for a user state class with
-        // no readable properties — an author mistake worth surfacing — but
-        // `Stateless` is the SDK's own marker for "there is no state", so it
-        // ships `{}` and reads back through `applyState`'s no-arg
-        // constructor. Without this, every stateless Java operator failed
-        // its migration serialize and its shutdown state ship.
-        if (cell.state instanceof Stateless) {
+        // A Void state has nothing to ship. It ships `{}`, and `applyState`
+        // keeps it absent, so a stateless operator's migration serialize and
+        // its shutdown state ship succeed.
+        if (cell.state == null) {
             return "{}".getBytes(StandardCharsets.UTF_8);
         }
         try {
@@ -70,19 +63,13 @@ final class StateExchange {
     }
 
     static void applyState(Cell cell, byte[] json) {
+        if (cell.state == null) {
+            return;
+        }
         try {
-            Class<?> targetClass = cell.state == null ? Object.class : cell.state.getClass();
-            cell.state = JSON.readValue(json, targetClass);
+            cell.state = JSON.readValue(json, cell.state.getClass());
         } catch (Exception e) {
             throw new IllegalStateException("state apply failed: " + e.getMessage(), e);
         }
-    }
-
-    static List<byte[]> serializeChanges(Cell cell, List<Change> buffer) {
-        List<byte[]> changeBytes = new ArrayList<>(buffer.size());
-        for (Change change : buffer) {
-            changeBytes.add(cell.codec.serialize(change));
-        }
-        return changeBytes;
     }
 }

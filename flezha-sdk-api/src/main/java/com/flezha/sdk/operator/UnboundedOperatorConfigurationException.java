@@ -42,36 +42,27 @@ public class UnboundedOperatorConfigurationException extends RuntimeException {
     }
 
     /**
-     * Raised when a Tasklet's type argument cannot be recovered from its
-     * generic supertype chain and the corresponding type-token method is not
-     * overridden — the argument is still generic at the concrete class. Naming
-     * the class and the parameter is the whole contract: a guess would surface
-     * later as a type mismatch far from its cause.
+     * Raised when a tasklet's type argument cannot be recovered from its generic supertype chain:
+     * the argument is still generic at the concrete class. Naming the class and the parameter is
+     * the whole contract: a guess would surface later as a type mismatch far from its cause.
      *
-     * <p>One of the two refusals the core has no vocabulary for: erasure is a
-     * Java fact and the record carries no type tokens, so nothing the builder
-     * could submit would let the core answer this.
+     * <p>One of the refusals the core has no vocabulary for: erasure is a Java fact and the record
+     * carries no type tokens, so nothing the builder could submit would let the core answer this.
      */
-    public static UnboundedOperatorConfigurationException unresolvedTypeToken(
-            String className, String parameter, String method) {
+    public static UnboundedOperatorConfigurationException unresolvedTypeToken(String className, String parameter) {
         return new UnboundedOperatorConfigurationException("tasklet class `" + className + "` leaves the `"
-                + parameter + "` type argument of Tasklet<…> unresolved; declare it concretely on the "
-                + "implements/extends clause, or override `" + method + "()`");
+                + parameter + "` type argument of Tasklet<Input, State, Output> unresolved; declare it"
+                + " concretely on the implements/extends clause");
     }
 
     /**
-     * Raised when a Tasklet declares {@code EventTimeFrom} but does not
-     * override {@code eventTime(Input)}. Rust enforces the extractor with a
-     * compile-time {@code TimeExtractor<Input>} bound; Java's erasure precludes
-     * that, so the same defect is caught at registration — before any input is
-     * served and before anything durable exists.
-     *
-     * <p>The second refusal the core has no vocabulary for: the record states
-     * the clock, never whether the host overrode its extractor.
+     * Raised when a tasklet class named in the wiring carries no {@code @Tasklet.Spec}. The name
+     * it declares is where the tasklet's state is saved, so it is never derived from the class.
      */
-    public static UnboundedOperatorConfigurationException eventTimeExtractorMissing(String taskletName) {
-        return new UnboundedOperatorConfigurationException("tasklet `" + taskletName
-                + "` declares the EventTimeFrom clock but does not override `eventTime(Input)`; "
-                + "an event-time clock has no value to serve without an extractor");
+    public static UnboundedOperatorConfigurationException taskletSpecMissing(String className) {
+        return new UnboundedOperatorConfigurationException(
+                "TaskletSpecMissing: tasklet class `" + className + "` carries no @Tasklet.Spec(name = ...);"
+                        + " the name it declares is where the tasklet's state is saved",
+                List.of("TaskletSpecMissing"));
     }
 }

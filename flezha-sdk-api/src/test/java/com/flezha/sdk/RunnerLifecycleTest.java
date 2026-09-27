@@ -8,6 +8,9 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.BoundedOperator;
 import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CyclicBarrier;
@@ -109,20 +112,21 @@ class RunnerLifecycleTest {
         public void channels(ChannelBuilder c) {}
     }
 
-    /** A short form: the runner registers the operator generated from it, {@link ShortFormUnboundedOperator}. */
+    /** A short form: the tasklet class itself declares the operator. */
     @com.flezha.sdk.authoring.UnboundedOperator(id = "lifecycle_short", sink = "out")
-    public static final class ShortForm {
-        public String run(String input) {
-            return input;
+    public static final class ShortForm implements Tasklet<String, Void, String> {
+        @Override
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
+            ctx.emit(input);
         }
     }
 
-    /** A short form with no generated operator beside it, as when the processor never ran. */
-    @com.flezha.sdk.authoring.BoundedOperator(id = "lifecycle_orphan")
-    public static final class Orphan {
-        public String run(String input) {
-            return input;
-        }
+    /** A class claiming both kinds through its two annotations. */
+    @com.flezha.sdk.authoring.UnboundedOperator(id = "lifecycle_both")
+    @com.flezha.sdk.authoring.BoundedOperator(id = "lifecycle_both")
+    public static final class BothShortForms implements Tasklet<String, Void, Void> {
+        @Override
+        public void run(String input, Ctx<Void, Void> ctx) {}
     }
 
     /** Neither an operator nor a short form. */
@@ -373,14 +377,14 @@ class RunnerLifecycleTest {
     }
 
     @Test
-    @DisplayName("a short form whose generated operator is missing is refused naming the processor")
-    void aShortFormWithoutItsGeneratedOperatorIsRefused() {
-        FlezhaRunner runner = Flezha.createRunner("ns_orphan");
+    @DisplayName("a short form annotated with both kinds is refused as ambiguous")
+    void aShortFormOfBothKindsIsRefused() {
+        FlezhaRunner runner = Flezha.createRunner("ns_both");
 
-        assertThatThrownBy(() -> runner.registerFactory(Orphan.class))
+        assertThatThrownBy(() -> runner.registerFactory(BothShortForms.class))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("OrphanBoundedOperator")
-                .hasMessageContaining("flezha-sdk-processor");
+                .hasMessageStartingWith("AmbiguousOperatorKind")
+                .hasMessageContaining(BothShortForms.class.getName());
     }
 
     @Test

@@ -2,15 +2,9 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.Stateless;
-import com.flezha.sdk.state.WallClock;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -41,24 +35,13 @@ public final class WedgeProbeUnboundedOperator implements UnboundedOperator {
         c.input(String.class, "input").into(WedgeProbeTasklet.class).sink("out");
     }
 
-    public static final class WedgeProbeTasklet
-            implements Tasklet<String, Stateless, String, NoChange, WallClock, Void> {
+    @Tasklet.Spec(name = "wedge_probe_tasklet")
+    public static final class WedgeProbeTasklet implements Tasklet<String, Void, String> {
 
         private static final AtomicBoolean ABORTED = new AtomicBoolean(false);
 
         @Override
-        public String name() {
-            return "wedge_probe_tasklet";
-        }
-
-        @Override
-        public Stateless initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new Stateless();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Stateless, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             if ("wedge".equals(input)) {
                 // Never returns. The runner stays connected and heartbeating;
                 // only its dispatch progress dies. Teardown is the stdin-EOF watcher.

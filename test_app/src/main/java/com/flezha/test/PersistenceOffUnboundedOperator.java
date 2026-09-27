@@ -2,6 +2,7 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.tasklet.Tasklet;
 
 /**
  * Same Tasklet topology as {@link StatefulCounterUnboundedOperator} but with
@@ -31,18 +32,10 @@ public final class PersistenceOffUnboundedOperator implements UnboundedOperator 
     }
 
     /** The {@link CounterEntryTasklet} parse under this operator's own node identity. */
-    public static final class PersistenceOffEntryTasklet extends CounterEntryTasklet {
-        @Override
-        public String name() {
-            return "persistence_off_entry_tasklet";
-        }
-    }
+    @Tasklet.Spec(name = "persistence_off_entry_tasklet")
+    public static final class PersistenceOffEntryTasklet extends CounterEntryTasklet {}
 
     /** The {@link CounterTasklet} fold under this operator's own node identity. */
-    public static final class PersistenceOffCounterTasklet extends CounterTasklet {
-        @Override
-        public String name() {
-            return "persistence_off_counter_tasklet";
-        }
-    }
+    @Tasklet.Spec(name = "persistence_off_counter_tasklet")
+    public static final class PersistenceOffCounterTasklet extends CounterTasklet {}
 }

@@ -18,8 +18,8 @@ Each Cell SHALL run on its own Tasklet instance :: Instance state does not leak 
 Each Cell SHALL run on its own Tasklet instance :: The dispatcher's documentation matches its behaviour
 Factory visibility SHALL match its documentation :: Declared visibility matches documented visibility
 Flezha static accessor for the active runner :: currentRunner() reflects the singleton's lifecycle
-Hot-path cost is bounded :: No JNI calls on state.apply
-Hot-path cost is bounded :: No serialization on state.apply
+Hot-path cost is bounded :: No JNI calls on ctx.change
+Hot-path cost is bounded :: No serialization on ctx.change
 JNI Bridge to flz_core_ffi :: Native buffer freed after copy into Java byte[]
 JNI Bridge to flz_core_ffi :: Shutdown wakes blocked Java pollers
 JNI Bridge to flz_core_ffi :: Version mismatch refuses at context creation
@@ -59,8 +59,6 @@ Java SDK implements bounded loop rewind :: A hookless task still drains the rewi
 Java SDK implements bounded loop rewind :: A rewind does not re-deliver consumed inputs
 Java SDK implements bounded loop rewind :: A rewind undoes committed iterations in reverse order
 Kryo serialization with stable registered type IDs :: Built-in types registered with stable IDs
-Kryo serialization with stable registered type IDs :: Unregistered class fails loud
-Kryo serialization with stable registered type IDs :: User types registered after built-ins
 Operator Type Declaration :: Declaring an unbounded operator class before start() succeeds
 Operator Type Declaration :: Declaring an operator type after start() is accepted
 Operator Type Declaration :: Declaring or removing a type on a closed runner is refused
@@ -85,26 +83,12 @@ Tasklet Interface and Per-Cell Dispatch :: Reserved flz. metadata key in user ma
 Tasklet Interface and Per-Cell Dispatch :: Run throwing TaskletException logs and continues
 Tasklet Interface and Per-Cell Dispatch :: Run throwing arbitrary RuntimeException logs and continues
 Tasklet Interface and Per-Cell Dispatch :: Single-mode Tasklet runs on a single cell
-Tasklet Interface and Per-Cell Dispatch :: Static-mode Tasklet creates one cell per cellKey
 Tasklet Interface and Per-Cell Dispatch :: Static-mode cellsFor fan-out enqueues input on each named cell
 Tasklet Interface and Per-Cell Dispatch :: emitKeyed on a non-keyed channel is rejected
 Tasklet Interface and Per-Cell Dispatch :: emitWithMeta on an inter-tasklet channel returns error
 Tasklet Interface and Per-Cell Dispatch :: now() is constant within one invocation
 Tasklet Interface and Per-Cell Dispatch :: stableId() is byte-identical to the Rust SDK
 Tasklet Interface and Per-Cell Dispatch :: stableId() is replay-stable and ordinal-distinct
-Tasklet declares Clock generic parameter with default WallClock :: Default Clock is WallClock
-Tasklet declares Clock generic parameter with default WallClock :: EventTimeFrom serves the extracted input time
-Tasklet declares Clock generic parameter with default WallClock :: EventTimeFrom without an eventTime override fails registration
-Tasklet declares Clock generic parameter with default WallClock :: LogicalClock serves the durable change seq and re-arms on restore
-Tasklet declares Clock generic parameter with default WallClock :: LogicalClock with NoChange fails registration
-Tasklet interface declares Change, Clock, Config generic parameters :: Default Change is NoChange skips persistence machinery
-Tasklet interface declares Change, Clock, Config generic parameters :: Default applyChange throws on non-NoChange Change without override
-Tasklet interface declares Change, Clock, Config generic parameters :: Default fromConfig invokes no-arg constructor for Void Config
-Tasklet interface declares Change, Clock, Config generic parameters :: User-defined Change opts the Tasklet into persistence
-Tasklet interface declares Change, Clock, Config generic parameters :: User-defined Config ships through Jackson deserialization
-Tasklet.run receives StateHandle, not direct State reference :: Direct field mutation requires apply
-Tasklet.run receives StateHandle, not direct State reference :: Mutation via apply runs applyChange and records
-Tasklet.run receives StateHandle, not direct State reference :: Read access via get() is allocation-free
 Public Java SDK handler classes use canonical Operator vocabulary :: New handlers wire into dispatch
 Public Java SDK handler classes use canonical Operator vocabulary :: Old handler classes do not exist
 Public Operator / Tasklet / Cell user-facing API names :: User extends UnboundedOperator
@@ -134,5 +118,3 @@ The snapshot frame SHALL be stamped with its payload-id :: The frame is routable
 Worker Pool and Dispatch Throughput Floor :: A throwing dispatch abandons instead of dropping the activation
 Worker Pool and Dispatch Throughput Floor :: Default fetcher count is small and fixed
 Worker Pool and Dispatch Throughput Floor :: Reference bench meets the Java throughput floor
-initState accepts optional restoration payload :: Cold start passes Optional.empty()
-initState accepts optional restoration payload :: Restart passes Optional.of(payload)

@@ -9,5 +9,10 @@ import com.flezha.sdk.state.Change;
  * Model A idempotent re-run over restored state is safe. Mirrors the Rust test
  * app's {@code Insert}.
  */
-public record Insert(String key) implements Change {
+public record Insert(String key) implements Change<SeenState> {
+
+    @Override
+    public void applyTo(SeenState state) {
+        state.items.add(key);
+    }
 }

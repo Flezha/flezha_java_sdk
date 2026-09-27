@@ -33,9 +33,9 @@ public final class PipelineOperator implements UnboundedOperator {
         // The labels are identities rather than documentation: "normalized" and "shouted" are what
         // a sink registers against and what a test feeds or reads.
         c.input(String.class, "in")
-                .into(NormalizeTasklet.class)
+                .into(Normalize.class)
                 .named("normalized")
-                .into(ShoutTasklet.class)
+                .into(Shout.class)
                 .sink("shouted");
     }
 }

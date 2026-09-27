@@ -37,14 +37,6 @@
             <artifactId>kryo</artifactId>
         </dependency>
 
-        <!-- Derives <Name>Change / <Name>Handle for the @State test fixtures, so the
-             shapes the generator emits are read back through this module's own codec
-             and restore fold. Test scope: nothing under src/main is derived. -->
-        <dependency>
-            <groupId>com.flezha</groupId>
-            <artifactId>flezha-sdk-processor</artifactId>
-            <scope>test</scope>
-        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -61,17 +53,6 @@
 
     <build>
         <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <compilerArgs combine.children="append">
-                        <!-- The processor claims none of the annotations it reads, so javac's
-                             processing lint would warn on every build. -->
-                        <arg>-Xlint:-processing</arg>
-                    </compilerArgs>
-                </configuration>
-            </plugin>
             <!-- The test classes as a jar of their own, so a sibling module's
                  tests resolve the contract set through `RepositoryFixture`. -->
             <plugin>

@@ -1,17 +1,12 @@
 package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
-import com.flezha.sdk.tasklet.TaskletException;
 import com.flezha.sdk.operator.UnboundedOperator;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Optional;
 
 /**
  * Java mirror of the Rust test app's {@code HybridChannelUnboundedOperator}.
@@ -34,21 +29,11 @@ public final class HybridChannelUnboundedOperator implements UnboundedOperator {
         sHybridProducerTasklet.sink("hybrid_indicator", v -> { if (v == 0xDEAD_BEEFL) { throw new RuntimeException("hybrid_indicators: serializer rejected sentinel 0xDEADBEEF"); } return ByteBuffer.allocate(4) .order(ByteOrder.BIG_ENDIAN) .putInt(v.intValue()) .array(); }).into(HybridConsumerTasklet.class);
     }
 
-    public static final class HybridProducerTasklet
-            implements Tasklet<String, HybridProducerTasklet.State, Long, NoChange, WallClock, Void> {
+    @Tasklet.Spec(name = "hybrid_producer_tasklet")
+    public static final class HybridProducerTasklet implements Tasklet<String, Void, Long> {
 
         @Override
-        public String name() {
-            return "hybrid_producer_tasklet";
-        }
-
-        @Override
-        public State initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new State();
-        }
-
-        @Override
-        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx) throws TaskletException {
+        public void run(String input, Ctx<Void, Long> ctx) throws TaskletException {
             long n;
             try {
                 n = Long.parseLong(input);
@@ -62,28 +47,14 @@ public final class HybridChannelUnboundedOperator implements UnboundedOperator {
                         + e.getMessage());
             }
         }
-
-        public record State() {}
     }
 
-    public static final class HybridConsumerTasklet
-            implements Tasklet<Long, HybridConsumerTasklet.State, Void, NoChange, WallClock, Void> {
+    @Tasklet.Spec(name = "hybrid_consumer_tasklet")
+    public static final class HybridConsumerTasklet implements Tasklet<Long, Void, Void> {
 
         @Override
-        public String name() {
-            return "hybrid_consumer_tasklet";
-        }
-
-        @Override
-        public State initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new State();
-        }
-
-        @Override
-        public void run(Long input, StateHandle<State, NoChange> state, TaskletCtx ctx) {
+        public void run(Long input, Ctx<Void, Void> ctx) {
             System.out.println("hybrid_consumer_tasklet: received " + input);
         }
-
-        public record State() {}
     }
 }

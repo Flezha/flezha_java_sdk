@@ -2,17 +2,13 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.UnboundedOperator;
-import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
-import com.flezha.sdk.tasklet.TaskletException;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Twin of the Rust test app's schema-evolution fixtures: the same class either
@@ -45,7 +41,7 @@ public final class SchemaEvolutionUnboundedOperators {
             public long total;
         }
 
-        public static final class AddV1 implements Change {
+        public static final class AddV1 implements Change<CartV1> {
             public long delta;
 
             public AddV1() {}
@@ -53,15 +49,15 @@ public final class SchemaEvolutionUnboundedOperators {
             AddV1(long delta) {
                 this.delta = delta;
             }
-        }
-
-        public static final class Task
-                implements Tasklet<String, CartV1, byte[], AddV1, WallClock, Void> {
 
             @Override
-            public String name() {
-                return "evolving_cart";
+            public void applyTo(CartV1 state) {
+                state.total += delta;
             }
+        }
+
+        @Tasklet.Spec(name = "evolving_cart")
+        public static final class Task implements Tasklet<String, CartV1, byte[]> {
 
             @Override
             public List<Class<?>> kryoTypes() {
@@ -69,21 +65,10 @@ public final class SchemaEvolutionUnboundedOperators {
             }
 
             @Override
-            public CartV1 initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-                return new CartV1();
-            }
-
-            @Override
-            public void applyChange(CartV1 state, AddV1 change) {
-                state.total += change.delta;
-            }
-
-            @Override
-            public void run(String input, StateHandle<CartV1, AddV1> state, TaskletCtx ctx)
-                    throws TaskletException {
+            public void run(String input, Ctx<CartV1, byte[]> ctx) throws TaskletException {
                 long delta = parse(input);
-                long total = state.get().total + delta;
-                state.apply(new AddV1(delta));
+                long total = ctx.state().total + delta;
+                ctx.change(new AddV1(delta));
                 ctx.emit((total + ":").getBytes(StandardCharsets.UTF_8));
             }
         }
@@ -107,7 +92,7 @@ public final class SchemaEvolutionUnboundedOperators {
             public String currency = "";
         }
 
-        public static final class AddV2 implements Change {
+        public static final class AddV2 implements Change<CartV2> {
             public long delta;
             public String note = "";
 
@@ -117,10 +102,15 @@ public final class SchemaEvolutionUnboundedOperators {
                 this.delta = delta;
                 this.note = note;
             }
+
+            @Override
+            public void applyTo(CartV2 state) {
+                state.total += delta;
+            }
         }
 
-        public static final class Task
-                implements Tasklet<String, CartV2, byte[], AddV2, WallClock, Void> {
+        @Tasklet.Spec(name = "evolving_cart", schemaVersion = 2, minReadableSchemaVersion = 1)
+        public static final class Task implements Tasklet<String, CartV2, byte[]> {
 
             /**
              * The v1 type table, in v1's registration order — Kryo ids are
@@ -131,28 +121,8 @@ public final class SchemaEvolutionUnboundedOperators {
                     new KryoCodec(List.of(V1.CartV1.class, V1.AddV1.class));
 
             @Override
-            public String name() {
-                return "evolving_cart";
-            }
-
-            @Override
-            public int schemaVersion() {
-                return 2;
-            }
-
-            @Override
-            public int minReadableSchemaVersion() {
-                return 1;
-            }
-
-            @Override
             public List<Class<?>> kryoTypes() {
                 return List.of(CartV2.class, AddV2.class);
-            }
-
-            @Override
-            public CartV2 initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-                return new CartV2();
             }
 
             @Override
@@ -177,18 +147,12 @@ public final class SchemaEvolutionUnboundedOperators {
             }
 
             @Override
-            public void applyChange(CartV2 state, AddV2 change) {
-                state.total += change.delta;
-            }
-
-            @Override
-            public void run(String input, StateHandle<CartV2, AddV2> state, TaskletCtx ctx)
-                    throws TaskletException {
+            public void run(String input, Ctx<CartV2, byte[]> ctx) throws TaskletException {
                 long delta = parse(input);
-                CartV2 current = state.get();
+                CartV2 current = ctx.state();
                 long total = current.total + delta;
                 String currency = current.currency.isEmpty() ? "EUR" : current.currency;
-                state.apply(new AddV2(delta, "live"));
+                ctx.change(new AddV2(delta, "live"));
                 ctx.emit((total + ":" + currency).getBytes(StandardCharsets.UTF_8));
             }
         }

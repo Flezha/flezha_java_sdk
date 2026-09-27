@@ -5,7 +5,6 @@ import com.flezha.sdk.internal.RegistryCore;
 import com.flezha.sdk.internal.RunnerHandle;
 import com.flezha.sdk.internal.RuntimeBridge;
 import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.operator.UnboundedOperator;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,11 +49,11 @@ public final class FlezhaRunner implements AutoCloseable {
      * empty; generation 2 must re-define its types). The runtime-side class
      * registries stay process-global behind these.
      */
-    private final RegistryCore<UnboundedOperator> stream =
-            new RegistryCore<>("com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry", "operator");
+    private final RegistryCore stream =
+            new RegistryCore("com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry", "operator");
 
-    private final RegistryCore<BoundedOperator> bounded =
-            new RegistryCore<>("com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry", "bounded");
+    private final RegistryCore bounded =
+            new RegistryCore("com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry", "bounded");
 
     private final AtomicReference<RunnerHandle> handle = new AtomicReference<>();
 
@@ -88,30 +87,24 @@ public final class FlezhaRunner implements AutoCloseable {
      * call site, as {@code UnboundedOperatorConfigurationException} or
      * {@code BoundedOperatorConfigurationException}.
      *
-     * <p>A short form is registered by the class the author wrote, annotated
+     * <p>A short form is registered by the tasklet class the author wrote, annotated
      * {@link com.flezha.sdk.authoring.UnboundedOperator @UnboundedOperator} or
-     * {@link com.flezha.sdk.authoring.BoundedOperator @BoundedOperator}: the call declares the
-     * operator the annotation processor generated from it, {@code <Class>UnboundedOperator} or
-     * {@code <Class>BoundedOperator} in the class's package.
+     * {@link com.flezha.sdk.authoring.BoundedOperator @BoundedOperator}: the call reads the
+     * annotation and declares the one-tasklet operator it describes. Nothing is generated.
      *
      * <p>Unbounded and bounded operators share one factory-id namespace per runner, so a second class under
      * an id this runner already holds is refused whichever kind either one is.
      *
      * @throws IllegalArgumentException on a duplicate factory id (the message begins with
-     *     {@code DuplicateFactoryId}), when the class implements both kind interfaces
-     *     ({@code AmbiguousOperatorKind}), when it implements neither and is not a short form
-     *     ({@code UnknownOperatorKind}), or when a short form's generated operator is missing.
+     *     {@code DuplicateFactoryId}), when the class implements both kind interfaces or carries both
+     *     annotations ({@code AmbiguousOperatorKind}), when it is neither an operator nor a short
+     *     form ({@code UnknownOperatorKind}), or when a short form is refused.
      * @throws IllegalStateException on a closed runner.
      */
     @Nonnull
     public FlezhaRunner registerFactory(Class<?> operatorClass) {
         open("registerFactory()");
-        Class<? extends Operator> operator = operatorOf(operatorClass, "registerFactory()");
-        if (isBounded(operator)) {
-            bounded.register(operator.asSubclass(BoundedOperator.class));
-        } else {
-            stream.register(operator.asSubclass(UnboundedOperator.class));
-        }
+        coreOf(operatorClass, "registerFactory()").register(operatorClass);
         syncFactoriesIfStarted();
         return this;
     }
@@ -130,64 +123,32 @@ public final class FlezhaRunner implements AutoCloseable {
     @Nonnull
     public FlezhaRunner unregisterFactory(Class<?> operatorClass) {
         open("unregisterFactory()");
-        Class<? extends Operator> operator = operatorOf(operatorClass, "unregisterFactory()");
-        return isBounded(operator)
-                ? remove(bounded, operator.asSubclass(BoundedOperator.class))
-                : remove(stream, operator.asSubclass(UnboundedOperator.class));
+        return remove(coreOf(operatorClass, "unregisterFactory()"), operatorClass);
     }
 
     /**
-     * The operator a registration names: the class itself when it is one, or the operator the
-     * annotation processor generated from a short form, resolved by the processor's naming rule.
+     * The registry of the kind a class declares, read from the interface it implements or, for a
+     * short form, from its annotation. A class of both kinds, or of neither, is refused by the
+     * contract's name for it ({@code docs/sdk/authoring_contract.md} §5.1).
      */
-    private static Class<? extends Operator> operatorOf(Class<?> declared, String what) {
+    private RegistryCore coreOf(Class<?> declared, String what) {
         if (declared == null) {
             throw new IllegalArgumentException(what + ": the operator class must not be null");
         }
-        if (Operator.class.isAssignableFrom(declared)) {
-            return declared.asSubclass(Operator.class);
+        boolean isUnbounded = UnboundedOperator.class.isAssignableFrom(declared)
+                || declared.isAnnotationPresent(com.flezha.sdk.authoring.UnboundedOperator.class);
+        boolean isBounded = BoundedOperator.class.isAssignableFrom(declared)
+                || declared.isAnnotationPresent(com.flezha.sdk.authoring.BoundedOperator.class);
+        if (isUnbounded && isBounded) {
+            throw new IllegalArgumentException("AmbiguousOperatorKind: " + declared.getName()
+                    + " declares both an unbounded and a bounded operator, so its kind cannot be read");
         }
-        Class<? extends Operator> kind;
-        if (declared.isAnnotationPresent(com.flezha.sdk.authoring.UnboundedOperator.class)) {
-            kind = UnboundedOperator.class;
-        } else if (declared.isAnnotationPresent(com.flezha.sdk.authoring.BoundedOperator.class)) {
-            kind = BoundedOperator.class;
-        } else {
+        if (!isUnbounded && !isBounded) {
             throw new IllegalArgumentException("UnknownOperatorKind: " + declared.getName()
                     + " implements neither UnboundedOperator nor BoundedOperator, and is annotated with"
                     + " neither @UnboundedOperator nor @BoundedOperator");
         }
-        String simpleName = declared.getSimpleName() + kind.getSimpleName();
-        String generated =
-                declared.getPackageName().isEmpty() ? simpleName : declared.getPackageName() + "." + simpleName;
-        try {
-            return Class.forName(generated, true, declared.getClassLoader()).asSubclass(kind);
-        } catch (ClassNotFoundException e) {
-            throw new IllegalArgumentException(
-                    declared.getName() + " is annotated @" + kind.getSimpleName() + ", but " + generated
-                            + ", the operator the annotation processor generates from it, is not"
-                            + " on the class path: put flezha-sdk-processor on the annotation processor path",
-                    e);
-        }
-    }
-
-    /**
-     * Which kind the class declares, read from the interface it implements. A class of both kinds,
-     * or of neither, is refused by the contract's name for it
-     * ({@code docs/sdk/authoring_contract.md} §5.1).
-     */
-    private static boolean isBounded(Class<? extends Operator> operatorClass) {
-        boolean isUnbounded = UnboundedOperator.class.isAssignableFrom(operatorClass);
-        boolean isBounded = BoundedOperator.class.isAssignableFrom(operatorClass);
-        if (isUnbounded && isBounded) {
-            throw new IllegalArgumentException("AmbiguousOperatorKind: " + operatorClass.getName()
-                    + " implements both UnboundedOperator and BoundedOperator, so its kind cannot be read");
-        }
-        if (!isUnbounded && !isBounded) {
-            throw new IllegalArgumentException("UnknownOperatorKind: " + operatorClass.getName()
-                    + " implements neither UnboundedOperator nor BoundedOperator");
-        }
-        return isBounded;
+        return isBounded ? bounded : stream;
     }
 
     /**
@@ -219,7 +180,7 @@ public final class FlezhaRunner implements AutoCloseable {
         return this;
     }
 
-    private <C extends Operator> FlezhaRunner remove(RegistryCore<C> core, Class<? extends C> cls) {
+    private FlezhaRunner remove(RegistryCore core, Class<?> cls) {
         String factoryId = core.definedFactoryIdOf(cls);
         RunnerHandle h = handle.get();
         if (h != null) {

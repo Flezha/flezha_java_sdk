@@ -8,7 +8,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * The seam between {@link TaskletCtx#spawnBounded} and the control plane. The runtime installs a
+ * The seam between {@link Ctx#spawnBounded} and the control plane. The runtime installs a
  * {@link Requester} when it starts the core; the api layer, which cannot see the core, routes every
  * request through it. The core owns the rest: the replay skip, the deadline, the release of a handle
  * when its activation ends, and the warning for a failure nobody read.

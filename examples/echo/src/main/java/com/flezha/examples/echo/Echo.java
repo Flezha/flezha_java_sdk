@@ -1,26 +1,27 @@
 package com.flezha.examples.echo;
 
-import com.flezha.sdk.authoring.Tasklet;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletException;
 
 /**
  * A processing stage of the operator's graph, invoked once per message. This one prefixes the
- * input, and what {@code run} returns is emitted.
+ * input and emits the result.
  *
- * <p>The annotation processor generates {@code EchoTasklet} from this class at compile time,
- * reading the input and output types from the {@code run} signature. The operator names that
- * generated class. {@code run} takes no state parameter, so nothing is kept between messages and
- * nothing is journaled.
+ * <p>{@code Tasklet<String, Void, String>} reads input, state, output: a string in, no state, a
+ * string out. With {@code Void} state nothing is kept between messages and nothing is journaled.
  *
- * <p>{@code id} is the tasklet's stable identity. State is filed under it, so changing it later
+ * <p>{@code name} is the tasklet's stable identity. State is filed under it, so changing it later
  * declares a different tasklet rather than renaming this one.
  *
  * <p>Where the result goes is not decided here. The operator decides that, so the graph can be
  * rewired without touching this class.
  */
-@Tasklet(id = "echo")
-public final class Echo {
+@Tasklet.Spec(name = "echo")                 // state is saved under this name, so choose it once
+public final class Echo implements Tasklet<String, Void, String> {
 
-    public String run(String input) {
-        return "echo: " + input;
+    @Override
+    public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
+        ctx.emit("echo: " + input);          // where it goes is the operator's business
     }
 }

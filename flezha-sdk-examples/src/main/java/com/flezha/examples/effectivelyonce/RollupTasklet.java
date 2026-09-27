@@ -1,19 +1,23 @@
 package com.flezha.examples.effectivelyonce;
 
 import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.util.List;
-import java.util.Optional;
 import javax.annotation.Nonnull;
 
-/** A running total per symbol, written to a database that must not see duplicates. */
-public final class RollupTasklet
-        implements Tasklet<String, RollupTasklet.Totals, String, RollupTasklet.AddTick, WallClock, Void> {
+/**
+ * A running total per symbol, written to a database that must not see duplicates. Input is
+ * {@code <symbol>:<value>}, such as {@code BTC/USD:42}.
+ *
+ * <p>One cell per symbol, so the durability is per symbol too: {@code keys} names the cells and
+ * {@link #cellsFor} sends each input to its own.
+ */
+@Tasklet.Spec(
+        name = "rollup",
+        keys = {"BTC/USD", "ETH/USD"})
+public final class RollupTasklet implements Tasklet<String, RollupTasklet.Totals, String> {
 
     private static final int TICKS_PER_INTERVAL = 100;
 
@@ -22,49 +26,29 @@ public final class RollupTasklet
         public long ticks;
     }
 
-    public record AddTick(long value) implements Change {}
-
-    @Override
-    @Nonnull
-    public String name() {
-        return "rollup";
-    }
-
-    /** One cell per symbol, so the durability is per symbol too. */
-    @Override
-    @Nonnull
-    public List<String> cellKeys() {
-        return List.of("BTC", "ETH");
+    public record AddTick(long value) implements Change<Totals> {
+        @Override
+        public void applyTo(Totals totals) {
+            totals.sum += value;
+            totals.ticks++;
+        }
     }
 
     @Override
     @Nonnull
-    public List<String> cellsFor(@Nonnull String input) {
+    public List<String> cellsFor(String input) {
         return List.of(symbolOf(input));
     }
 
     @Override
-    public void applyChange(@Nonnull Totals state, @Nonnull AddTick change) {
-        state.sum += change.value();
-        state.ticks++;
-    }
-
-    @Override
-    @Nonnull
-    public Totals initState(@Nonnull Optional<String> cellKey, @Nonnull Optional<RestoreInitPayload> initPayload) {
-        return new Totals();
-    }
-
-    @Override
-    public void run(@Nonnull String input, @Nonnull StateHandle<Totals, AddTick> state, @Nonnull TaskletCtx ctx)
-            throws TaskletException {
-        state.apply(new AddTick(valueOf(input)));
+    public void run(String input, Ctx<Totals, String> ctx) throws TaskletException {
+        ctx.change(new AddTick(valueOf(input)));
 
         // The key comes from the input, so a replay emits under the same key and the sink
         // updates rather than inserting. That is what makes a repeated emit harmless.
-        ctx.emitKeyed(symbolOf(input), "sum=" + state.get().sum);
+        ctx.emitKeyed(symbolOf(input), "sum=" + ctx.state().sum);
 
-        if (state.get().ticks % TICKS_PER_INTERVAL == 0) {
+        if (ctx.state().ticks % TICKS_PER_INTERVAL == 0) {
             ctx.checkpoint();
         }
     }

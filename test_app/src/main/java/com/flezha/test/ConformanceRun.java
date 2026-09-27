@@ -76,16 +76,6 @@ public final class ConformanceRun {
     private static final List<String> SURFACES =
             List.of("merge", "branch", "bounded", "shorthand", "shorthand_typed_output");
 
-    /**
-     * The §5 short-form refusals Java raises at COMPILE time, each with the {@code FlezhaProcessorTest}
-     * case that pins the message: {@code ShortFormWithTopology} in
-     * {@code anAnnotatedClassImplementingAnOperatorInterfaceIsRefused}, {@code SinkWithoutOutput} in
-     * {@code aSinkOnAVoidRunIsRefused}. A row the compiler answers cannot be driven through a builder
-     * that never sees it, so the app cites the test and the drill checks the cited file carries the name.
-     */
-    private static final String PROCESSOR_TEST =
-            "sdk/java/flezha-sdk-processor/src/test/java/com/flezha/sdk/processor/FlezhaProcessorTest.java";
-
     /** The capacity a row declared per role, read as the tasklet is minted. */
     private static final Map<String, Integer> MAILBOX = new HashMap<>();
 
@@ -277,7 +267,7 @@ public final class ConformanceRun {
             case "into" -> handles.put(call[1], wire(s, call[1]));
             case "retry_max" -> s.retryMax(Integer.parseInt(call[1]));
             case "on_full" -> s.onFull(overflow(call[1]));
-            // Read by the palette's mailboxCapacity() as the tasklet was minted.
+            // Read by taskletClass() as the tasklet was minted.
             case "mailbox" -> {}
             default -> producerLink(s, call);
         }
@@ -371,19 +361,23 @@ public final class ConformanceRun {
     }
 
     @SuppressWarnings("unchecked")
-    private static Class<? extends Tasklet<String, ?, String, ?, ?, ?>> taskletClass(String role) {
+    private static Class<? extends Tasklet<String, ?, String>> taskletClass(String role) {
         Class<?> bound = switch (role) {
-            case "plain" -> Palette.Plain.class;
+            case "plain" -> switch (mailboxOf(role)) {
+                case Palette.OVERSIZED_MAILBOX -> Palette.PlainOversized.class;
+                case 0 -> Palette.PlainWithoutMailbox.class;
+                default -> Palette.Plain.class;
+            };
             case "second" -> Palette.Second.class;
             case "twin" -> Palette.Twin.class;
             case "static" -> Palette.StaticKeys.class;
             case "routed" -> Palette.Routed.class;
             case "dynamic" -> Palette.Dynamic.class;
-            case "nochange" -> Palette.NoChangeLogical.class;
+            case "nochange" -> Palette.LogicalWithoutState.class;
             case "eventtime" -> Palette.EventTime.class;
             default -> throw new IllegalStateException("the fixture names a palette role that is not one: " + role);
         };
-        return (Class<? extends Tasklet<String, ?, String, ?, ?, ?>>) bound;
+        return (Class<? extends Tasklet<String, ?, String>>) bound;
     }
 
     // -----------------------------------------------------------------------
@@ -406,8 +400,8 @@ public final class ConformanceRun {
         }
     }
 
-    static int mailboxOf(String role) {
-        return MAILBOX.getOrDefault(role, 1024);
+    private static int mailboxOf(String role) {
+        return MAILBOX.getOrDefault(role, Palette.MAILBOX);
     }
 
     /**
@@ -464,13 +458,13 @@ public final class ConformanceRun {
      */
     private record Shorthand(boolean hasSink, boolean noout, boolean topology) {
 
-        /** The refusal this declaration earns: the topology body is judged before the output. */
-        String refusal() {
+        /** The palette class this declaration spells: the topology body is judged before the output. */
+        Class<?> declared() {
             if (topology) {
-                return "ShortFormWithTopology";
+                return Palette.ShortFormWithTopology.class;
             }
             if (noout && hasSink) {
-                return "SinkWithoutOutput";
+                return Palette.SinkWithoutOutput.class;
             }
             throw new IllegalStateException("a well-formed shorthand declaration earns no refusal of its own");
         }
@@ -504,31 +498,32 @@ public final class ConformanceRun {
     }
 
     /**
-     * A short-form row's verdict. A row the compiler answers is {@code cited}: the name and the
-     * processor test that holds the message. A second declaration under one factory id is a runtime
-     * refusal in every SDK, so that row is driven for real.
+     * A short-form row's verdict, driven for real: registration reads the annotation, so a
+     * malformed short form is refused there, and a second declaration under one factory id is
+     * refused by the registry.
      */
     private static ObjectNode judgeShorthand(ObjectMapper json, ObjectNode entry, List<Shorthand> declarations) {
-        if (declarations.size() > 1) {
-            try {
-                driveDuplicate(com.flezha.sdk.Flezha.createRunner("conformance_shorthand"));
-                entry.put("outcome", "accepted");
-            } catch (IllegalArgumentException refusal) {
-                entry.put("outcome", "refused");
-                entry.putArray("names").add(refusalName(refusal.getMessage()));
-            }
-            return entry;
+        try {
+            drive(com.flezha.sdk.Flezha.createRunner("conformance_shorthand"), declarations);
+            entry.put("outcome", "accepted");
+        } catch (IllegalArgumentException refusal) {
+            entry.put("outcome", "refused");
+            entry.putArray("names").add(refusalName(refusal.getMessage()));
         }
-        entry.put("outcome", "cited");
-        entry.putArray("names").add(declarations.get(0).refusal());
-        entry.put("citation", PROCESSOR_TEST);
         return entry;
     }
 
-    /** Register the duplicate row's pair; the second call is the one under test. */
-    private static void driveDuplicate(FlezhaRunner runner) {
-        runner.registerFactory(ShorthandDupUnbounded.class);
-        runner.registerFactory(ShorthandDupBounded.class);
+    /**
+     * Register the row's short forms: the duplicate row's pair, where the second call is the one
+     * under test, or the one malformed declaration.
+     */
+    private static void drive(FlezhaRunner runner, List<Shorthand> declarations) {
+        if (declarations.size() > 1) {
+            runner.registerFactory(ShorthandDupUnbounded.class);
+            runner.registerFactory(ShorthandDupBounded.class);
+        } else {
+            runner.registerFactory(declarations.get(0).declared());
+        }
     }
 
     /** The leading refusal name of a message the contract requires to begin with one. */
@@ -612,23 +607,15 @@ public final class ConformanceRun {
                     + "`, so the row is skipped and nothing is registered");
             System.exit(1);
         }
-        // A short form the compiler refuses cannot be booted at all, so the app
-        // answers the row by naming the refusal and the test that pins it; the
-        // drill checks the cited file exists and carries the name.
         List<Shorthand> shorthand = shorthandSteps(row);
         if (!shorthand.isEmpty()) {
-            if (shorthand.size() > 1) {
-                try {
-                    driveDuplicate(runner);
-                } catch (IllegalArgumentException refusal) {
-                    System.err.println(topology + ": " + refusal.getMessage());
-                    System.exit(1);
-                }
-                System.err.println(topology + ": the runner accepted a second operator under one factory id");
+            try {
+                drive(runner, shorthand);
+            } catch (IllegalArgumentException refusal) {
+                System.err.println(topology + ": " + refusal.getMessage());
                 System.exit(1);
             }
-            System.err.println(topology + ": " + shorthand.get(0).refusal()
-                    + " is a compile error here; pinned by " + PROCESSOR_TEST);
+            System.err.println(topology + ": the runner accepted a short form the table refuses");
             System.exit(1);
         }
         if (row.steps().equals("cited above")) {

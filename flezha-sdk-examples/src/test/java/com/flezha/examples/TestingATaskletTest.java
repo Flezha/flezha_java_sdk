@@ -40,7 +40,7 @@ class TestingATaskletTest {
     @Test
     @DisplayName("the Tasklet records the Changes and emits what we expect")
     void recordsChangesAndEmits() {
-        TaskletTestHarness<String, Counter, String, Increment> harness = TaskletTestHarness.of(new CountTasklet())
+        TaskletTestHarness<String, Counter, String> harness = TaskletTestHarness.of(new CountTasklet())
                 // Pin the clock so ctx.now() is a constant — otherwise the
                 // assertions below would depend on when the test ran.
                 .withWallClock(1_700_000_000_000L);
@@ -58,7 +58,7 @@ class TestingATaskletTest {
     @Test
     @DisplayName("state survives a replay: the change log rebuilds it byte-identically")
     void stateIsReplaySafe() {
-        TaskletTestHarness<String, Counter, String, Increment> harness =
+        TaskletTestHarness<String, Counter, String> harness =
                 TaskletTestHarness.of(new CountTasklet()).withWallClock(1_700_000_000_000L);
 
         harness.applyInputs(List.of("a", "b", "c"));
@@ -73,7 +73,7 @@ class TestingATaskletTest {
     void outputIsReplaySafe() {
         List<String> inputs = List.of("a", "b", "c");
 
-        TaskletTestHarness<String, Counter, String, Increment> harness =
+        TaskletTestHarness<String, Counter, String> harness =
                 TaskletTestHarness.of(new CountTasklet()).withWallClock(1_700_000_000_000L);
 
         harness.applyInputs(inputs);
@@ -86,7 +86,7 @@ class TestingATaskletTest {
     @Test
     @DisplayName("a scripted clock advances one value per invocation")
     void scriptedClock() {
-        TaskletTestHarness<String, Counter, String, Increment> harness =
+        TaskletTestHarness<String, Counter, String> harness =
                 TaskletTestHarness.of(new CountTasklet()).withWallClockScript(1_000L, 2_000L);
 
         harness.applyInputs(List.of("a", "b"));

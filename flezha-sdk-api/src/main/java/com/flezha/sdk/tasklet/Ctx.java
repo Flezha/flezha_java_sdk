@@ -7,36 +7,55 @@ import java.util.Optional;
 import javax.annotation.Nonnull;
 
 /**
- * The runtime handle passed to every {@link Tasklet#run} call: emit output, read the clock, ask
- * for a replay-stable identifier, register a timer, request a worker.
+ * One invocation's context, passed to {@link Tasklet#run}, {@link Tasklet#onTimer} and
+ * {@link Tasklet#compensate}: the cell's state and its changes, emits, the clock, a replay-stable
+ * identifier, timers and bounded spawns.
  *
  * <pre>{@code
- * @Tasklet(id = "add_to_cart", emits = String.class)
- * public final class AddToCart {
- *     public void run(Order order, CartHandle cart, TaskletCtx ctx) throws TaskletException {
- *         cart.pushItems(order.item());
- *         cart.setUpdatedMs(ctx.now());          // ctx.now(), never System.currentTimeMillis()
- *         ctx.emit("added " + order.item());     // where this goes is the operator's business
- *     }
+ * @Override
+ * public void run(Order order, Ctx<Cart, String> ctx) throws TaskletException {
+ *     ctx.change(new ItemAdded(order.item(), ctx.now()));   // ctx.now(), never System.currentTimeMillis()
+ *     ctx.emit("added " + order.item());                    // where this goes is the operator's business
  * }
  * }</pre>
  *
- * <p>The three members worth knowing before anything else:
+ * <p>The members worth knowing before anything else:
  *
  * <ul>
+ *   <li>{@link #state()} reads the cell's state and {@link #change} is the one recorded way to
+ *       mutate it: the change is applied and written to the cell's log, from which the state is
+ *       rebuilt after a restart.
  *   <li>{@link #emit} sends a value onward. The destination is declared by the operator, not here,
  *       so a graph can be rewired without touching the tasklet.
  *   <li>{@link #now()} is the invocation's time, computed once by the runtime from the tasklet's
- *       declared clock and served identically on a replay. Reading the system clock instead makes
- *       the reconstructed state diverge from what was observed.
+ *       clock and served identically on a replay.
  *   <li>{@link #stableId()} is an identifier derived deterministically, so a re-executed invocation
  *       produces the same one. An external system then sees a retry rather than a second request.
  * </ul>
  *
- * <p>The context belongs to one invocation and borrows the runner's per-cell routing tables. It
- * must not be retained past the call or handed to another thread.
+ * <p>The context belongs to one invocation. It must not be retained past the call or handed to
+ * another thread.
+ *
+ * @param <State> the tasklet's state type
+ * @param <Output> the tasklet's output type, which {@link #emit(Object)} takes
  */
-public interface TaskletCtx {
+public interface Ctx<State, Output> {
+
+    /**
+     * The cell's state, including every change applied so far in this invocation.
+     *
+     * <p>The object returned is the live state, so assigning one of its fields compiles and runs.
+     * Do not: such a write is not recorded and does not survive a restart. Mutate through
+     * {@link #change} instead; {@code TaskletTestHarness.replayEquals()} catches a direct write.
+     */
+    State state();
+
+    /**
+     * Applies {@code change} to the state through its {@link com.flezha.sdk.state.Change#applyTo}
+     * and records it in the cell's change log. This is the only mutation that survives a restart,
+     * and a read through {@link #state()} right after it reflects it.
+     */
+    void change(com.flezha.sdk.state.Change<State> change);
 
     /**
      * Reserved metadata namespace: the runtime's identity stamps
@@ -48,9 +67,9 @@ public interface TaskletCtx {
 
     /**
      * The invocation's time value, computed <b>once</b> by the runtime from the
-     * Tasklet's declared {@code Clock} before {@code run} executes: epoch
-     * milliseconds for {@code WallClock}, the extracted input timestamp for
-     * {@code EventTimeFrom}, the durable change seq for {@code LogicalClock}.
+     * tasklet's clock before {@code run} executes: epoch milliseconds by
+     * default, what {@code eventTime(input)} returns when the tasklet writes
+     * it, the durable change seq under {@code @Tasklet.Spec(logicalClock = true)}.
      * Every call within one invocation returns the same value.
      *
      * <p>This is the determinism-contract replacement for
@@ -214,7 +233,7 @@ public interface TaskletCtx {
      *
      * <p>Refused with
      * {@link TaskletException.EventTimeTimerWithoutEventTimeClock} unless the
-     * Tasklet declares {@code EventTimeFrom} as its Clock.
+     * tasklet writes {@link Tasklet#eventTime}.
      *
      * <p>Registering the same timestamp twice is idempotent — pending timers are
      * a set. Handle the firing in {@link Tasklet#onTimer}.
@@ -227,9 +246,9 @@ public interface TaskletCtx {
      * Register a <b>processing-time</b> timer {@code delay} after {@link #now},
      * returning the absolute timestamp it is scheduled at.
      *
-     * <p>The anchor is {@code ctx.now()} — the declared Clock — not an ambient
+     * <p>The anchor is {@code ctx.now()}, the tasklet's clock, not an ambient
      * read, which is what makes a replayed invocation register the same absolute
-     * timestamp the live one did. Under an {@code EventTimeFrom} clock the
+     * timestamp the live one did. Under an event-time clock the
      * anchor is therefore the input's event time: an unbounded operator that is caught up
      * schedules the same instant a wall clock would, and one replaying history
      * schedules a past instant, which fires at once.
@@ -268,10 +287,10 @@ public interface TaskletCtx {
      * source. Emitting a key on a channel not declared {@code .keyed()} throws
      * {@link TaskletException.KeyNotAllowedOnNonKeyedChannel}.
      */
-    <C> void emitKeyed(String key, C value) throws TaskletException;
+    void emitKeyed(String key, Output value) throws TaskletException;
 
     /** {@link #emitKeyed} with user-attached metadata. */
-    <C> void emitKeyedWithMeta(String key, C value, Map<String, String> meta) throws TaskletException;
+    void emitKeyedWithMeta(String key, Output value, Map<String, String> meta) throws TaskletException;
 
     /**
      * Emit a typed value on this Tasklet's declared output channel. The channel
@@ -280,7 +299,7 @@ public interface TaskletCtx {
      *
      * <p>Inter-tasklet channels: the value is passed by reference to consumer
      * Tasklets; the user MUST treat it as immutable from the producer side
-     * after this call returns (see {@code design.md} Decision 4).
+     * after this call returns.
      *
      * <p>Plugin-bound channels: the value is serialized synchronously via the
      * channel's serializer and queued for the wire with
@@ -292,7 +311,7 @@ public interface TaskletCtx {
      * throws {@link TaskletException.KeyRequiredOnKeyedChannel}; an output
      * whose natural key differs from the Cell's uses {@link #emitKeyed}.
      */
-    <C> void emit(C value) throws TaskletException;
+    void emit(Output value) throws TaskletException;
 
     /**
      * Emits on a named channel, for a tasklet that produces on more than one.
@@ -315,7 +334,7 @@ public interface TaskletCtx {
      * {@link #RESERVED_METADATA_PREFIX} namespace are rejected with
      * {@link TaskletException.ReservedMetadataKey}.
      */
-    <C> void emitWithMeta(C value, Map<String, String> meta) throws TaskletException;
+    void emitWithMeta(Output value, Map<String, String> meta) throws TaskletException;
 
     /** Same as {@link #emitWithMeta(Object, Map)} but pinned to a specific channel name. */
     <C> void emitWithMeta(String channel, C value, Map<String, String> meta) throws TaskletException;

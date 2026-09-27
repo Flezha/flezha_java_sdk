@@ -3,11 +3,9 @@ package com.flezha.test;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.LoopMode;
 import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.state.Change;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.time.Duration;
 import java.util.List;
@@ -50,39 +48,31 @@ public final class KeyedLoopBoundedOperator implements BoundedOperator {
                 .sink("keyed_loop_bounded_out");
     }
 
-    public static final class Count
-            implements Tasklet<String, Count.State, String, CounterChange, WallClock, Void> {
+    @Tasklet.Spec(name = "keyed_loop_count")
+    public static final class Count implements Tasklet<String, Count.State, String> {
 
         public static final class State {
             public long value;
         }
 
-        @Override
-        public String name() {
-            return "keyed_loop_count";
-        }
-
-        @Override
-        public State initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new State();
-        }
-
-        @Override
-        public void applyChange(State state, CounterChange change) {
-            state.value += change.delta();
+        /** One more message counted for the Cell's symbol. */
+        public record Counted(long delta) implements Change<State> {
+            @Override
+            public void applyTo(State state) {
+                state.value += delta;
+            }
         }
 
         @Override
         public List<Class<?>> kryoTypes() {
-            return List.of(State.class, CounterChange.class);
+            return List.of(State.class, Counted.class);
         }
 
         @Override
-        public void run(String input, StateHandle<State, CounterChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<State, String> ctx) throws TaskletException {
             String symbol = DynamicCellUnboundedOperator.key(input);
-            state.apply(new CounterChange(1));
-            ctx.emit(symbol + ":" + state.get().value);
+            ctx.change(new Counted(1));
+            ctx.emit(symbol + ":" + ctx.state().value);
         }
     }
 }

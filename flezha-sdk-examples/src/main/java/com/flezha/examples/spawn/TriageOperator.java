@@ -16,6 +16,6 @@ public final class TriageOperator implements BoundedOperator {
     /** The spawn payload, the alert that asked for this worker, seeds the one pass. */
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
-        c.input(String.class, "alert").into(TriageTasklet.class).sink("triaged");
+        c.input(String.class, "alert").into(Triage.class).sink("triaged");
     }
 }

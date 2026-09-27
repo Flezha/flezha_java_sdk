@@ -3,6 +3,7 @@ package com.flezha.test;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.tasklet.Tasklet;
 
 /** Mirror of the Rust test app's {@code BoundedMailboxDropOldestOperator}. */
 public final class BoundedMailboxDropOldestUnboundedOperator implements UnboundedOperator {
@@ -20,10 +21,6 @@ public final class BoundedMailboxDropOldestUnboundedOperator implements Unbounde
                 .sink("drop_oldest_echo");
     }
 
-    public static final class DropOldestTestTasklet extends BoundedMailboxTasklet {
-        @Override
-        public String name() {
-            return "drop_oldest_test_tasklet";
-        }
-    }
+    @Tasklet.Spec(name = "drop_oldest_test_tasklet", capacity = BoundedMailboxTasklet.CAPACITY)
+    public static final class DropOldestTestTasklet extends BoundedMailboxTasklet {}
 }

@@ -1,13 +1,10 @@
 package com.flezha.test;
 
+import com.flezha.sdk.state.Change;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.WallClock;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -16,44 +13,34 @@ import java.util.Optional;
  * The dynamic-mode consumer of {@link DynamicCellUnboundedOperator}. It
  * declares no keying member of any kind — the edge's {@code keyBy} is what makes
  * it dynamic — and applies a Change per input so the controller writes a WAL
- * file per lazily-created Cell. {@code cellIdleTtl} stays on the tasklet:
- * only the KEY moved to the wiring. The TTL comes from {@code DYN_TEST_TTL_MS}
- * (the e2e sets 200 ms to exercise reap + delete; the bench leaves it unset).
+ * file per lazily-created Cell. It declares no idle TTL, so every Cell is kept.
  */
-public final class DynamicCellTasklet
-        implements Tasklet<String, DynamicCellTasklet.State, byte[], StoreInputChange, WallClock, Void> {
+@Tasklet.Spec(name = "dynamic_cell_tasklet")
+public final class DynamicCellTasklet implements Tasklet<String, DynamicCellTasklet.State, byte[]> {
 
-    @Override
-    public String name() {
-        return "dynamic_cell_tasklet";
+    public record State(List<String> seen) {}
+
+    /** One input the Cell has seen. */
+    public record Seen(String text) implements Change<State> {
+        @Override
+        public void applyTo(State state) {
+            state.seen().add(text);
+        }
     }
 
     @Override
-    public Optional<Duration> cellIdleTtl() {
-        return TestEnv.optLong("DYN_TEST_TTL_MS").map(Duration::ofMillis);
-    }
-
-    @Override
-    public State initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
+    public State initState(Optional<String> cellKey) {
         return new State(new ArrayList<>());
     }
 
     @Override
-    public void applyChange(State state, StoreInputChange change) {
-        state.seen().add(change.text());
-    }
-
-    @Override
     public List<Class<?>> kryoTypes() {
-        return List.of(State.class, StoreInputChange.class, ArrayList.class);
+        return List.of(State.class, Seen.class, ArrayList.class);
     }
 
     @Override
-    public void run(String input, StateHandle<State, StoreInputChange> state, TaskletCtx ctx)
-            throws TaskletException {
-        state.apply(new StoreInputChange(input));
+    public void run(String input, Ctx<State, byte[]> ctx) throws TaskletException {
+        ctx.change(new Seen(input));
         ctx.emit(input.getBytes(StandardCharsets.UTF_8));
     }
-
-    public record State(List<String> seen) {}
 }

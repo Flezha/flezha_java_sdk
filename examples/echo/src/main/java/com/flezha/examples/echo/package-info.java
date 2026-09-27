@@ -7,12 +7,11 @@
  *
  * <p>{@link com.flezha.examples.echo.EchoOperator} declares the graph and is the unit the cluster
  * actually schedules. {@link com.flezha.examples.echo.Echo} is the processing stage invoked once per
- * message: its {@code @Tasklet} annotation generates {@code EchoTasklet}, the class the
- * operator routes into. {@link com.flezha.examples.echo.Main} starts a runner and declares the
- * operator on it. Read the operator first: its single wiring expression is the shortest complete
- * description of what this application does.
+ * message, and the class the operator routes into. {@link com.flezha.examples.echo.Main} starts a
+ * runner and declares the operator on it. Read the operator first: its single wiring expression is
+ * the shortest complete description of what this application does.
  *
- * <p>The tasklet's {@code run} takes no state parameter, so it persists nothing. Nothing is
+ * <p>The tasklet declares {@code Void} state, so it persists nothing. Nothing is
  * journaled, no snapshot is written, and a restart begins with no history. The {@code state}
  * example is the next step, and covers what changes when that is no longer acceptable.
  */

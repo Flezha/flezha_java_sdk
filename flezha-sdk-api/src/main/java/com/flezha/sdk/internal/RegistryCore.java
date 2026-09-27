@@ -17,12 +17,11 @@ import javax.annotation.Nonnull;
  * <p><b>Internal.</b> Not part of the SDK's public API; user code never calls
  * this.
  *
- * @param <C> the authoring interface the registry holds classes of
  */
-public final class RegistryCore<C extends Operator> {
+public final class RegistryCore {
 
     private final Object lock = new Object();
-    private final Map<String, Class<? extends C>> entries = new LinkedHashMap<>();
+    private final Map<String, Class<?>> entries = new LinkedHashMap<>();
     private final String runtimeRegistryFqn;
     private final String kindLabel;
 
@@ -50,7 +49,7 @@ public final class RegistryCore<C extends Operator> {
      * @throws IllegalArgumentException on a null class or a duplicate factory
      *     id; the message begins with {@code DuplicateFactoryId}.
      */
-    public String register(Class<? extends C> cls) {
+    public String register(Class<?> cls) {
         if (cls == null) {
             throw new IllegalArgumentException(kindLabel + "Class must not be null");
         }
@@ -88,9 +87,9 @@ public final class RegistryCore<C extends Operator> {
      *     is not defined here (never defined, or already removed).
      */
     @Nonnull
-    public String definedFactoryIdOf(Class<? extends C> cls) {
+    public String definedFactoryIdOf(Class<?> cls) {
         synchronized (lock) {
-            for (Map.Entry<String, Class<? extends C>> e : entries.entrySet()) {
+            for (Map.Entry<String, Class<?>> e : entries.entrySet()) {
                 if (e.getValue().equals(cls)) {
                     return e.getKey();
                 }
@@ -151,20 +150,26 @@ public final class RegistryCore<C extends Operator> {
 
     /**
      * The refusal for a class not defined here, naming its self-declared
-     * factory id, or its class name when its no-arg constructor cannot be
-     * called. What that constructor throws is the refusal's cause.
+     * factory id (a short form's annotation id), or its class name when its
+     * no-arg constructor cannot be called. What that constructor throws is the
+     * refusal's cause.
      */
-    private IllegalArgumentException notDefined(Class<? extends C> cls) {
-        String factoryId = cls.getName();
+    private IllegalArgumentException notDefined(Class<?> cls) {
+        ShortFormDeclaration shortForm = ShortFormDeclaration.of(cls);
+        String factoryId = shortForm == null ? null : shortForm.id();
         Throwable cause = null;
         try {
-            factoryId = cls.getDeclaredConstructor().newInstance().factoryId();
+            if (factoryId == null && Operator.class.isAssignableFrom(cls)) {
+                factoryId = ((Operator) cls.getDeclaredConstructor().newInstance()).factoryId();
+            }
         } catch (InvocationTargetException e) {
             cause = e.getCause();
         } catch (ReflectiveOperationException e) {
             // No callable constructor: the class name stands in for the id.
         }
         return new IllegalArgumentException(
-                kindLabel + " factory '" + factoryId + "' is not defined on this runner", cause);
+                kindLabel + " factory '" + (factoryId == null ? cls.getName() : factoryId)
+                        + "' is not defined on this runner",
+                cause);
     }
 }

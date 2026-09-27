@@ -6,7 +6,7 @@ import javax.annotation.Nullable;
 /**
  * The keyed-channel contract, in one place: which key an emit carries, given
  * the channel's declaration and the Cell it came from. Every
- * {@link TaskletCtx} implementation resolves through here — the runtime
+ * {@link Ctx} implementation resolves through here — the runtime
  * dispatcher and the test harness alike — so an author's harness-green test
  * cannot pass under a rule the runtime does not apply.
  *

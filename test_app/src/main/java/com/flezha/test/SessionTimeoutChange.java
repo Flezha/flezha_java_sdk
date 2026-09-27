@@ -6,7 +6,7 @@ import com.flezha.sdk.state.Change;
  * One mutation of a {@link SessionTimeoutState}. {@code closedAt >= 0} marks a
  * firing; anything else is a touch carrying the input.
  */
-public final class SessionTimeoutChange implements Change {
+public final class SessionTimeoutChange implements Change<SessionTimeoutState> {
 
     private String touched = "";
     private long closedAt = -1L;
@@ -32,5 +32,14 @@ public final class SessionTimeoutChange implements Change {
 
     public long closedAt() {
         return closedAt;
+    }
+
+    @Override
+    public void applyTo(SessionTimeoutState state) {
+        if (closedAt >= 0) {
+            state.closedAt.add(closedAt);
+        } else {
+            state.touched.add(touched);
+        }
     }
 }

@@ -8,14 +8,11 @@ import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -96,7 +93,7 @@ class UnboundedOperatorTopologyBuilderTest {
             assertThatThrownBy(() -> UnboundedOperatorTopologyBuilder.build(new ThrowingTaskletUnboundedOperator()))
                     .isInstanceOf(UnboundedOperatorConfigurationException.class)
                     .hasMessageStartingWith("topology rejected [Declaration, Declaration")
-                    .hasMessageContaining("`no_extractor` declares the EventTimeFrom clock")
+                    .hasMessageContaining("`two_clocks` writes eventTime(Input) and declares")
                     .hasMessageContaining(ThrowingConstructorTasklet.REFUSAL)
                     .hasMessageNotContaining("no-arg constructor")
                     .hasMessageNotContaining("does not match");
@@ -119,19 +116,11 @@ class UnboundedOperatorTopologyBuilderTest {
     // ---- Test operators / tasklets -----------------------------------------------
 
     /** A concrete tasklet class that leaves its own Input open. */
-    public static final class UnresolvedInputTasklet<I> extends StatelessTestTasklet<I, Object, String> {
-        @Override
-        public String name() {
-            return "unresolved_input";
-        }
+    @Tasklet.Spec(name = "unresolved_input")
+    public static final class UnresolvedInputTasklet<I> implements Tasklet<I, Void, String> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(I input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(I input, Ctx<Void, String> ctx) {}
     }
 
     public static final class UnresolvedTokenUnboundedOperator implements UnboundedOperator {
@@ -146,12 +135,13 @@ class UnboundedOperatorTopologyBuilderTest {
             // A generic tasklet class has a raw class literal, so wiring it
             // takes a cast — which is the author's first hint that the runtime
             // will have nothing concrete to read either.
-            c.input(String.class, "in").into((Class<? extends Tasklet<String, ?, String, ?, ?, ?>>)
-                    (Class<?>) UnresolvedInputTasklet.class);
+            c.input(String.class, "in")
+                    .into((Class<? extends Tasklet<String, ?, String>>) (Class<?>) UnresolvedInputTasklet.class);
         }
     }
 
-    public static final class ThrowingConstructorTasklet extends StatelessTestTasklet<String, Object, String> {
+    @Tasklet.Spec(name = "throwing_constructor")
+    public static final class ThrowingConstructorTasklet implements Tasklet<String, Void, String> {
         static final String REFUSAL = "the author's own refusal";
 
         public ThrowingConstructorTasklet() throws IOException {
@@ -159,17 +149,7 @@ class UnboundedOperatorTopologyBuilderTest {
         }
 
         @Override
-        public String name() {
-            return "throwing_constructor";
-        }
-
-        @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(String input, Ctx<Void, String> ctx) {}
     }
 
     public static final class ThrowingTaskletUnboundedOperator implements UnboundedOperator {
@@ -181,24 +161,16 @@ class UnboundedOperatorTopologyBuilderTest {
         @Override
         public void channels(ChannelBuilder c) {
             c.input(String.class, "in")
-                    .into(ClockAndKeyedValidationTest.NoExtractorTask.class)
+                    .into(ClockAndKeyedValidationTest.TwoClocksTask.class)
                     .into(ThrowingConstructorTasklet.class);
         }
     }
 
-    public static final class SingleTasklet extends StatelessTestTasklet<String, Object, String> {
-        @Override
-        public String name() {
-            return "single_tasklet";
-        }
+    @Tasklet.Spec(name = "single_tasklet")
+    public static final class SingleTasklet implements Tasklet<String, Void, String> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(String input, Ctx<Void, String> ctx) {}
     }
 
     public static final class SingleModeUnboundedOperator implements UnboundedOperator {
@@ -213,21 +185,10 @@ class UnboundedOperatorTopologyBuilderTest {
         }
     }
 
-    public static final class StaticTasklet extends StatelessTestTasklet<String, Object, String> {
-        @Override
-        public String name() {
-            return "static_tasklet";
-        }
-
-        @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public List<String> cellKeys() {
-            return List.of("a", "b", "c", "d");
-        }
+    @Tasklet.Spec(
+            name = "static_tasklet",
+            keys = {"a", "b", "c", "d"})
+    public static final class StaticTasklet implements Tasklet<String, Void, String> {
 
         @Override
         public List<String> cellsFor(String input) {
@@ -235,7 +196,7 @@ class UnboundedOperatorTopologyBuilderTest {
         }
 
         @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(String input, Ctx<Void, String> ctx) {}
     }
 
     public static final class StaticModeUnboundedOperator implements UnboundedOperator {
@@ -262,49 +223,25 @@ class UnboundedOperatorTopologyBuilderTest {
         }
     }
 
-    public static final class TradeTasklet extends StatelessTestTasklet<Trade, Object, String> {
-        @Override
-        public String name() {
-            return "trade_tasklet";
-        }
+    @Tasklet.Spec(name = "trade_tasklet")
+    public static final class TradeTasklet implements Tasklet<Trade, Void, String> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(Trade input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(Trade input, Ctx<Void, String> ctx) {}
     }
 
-    public static final class CandleTasklet extends StatelessTestTasklet<Candle, Object, String> {
-        @Override
-        public String name() {
-            return "candle_tasklet";
-        }
+    @Tasklet.Spec(name = "candle_tasklet")
+    public static final class CandleTasklet implements Tasklet<Candle, Void, String> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(Candle input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(Candle input, Ctx<Void, String> ctx) {}
     }
 
-    public static final class TradeProducerTasklet extends StatelessTestTasklet<String, Object, Trade> {
-        @Override
-        public String name() {
-            return "trade_producer";
-        }
+    @Tasklet.Spec(name = "trade_producer")
+    public static final class TradeProducerTasklet implements Tasklet<String, Void, Trade> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) throws TaskletException {}
+        public void run(String input, Ctx<Void, Trade> ctx) throws TaskletException {}
     }
 
     public static final class TypeMismatchUnboundedOperator implements UnboundedOperator {
@@ -328,24 +265,13 @@ class UnboundedOperatorTopologyBuilderTest {
         }
     }
 
-    public static final class MissingCellsForTasklet extends StatelessTestTasklet<String, Object, String> {
-        @Override
-        public String name() {
-            return "missing_pfo_tasklet";
-        }
+    @Tasklet.Spec(
+            name = "missing_pfo_tasklet",
+            keys = {"a", "b"})
+    public static final class MissingCellsForTasklet implements Tasklet<String, Void, String> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public List<String> cellKeys() {
-            return List.of("a", "b");
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(String input, Ctx<Void, String> ctx) {}
     }
 
     public static final class MissingCellsForUnboundedOperator implements UnboundedOperator {
@@ -360,19 +286,11 @@ class UnboundedOperatorTopologyBuilderTest {
         }
     }
 
-    public static final class DynamicModeOnlyTasklet extends StatelessTestTasklet<String, Object, String> {
-        @Override
-        public String name() {
-            return "dynamic_only_tasklet";
-        }
+    @Tasklet.Spec(name = "dynamic_only_tasklet")
+    public static final class DynamicModeOnlyTasklet implements Tasklet<String, Void, String> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(String input, Ctx<Void, String> ctx) {}
     }
 
     public static final class DynamicModeOnlyUnboundedOperator implements UnboundedOperator {
@@ -697,48 +615,24 @@ class UnboundedOperatorTopologyBuilderTest {
         }
     }
 
-    public static final class GraphStage1 extends StatelessTestTasklet<String, Object, String> {
-        @Override
-        public String name() {
-            return "graph_stage1";
-        }
+    @Tasklet.Spec(name = "graph_stage1")
+    public static final class GraphStage1 implements Tasklet<String, Void, String> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(String input, Ctx<Void, String> ctx) {}
     }
 
-    public static final class GraphStage2 extends StatelessTestTasklet<String, Object, String> {
-        @Override
-        public String name() {
-            return "graph_stage2";
-        }
+    @Tasklet.Spec(name = "graph_stage2")
+    public static final class GraphStage2 implements Tasklet<String, Void, String> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(String input, Ctx<Void, String> ctx) {}
     }
 
-    public static final class GraphMerge extends StatelessTestTasklet<String, Object, String> {
-        @Override
-        public String name() {
-            return "graph_merge";
-        }
+    @Tasklet.Spec(name = "graph_merge")
+    public static final class GraphMerge implements Tasklet<String, Void, String> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(String input, Ctx<Void, String> ctx) {}
     }
 }

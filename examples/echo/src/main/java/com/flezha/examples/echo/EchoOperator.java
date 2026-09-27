@@ -37,6 +37,6 @@ public final class EchoOperator implements UnboundedOperator {
      */
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
-        c.input(String.class, "in").into(EchoTasklet.class).sink("out");
+        c.input(String.class, "in").into(Echo.class).sink("out");
     }
 }

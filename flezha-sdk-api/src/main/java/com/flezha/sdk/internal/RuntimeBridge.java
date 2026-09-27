@@ -48,10 +48,15 @@ public final class RuntimeBridge {
      * {@link ReflectiveOperationException}.
      */
     public static <T> T construct(Class<T> cls) throws ReflectiveOperationException {
+        return construct(cls.getDeclaredConstructor());
+    }
+
+    /** {@link #construct(Class)} through a constructor already resolved, under the same rule. */
+    public static <T> T construct(java.lang.reflect.Constructor<T> constructor) throws ReflectiveOperationException {
         try {
-            return cls.getDeclaredConstructor().newInstance();
+            return constructor.newInstance();
         } catch (InvocationTargetException e) {
-            throw unwrap(e, "constructor of `" + cls.getName() + "` failed");
+            throw unwrap(e, "constructor of `" + constructor.getDeclaringClass().getName() + "` failed");
         }
     }
 

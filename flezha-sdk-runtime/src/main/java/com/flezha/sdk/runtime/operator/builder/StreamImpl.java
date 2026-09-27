@@ -58,14 +58,13 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
 
     @Override
     @Nonnull
-    public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<T, ?, O, ?, ?, ?>> taskletClass) {
+    public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<T, ?, O>> taskletClass) {
         return edge.into(taskletClass);
     }
 
     @Override
     @Nonnull
-    public <O> Stream<O> into(
-            @Nonnull Class<? extends Tasklet<T, ?, O, ?, ?, ?>> taskletClass, @Nonnull String nodeName) {
+    public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<T, ?, O>> taskletClass, @Nonnull String nodeName) {
         return edge.into(taskletClass, nodeName);
     }
 

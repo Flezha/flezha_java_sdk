@@ -1,15 +1,11 @@
 package com.flezha.test;
 
-import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
-import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.state.TimerKind;
-import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Mirror of the Rust runner's {@code SessionTimeoutTasklet}: each input pushes
@@ -19,13 +15,8 @@ import java.util.Optional;
  * cannot be an event-time one — nothing would advance the clock. The timeout is
  * read from {@code TIMER_TEST_TIMEOUT_MS} so the e2e can set it short.
  */
-public final class SessionTimeoutTasklet
-        implements Tasklet<String, SessionTimeoutState, byte[], SessionTimeoutChange, WallClock, Void> {
-
-    @Override
-    public String name() {
-        return "session_timeout_tasklet";
-    }
+@Tasklet.Spec(name = "session_timeout_tasklet")
+public final class SessionTimeoutTasklet implements Tasklet<String, SessionTimeoutState, byte[]> {
 
     @Override
     public List<Class<?>> kryoTypes() {
@@ -33,34 +24,14 @@ public final class SessionTimeoutTasklet
     }
 
     @Override
-    public SessionTimeoutState initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-        return new SessionTimeoutState();
-    }
-
-    @Override
-    public void applyChange(SessionTimeoutState state, SessionTimeoutChange change) {
-        if (change.closedAt() >= 0) {
-            state.closedAt.add(change.closedAt());
-        } else {
-            state.touched.add(change.touched());
-        }
-    }
-
-    @Override
-    public void run(String input, StateHandle<SessionTimeoutState, SessionTimeoutChange> state, TaskletCtx ctx)
-            throws TaskletException {
-        state.apply(SessionTimeoutChange.touched(input));
+    public void run(String input, Ctx<SessionTimeoutState, byte[]> ctx) throws TaskletException {
+        ctx.change(SessionTimeoutChange.touched(input));
         ctx.timerAfter(Duration.ofMillis(timeoutMs()));
     }
 
     @Override
-    public void onTimer(
-            long firedAt,
-            TimerKind kind,
-            StateHandle<SessionTimeoutState, SessionTimeoutChange> state,
-            TaskletCtx ctx)
-            throws TaskletException {
-        state.apply(SessionTimeoutChange.closed(firedAt));
+    public void onTimer(long firedAt, TimerKind kind, Ctx<SessionTimeoutState, byte[]> ctx) throws TaskletException {
+        ctx.change(SessionTimeoutChange.closed(firedAt));
         ctx.emit(("closed@" + firedAt).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 

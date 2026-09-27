@@ -70,13 +70,13 @@ final class MergeImpl<I> implements Merge<I> {
 
     @Override
     @Nonnull
-    public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<I, ?, O, ?, ?, ?>> tasklet) {
+    public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<I, ?, O>> tasklet) {
         return wire(tasklet, null);
     }
 
     @Override
     @Nonnull
-    public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<I, ?, O, ?, ?, ?>> tasklet, @Nonnull String nodeName) {
+    public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<I, ?, O>> tasklet, @Nonnull String nodeName) {
         return wire(tasklet, nodeName);
     }
 
@@ -86,7 +86,7 @@ final class MergeImpl<I> implements Merge<I> {
      * ({@code routeLatest}) closes its own merge with instead of re-deriving
      * the named/unnamed dispatch.
      */
-    <O> Stream<O> wire(Class<? extends Tasklet<I, ?, O, ?, ?, ?>> taskletClass, String nodeName) {
+    <O> Stream<O> wire(Class<? extends Tasklet<I, ?, O>> taskletClass, String nodeName) {
         owner.checkMutable();
         // Register the consumer before its sources — as Rust's `Merge::wire`
         // does — so a merge that declared none still records a tasklet the

@@ -1,6 +1,7 @@
-package com.flezha.sdk.tasklet;
+package com.flezha.sdk.runtime.operator;
 
 import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
+import com.flezha.sdk.tasklet.Tasklet;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -22,26 +23,16 @@ import java.util.Map;
  */
 final class TypeTokens {
 
-    /**
-     * {@link Tasklet}'s type parameters in declaration order, each paired
-     * with the token method an implementation overrides to declare it
-     * explicitly. {@code State} has no token method — it is read only to
-     * default {@code kryoTypes()} — so it names the type parameter alone.
-     */
+    /** {@link Tasklet}'s type parameters in declaration order. */
     enum Token {
-        INPUT("Input", "inputType"),
-        STATE("State", null),
-        OUTPUT("Output", "outputType"),
-        CHANGE("ChangeT", "changeType"),
-        CLOCK("ClockT", "clockType"),
-        CONFIG("ConfigT", "configType");
+        INPUT("Input"),
+        STATE("State"),
+        OUTPUT("Output");
 
         private final String parameter;
-        private final String method;
 
-        Token(String parameter, String method) {
+        Token(String parameter) {
             this.parameter = parameter;
-            this.method = method;
         }
     }
 
@@ -60,14 +51,13 @@ final class TypeTokens {
     static Class<?> require(Class<?> impl, Token token) {
         Class<?> resolved = find(impl, token);
         if (resolved == null) {
-            throw UnboundedOperatorConfigurationException.unresolvedTypeToken(
-                    impl.getName(), token.parameter, token.method);
+            throw UnboundedOperatorConfigurationException.unresolvedTypeToken(impl.getName(), token.parameter);
         }
         return resolved;
     }
 
     /** The {@code token} type argument, or {@code null} when unresolvable. */
-    static Class<?> find(Class<?> impl, Token token) {
+    private static Class<?> find(Class<?> impl, Token token) {
         return erase(RESOLVED.get(impl)[token.ordinal()]);
     }
 

@@ -1,17 +1,11 @@
 package com.flezha.test;
 
-import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.authoring.UnboundedOperator;
+import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.EventTimeFrom;
-import com.flezha.sdk.state.LogicalClock;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.Stateless;
-import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * The tasklet palette {@link ConformanceRun} binds the fixture's roles to —
@@ -23,97 +17,62 @@ import java.util.Optional;
  * live beside the interpreter because a role IS a tasklet declaration, and
  * one written elsewhere would be read as a fixture.
  *
- * <p>Every role but {@code nochange} journals a Change, which is what makes
- * the class persistent in this SDK: Java reads persistence off the Change
- * types its tasklets declare rather than off a class flag, so a row's
+ * <p>Every role but {@code nochange} keeps a state its Change applies to,
+ * which is what makes the class persistent in this SDK: Java reads persistence
+ * off the state its tasklets declare rather than off a class flag, so a row's
  * {@code class.persistent} step is what the palette already says.
  */
 final class Palette {
 
+    /** The mailbox capacity every role declares unless its row writes one. */
+    static final int MAILBOX = 1024;
+
+    /** The capacity the fixture's {@code mailbox_huge} row declares on {@code plain}. */
+    static final int OVERSIZED_MAILBOX = 2_000_000;
+
     private Palette() {}
 
+    /** The state the journalling roles keep; nothing reads it. */
+    static final class Log {}
+
     /** The Change the journalling roles record; its content is never read. */
-    record Journalled(String value) implements Change {}
-
-    /**
-     * A role with the shared declaration: single mode, wall clock, and a
-     * Change the class persists. The role names the fixture row's binding,
-     * which is the tasklet's own name everywhere but {@code twin}.
-     */
-    abstract static class Role implements Tasklet<String, Stateless, String, Journalled, WallClock, Void> {
-
-        abstract String role();
-
+    record Journalled(String value) implements Change<Log> {
         @Override
-        public String name() {
-            return role();
-        }
-
-        @Override
-        public Stateless initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new Stateless();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Stateless, Journalled> state, TaskletCtx ctx) {}
-
-        @Override
-        public int mailboxCapacity() {
-            return ConformanceRun.mailboxOf(role());
-        }
+        public void applyTo(Log log) {}
     }
 
-    public static final class Plain extends Role {
+    /** A role with the shared declaration: single mode, wall clock, and a state the class persists. */
+    abstract static class Role implements Tasklet<String, Log, String> {
+
         @Override
-        String role() {
-            return "plain";
-        }
+        public void run(String input, Ctx<Log, String> ctx) {}
     }
 
-    public static final class Second extends Role {
-        @Override
-        String role() {
-            return "second";
-        }
-    }
+    @Tasklet.Spec(name = "plain", capacity = MAILBOX)
+    public static final class Plain extends Role {}
+
+    /** {@code plain} with a mailbox past the ceiling. */
+    @Tasklet.Spec(name = "plain", capacity = OVERSIZED_MAILBOX)
+    public static final class PlainOversized extends Role {}
+
+    /** {@code plain} with a mailbox of zero. */
+    @Tasklet.Spec(name = "plain", capacity = 0)
+    public static final class PlainWithoutMailbox extends Role {}
+
+    @Tasklet.Spec(name = "second", capacity = MAILBOX)
+    public static final class Second extends Role {}
 
     /** A distinct class declaring the SAME name as {@code plain}: the collision. */
-    public static final class Twin extends Role {
-        @Override
-        String role() {
-            return "twin";
-        }
-
-        @Override
-        public String name() {
-            return "plain";
-        }
-    }
+    @Tasklet.Spec(name = "plain", capacity = MAILBOX)
+    public static final class Twin extends Role {}
 
     /** Static mode with no router: {@code cellsFor} is deliberately absent. */
-    public static final class StaticKeys extends Role {
-        @Override
-        String role() {
-            return "static";
-        }
-
-        @Override
-        public List<String> cellKeys() {
-            return List.of("a", "b");
-        }
-    }
+    @Tasklet.Spec(name = "static", keys = {"a", "b"}, capacity = MAILBOX)
+    public static final class StaticKeys extends Role {}
 
     /** Static mode with its router declared. */
+    @Tasklet.Spec(name = "routed", keys = {"a", "b"}, capacity = MAILBOX)
     public static final class Routed extends Role {
-        @Override
-        String role() {
-            return "routed";
-        }
-
-        @Override
-        public List<String> cellKeys() {
-            return List.of("a", "b");
-        }
 
         @Override
         public List<String> cellsFor(String input) {
@@ -126,61 +85,51 @@ final class Palette {
      * chain closes onto is dynamic — so the role's own declaration is a plain
      * one.
      */
-    public static final class Dynamic extends Role {
+    @Tasklet.Spec(name = "dynamic", capacity = MAILBOX)
+    public static final class Dynamic extends Role {}
+
+    /** A logical clock over a tasklet that keeps no state, so journals nothing. */
+    @Tasklet.Spec(name = "nochange", logicalClock = true, capacity = MAILBOX)
+    public static final class LogicalWithoutState implements Tasklet<String, Void, String> {
+
         @Override
-        String role() {
-            return "dynamic";
-        }
+        public void run(String input, Ctx<Void, String> ctx) {}
     }
 
-    /** A logical clock over a tasklet that journals nothing. */
-    public static final class NoChangeLogical
-            implements Tasklet<String, Stateless, String, NoChange, LogicalClock, Void> {
-
-        @Override
-        public String name() {
-            return "nochange";
-        }
-
-        @Override
-        public Stateless initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new Stateless();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Stateless, NoChange> state, TaskletCtx ctx) {}
-
-        @Override
-        public int mailboxCapacity() {
-            return ConformanceRun.mailboxOf("nochange");
-        }
-    }
-
-    /** An event-time clock, with the extractor erasure makes it declare here. */
-    public static final class EventTime
-            implements Tasklet<String, Stateless, String, Journalled, EventTimeFrom, Void> {
-
-        @Override
-        public String name() {
-            return "eventtime";
-        }
-
-        @Override
-        public Stateless initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new Stateless();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Stateless, Journalled> state, TaskletCtx ctx) {}
+    /** An event-time clock, declared by writing the extractor. */
+    @Tasklet.Spec(name = "eventtime", capacity = MAILBOX)
+    public static final class EventTime extends Role {
 
         @Override
         public long eventTime(String input) {
             return input.length();
         }
+    }
+
+    /** {@code shorthand(plain, out, -).topology}: a short form that also implements an operator interface. */
+    @UnboundedOperator(id = "plain", sink = "out")
+    public static final class ShortFormWithTopology
+            implements Tasklet<String, Void, String>, com.flezha.sdk.operator.UnboundedOperator {
 
         @Override
-        public int mailboxCapacity() {
-            return ConformanceRun.mailboxOf("eventtime");
+        public String factoryId() {
+            return "plain";
         }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "input").into(ShortFormWithTopology.class).sink("out");
+        }
+
+        @Override
+        public void run(String input, Ctx<Void, String> ctx) {}
+    }
+
+    /** {@code shorthand(plain, out, -).noout}: a short form with a sink and no output. */
+    @UnboundedOperator(id = "plain", sink = "out")
+    public static final class SinkWithoutOutput implements Tasklet<String, Void, Void> {
+
+        @Override
+        public void run(String input, Ctx<Void, Void> ctx) {}
     }
 }

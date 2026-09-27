@@ -44,16 +44,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
-                <!-- Generates EchoTasklet from the @Tasklet class Echo. -->
-                <configuration>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>com.flezha</groupId>
-                            <artifactId>flezha-sdk-processor</artifactId>
-                            <version>${flezha.sdk.version}</version>
-                        </path>
-                    </annotationProcessorPaths>
-                </configuration>
             </plugin>
             <!-- One runnable jar with the SDK inside: java -jar target/echo.jar -->
             <plugin>

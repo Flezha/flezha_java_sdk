@@ -2,9 +2,9 @@ package com.flezha.examples.tradedesk;
 
 import com.flezha.examples.tradedesk.OrderExecutorOperator.OrderTicket;
 import com.flezha.examples.tradedesk.ReserveFunds.Reserved;
-import com.flezha.sdk.authoring.State;
-import com.flezha.sdk.authoring.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.state.Change;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.util.List;
 
@@ -12,26 +12,33 @@ import java.util.List;
  * Step two: place the order with the paper exchange, keeping the id it answers with, and cancel
  * the order again if it is undone. It has the same shape as step one.
  */
-@Tasklet(id = "place_order", emits = PlaceOrder.PlacedOrder.class)
-public final class PlaceOrder {
+@Tasklet.Spec(name = "place_order")
+public final class PlaceOrder implements Tasklet<Reserved, PlaceOrder.Placement, PlaceOrder.PlacedOrder> {
 
-    /** What it hands on: the order, and the exchange's id for it. */
-    public record PlacedOrder(OrderTicket order, String orderId) {}
+    public record PlacedOrder(OrderTicket order, String orderId) {}  // what it hands on
 
-    /** What this step remembers: the id cancelling the order needs. */
-    @State
-    public static class Placement {
+    public static class Placement {                          // what this step remembers
         public String orderId = "";
     }
 
-    public void run(Reserved reserved, PlacementHandle placement, TaskletCtx ctx) throws TaskletException {
+    public record Placing(String orderId) implements Change<Placement> {  // how the id is written down
+        @Override
+        public void applyTo(Placement placement) {
+            placement.orderId = orderId;
+        }
+    }
+
+    // The step: place the order under an id, remember the id, and hand the order on.
+    @Override
+    public void run(Reserved reserved, Ctx<Placement, PlacedOrder> ctx) throws TaskletException {
         String orderId = "ord-" + ctx.stableId();
-        placement.setOrderId(orderId);
+        ctx.change(new Placing(orderId));
         ctx.emit(new PlacedOrder(reserved.order(), orderId));
     }
 
-    /** The undo: the order is cancelled at the exchange, by the id this step wrote down. */
-    public void compensate(List<PlacedOrder> completedOutput, PlacementHandle placement) {
-        System.out.println("[undo] cancelled " + placement.get().orderId);
+    // The undo: cancel the order, by the id the state kept.
+    @Override
+    public void compensate(List<PlacedOrder> completedOutput, Ctx<Placement, PlacedOrder> ctx) {
+        System.out.println("[undo] cancelled " + ctx.state().orderId);
     }
 }

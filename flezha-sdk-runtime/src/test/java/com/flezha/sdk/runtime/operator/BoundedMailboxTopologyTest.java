@@ -8,10 +8,8 @@ import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.tasklet.TaskletCtx;
-import java.util.Optional;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,7 +71,7 @@ class BoundedMailboxTopologyTest {
     }
 
     @Test
-    @DisplayName("mailboxCapacity = 0 fails registration, named by the core")
+    @DisplayName("capacity = 0 fails registration, named by the core")
     void zeroCapacityRejected() {
         assertThatThrownBy(() -> UnboundedOperatorTopologyBuilder.build(new ZeroCapacityUnboundedOperator()))
                 .isInstanceOf(UnboundedOperatorConfigurationException.class)
@@ -93,34 +91,18 @@ class BoundedMailboxTopologyTest {
 
     // ---- Test tasklets / operators ----------------------------------------------------
 
-    public static final class A extends StatelessTestTasklet<String, Object, Integer> {
-        @Override
-        public String name() {
-            return "a";
-        }
+    @Tasklet.Spec(name = "a")
+    public static final class A implements Tasklet<String, Void, Integer> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(String input, Ctx<Void, Integer> ctx) {}
     }
 
-    public static final class B extends StatelessTestTasklet<Integer, Object, Void> {
-        @Override
-        public String name() {
-            return "b";
-        }
+    @Tasklet.Spec(name = "b")
+    public static final class B implements Tasklet<Integer, Void, Void> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(Integer input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(Integer input, Ctx<Void, Void> ctx) {}
     }
 
     public static final class TwoStageUnboundedOperator implements UnboundedOperator {
@@ -206,24 +188,11 @@ class BoundedMailboxTopologyTest {
     }
 
     // Custom Tasklet with an explicit mailboxCapacity() override.
-    public static final class BigMailboxTasklet extends StatelessTestTasklet<String, Object, Integer> {
-        @Override
-        public String name() {
-            return "big_mailbox_tasklet";
-        }
+    @Tasklet.Spec(name = "big_mailbox_tasklet", capacity = 8192)
+    public static final class BigMailboxTasklet implements Tasklet<String, Void, Integer> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public int mailboxCapacity() {
-            return 8192;
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(String input, Ctx<Void, Integer> ctx) {}
     }
 
     public static final class BigMailboxUnboundedOperator implements UnboundedOperator {
@@ -238,24 +207,10 @@ class BoundedMailboxTopologyTest {
         }
     }
 
-    public static final class ZeroCapacityTasklet extends StatelessTestTasklet<String, Object, Integer> {
+    @Tasklet.Spec(name = "zero_capacity_tasklet", capacity = 0)
+    public static final class ZeroCapacityTasklet implements Tasklet<String, Void, Integer> {
         @Override
-        public String name() {
-            return "zero_capacity_tasklet";
-        }
-
-        @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public int mailboxCapacity() {
-            return 0;
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(String input, Ctx<Void, Integer> ctx) {}
     }
 
     public static final class ZeroCapacityUnboundedOperator implements UnboundedOperator {
@@ -270,24 +225,11 @@ class BoundedMailboxTopologyTest {
         }
     }
 
-    public static final class HugeCapacityTasklet extends StatelessTestTasklet<String, Object, Integer> {
-        @Override
-        public String name() {
-            return "huge_capacity_tasklet";
-        }
+    @Tasklet.Spec(name = "huge_capacity_tasklet", capacity = 9_999_999)
+    public static final class HugeCapacityTasklet implements Tasklet<String, Void, Integer> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public int mailboxCapacity() {
-            return 9_999_999;
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(String input, Ctx<Void, Integer> ctx) {}
     }
 
     public static final class HugeCapacityUnboundedOperator implements UnboundedOperator {

@@ -1,21 +1,21 @@
 /**
  * The unit of user code: a tasklet, the context handed to it, and the values it may request.
  *
- * <p>{@link com.flezha.sdk.tasklet.Tasklet} is parameterised by six types, in declaration
- * order: the input value, the per-cell state, the emitted output, the change type used to record
- * state mutations, the clock the tasklet reads, and its configuration type. A tasklet that
- * keeps no state declares {@link com.flezha.sdk.state.NoChange}; one that takes no configuration
- * declares {@link java.lang.Void}. The runtime recovers these six as {@code Class} handles from the
- * {@code implements} clause, so they must be concrete there or supplied by overriding the
- * corresponding accessor.
+ * <p>{@link com.flezha.sdk.tasklet.Tasklet} is parameterised by three types: the input value, the
+ * per-cell state and the emitted output. {@link java.lang.Void} as the state keeps no state, and
+ * as the output declares no output channel. The runtime reads the three from the class's
+ * {@code implements} clause, and its name and settings from its
+ * {@link com.flezha.sdk.tasklet.Tasklet.Spec @Tasklet.Spec} annotation. Nothing is generated: the
+ * class the author writes is the class the wiring names.
  *
  * <p>Invocation is serialised per cell. Two messages for the same key are never handled
  * concurrently, so a tasklet requires no internal locking around its own state. Messages for
  * distinct keys are handled concurrently, on the same host or on different hosts, and a tasklet
  * instance is held per cell rather than shared across them.
  *
- * <p>{@link com.flezha.sdk.tasklet.TaskletCtx} is the runtime handle passed to every
- * invocation. It supplies output through {@code emit} and {@code emitKeyed}, the declared clock
+ * <p>{@link com.flezha.sdk.tasklet.Ctx} is the context passed to every invocation. It holds the
+ * cell's state through {@code state()} and {@code change(...)}, supplies output through
+ * {@code emit} and {@code emitKeyed}, the tasklet's clock
  * through {@code now()}, a replay-stable identifier through {@code stableId()}, checkpoint control,
  * timer registration, and the bounded spawn request described below.
  *

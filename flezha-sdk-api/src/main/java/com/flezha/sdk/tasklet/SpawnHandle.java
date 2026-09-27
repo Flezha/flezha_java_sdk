@@ -9,7 +9,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * The async result of a {@link TaskletCtx#spawnBounded} request, returned before the controller
+ * The async result of a {@link Ctx#spawnBounded} request, returned before the controller
  * answers. {@link #await} waits for the answer; {@link #tryResult} never waits.
  *
  * <p>Read it inside the invocation that made it. Every read asks the core, which answers a resolved

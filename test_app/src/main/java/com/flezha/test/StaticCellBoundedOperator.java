@@ -3,9 +3,8 @@ package com.flezha.test;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.LoopMode;
 import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.time.Duration;
 import java.util.List;
@@ -45,24 +44,15 @@ public final class StaticCellBoundedOperator implements BoundedOperator {
     }
 
     /** Emits its cell key beside the message, on the two cells it names. */
-    public static final class Keyed extends StatelessStep {
-        @Override
-        public String name() {
-            return "static_cell_step";
-        }
-
-        @Override
-        public List<String> cellKeys() {
-            return List.of("a", "b", "c");
-        }
-
+    @Tasklet.Spec(name = "static_cell_step", keys = {"a", "b", "c"})
+    public static final class Keyed extends NoStateStep {
         @Override
         public List<String> cellsFor(String input) {
             return List.of("a", "b");
         }
 
         @Override
-        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx) throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             ctx.emit(ctx.cellKey().orElse("") + ":" + input);
         }
     }

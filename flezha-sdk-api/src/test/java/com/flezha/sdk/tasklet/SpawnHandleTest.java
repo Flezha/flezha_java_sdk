@@ -49,7 +49,7 @@ class SpawnHandleTest {
     void aSpawnWithAnIdCarriesItAndItsPolicy() throws Exception {
         core.answer = "{\"id\":\"w1\",\"outcome\":\"delivered\"}";
         SpawnRequests.install(core);
-        TaskletCtx ctx = new StubCtx(false, 42);
+        Ctx<Void, Object> ctx = new StubCtx(false, 42);
 
         assertThat(ctx.spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1")).await())
                 .isEqualTo(new SpawnResult("w1", SpawnOutcome.DELIVERED));
@@ -64,7 +64,7 @@ class SpawnHandleTest {
     @DisplayName("a payload is encoded as a sink with no encoder encodes it: a string as UTF-8, a record as JSON")
     void aPayloadIsEncodedAsASinkWithNoEncoder() {
         SpawnRequests.install(core);
-        TaskletCtx ctx = new StubCtx(false, 42);
+        Ctx<Void, Object> ctx = new StubCtx(false, 42);
 
         ctx.spawnBounded("worker", "p");
         ctx.spawnBounded("worker", new Ticket("AAPL", 10), SpawnOptions.id("w1"));
@@ -162,7 +162,7 @@ class SpawnHandleTest {
     @DisplayName("a replayed spawn carries the flag and answers skipped with its id, or an empty one without")
     void aReplayedSpawnAnswersSkippedWithItsIdOrAnEmptyOne() throws Exception {
         SpawnRequests.install(core);
-        TaskletCtx replaying = new StubCtx(true, 42);
+        Ctx<Void, Object> replaying = new StubCtx(true, 42);
 
         core.answer = "{\"id\":\"\",\"outcome\":\"skipped_on_replay\"}";
         assertThat(replaying.spawnBounded("worker", PAYLOAD).await())
@@ -198,7 +198,7 @@ class SpawnHandleTest {
             "without a control plane a replayed spawn answers skipped with its id, or an empty one, and logs nothing")
     void withoutAControlPlaneAReplayedSpawnAnswersSkipped() throws Exception {
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-        TaskletCtx replaying = new StubCtx(true, 42);
+        Ctx<Void, Object> replaying = new StubCtx(true, 42);
         SpawnHandle unnamed = capturingStderr(stderr, () -> replaying.spawnBounded("worker", PAYLOAD));
         SpawnHandle named =
                 capturingStderr(stderr, () -> replaying.spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1")));
@@ -278,7 +278,7 @@ class SpawnHandleTest {
     }
 
     /** Only the members the defaults of {@code spawnBounded} and {@code complete} read. */
-    private record StubCtx(boolean replay, long token, List<String> completed) implements TaskletCtx {
+    private record StubCtx(boolean replay, long token, List<String> completed) implements Ctx<Void, Object> {
         StubCtx(boolean replay, long token) {
             this(replay, token, new CopyOnWriteArrayList<>());
         }
@@ -292,6 +292,14 @@ class SpawnHandleTest {
         public long activationToken() {
             return token;
         }
+
+        @Override
+        public Void state() {
+            return null;
+        }
+
+        @Override
+        public void change(com.flezha.sdk.state.Change<Void> change) {}
 
         @Override
         public long now() {
@@ -312,19 +320,19 @@ class SpawnHandleTest {
         }
 
         @Override
-        public <C> void emitKeyed(String key, C value) {}
+        public void emitKeyed(String key, Object value) {}
 
         @Override
-        public <C> void emitKeyedWithMeta(String key, C value, Map<String, String> meta) {}
+        public void emitKeyedWithMeta(String key, Object value, Map<String, String> meta) {}
 
         @Override
-        public <C> void emit(C value) {}
+        public void emit(Object value) {}
 
         @Override
         public <C> void emit(String channel, C value) {}
 
         @Override
-        public <C> void emitWithMeta(C value, Map<String, String> meta) {}
+        public void emitWithMeta(Object value, Map<String, String> meta) {}
 
         @Override
         public <C> void emitWithMeta(String channel, C value, Map<String, String> meta) {}

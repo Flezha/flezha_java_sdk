@@ -1,5 +1,6 @@
 package com.flezha.sdk.runtime.operator;
 
+import com.flezha.sdk.internal.ShortFormDeclaration;
 import com.flezha.sdk.operator.Operator;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,8 +23,11 @@ public class UnboundedOperatorClassRegistry {
 
     protected UnboundedOperatorClassRegistry() {}
 
-    public static String registerClass(Class<? extends Operator> operatorClass) throws Exception {
-        String factoryId = operatorClass.getDeclaredConstructor().newInstance().factoryId();
+    public static String registerClass(Class<?> operatorClass) throws Exception {
+        ShortFormDeclaration shortForm = ShortFormDeclaration.of(operatorClass);
+        String factoryId = shortForm != null
+                ? shortForm.id()
+                : ((Operator) operatorClass.getDeclaredConstructor().newInstance()).factoryId();
         synchronized (REGISTERED) {
             if (!REGISTERED.contains(factoryId)) {
                 REGISTERED.add(factoryId);

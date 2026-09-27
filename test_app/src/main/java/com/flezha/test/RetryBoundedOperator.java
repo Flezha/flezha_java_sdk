@@ -1,10 +1,9 @@
 package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.operator.BoundedOperator;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -35,22 +34,17 @@ public final class RetryBoundedOperator implements BoundedOperator {
     }
 
     /** Task RA: durable, forwards on the hybrid channel, compensates with an undo record. */
+    @Tasklet.Spec(name = "retry_a")
     public static final class RetryA extends DurableStep {
-
         @Override
-        public String name() {
-            return "retry_a";
-        }
-
-        @Override
-        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void compensate(List<String> completedOutput, Ctx<SeenState, String> ctx) throws TaskletException {
             ctx.emit("undone");
         }
     }
 
     /** Fails its first armed attempts, then reports which attempt succeeded. */
-    public static final class RetryFlaky extends StatelessStep {
+    @Tasklet.Spec(name = "retry_flaky")
+    public static final class RetryFlaky extends NoStateStep {
 
         /**
          * Attempts made in this process — a retry re-runs the tasklet in place,
@@ -59,13 +53,7 @@ public final class RetryBoundedOperator implements BoundedOperator {
         private static final AtomicInteger ATTEMPTS = new AtomicInteger();
 
         @Override
-        public String name() {
-            return "retry_flaky";
-        }
-
-        @Override
-        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             int attempt = ATTEMPTS.incrementAndGet();
             if (attempt <= TestEnv.longVar("FLEZHA_BOUNDED_RETRY_FAILS", 0)) {
                 throw new TaskletException("flaky attempt " + attempt);

@@ -19,9 +19,10 @@ write them one tasklet at a time.
 | `ConfirmFill.java` | waits ten seconds for the exchange, confirms the fill and ends the order with its result, and refuses an order above the exchange's limit |
 | `RecordOrder.java` | books the placed order, and has nothing to undo |
 
-Every tasklet is a class annotated `@Tasklet`. What a tasklet remembers, and the
-records it takes and hands on, sit inside its own class, because nothing else
-uses them.
+Every tasklet is a class that implements `Tasklet<Input, State, Output>` and
+carries `@Tasklet.Spec` with its name. What a tasklet remembers, the changes that
+record it, and the records it takes and hands on, sit inside its own class,
+because nothing else uses them.
 
 ## Run it
 
@@ -69,10 +70,12 @@ flz operator info order_1 --namespace trading
 ```
 
 ```
+...
 Operator: order_1
   Kind: bounded
   Phase: finished
   Status: ok
+  Finished At (unix s): 1790554778
 ```
 
 ## Watch it undo itself
@@ -92,8 +95,8 @@ money is released. `record_order` has no undo, so the booking stays:
 
 ```
 [book] EUR/USD 500 as ord-0e7ee9553cfe5eac606fd232fd7ab33c
-[flezha] tasklet confirm_fill attempt 1/3 failed (retrying in 50 ms): the exchange fills at most 100 a time, and this is 500
-[flezha] tasklet confirm_fill attempt 2/3 failed (retrying in 73 ms): the exchange fills at most 100 a time, and this is 500
+[flezha] tasklet confirm_fill attempt 1/3 failed (retrying in 54 ms): the exchange fills at most 100 a time, and this is 500
+[flezha] tasklet confirm_fill attempt 2/3 failed (retrying in 136 ms): the exchange fills at most 100 a time, and this is 500
 [undo] cancelled ord-0e7ee9553cfe5eac606fd232fd7ab33c
 [undo] released res-54e4641a002cc27f8d030507d8d5aea5
 ```
@@ -103,11 +106,13 @@ flz operator info order_2 --namespace trading
 ```
 
 ```
+...
 Operator: order_2
   Kind: bounded
   Phase: finished
   Status: error
   Error: the exchange fills at most 100 a time, and this is 500
+  Finished At (unix s): 1790554813
 ```
 
 ## Building from a checkout

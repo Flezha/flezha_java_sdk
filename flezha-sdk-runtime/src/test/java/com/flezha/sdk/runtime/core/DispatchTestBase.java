@@ -6,18 +6,11 @@ import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.BoundedOperator;
 import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
-import com.flezha.sdk.runtime.operator.StatelessTestTasklet;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
 import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.EventTimeFrom;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.Stateless;
 import com.flezha.sdk.state.TimerKind;
-import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -134,37 +127,25 @@ abstract class DispatchTestBase {
     }
 
     /**
-     * A stateless fixture Tasklet over an {@code Object} state: a name and a
-     * run body, which is all these vary. A fixture that needs the cell key,
-     * a state type of its own or a Change declares itself in full instead.
+     * A stateless fixture Tasklet: a run body, which is all these vary; each
+     * subclass names itself with {@code @Tasklet.Spec}. A fixture that needs a
+     * state or a change declares itself in full instead.
      */
-    public abstract static class Task<O> extends StatelessTestTasklet<String, Object, O> {
+    public abstract static class Task<O> implements Tasklet<String, Void, O> {
 
-        /** The run body, with the state handle the fixtures never read elided. */
-        public interface Body {
-            void run(String input, TaskletCtx ctx) throws TaskletException;
+        /** The run body. */
+        public interface Body<O> {
+            void run(String input, Ctx<Void, O> ctx) throws TaskletException;
         }
 
-        private final String name;
-        private final Body body;
+        private final Body<O> body;
 
-        protected Task(String name, Body body) {
-            this.name = name;
+        protected Task(Body<O> body) {
             this.body = body;
         }
 
         @Override
-        public String name() {
-            return name;
-        }
-
-        @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) throws TaskletException {
+        public void run(String input, Ctx<Void, O> ctx) throws TaskletException {
             body.run(input, ctx);
         }
     }
@@ -173,13 +154,18 @@ abstract class DispatchTestBase {
         public int n;
     }
 
-    public static class CountChange implements Change {
+    public static class CountChange implements Change<CounterState> {
         public int delta;
 
         public CountChange() {}
 
         CountChange(int delta) {
             this.delta = delta;
+        }
+
+        @Override
+        public void applyTo(CounterState state) {
+            state.n += delta;
         }
     }
 
@@ -191,31 +177,17 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class CountTask implements Tasklet<String, CounterState, String, CountChange, WallClock, Void> {
-        @Override
-        public String name() {
-            return "count_task";
-        }
-
+    /** Its change is declared outside it, so it lists its types. */
+    @Tasklet.Spec(name = "count_task")
+    public static final class CountTask implements Tasklet<String, CounterState, String> {
         @Override
         public List<Class<?>> kryoTypes() {
             return List.of(CountChange.class, CounterState.class);
         }
 
         @Override
-        public CounterState initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new CounterState();
-        }
-
-        @Override
-        public void applyChange(CounterState state, CountChange change) {
-            state.n += change.delta;
-        }
-
-        @Override
-        public void run(String input, StateHandle<CounterState, CountChange> state, TaskletCtx ctx)
-                throws TaskletException {
-            state.apply(new CountChange(1));
+        public void run(String input, Ctx<CounterState, String> ctx) throws TaskletException {
+            ctx.change(new CountChange(1));
             if (input.startsWith("key:")) {
                 ctx.emitKeyed("k", input);
             } else {
@@ -238,31 +210,11 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class MigratingCountTask
-            implements Tasklet<String, CounterState, String, CountChange, WallClock, Void> {
-        @Override
-        public String name() {
-            return "count_task";
-        }
-
-        @Override
-        public int schemaVersion() {
-            return 2;
-        }
-
-        @Override
-        public int minReadableSchemaVersion() {
-            return 1;
-        }
-
+    @Tasklet.Spec(name = "count_task", schemaVersion = 2, minReadableSchemaVersion = 1)
+    public static final class MigratingCountTask implements Tasklet<String, CounterState, String> {
         @Override
         public List<Class<?>> kryoTypes() {
             return List.of(CountChange.class, CounterState.class);
-        }
-
-        @Override
-        public CounterState initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new CounterState();
         }
 
         @Override
@@ -284,14 +236,8 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        public void applyChange(CounterState state, CountChange change) {
-            state.n += change.delta;
-        }
-
-        @Override
-        public void run(String input, StateHandle<CounterState, CountChange> state, TaskletCtx ctx)
-                throws TaskletException {
-            state.apply(new CountChange(1));
+        public void run(String input, Ctx<CounterState, String> ctx) throws TaskletException {
+            ctx.change(new CountChange(1));
             ctx.emit(input);
         }
     }
@@ -325,27 +271,19 @@ abstract class DispatchTestBase {
         }
     }
 
-    /** The shape the annotation processor generates for a stateless `@Tasklet`. */
-    public static final class StatelessStateTask extends StatelessTestTasklet<String, Stateless, String> {
+    /** A tasklet declaring {@code Void} state: it keeps nothing. */
+    @Tasklet.Spec(name = "stateless_state_task")
+    public static final class StatelessStateTask implements Tasklet<String, Void, String> {
         @Override
-        public String name() {
-            return "stateless_state_task";
-        }
-
-        @Override
-        protected Stateless initState(Optional<String> cellKey) {
-            return new Stateless();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Stateless, NoChange> state, TaskletCtx ctx) throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             ctx.emit("ok:" + input);
         }
     }
 
+    @Tasklet.Spec(name = "keyed_task")
     public static final class KeyedTask extends Task<String> {
         public KeyedTask() {
-            super("keyed_task", (input, ctx) -> {
+            super((input, ctx) -> {
                 // The plain spelling: on a keyed channel it carries the Cell's own key.
                 if (input.startsWith("plain:")) {
                     ctx.emit(input);
@@ -378,24 +316,12 @@ abstract class DispatchTestBase {
         }
     }
 
-    /** Records {@code cellKey=value}; one instance per Cell by contract. */
-    public static final class KeyRecorder extends StatelessTestTasklet<String, Object, Void> {
-        private String key = "";
-
+    /** Records {@code cellKey=value}. */
+    @Tasklet.Spec(name = "key_recorder")
+    public static final class KeyRecorder implements Tasklet<String, Void, Void> {
         @Override
-        public String name() {
-            return "key_recorder";
-        }
-
-        @Override
-        protected Object initState(Optional<String> cellKey) {
-            this.key = cellKey.orElse("");
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {
-            RECORDED.add(key + "=" + input);
+        public void run(String input, Ctx<Void, Void> ctx) {
+            RECORDED.add(ctx.cellKey().orElse("") + "=" + input);
         }
     }
 
@@ -406,19 +332,11 @@ abstract class DispatchTestBase {
     }
 
     /** Static keys a/b; counts runs per INSTANCE to pin per-Cell instances. */
-    public static final class StaticTask extends StatelessTestTasklet<String, Object, Void> {
-        private String key = "";
+    @Tasklet.Spec(
+            name = "static_task",
+            keys = {"a", "b"})
+    public static final class StaticTask implements Tasklet<String, Void, Void> {
         private int instanceRuns;
-
-        @Override
-        public String name() {
-            return "static_task";
-        }
-
-        @Override
-        public List<String> cellKeys() {
-            return List.of("a", "b");
-        }
 
         @Override
         public List<String> cellsFor(String input) {
@@ -426,15 +344,9 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            this.key = cellKey.orElse("");
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {
+        public void run(String input, Ctx<Void, Void> ctx) {
             instanceRuns++;
-            RECORDED.add(key + "#" + instanceRuns + "=" + input);
+            RECORDED.add(ctx.cellKey().orElse("") + "#" + instanceRuns + "=" + input);
         }
     }
 
@@ -455,9 +367,10 @@ abstract class DispatchTestBase {
         }
     }
 
+    @Tasklet.Spec(name = "mid_task")
     public static final class MidTask extends Task<String> {
         public MidTask() {
-            super("mid_task", (input, ctx) -> ctx.emit("mid:" + input));
+            super((input, ctx) -> ctx.emit("mid:" + input));
         }
     }
 
@@ -500,9 +413,10 @@ abstract class DispatchTestBase {
         }
     }
 
+    @Tasklet.Spec(name = "poison_task")
     public static final class PoisonTask extends Task<Void> {
         public PoisonTask() {
-            super("poison_task", (input, ctx) -> {
+            super((input, ctx) -> {
                 if (input.equals("bad-fatal")) {
                     throw new TaskletException.NonRetryable("fatal poison");
                 }
@@ -523,19 +437,10 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class TypedEntryTask implements Tasklet<Ticket, Object, Void, NoChange, WallClock, Void> {
+    @Tasklet.Spec(name = "typed_entry_task")
+    public static final class TypedEntryTask implements Tasklet<Ticket, Void, Void> {
         @Override
-        public String name() {
-            return "typed_entry_task";
-        }
-
-        @Override
-        public Object initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new Object();
-        }
-
-        @Override
-        public void run(Ticket input, StateHandle<Object, NoChange> state, TaskletCtx ctx) throws TaskletException {
+        public void run(Ticket input, Ctx<Void, Void> ctx) throws TaskletException {
             if (input.text().equals("boom")) {
                 throw new IllegalStateException("the tasklet failed on a readable ticket");
             }
@@ -549,31 +454,21 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class TimerTask implements Tasklet<String, Object, Void, NoChange, EventTimeFrom, Void> {
-        @Override
-        public String name() {
-            return "timer_task";
-        }
-
+    @Tasklet.Spec(name = "timer_task")
+    public static final class TimerTask implements Tasklet<String, Void, Void> {
         @Override
         public long eventTime(String input) {
             return Long.parseLong(input);
         }
 
         @Override
-        public Object initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) throws TaskletException {
+        public void run(String input, Ctx<Void, Void> ctx) throws TaskletException {
             ctx.timerAtEventTime(ctx.now() + 10);
             ctx.timerAfter(Duration.ofMillis(5));
         }
 
         @Override
-        public void onTimer(long firedAt, TimerKind kind, StateHandle<Object, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void onTimer(long firedAt, TimerKind kind, Ctx<Void, Void> ctx) throws TaskletException {
             TIMER_EVENTS.add(kind + "@" + firedAt + " now=" + ctx.now());
             if (kind == TimerKind.EVENT_TIME) {
                 ctx.timerAfter(Duration.ofMillis(7));
@@ -587,9 +482,10 @@ abstract class DispatchTestBase {
         }
     }
 
+    @Tasklet.Spec(name = "wall_timer_task")
     public static final class WallTimerTask extends Task<Void> {
         public WallTimerTask() {
-            super("wall_timer_task", (input, ctx) -> ctx.timerAtEventTime(1));
+            super((input, ctx) -> ctx.timerAtEventTime(1));
         }
     }
 
@@ -605,25 +501,13 @@ abstract class DispatchTestBase {
 
     /**
      * The tier IS durable state, so a checkpointing class journals something:
-     * this Tasklet declares a Change, which is what makes the class
+     * this Tasklet declares a state, which is what makes the class
      * {@code persistent} in the record.
      */
-    public static final class CkptTask implements Tasklet<String, Object, String, CkptChange, WallClock, Void> {
+    @Tasklet.Spec(name = "ckpt_task")
+    public static final class CkptTask implements Tasklet<String, CkptState, String> {
         @Override
-        public String name() {
-            return "ckpt_task";
-        }
-
-        @Override
-        public Object initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new Object();
-        }
-
-        @Override
-        public void applyChange(Object state, CkptChange change) {}
-
-        @Override
-        public void run(String input, StateHandle<Object, CkptChange> state, TaskletCtx ctx) throws TaskletException {
+        public void run(String input, Ctx<CkptState, String> ctx) throws TaskletException {
             ctx.emitKeyed("ck", input);
             if (input.equals("commit")) {
                 ctx.checkpoint();
@@ -631,8 +515,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    /** The one Change the checkpoint fixture journals. */
-    public record CkptChange(String value) implements Change {}
+    /** The checkpoint fixture's state, which it never changes. */
+    public static final class CkptState {}
 
     public static final class ReplayProbeOperator extends Op {
         public ReplayProbeOperator() {
@@ -640,16 +524,18 @@ abstract class DispatchTestBase {
         }
     }
 
+    @Tasklet.Spec(name = "replay_probe_task")
     public static final class ReplayProbeTask extends Task<Void> {
         public ReplayProbeTask() {
-            super("replay_probe_task", (input, ctx) -> RECORDED.add("replaying=" + ctx.replaying()));
+            super((input, ctx) -> RECORDED.add("replaying=" + ctx.replaying()));
         }
     }
 
     /** Completes twice, the later call with its input; on {@code fail} it then throws. */
+    @Tasklet.Spec(name = "completing_task")
     public static final class CompletingTask extends Task<Void> {
         public CompletingTask() {
-            super("completing_task", (input, ctx) -> {
+            super((input, ctx) -> {
                 ctx.complete("superseded");
                 ctx.complete("done:" + input);
                 if (input.equals("fail")) {
@@ -723,14 +609,14 @@ abstract class DispatchTestBase {
         }
     }
 
+    @Tasklet.Spec(name = "undoable_task")
     public static final class UndoableTask extends Task<String> {
         public UndoableTask() {
-            super("undoable_task", (input, ctx) -> ctx.emit("fwd:" + input));
+            super((input, ctx) -> ctx.emit("fwd:" + input));
         }
 
         @Override
-        public void compensate(List<String> completedOutput, StateHandle<Object, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void compensate(List<String> completedOutput, Ctx<Void, String> ctx) throws TaskletException {
             for (String output : completedOutput) {
                 RECORDED.add("compensated:" + output);
                 ctx.emit("undo:" + output);

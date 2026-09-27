@@ -1,30 +1,16 @@
 package com.flezha.test;
 
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.WallClock;
 import java.util.List;
-import java.util.Optional;
 import java.util.TreeMap;
 
 /**
  * Shared base for the {@code key:value} upsert tasklets: {@link TierStoreTasklet},
  * {@link CheckpointStoreTasklet} and {@link BenchCheckpointTasklet} differ only
- * in {@code name()} and {@code run}. Mirrors the Rust test app's three tasklets
+ * in their name and {@code run}. Mirrors the Rust test app's three tasklets
  * over one {@code TierStoreState} / {@code TierStoreChange} pair.
  */
-public abstract class KeyedStoreTasklet
-        implements Tasklet<String, TierStoreState, String, TierStoreChange, WallClock, Void> {
-
-    @Override
-    public TierStoreState initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-        return new TierStoreState();
-    }
-
-    @Override
-    public void applyChange(TierStoreState state, TierStoreChange change) {
-        state.values.put(change.key(), change.value());
-    }
+public abstract class KeyedStoreTasklet implements Tasklet<String, TierStoreState, String> {
 
     @Override
     public List<Class<?>> kryoTypes() {

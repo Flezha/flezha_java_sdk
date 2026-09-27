@@ -11,11 +11,9 @@ import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import com.flezha.sdk.runtime.operator.builder.LatestDocumentRouter;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -36,27 +34,11 @@ class RouteLatestExpansionTest {
      * exactly as an author declares one: its {@code Input} is the routed pair
      * over its own document type.
      */
-    public static final class Detector extends StatelessTestTasklet<RoutedDocument<Thresholds>, String, Void> {
+    @Tasklet.Spec(name = "detector")
+    public static final class Detector implements Tasklet<RoutedDocument<Thresholds>, Void, Void> {
 
         @Override
-        public String name() {
-            return "detector";
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public Class<RoutedDocument<Thresholds>> inputType() {
-            return (Class<RoutedDocument<Thresholds>>) (Class<?>) RoutedDocument.class;
-        }
-
-        @Override
-        protected String initState(Optional<String> cellKey) {
-            return "";
-        }
-
-        @Override
-        public void run(RoutedDocument<Thresholds> input, StateHandle<String, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(RoutedDocument<Thresholds> input, Ctx<Void, Void> ctx) throws TaskletException {
             // The expansion is what is under test; the consumer only has to exist.
         }
     }

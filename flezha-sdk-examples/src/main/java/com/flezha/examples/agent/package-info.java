@@ -15,8 +15,9 @@
  * passing the accumulated turns as history. Keeping the reply a function of that history is
  * what allows an iteration that failed part-way to be re-executed safely.
  *
- * <p>{@link com.flezha.examples.agent.Conversation} is a {@code @State} class, so each turn is
- * recorded by the generated {@code pushTurns} rather than added to the list directly, and the
- * processor also generates the Kryo type list, so nothing is registered by hand.
+ * <p>{@link com.flezha.examples.agent.Conversation} is the state, and its nested
+ * {@code TurnTaken} record is the one change it records: each turn goes through
+ * {@code ctx.change} rather than being added to the list directly, so a restart replays every
+ * turn. Nothing is registered by hand; the SDK finds the state class and the change nested in it.
  */
 package com.flezha.examples.agent;

@@ -109,25 +109,12 @@ final class TopologyMaterializer {
             TaskletEntry entry = tasklets.get(i);
             descriptors.add(new TaskletDescriptor(
                     entry.name,
-                    entry.taskletClass,
-                    entry.cellKeys,
-                    entry.cellsForOverridden,
+                    entry.model,
                     entry.dynamic,
                     inputChannel(channels, i),
                     entry.outputChannelId == null ? OptionalInt.empty() : OptionalInt.of(entry.outputChannelId),
-                    entry.inputType,
-                    entry.outputType,
-                    entry.changeType,
-                    entry.clockType,
-                    entry.configType,
                     entry.kryoTypes,
-                    entry.schemaVersion,
-                    entry.minReadableSchemaVersion,
-                    entry.compactAfterBytes,
-                    capacities[i],
-                    entry.compensateOverridden,
-                    entry.cellIdleTtl,
-                    entry.maxCells));
+                    capacities[i]));
         }
         return descriptors;
     }

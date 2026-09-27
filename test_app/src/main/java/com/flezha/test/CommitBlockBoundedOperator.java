@@ -2,10 +2,9 @@ package com.flezha.test;
 
 import com.flezha.sdk.operator.BoundedOperator;
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
 
 /**
  * Durable structured bounded operator for the crash-resume e2e (§7c.3), the
@@ -29,27 +28,18 @@ public final class CommitBlockBoundedOperator implements BoundedOperator {
     }
 
     /** Task A: commits idempotent durable Cell state, then hands input to task B. */
-    public static final class CommitA extends DurableStep {
-        @Override
-        public String name() {
-            return "commit_a";
-        }
-    }
+    @Tasklet.Spec(name = "commit_a")
+    public static final class CommitA extends DurableStep {}
 
     /**
      * Task B: blocks a pool worker until the resumed runner sets the release
      * env, then the chain reaches quiescence (status {@code ok}). No emit —
      * completion is observed controller-side via the finished-job record.
      */
-    public static final class BlockB extends StatelessStep {
+    @Tasklet.Spec(name = "block_b")
+    public static final class BlockB extends NoStateStep {
         @Override
-        public String name() {
-            return "block_b";
-        }
-
-        @Override
-        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             BoundedE2eGate.blockUntilReleased();
         }
     }

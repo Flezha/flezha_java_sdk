@@ -53,19 +53,19 @@ public interface EdgeStream<T> {
      * fan-out; wiring the same unnamed class from two streams declares fan-in.
      */
     @Nonnull
-    <O> Stream<O> into(Class<? extends Tasklet<T, ?, O, ?, ?, ?>> tasklet);
+    <O> Stream<O> into(Class<? extends Tasklet<T, ?, O>> tasklet);
 
     /**
      * Like {@link #into(Class)}, but the consumer is a distinct <b>named
      * node</b>: its identity string is {@code nodeName} instead of the
-     * tasklet's {@code name()}, for every purpose identity serves — per-cell
+     * tasklet's {@code @Tasklet.Spec} name, for every purpose identity serves — per-cell
      * state directories, journal entries, the derived channel name,
      * diagnostics. This lets one Tasklet class appear at several graph
      * positions with independent state. Node identity strings are unique per
      * operator; a collision fails registration.
      */
     @Nonnull
-    <O> Stream<O> into(Class<? extends Tasklet<T, ?, O, ?, ?, ?>> tasklet, String nodeName);
+    <O> Stream<O> into(Class<? extends Tasklet<T, ?, O>> tasklet, String nodeName);
 
     /** Reshape every value on the way to the next consumer. */
     @Nonnull
@@ -101,7 +101,7 @@ public interface EdgeStream<T> {
      * <p>Total by signature: it names a Cell, it never declines. Discard
      * inputs with {@link #filter} before it. It is evaluated on the
      * <b>post-transform</b> value, so it must be the last link before
-     * {@code into}. Wiring it onto a Tasklet declaring {@code cellKeys()}
+     * {@code into}. Wiring it onto a Tasklet declaring {@code @Tasklet.Spec(keys = ...)}
      * (static mode) fails registration.
      */
     @Nonnull

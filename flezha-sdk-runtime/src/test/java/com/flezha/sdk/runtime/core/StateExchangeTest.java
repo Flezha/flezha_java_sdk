@@ -12,8 +12,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * State across the host boundary: the restore fold and its migration decision,
- * the snapshot and live-state reads, ApplyState / MigrationSerialize, and the
- * Stateless marker.
+ * the snapshot and live-state reads, ApplyState / MigrationSerialize, and a
+ * Void state.
  */
 class StateExchangeTest extends DispatchTestBase {
 
@@ -105,19 +105,17 @@ class StateExchangeTest extends DispatchTestBase {
                 .isEqualTo("{\"n\":3}");
     }
 
-    // The write side of a derived change was always exercised; the read side
-    // was not, and a generated variant could not be rebuilt at all (KB-467).
     // No snapshot here, so the state comes from the journal alone.
     @Test
-    @DisplayName("a restore fold reads back a @State-derived change and rebuilds the state from it")
-    void restoreFoldReadsBackADerivedChange() {
-        UnboundedOperatorClassRegistry.registerClass(SugarTallyUnboundedOperator.class);
-        ItemEffect ran = soleEffect(work("sugar_tally_op", 0, Optional.empty(), 0, input(0, "a", 1)));
-        assertThat(ran.changes()).as("pushSeen then setN").hasSize(2);
+    @DisplayName("Nested change records are discovered: a restore fold decodes them and rebuilds the state")
+    void nestedChangeRecordsAreDiscovered() {
+        UnboundedOperatorClassRegistry.registerClass(Tally.class);
+        ItemEffect ran = soleEffect(work("tally_op", 0, Optional.empty(), 0, input(0, "a", 1)));
+        assertThat(ran.changes()).as("Seen then Counted").hasSize(2);
 
         ActivationDispatcher rebound = new ActivationDispatcher();
         ActivationOutcome restored = rebound.dispatch(command(
-                        "sugar_tally_op",
+                        "tally_op",
                         0,
                         Optional.empty(),
                         new ActivationKind.RestoreFold(
@@ -129,7 +127,7 @@ class StateExchangeTest extends DispatchTestBase {
         assertThat(restored).isInstanceOf(ActivationOutcome.Restored.class);
 
         ActivationOutcome json = rebound.dispatch(
-                        command("sugar_tally_op", 0, Optional.empty(), new ActivationKind.LiveStateRead()))
+                        command("tally_op", 0, Optional.empty(), new ActivationKind.LiveStateRead()))
                 .outcome();
         assertThat(new String(((ActivationOutcome.StateJson) json).json(), StandardCharsets.UTF_8))
                 .contains("\"n\":1")
@@ -153,12 +151,11 @@ class StateExchangeTest extends DispatchTestBase {
                 .isEqualTo("{\"n\":42}");
     }
 
-    // A stateless tasklet has nothing to ship, and Jackson refuses an empty
-    // bean: the marker is what the migration serialize and the graceful
-    // shutdown's state ship carry for a stateless Java operator.
+    // A Void state has nothing to ship: the empty object is what the migration
+    // serialize and the graceful shutdown's state ship carry for it.
     @Test
-    @DisplayName("a Stateless state serializes as an empty object and reads back")
-    void statelessStateShipsAsEmptyObject() {
+    @DisplayName("a Void state serializes as an empty object and reads back")
+    void voidStateShipsAsEmptyObject() {
         UnboundedOperatorClassRegistry.registerClass(StatelessStateOperator.class);
 
         ActivationOutcome migrated =

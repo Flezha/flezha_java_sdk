@@ -2,12 +2,10 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.state.Change;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.WallClock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -39,35 +37,32 @@ public final class PartitionRelayUnboundedOperator implements UnboundedOperator 
                 .sink("input");
     }
 
-    public static final class PartitionRelayTasklet
-            implements Tasklet<String, PartitionRelayTasklet.State, String, StoreInputChange, WallClock, Void> {
+    @Tasklet.Spec(name = "partition_relay_tasklet")
+    public static final class PartitionRelayTasklet implements Tasklet<String, PartitionRelayTasklet.State, String> {
 
         public record State(List<String> seen) {}
 
-        @Override
-        public String name() {
-            return "partition_relay_tasklet";
+        /** One input the Cell has relayed. */
+        public record Seen(String text) implements Change<State> {
+            @Override
+            public void applyTo(State state) {
+                state.seen().add(text);
+            }
         }
 
         @Override
-        public State initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
+        public State initState(Optional<String> cellKey) {
             return new State(new ArrayList<>());
         }
 
         @Override
-        public void applyChange(State state, StoreInputChange change) {
-            state.seen().add(change.text());
-        }
-
-        @Override
         public List<Class<?>> kryoTypes() {
-            return List.of(State.class, StoreInputChange.class, ArrayList.class);
+            return List.of(State.class, Seen.class, ArrayList.class);
         }
 
         @Override
-        public void run(String input, StateHandle<State, StoreInputChange> state, TaskletCtx ctx)
-                throws TaskletException {
-            state.apply(new StoreInputChange(input));
+        public void run(String input, Ctx<State, String> ctx) throws TaskletException {
+            ctx.change(new Seen(input));
             ctx.emitKeyed(DynamicCellUnboundedOperator.key(input), input);
         }
     }

@@ -52,9 +52,8 @@ public interface UnboundedOperator extends Operator {
      * <p>Override to {@code false} to opt out for the whole class: changes are still applied in
      * memory, so tasklets behave normally, but nothing is written to disk and a cell begins
      * with no history after a restart. This is a throughput trade for work whose state can be
-     * recomputed or safely lost, and it is not the same as declaring
-     * {@link com.flezha.sdk.state.NoChange}, which removes the change machinery from the tasklet
-     * altogether.
+     * recomputed or safely lost, and it is not the same as a tasklet declaring {@code Void} state,
+     * which keeps no state at all.
      *
      * <p>The runtime announces the value to the controller, which resolves it for the class; an
      * user can still override it per class on the controller.

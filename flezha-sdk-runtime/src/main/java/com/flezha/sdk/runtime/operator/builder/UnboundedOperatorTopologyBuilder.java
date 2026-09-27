@@ -19,24 +19,13 @@ import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.core.HostLink;
 import com.flezha.sdk.runtime.operator.EdgeYield;
+import com.flezha.sdk.runtime.operator.TaskletModel;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
-import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.Clock;
-import com.flezha.sdk.state.EventTimeFrom;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.WallClock;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.OptionalInt;
-import java.util.OptionalLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
@@ -72,8 +61,9 @@ import javax.annotation.Nullable;
  * handle was given and submits that record to {@code flz_core}'s one check,
  * which answers the derived declaration or the verdict. What it still refuses
  * itself is only what erasure makes and no record could carry — a payload type
- * that does not reach its consumer's input, a type argument left generic at the
- * tasklet class, a missing {@code eventTime} extractor, a tasklet class
+ * that does not reach its consumer's input, and what {@link TaskletModel} reads
+ * off a tasklet class (a type argument left generic, a setting out of range, two
+ * clocks, a state with no constructor, colliding type ids), plus a tasklet class
  * with no public no-arg constructor. After {@link #build(Operator)} the
  * topology is frozen: a retained handle used afterwards throws
  * {@link IllegalStateException} naming the operator.
@@ -304,7 +294,7 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
         int[] capacities = new int[tasklets.size()];
         for (int i = 0; i < tasklets.size(); i++) {
             TaskletEntry tasklet = tasklets.get(i);
-            capacities[i] = MailboxCapacityResolver.resolve(tasklet.mailboxCapacity);
+            capacities[i] = MailboxCapacityResolver.resolve(tasklet.model.mailboxCapacity());
         }
         markKeyedTargetsDynamic();
 
@@ -345,7 +335,7 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
             }
             for (HostLink link : chain.links) {
                 Integer target = link.target();
-                if (target != null && tasklets.get(target).cellKeys.isEmpty()) {
+                if (target != null && tasklets.get(target).model.cellKeys().isEmpty()) {
                     tasklets.get(target).dynamic = true;
                 }
             }
@@ -414,21 +404,22 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
      * Resolve or create the node for {@code taskletClass} under the
      * node-identity rule: two unnamed mentions of one class are the same
      * node; an explicit node name creates/refers to a distinct node whose
-     * identity string replaces the tasklet's {@code name()}. An identity
-     * claimed by a <i>different</i> declaration is a collision.
+     * identity string replaces the tasklet's name. An identity claimed by a
+     * <i>different</i> declaration is a collision.
      */
-    int registerNode(Class<? extends Tasklet<?, ?, ?, ?, ?, ?>> taskletClass, String nodeName) {
-        Tasklet<?, ?, ?, ?, ?, ?> probe = instantiate(taskletClass);
-        String identity = nodeName != null ? nodeName : probe.name();
+    int registerNode(Class<? extends Tasklet<?, ?, ?>> taskletClass, String nodeName) {
+        TaskletModel model = TaskletModel.read(taskletClass, instantiate(taskletClass));
+        String identity = nodeName != null ? nodeName : model.name();
         Integer existing = resolveIdentity(identity, taskletClass, nodeName != null);
         if (existing != null) {
             return existing;
         }
-        TaskletEntry entry = probeDeclarations(probe, identity);
-        entry.taskletClass = taskletClass;
+        model.errors().forEach(this::refuse);
+        TaskletEntry entry = new TaskletEntry();
+        entry.model = model;
+        entry.kryoTypes = model.kryoTypes();
         entry.name = identity;
         entry.named = nodeName != null;
-        entry.uninstantiable = probe == UNINSTANTIABLE;
         int id = tasklets.size();
         tasklets.add(entry);
         taskletNameToId.put(identity, id);
@@ -440,8 +431,7 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
      * fresh one. A claim by a different class, or by the other of the
      * named/unnamed spellings, is the collision.
      */
-    private Integer resolveIdentity(
-            String identity, Class<? extends Tasklet<?, ?, ?, ?, ?, ?>> taskletClass, boolean named) {
+    private Integer resolveIdentity(String identity, Class<? extends Tasklet<?, ?, ?>> taskletClass, boolean named) {
         Integer existing = taskletNameToId.get(identity);
         if (existing == null) {
             return null;
@@ -450,79 +440,16 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
         // A claim by a different class, or by the other of the named/unnamed
         // spellings, is a SECOND node under one identity: it is recorded as
         // one, and the core answers NodeIdentityCollision off the record.
-        boolean sameNode = existingEntry.taskletClass.equals(taskletClass) && existingEntry.named == named;
+        boolean sameNode = existingEntry.model.taskletClass().equals(taskletClass) && existingEntry.named == named;
         return sameNode ? existing : null;
     }
 
     /**
-     * Everything a fresh node records off one probe instance: the type tokens,
-     * the Cell-mode and durability declarations, the optional hooks its class
-     * writes, and the one clock refusal.
-     *
-     * <p>Every clock in the sealed hierarchy is wired. The missing
-     * {@code eventTime(Input)} extractor is refused here because the record
-     * carries no such fact: Rust states it as a {@code TimeExtractor<Input>}
-     * bound at compile time, and erasure precludes that form.
+     * One instance of the class, which proves it constructible and answers a
+     * written {@code kryoTypes()}; {@code null}, with the refusal recorded, when
+     * it cannot be built.
      */
-    private TaskletEntry probeDeclarations(Tasklet<?, ?, ?, ?, ?, ?> probe, String identity) {
-        Class<?> impl = probe.getClass();
-        TaskletEntry entry = new TaskletEntry();
-        entry.cellKeys = List.copyOf(probe.cellKeys());
-        entry.cellsForOverridden = Hook.CELLS_FOR.declaredBy(impl);
-        entry.inputType = probe.inputType();
-        entry.outputType = probe.outputType();
-        entry.changeType = probe.changeType();
-        entry.clockType = probe.clockType();
-        entry.configType = probe.configType();
-        entry.kryoTypes = List.copyOf(probe.kryoTypes());
-        entry.schemaVersion = probe.schemaVersion();
-        entry.minReadableSchemaVersion = probe.minReadableSchemaVersion();
-        entry.compactAfterBytes = probe.compactAfterBytes();
-        entry.mailboxCapacity =
-                Hook.MAILBOX_CAPACITY.declaredBy(impl) ? OptionalInt.of(probe.mailboxCapacity()) : OptionalInt.empty();
-        entry.compensateOverridden = Hook.COMPENSATE.declaredBy(impl);
-        entry.cellIdleTtl = probe.cellIdleTtl();
-        entry.maxCells = Hook.MAX_CELLS.declaredBy(impl) ? OptionalLong.of(probe.maxCells()) : OptionalLong.empty();
-        if (entry.clockType == EventTimeFrom.class && !Hook.EVENT_TIME.declaredBy(impl)) {
-            errors.add(UnboundedOperatorConfigurationException.eventTimeExtractorMissing(identity)
-                    .getMessage());
-        }
-        return entry;
-    }
-
-    /** The optional {@link Tasklet} hooks a class declares by writing them, each by its erased signature. */
-    enum Hook {
-        COMPENSATE("compensate", List.class, StateHandle.class, TaskletCtx.class),
-        CELLS_FOR("cellsFor", Object.class),
-        EVENT_TIME("eventTime", Object.class),
-        MAILBOX_CAPACITY("mailboxCapacity"),
-        MAX_CELLS("maxCells");
-
-        private final String method;
-        private final Class<?>[] erased;
-
-        Hook(String method, Class<?>... erased) {
-            this.method = method;
-            this.erased = erased;
-        }
-
-        /**
-         * Whether {@code impl}, or any class above it, writes this hook rather
-         * than inheriting the interface's default. A hook taking {@code Input}
-         * erases to {@code Object}, and an author writing a concrete parameter
-         * type gets a compiler bridge on their own class, so bridges are what
-         * answer {@code true} there and are not filtered out.
-         */
-        boolean declaredBy(Class<?> impl) {
-            try {
-                return impl.getMethod(method, erased).getDeclaringClass() != Tasklet.class;
-            } catch (NoSuchMethodException e) {
-                throw new IllegalStateException("Tasklet declares no hook `" + method + "`", e);
-            }
-        }
-    }
-
-    private Tasklet<?, ?, ?, ?, ?, ?> instantiate(Class<? extends Tasklet<?, ?, ?, ?, ?, ?>> taskletClass) {
+    private Tasklet<?, ?, ?> instantiate(Class<? extends Tasklet<?, ?, ?>> taskletClass) {
         String refusal;
         try {
             return RuntimeBridge.construct(taskletClass);
@@ -531,52 +458,16 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
         } catch (RuntimeException e) {
             refusal = "constructor threw " + e;
         }
-        errors.add("tasklet class `" + taskletClass.getName() + "` " + refusal);
-        // A placeholder lets the build collect more errors; build() throws them all.
-        return UNINSTANTIABLE;
+        refuse("tasklet class `" + taskletClass.getName() + "` " + refusal);
+        return null;
     }
 
-    private static final Tasklet<Object, Object, Object, NoChange, WallClock, Void> UNINSTANTIABLE = new Tasklet<>() {
-        @Override
-        public String name() {
-            return "<uninstantiable>";
+    /** Record one refusal; a class mentioned twice reports it once. */
+    private void refuse(String error) {
+        if (!errors.contains(error)) {
+            errors.add(error);
         }
-
-        @Override
-        public Class<Object> inputType() {
-            return Object.class;
-        }
-
-        @Override
-        public Class<Object> outputType() {
-            return Object.class;
-        }
-
-        @Override
-        public Class<NoChange> changeType() {
-            return NoChange.class;
-        }
-
-        @Override
-        public Class<WallClock> clockType() {
-            return WallClock.class;
-        }
-
-        @Override
-        public Class<Void> configType() {
-            return Void.class;
-        }
-
-        @Override
-        public Object initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            throw new UnsupportedOperationException("uninstantiable tasklet");
-        }
-
-        @Override
-        public void run(Object input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {
-            throw new UnsupportedOperationException("uninstantiable tasklet");
-        }
-    };
+    }
 
     /**
      * Record {@code channelId}'s chain as closing onto a consumer node
@@ -584,10 +475,7 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
      * handle can continue the chain.
      */
     int wireConsumer(
-            int channelId,
-            Class<? extends Tasklet<?, ?, ?, ?, ?, ?>> taskletClass,
-            String nodeName,
-            Integer pendingChain) {
+            int channelId, Class<? extends Tasklet<?, ?, ?>> taskletClass, String nodeName, Integer pendingChain) {
         return wireConsumer(channelId, taskletClass, nodeName, null, pendingChain, null);
     }
 
@@ -716,7 +604,7 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
      */
     int wireConsumer(
             int channelId,
-            Class<? extends Tasklet<?, ?, ?, ?, ?, ?>> taskletClass,
+            Class<? extends Tasklet<?, ?, ?>> taskletClass,
             String nodeName,
             Class<?> deliveredTypeOverride,
             Integer pendingChain,
@@ -743,9 +631,10 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
         Class<?> declared = deliveredTypeOverride != null ? deliveredTypeOverride : chainType;
         Class<?> deliveredType = declared != null ? declared : channel.payloadType;
         // A placeholder's types are not the author's: its construction is already refused.
-        boolean placeholderProducer =
-                declared == null && channel.producer != null && tasklets.get(channel.producer).uninstantiable;
-        if (deliveredType.equals(tasklet.inputType) || tasklet.uninstantiable || placeholderProducer) {
+        boolean placeholderProducer = declared == null
+                && channel.producer != null
+                && !tasklets.get(channel.producer).model.typesResolved();
+        if (deliveredType.equals(tasklet.model.inputType()) || !tasklet.model.typesResolved() || placeholderProducer) {
             return;
         }
         String producedBy = deliveredTypeOverride != null
@@ -754,25 +643,25 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
                         ? "edge transforms produce"
                         : channel.producer == null
                                 ? "payload type"
-                                : "producer tasklet `" + tasklets.get(channel.producer).name + "` outputType() =";
+                                : "producer tasklet `" + tasklets.get(channel.producer).name + "` output type";
         errors.add("channel `" + channel.name + "`: " + producedBy + " "
                 + describe(deliveredType)
                 + " does not match consumer tasklet `" + tasklet.name
-                + "` inputType() = " + describe(tasklet.inputType));
+                + "` input type " + describe(tasklet.model.inputType()));
     }
 
     /**
      * The node's output channel, created lazily on first use so a leaf node
      * never carries a phantom channel. Named by the node's identity until a
      * {@code .named(...)} override; payload type = the node's declared
-     * {@code outputType()}.
+     * output type.
      */
     int ensureOutputChannel(int taskletId) {
         TaskletEntry tasklet = tasklets.get(taskletId);
         if (tasklet.outputChannelId != null) {
             return tasklet.outputChannelId;
         }
-        int id = declareChannel(tasklet.outputType, tasklet.name, ChannelKind.INTER_TASKLET);
+        int id = declareChannel(tasklet.model.outputType(), tasklet.name, ChannelKind.INTER_TASKLET);
         channels.get(id).producer = taskletId;
         tasklet.outputChannelId = id;
         return id;
@@ -817,22 +706,18 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
     /** Mutable internal record for a node registration. */
     public static final class TaskletEntry {
         /**
-         * Node identity: the tasklet's {@code name()}, or the explicit node
-         * name given at wiring time. Feeds everything {@code name()} feeds —
-         * state directories, journal entries, the derived channel name,
-         * diagnostics.
+         * Node identity: the tasklet's name, or the explicit node name given at
+         * wiring time. Feeds everything the name feeds — state directories,
+         * journal entries, the derived channel name, diagnostics.
          */
         public String name;
 
         /** Whether this node was created with an explicit node name. */
         boolean named;
 
-        /** Whether its class could not be constructed and a placeholder stands in. */
-        boolean uninstantiable;
+        /** What the node's class declares. */
+        public TaskletModel model;
 
-        Class<? extends Tasklet<?, ?, ?, ?, ?, ?>> taskletClass;
-        public List<String> cellKeys;
-        public boolean cellsForOverridden;
         /**
          * Set when some chain closing onto this node carries a key function —
          * Cell mode is read off the WIRING, not off the tasklet, and the
@@ -840,21 +725,9 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
          */
         public boolean dynamic;
 
-        Class<?> inputType;
-        Class<?> outputType;
-        public Class<? extends Change> changeType;
-        public Class<? extends Clock> clockType;
-        Class<?> configType;
+        /** The class's encoded types, plus any only the wiring knows. */
         List<Class<?>> kryoTypes;
-        public int schemaVersion;
-        public int minReadableSchemaVersion;
-        public long compactAfterBytes;
-        Integer outputChannelId;
-        /** The capacity the tasklet writes, empty when it takes the environment's or the default. */
-        OptionalInt mailboxCapacity = OptionalInt.empty();
 
-        public boolean compensateOverridden;
-        public Optional<Duration> cellIdleTtl = Optional.empty();
-        public OptionalLong maxCells = OptionalLong.empty();
+        Integer outputChannelId;
     }
 }

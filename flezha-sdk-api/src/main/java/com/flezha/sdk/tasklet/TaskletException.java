@@ -1,7 +1,7 @@
 package com.flezha.sdk.tasklet;
 
 /**
- * Recoverable error thrown by {@link Tasklet#run} or {@link TaskletCtx} emit
+ * Recoverable error thrown by {@link Tasklet#run} or {@link Ctx} emit
  * methods. The runtime catches this, logs against
  * {@code (operatorInstance, tasklet, cell)}, discards any partial emits, and
  * continues dispatching subsequent inputs on the same Cell.
@@ -79,7 +79,7 @@ public class TaskletException extends Exception {
         private final String key;
 
         public ReservedMetadataKey(String key) {
-            super("metadata key `" + key + "` is reserved: the `" + TaskletCtx.RESERVED_METADATA_PREFIX
+            super("metadata key `" + key + "` is reserved: the `" + Ctx.RESERVED_METADATA_PREFIX
                     + "` namespace belongs to the runtime");
             this.key = key;
         }
@@ -124,8 +124,8 @@ public class TaskletException extends Exception {
     }
 
     /**
-     * Thrown when a Tasklet whose declared Clock does not derive time from
-     * the input registers an event-time timer: without an event-time clock
+     * Thrown when a tasklet whose clock does not derive time from the input
+     * registers an event-time timer: without an event-time clock
      * there is no high-water for it to fire against.
      */
     public static final class EventTimeTimerWithoutEventTimeClock extends TaskletException {
@@ -133,12 +133,12 @@ public class TaskletException extends Exception {
         public EventTimeTimerWithoutEventTimeClock(String tasklet, String clock) {
             super("tasklet `" + tasklet + "` declares clock `" + clock
                     + "`, which does not derive time from the input; an event-time timer needs"
-                    + " an EventTimeFrom clock");
+                    + " an event-time clock, which writing eventTime(input) declares");
         }
     }
 
     /**
-     * Thrown when a Cell already holds {@code maxTimersPerCell()} pending
+     * Thrown when a Cell already holds {@code @Tasklet.Spec(maxTimersPerCell)} pending
      * timers and registers one more. A per-Cell timer set is author-controlled
      * memory multiplied by an unbounded Cell count; the cap is what keeps a
      * runaway registration a refusal rather than an OOM.
@@ -147,7 +147,7 @@ public class TaskletException extends Exception {
 
         public TimerCapExceeded(String tasklet, int max) {
             super("tasklet `" + tasklet + "` already holds its maximum of " + max
-                    + " pending timers for this Cell; cancel one or raise maxTimersPerCell()");
+                    + " pending timers for this Cell; cancel one or raise @Tasklet.Spec(maxTimersPerCell)");
         }
     }
 

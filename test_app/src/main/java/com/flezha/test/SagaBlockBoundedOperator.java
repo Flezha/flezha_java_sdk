@@ -2,10 +2,9 @@ package com.flezha.test;
 
 import com.flezha.sdk.operator.BoundedOperator;
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
 import java.util.List;
 
 /**
@@ -37,15 +36,10 @@ public final class SagaBlockBoundedOperator implements BoundedOperator {
      * env so the SIGKILL lands mid-compensation (its compensation-intent is
      * durable, its compensation-done is not until the respawn releases it).
      */
+    @Tasklet.Spec(name = "saga_a")
     public static final class SagaA extends DurableStep {
         @Override
-        public String name() {
-            return "saga_a";
-        }
-
-        @Override
-        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void compensate(List<String> completedOutput, Ctx<SeenState, String> ctx) throws TaskletException {
             BoundedE2eGate.blockUntilReleased();
         }
     }
@@ -55,14 +49,10 @@ public final class SagaBlockBoundedOperator implements BoundedOperator {
      * compensation-done marker lands before the crash), so the respawn MUST skip
      * it rather than re-run it.
      */
+    @Tasklet.Spec(name = "saga_b")
     public static final class SagaB extends DurableStep {
         @Override
-        public String name() {
-            return "saga_b";
-        }
-
-        @Override
-        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx) {
+        public void compensate(List<String> completedOutput, Ctx<SeenState, String> ctx) {
             // Fast, no-op undo — the done marker is what the resume observes.
         }
     }
@@ -71,15 +61,10 @@ public final class SagaBlockBoundedOperator implements BoundedOperator {
      * Task SC: terminal step that always fails, triggering reverse-order rollback
      * of the completed SB then SA. Itself uncompleted ⇒ never compensated.
      */
-    public static final class SagaC extends StatelessStep {
+    @Tasklet.Spec(name = "saga_c")
+    public static final class SagaC extends NoStateStep {
         @Override
-        public String name() {
-            return "saga_c";
-        }
-
-        @Override
-        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             throw new TaskletException("saga_c always fails");
         }
     }

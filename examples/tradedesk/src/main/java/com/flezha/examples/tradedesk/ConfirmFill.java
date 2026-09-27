@@ -1,8 +1,8 @@
 package com.flezha.examples.tradedesk;
 
 import com.flezha.examples.tradedesk.PlaceOrder.PlacedOrder;
-import com.flezha.sdk.authoring.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 
 /**
@@ -10,7 +10,7 @@ import com.flezha.sdk.tasklet.TaskletException;
  * rejects anything above its own size, which is what makes this the step that fails, and takes
  * ten seconds to answer, which leaves time to stop the runner in the middle of an order.
  *
- * <p>It remembers nothing and has nothing to undo, so it declares only {@code run}. It
+ * <p>It remembers nothing and has nothing to undo, so it writes only {@code run}. It
  * ends the instance with a result rather than emitting one: the order's outcome is the instance's
  * own answer, which {@code flz operator info} reads back, so the desk needs no sink here.
  *
@@ -18,22 +18,22 @@ import com.flezha.sdk.tasklet.TaskletException;
  * Everything that finished is then undone in reverse, across both arms: the order is cancelled and
  * the money released, while the desk's book is skipped because it declares no {@code compensate}.
  */
-@Tasklet(id = "confirm_fill")
-public final class ConfirmFill {
+@Tasklet.Spec(name = "confirm_fill")
+public final class ConfirmFill implements Tasklet<PlacedOrder, Void, Void> {
 
-    /** The largest order the paper exchange fills in one go. Anything above it is rejected. */
     private static final int EXCHANGE_MAX = 100;
 
-    public void run(PlacedOrder placed, TaskletCtx ctx) throws TaskletException {
+    @Override
+    public void run(PlacedOrder placed, Ctx<Void, Void> ctx) throws TaskletException {
         try {
-            Thread.sleep(10_000);
+            Thread.sleep(10_000);                            // the paper exchange takes ten seconds to answer
         } catch (InterruptedException stopped) {
             Thread.currentThread().interrupt();
             throw new TaskletException("stopped while waiting for the exchange");
         }
         int quantity = placed.order().quantity();
         if (quantity > EXCHANGE_MAX) {
-            throw new TaskletException(
+            throw new TaskletException(                      // tried again, then the order is undone
                     "the exchange fills at most " + EXCHANGE_MAX + " a time, and this is " + quantity);
         }
         ctx.complete("filled " + placed.order().symbol() + " " + quantity + " as " + placed.orderId());

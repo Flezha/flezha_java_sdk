@@ -209,7 +209,7 @@ public interface ChannelBuilder {
      * the controller rather than handled purely SDK-side.
      *
      * <p>Requires {@link #effectivelyOnce()} (a correction rewinds a consumed
-     * offset), an {@code EventTimeFrom} clock (there is no event time to compare
+     * offset), an event-time clock, a written {@code eventTime} (there is no event time to compare
      * without one), and every channel keyed (a corrected re-emit must overwrite,
      * not duplicate). Each is checked at registration.
      */

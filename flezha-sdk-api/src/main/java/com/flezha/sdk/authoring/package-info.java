@@ -1,24 +1,13 @@
 /**
- * The annotations a tasklet, its state and a short-form operator are written with.
- *
- * <p>{@link com.flezha.sdk.authoring.Tasklet} marks a class with one public {@code run} method.
- * The annotation processor generates {@code <Class>Tasklet} from it, the
- * {@link com.flezha.sdk.tasklet.Tasklet} implementation an operator wires, reading the input
- * and output types from the {@code run} signature so that nothing is declared twice.
- * {@link com.flezha.sdk.authoring.State} marks a state class, from which the processor generates the
- * change type and the handle a stateful {@code run} takes, and
- * {@link com.flezha.sdk.authoring.Journal} opts one of its map fields into per-key recording.
- *
- * <p>{@link com.flezha.sdk.authoring.CellsFor} marks the method that routes an input to the
- * static cells a tasklet's {@code keys} name, and {@link com.flezha.sdk.authoring.InitState}
- * the method that builds a cell's initial state from its key.
- * {@link com.flezha.sdk.authoring.CellKey} generates nothing: declaring it fails processing with
- * the instruction to key the stream on the wiring instead.
+ * The short form: a whole single-tasklet operator declared on the tasklet class itself.
  *
  * <p>{@link com.flezha.sdk.authoring.UnboundedOperator} and
- * {@link com.flezha.sdk.authoring.BoundedOperator} declare a whole single-tasklet operator of
- * their kind, the short form. These two and {@code @Tasklet} share their names with the
- * interfaces the generated classes implement.
+ * {@link com.flezha.sdk.authoring.BoundedOperator} go on a class that implements
+ * {@link com.flezha.sdk.tasklet.Tasklet}. They are read when the class is registered,
+ * {@code runner.registerFactory(Echo.class)}, which declares an operator of that kind wiring an
+ * entry channel into the class and, when a sink is written, the class to that plugin sink.
+ * Nothing is generated. The tasklet takes the operator's {@code id} as its name, so a short form
+ * carries {@code @Tasklet.Spec} only for its settings.
  */
 @javax.annotation.ParametersAreNonnullByDefault
 package com.flezha.sdk.authoring;

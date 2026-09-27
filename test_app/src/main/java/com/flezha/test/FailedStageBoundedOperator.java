@@ -2,9 +2,8 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.nio.charset.StandardCharsets;
 
@@ -31,16 +30,10 @@ public final class FailedStageBoundedOperator implements BoundedOperator {
     }
 
     /** Emits the first value; fails on {@code b}. */
-    public static final class FailedStage extends StatelessStep {
-
+    @Tasklet.Spec(name = "failed_stage")
+    public static final class FailedStage extends NoStateStep {
         @Override
-        public String name() {
-            return "failed_stage";
-        }
-
-        @Override
-        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             if (input.equals("b")) {
                 throw new TaskletException("failed_stage fails on b");
             }

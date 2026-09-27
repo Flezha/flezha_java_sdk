@@ -35,7 +35,7 @@ import javax.annotation.Nonnull;
  *       failed attempt's staged output is dropped rather than double-emitted.</li>
  *   <li><strong>Exit triggers</strong>: the operator terminates on the first
  *       of: the chain running to quiescence, a tasklet calling
- *       {@link com.flezha.sdk.tasklet.TaskletCtx#complete(byte[])}, a chained
+ *       {@link com.flezha.sdk.tasklet.Ctx#complete(byte[])}, a chained
  *       loop releasing an empty batch, a declared {@link #maxDuration}, or
  *       external {@code flz operator stop}. Every trigger converges on the
  *       single {@code BoundedCompleted} teardown.</li>

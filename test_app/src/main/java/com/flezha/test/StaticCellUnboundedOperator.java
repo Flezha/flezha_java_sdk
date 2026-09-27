@@ -2,14 +2,10 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.state.Change;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.Stateless;
-import com.flezha.sdk.state.WallClock;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,19 +33,17 @@ public final class StaticCellUnboundedOperator implements UnboundedOperator {
                 .sink("kafka");
     }
 
-    public static final class StaticEntryTasklet
-            implements Tasklet<String, StaticEntryTasklet.State, String, StoreInputChange, WallClock, Void> {
+    @Tasklet.Spec(name = "static_entry_tasklet", keys = {"a", "b", "c", "d"})
+    public static final class StaticEntryTasklet implements Tasklet<String, StaticEntryTasklet.State, String> {
 
         public record State(List<String> seen) {}
 
-        @Override
-        public String name() {
-            return "static_entry_tasklet";
-        }
-
-        @Override
-        public List<String> cellKeys() {
-            return List.of("a", "b", "c", "d");
+        /** One input the Cell has seen. */
+        public record Seen(String text) implements Change<State> {
+            @Override
+            public void applyTo(State state) {
+                state.seen().add(text);
+            }
         }
 
         @Override
@@ -58,44 +52,27 @@ public final class StaticCellUnboundedOperator implements UnboundedOperator {
         }
 
         @Override
-        public State initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
+        public State initState(Optional<String> cellKey) {
             return new State(new ArrayList<>());
         }
 
         @Override
-        public void applyChange(State state, StoreInputChange change) {
-            state.seen().add(change.text());
-        }
-
-        @Override
         public List<Class<?>> kryoTypes() {
-            return List.of(State.class, StoreInputChange.class, ArrayList.class);
+            return List.of(State.class, Seen.class, ArrayList.class);
         }
 
         @Override
-        public void run(String input, StateHandle<State, StoreInputChange> state, TaskletCtx ctx)
-                throws TaskletException {
-            state.apply(new StoreInputChange(input));
+        public void run(String input, Ctx<State, String> ctx) throws TaskletException {
+            ctx.change(new Seen(input));
             ctx.emit(input);
         }
     }
 
-    public static final class StaticDownstreamTasklet
-            implements Tasklet<String, Stateless, byte[], NoChange, WallClock, Void> {
+    @Tasklet.Spec(name = "static_downstream_tasklet")
+    public static final class StaticDownstreamTasklet implements Tasklet<String, Void, byte[]> {
 
         @Override
-        public String name() {
-            return "static_downstream_tasklet";
-        }
-
-        @Override
-        public Stateless initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new Stateless();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Stateless, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, byte[]> ctx) throws TaskletException {
             ctx.emit(input.getBytes(StandardCharsets.UTF_8));
         }
     }

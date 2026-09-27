@@ -2,10 +2,9 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
 
 /**
  * Run-once bounded operator mirroring {@code rust_runner}'s
@@ -26,14 +25,10 @@ public final class EchoBoundedOperator implements BoundedOperator {
     }
 
     /** Echoes the message a {@code ONCE} bounded operator's single pass runs over. */
-    public static final class Echo extends StatelessStep {
+    @Tasklet.Spec(name = "echo")
+    public static final class Echo extends NoStateStep {
         @Override
-        public String name() {
-            return "echo";
-        }
-
-        @Override
-        public void run(String args, StateHandle<State, NoChange> state, TaskletCtx ctx) throws TaskletException {
+        public void run(String args, Ctx<Void, String> ctx) throws TaskletException {
             ctx.emit("echo:" + args);
         }
     }

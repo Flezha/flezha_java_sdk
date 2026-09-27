@@ -2,20 +2,14 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.SpawnException;
 import com.flezha.sdk.tasklet.SpawnHandle;
 import com.flezha.sdk.tasklet.SpawnOptions;
 import com.flezha.sdk.tasklet.SpawnResult;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.Stateless;
-import com.flezha.sdk.state.WallClock;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
-import java.util.Optional;
 
 /**
  * Mirror of the Rust test app's {@code SpawnRequesterOperator}: on each input it spawns
@@ -34,23 +28,13 @@ public final class SpawnRequesterUnboundedOperator implements UnboundedOperator 
         c.input(String.class, "in").into(SpawnRequesterTasklet.class).sink("out");
     }
 
-    public static final class SpawnRequesterTasklet
-            implements Tasklet<String, Stateless, String, NoChange, WallClock, Void> {
+    @Tasklet.Spec(name = "spawn_requester")
+    public static final class SpawnRequesterTasklet implements Tasklet<String, Void, String> {
 
         private static final String BOUNDED = "stateless_loop_bounded";
 
         @Override
-        public String name() {
-            return "spawn_requester";
-        }
-
-        @Override
-        public Stateless initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new Stateless();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Stateless, NoChange> state, TaskletCtx ctx) {
+        public void run(String input, Ctx<Void, String> ctx) {
             byte[] payload = input.getBytes(StandardCharsets.UTF_8);
             SpawnHandle unnamed = ctx.spawnBounded(BOUNDED, payload);
             SpawnHandle named = ctx.spawnBounded(BOUNDED, payload, SpawnOptions.id(input));

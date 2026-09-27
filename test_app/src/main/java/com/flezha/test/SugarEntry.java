@@ -1,14 +1,24 @@
 package com.flezha.test;
 
-import com.flezha.sdk.authoring.Tasklet;
-import com.flezha.sdk.authoring.CellsFor;
+import com.flezha.sdk.state.Change;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.util.List;
 
 /** Static-cell entry tasklet of the 2-tasklet reference operator. */
-@Tasklet(id = "macro_static_entry_tasklet", keys = {"a", "b", "c", "d"})
-public class SugarEntry {
+@Tasklet.Spec(name = "macro_static_entry_tasklet", keys = {"a", "b", "c", "d"})
+public class SugarEntry implements Tasklet<String, SugarEntryState, String> {
 
-    @CellsFor
+    /** One input the Cell has seen. */
+    public record Seen(String input) implements Change<SugarEntryState> {
+        @Override
+        public void applyTo(SugarEntryState state) {
+            state.seen.add(input);
+        }
+    }
+
+    @Override
     public List<String> cellsFor(String input) {
         char c = input.isEmpty() ? ' ' : input.charAt(0);
         return switch (c) {
@@ -19,8 +29,9 @@ public class SugarEntry {
         };
     }
 
-    public String run(String input, SugarEntryStateHandle state) {
-        state.pushSeen(input);
-        return input;
+    @Override
+    public void run(String input, Ctx<SugarEntryState, String> ctx) throws TaskletException {
+        ctx.change(new Seen(input));
+        ctx.emit(input);
     }
 }

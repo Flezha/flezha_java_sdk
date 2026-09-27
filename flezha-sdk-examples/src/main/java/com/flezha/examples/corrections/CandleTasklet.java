@@ -1,23 +1,18 @@
 package com.flezha.examples.corrections;
 
 import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.EventTimeFrom;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
-import java.util.Optional;
-import javax.annotation.Nonnull;
 
 /**
  * A one-minute candle. Input is {@code <epochMillis>:<price>}.
  *
- * <p>This implements {@link Tasklet} directly rather than through {@code @Tasklet}, because its
- * clock is {@link EventTimeFrom}, a type argument the annotation does not take.
+ * <p>It writes {@link #eventTime}, and writing it is what makes the tasklet's clock event time:
+ * {@code ctx.now()} is then the message's own timestamp rather than the moment it was processed.
  */
-public final class CandleTasklet
-        implements Tasklet<String, CandleTasklet.Candle, String, CandleTasklet.Tick, EventTimeFrom, Void> {
+@Tasklet.Spec(name = "candle")
+public final class CandleTasklet implements Tasklet<String, CandleTasklet.Candle, String> {
 
     private static final long ONE_MINUTE_MS = 60_000L;
 
@@ -28,49 +23,33 @@ public final class CandleTasklet
         public long close;
     }
 
-    public record Tick(long price) implements Change {}
-
-    @Override
-    @Nonnull
-    public String name() {
-        return "candle";
+    public record Tick(long price) implements Change<Candle> {
+        @Override
+        public void applyTo(Candle candle) {
+            if (candle.open == 0) {
+                candle.open = price;
+                candle.low = price;
+            }
+            candle.high = Math.max(candle.high, price);
+            candle.low = Math.min(candle.low, price);
+            candle.close = price;
+        }
     }
 
-    /**
-     * Where the event time comes from. Rust binds this through a type bound; Java's erasure
-     * cannot, so declaring {@code EventTimeFrom} without overriding this fails at registration.
-     */
+    /** Where the event time comes from: the timestamp in front of the price. */
     @Override
-    public long eventTime(@Nonnull String input) {
+    public long eventTime(String input) {
         return Long.parseLong(input.split(":", 2)[0]);
     }
 
     @Override
-    public void applyChange(@Nonnull Candle state, @Nonnull Tick tick) {
-        if (state.open == 0) {
-            state.open = tick.price();
-            state.low = tick.price();
-        }
-        state.high = Math.max(state.high, tick.price());
-        state.low = Math.min(state.low, tick.price());
-        state.close = tick.price();
-    }
-
-    @Override
-    @Nonnull
-    public Candle initState(@Nonnull Optional<String> cellKey, @Nonnull Optional<RestoreInitPayload> initPayload) {
-        return new Candle();
-    }
-
-    @Override
-    public void run(@Nonnull String input, @Nonnull StateHandle<Candle, Tick> state, @Nonnull TaskletCtx ctx)
-            throws TaskletException {
-        state.apply(new Tick(Long.parseLong(input.split(":", 2)[1])));
+    public void run(String input, Ctx<Candle, String> ctx) throws TaskletException {
+        ctx.change(new Tick(Long.parseLong(input.split(":", 2)[1])));
 
         // ctx.now() is the event time, so on a correction replay it is the late message's own
         // timestamp. Bucketing by it puts the corrected candle where it always belonged.
         long bucket = ctx.now() / ONE_MINUTE_MS;
 
-        ctx.emitKeyed(String.valueOf(bucket), "close=" + state.get().close);
+        ctx.emitKeyed(String.valueOf(bucket), "close=" + ctx.state().close);
     }
 }

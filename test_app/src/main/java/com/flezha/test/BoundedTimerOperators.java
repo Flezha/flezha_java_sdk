@@ -3,14 +3,9 @@ package com.flezha.test;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.LoopMode;
 import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.state.EventTimeFrom;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.state.TimerKind;
-import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.time.Duration;
 import java.util.List;
@@ -74,33 +69,18 @@ public final class BoundedTimerOperators {
         }
     }
 
-    public static final class Tick implements Tasklet<String, SeenState, String, Insert, WallClock, Void> {
-        @Override
-        public String name() {
-            return "tick";
-        }
-
+    @Tasklet.Spec(name = "tick")
+    public static final class Tick implements Tasklet<String, SeenState, String> {
         @Override
         public List<Class<?>> kryoTypes() {
             return List.of(Insert.class, SeenState.class);
         }
 
         @Override
-        public SeenState initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new SeenState();
-        }
-
-        @Override
-        public void applyChange(SeenState state, Insert change) {
-            state.items.add(change.key());
-        }
-
-        @Override
-        public void run(String input, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<SeenState, String> ctx) throws TaskletException {
             if (input.startsWith("after:")) {
                 long at = ctx.timerAfter(Duration.ofMillis(millis(input, "after:")));
-                state.apply(new Insert("armed:" + at));
+                ctx.change(new Insert("armed:" + at));
                 ctx.emit("armed:" + at);
                 return;
             }
@@ -115,8 +95,7 @@ public final class BoundedTimerOperators {
         }
 
         @Override
-        public void onTimer(long firedAt, TimerKind kind, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void onTimer(long firedAt, TimerKind kind, Ctx<SeenState, String> ctx) throws TaskletException {
             BoundedE2eGate.holdAt("timer");
             ctx.emit("fired:" + firedAt);
         }
@@ -130,14 +109,10 @@ public final class BoundedTimerOperators {
         }
     }
 
-    public static final class Relay extends StatelessStep {
+    @Tasklet.Spec(name = "relay")
+    public static final class Relay extends NoStateStep {
         @Override
-        public String name() {
-            return "relay";
-        }
-
-        @Override
-        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx) throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             if (input.startsWith("fired:")) {
                 BoundedE2eGate.holdAt("relay");
             }
@@ -145,12 +120,8 @@ public final class BoundedTimerOperators {
         }
     }
 
-    public static final class EventTick implements Tasklet<String, SeenState, String, Insert, EventTimeFrom, Void> {
-        @Override
-        public String name() {
-            return "event_tick";
-        }
-
+    @Tasklet.Spec(name = "event_tick")
+    public static final class EventTick implements Tasklet<String, SeenState, String> {
         @Override
         public long eventTime(String input) {
             int at = input.indexOf(':');
@@ -167,26 +138,14 @@ public final class BoundedTimerOperators {
         }
 
         @Override
-        public SeenState initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new SeenState();
-        }
-
-        @Override
-        public void applyChange(SeenState state, Insert change) {
-            state.items.add(change.key());
-        }
-
-        @Override
-        public void run(String input, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<SeenState, String> ctx) throws TaskletException {
             long at = ctx.timerAtEventTime(ctx.now() + 100);
-            state.apply(new Insert("armed:" + at));
+            ctx.change(new Insert("armed:" + at));
             ctx.emit("seen:" + ctx.now());
         }
 
         @Override
-        public void onTimer(long firedAt, TimerKind kind, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void onTimer(long firedAt, TimerKind kind, Ctx<SeenState, String> ctx) throws TaskletException {
             ctx.emit("fired:" + firedAt);
         }
     }

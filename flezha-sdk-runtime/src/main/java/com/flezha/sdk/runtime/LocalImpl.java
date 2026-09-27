@@ -5,7 +5,6 @@ import com.flezha.sdk.Logger;
 import com.flezha.sdk.SinkOutput;
 import com.flezha.sdk.internal.LocalRunHandle;
 import com.flezha.sdk.native_.FlzCore;
-import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.runtime.config.FlezhaEnv;
 import com.flezha.sdk.runtime.core.ActivationCodec;
 import com.flezha.sdk.runtime.core.ActivationDispatcher;
@@ -53,7 +52,7 @@ public final class LocalImpl implements LocalRunHandle {
 
     /** Entry point invoked by reflection from {@code LocalOperator.start}. */
     @Nonnull
-    public static LocalRunHandle start(@Nonnull Class<? extends UnboundedOperator> type) {
+    public static LocalRunHandle start(@Nonnull Class<?> type) {
         String factoryId = UnboundedOperatorClassRegistry.registerClass(type);
         long core = FlzCore.newContext();
         try {

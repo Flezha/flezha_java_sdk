@@ -1,15 +1,15 @@
 package com.flezha.sdk.testing;
 
+import com.flezha.sdk.runtime.operator.TaskletModel;
+import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.ReplayMismatch;
 import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.EmitKeys;
 import com.flezha.sdk.tasklet.StableId;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -21,10 +21,11 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Test harness for {@link Tasklet} authors. Drives a Tasklet through a sequence of
- * inputs without standing up the runtime, recording the Changes
- * {@code state.apply}-ed and the values {@code ctx.emit}-ed. Mirrors the
- * Rust SDK's {@code TaskletTestHarness<S>}.
+ * Test harness for {@link Tasklet} authors. Drives the class you wrote through a sequence of
+ * inputs without standing up the runtime, recording the changes passed to {@code ctx.change} and
+ * the values passed to {@code ctx.emit}. It reads the class exactly as registration does: its
+ * initial state, its clock and the types its state is encoded with. Mirrors the Rust SDK's
+ * {@code TaskletTestHarness<S>}.
  *
  * <p>{@link #replayEquals()} is the determinism gate: it reconstructs the
  * initial state captured at construction, replays the recorded Changes, and
@@ -32,14 +33,16 @@ import javax.annotation.Nullable;
  * a deterministic function of the Change log — which is the umbrella's
  * correctness contract.
  */
-public final class TaskletTestHarness<Input, State, Output, ChangeT extends Change> {
+public final class TaskletTestHarness<Input, State, Output> {
 
-    private final Tasklet<Input, State, Output, ChangeT, ?, ?> tasklet;
+    private final Tasklet<Input, State, Output> tasklet;
+    private final TaskletModel model;
+    private final KryoCodec codec;
     private State state;
     /** Kryo snapshot of the state at construction, replayed by {@link #replayEquals()}. */
     private byte[] initialStateBytes;
 
-    private final List<ChangeT> recordedChanges = new ArrayList<>();
+    private final List<Change<State>> recordedChanges = new ArrayList<>();
     private final List<Object> recordedEmits = new ArrayList<>();
     private final List<EmitRecord> emitRecords = new ArrayList<>();
 
@@ -64,42 +67,64 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
      */
     public record EmitRecord(String channel, String key, Object value, Map<String, String> metadata) {}
 
-    private TaskletTestHarness(Tasklet<Input, State, Output, ChangeT, ?, ?> tasklet, State initialState) {
+    private TaskletTestHarness(Tasklet<Input, State, Output> tasklet, TaskletModel model) {
         this.tasklet = tasklet;
-        captureInitial(initialState);
+        this.model = model;
+        this.codec = model.codec(model.kryoTypes());
+        captureInitial(initialState(Optional.empty()));
     }
 
     /** Snapshot {@code initial} as the replay baseline, before {@code applyInputs} mutates it. */
     private void captureInitial(State initial) {
         this.state = initial;
-        // Stateless tasklets journal nothing, so there is no replay baseline to capture
-        // (and their `Stateless` state is not Kryo-registered).
-        this.initialStateBytes =
-                tasklet.changeType() == NoChange.class ? null : new KryoCodec(tasklet.kryoTypes()).serialize(initial);
+        // A Void state journals nothing, so there is no replay baseline to capture.
+        this.initialStateBytes = model.stateless() ? null : codec.serialize(initial);
+    }
+
+    @SuppressWarnings("unchecked")
+    private State initialState(Optional<String> key) {
+        return (State) model.initialState(tasklet, key);
     }
 
     /**
-     * Static factory. Calls {@code Tasklet.initState(Optional.empty(), Optional.empty())}
-     * to seed the harness with a fresh state. Override via
-     * {@link #withInitialState(Object)} or {@link #withPayload(Optional, RestoreInitPayload)}.
+     * A harness over {@code tasklet}, starting from the state registration would give a new
+     * single cell: the state class's no-arg constructor, or the class's written
+     * {@code initState(Optional.empty())}. Override via {@link #withInitialState(Object)} or
+     * {@link #withPayload(Optional, RestoreInitPayload)}.
+     *
+     * @throws IllegalArgumentException naming every refusal registration would raise for the class
      */
     @Nonnull
-    public static <I, S, O, C extends Change> TaskletTestHarness<I, S, O, C> of(
-            @Nonnull Tasklet<I, S, O, C, ?, ?> tasklet) {
-        S init = tasklet.initState(Optional.empty(), Optional.empty());
-        return new TaskletTestHarness<>(tasklet, init);
+    public static <I, S, O> TaskletTestHarness<I, S, O> of(@Nonnull Tasklet<I, S, O> tasklet) {
+        TaskletModel model = TaskletModel.read(tasklet.getClass(), tasklet);
+        if (!model.errors().isEmpty()) {
+            throw new IllegalArgumentException(String.join("\n", model.errors()));
+        }
+        return new TaskletTestHarness<>(tasklet, model);
     }
 
     @Nonnull
-    public TaskletTestHarness<Input, State, Output, ChangeT> withInitialState(@Nonnull State state) {
+    public TaskletTestHarness<Input, State, Output> withInitialState(@Nonnull State state) {
         captureInitial(state);
         return this;
     }
 
+    /**
+     * Restore the cell keyed {@code cellKey} as the runtime does: its initial state, then the
+     * payload's snapshot when there is one, then each change of its change log through
+     * {@code applyTo}.
+     */
     @Nonnull
-    public TaskletTestHarness<Input, State, Output, ChangeT> withPayload(
+    @SuppressWarnings("unchecked")
+    public TaskletTestHarness<Input, State, Output> withPayload(
             @Nonnull Optional<String> cellKey, @Nonnull RestoreInitPayload payload) {
-        captureInitial(tasklet.initState(cellKey, Optional.of(payload)));
+        State restored = payload.snapshotBytes().length > 0
+                ? (State) codec.deserialize(payload.snapshotBytes(), Object.class)
+                : initialState(cellKey);
+        if (payload.changeLogBytes().length > 0) {
+            replay(restored, (List<Change<State>>) codec.deserialize(payload.changeLogBytes(), List.class));
+        }
+        captureInitial(restored);
         this.cellKey = cellKey;
         return this;
     }
@@ -110,7 +135,7 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
      * to {@link #withCellKey} — or is refused where there is no Cell key.
      */
     @Nonnull
-    public TaskletTestHarness<Input, State, Output, ChangeT> withKeyedChannel() {
+    public TaskletTestHarness<Input, State, Output> withKeyedChannel() {
         this.keyed = true;
         return this;
     }
@@ -121,30 +146,33 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
      * Without this the harness is a single-cell Tasklet, where that emit is refused.
      */
     @Nonnull
-    public TaskletTestHarness<Input, State, Output, ChangeT> withCellKey(@Nonnull String key) {
+    public TaskletTestHarness<Input, State, Output> withCellKey(@Nonnull String key) {
         this.cellKey = Optional.of(key);
         return this;
     }
 
     /** Run the Tasklet against each input, recording state mutations and emits. */
     @Nonnull
-    public TaskletTestHarness<Input, State, Output, ChangeT> applyInputs(@Nonnull Iterable<Input> inputs) {
+    public TaskletTestHarness<Input, State, Output> applyInputs(@Nonnull Iterable<Input> inputs) {
         for (Input input : inputs) {
-            StateHandle<State, ChangeT> handle = StateHandle.create(state, recordedChanges, tasklet::applyChange);
-            TestTaskletCtx ctx = new TestTaskletCtx(recordedEmits, emitRecords, clockAt(invocation), keyed, cellKey);
+            TestCtx ctx = new TestCtx(state, recordedChanges, recordedEmits, emitRecords, clockAt(invocation, input));
             invocation++;
+            int recorded = recordedChanges.size();
             try {
-                tasklet.run(input, handle, ctx);
+                tasklet.run(input, ctx);
             } catch (TaskletException e) {
                 // Test harness is forgiving — record but keep going.
             }
+            // Encode what the invocation recorded, as the runtime's flush does, so a change the
+            // codec cannot write fails here, with UnregisteredClass, rather than first in production.
+            codec.serializeAll(recordedChanges.subList(recorded, recordedChanges.size()));
         }
         return this;
     }
 
     /** Assert that the recorded Change list equals the supplied list. */
     @Nonnull
-    public TaskletTestHarness<Input, State, Output, ChangeT> expectChanges(@Nonnull List<ChangeT> expected) {
+    public TaskletTestHarness<Input, State, Output> expectChanges(@Nonnull List<? extends Change<State>> expected) {
         if (!recordedChanges.equals(expected)) {
             throw new AssertionError("changes mismatch:\n  expected: " + expected + "\n  actual:   " + recordedChanges);
         }
@@ -158,8 +186,7 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
      */
     @SuppressWarnings("unchecked")
     @Nonnull
-    public <C> TaskletTestHarness<Input, State, Output, ChangeT> expectEmits(
-            @Nonnull Class<C> type, @Nonnull List<C> expected) {
+    public <C> TaskletTestHarness<Input, State, Output> expectEmits(@Nonnull Class<C> type, @Nonnull List<C> expected) {
         List<C> actual = new ArrayList<>();
         for (Object emit : recordedEmits) {
             if (type.isInstance(emit)) {
@@ -173,10 +200,13 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
         return this;
     }
 
-    /** Assert that the current state equals the supplied state via {@link Object#equals}. */
+    /**
+     * Assert that the current state equals the supplied state, compared as the bytes the state is
+     * saved as, so a state class need not override {@link Object#equals}.
+     */
     @Nonnull
-    public TaskletTestHarness<Input, State, Output, ChangeT> expectState(@Nonnull State expected) {
-        if (!expected.equals(state)) {
+    public TaskletTestHarness<Input, State, Output> expectState(@Nonnull State expected) {
+        if (!Arrays.equals(codec.serialize(expected), codec.serialize(state))) {
             throw new AssertionError("state mismatch:\n  expected: " + expected + "\n  actual:   " + state);
         }
         return this;
@@ -184,16 +214,15 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
 
     /**
      * Imperative replay: start from {@code initial}, fold the change log
-     * via {@code Tasklet.applyChange}, and return the resulting state. Useful
-     * for cross-checks beyond {@link #replayEquals()}.
+     * through each change's {@code applyTo}, and return the resulting state.
+     * Useful for cross-checks beyond {@link #replayEquals()}.
      */
     @Nonnull
-    public State replay(@Nonnull State initial, @Nonnull List<ChangeT> log) {
-        State s = initial;
-        for (ChangeT c : log) {
-            tasklet.applyChange(s, c);
+    public State replay(@Nonnull State initial, @Nonnull List<? extends Change<State>> log) {
+        for (Change<State> c : log) {
+            c.applyTo(initial);
         }
-        return s;
+        return initial;
     }
 
     /**
@@ -207,15 +236,12 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
     @SuppressWarnings("unchecked")
     @Nonnull
     public Optional<ReplayMismatch> replayEquals() {
-        // Stateless tasklets have no journaled state — replay is vacuously equal.
+        // A Void state journals nothing, so replay is vacuously equal.
         if (initialStateBytes == null) {
             return Optional.empty();
         }
-        KryoCodec codec = new KryoCodec(tasklet.kryoTypes());
         State fresh = (State) codec.deserialize(initialStateBytes, state.getClass());
-        for (ChangeT c : recordedChanges) {
-            tasklet.applyChange(fresh, c);
-        }
+        replay(fresh, recordedChanges);
         byte[] expected = codec.serialize(state);
         byte[] actual = codec.serialize(fresh);
         if (Arrays.equals(expected, actual)) {
@@ -232,7 +258,7 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
 
     /** Read-only view of the recorded Change log. */
     @Nonnull
-    public List<ChangeT> recordedChanges() {
+    public List<Change<State>> recordedChanges() {
         return List.copyOf(recordedChanges);
     }
 
@@ -250,7 +276,7 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
 
     /** Pin {@code ctx.now()} to a constant for every invocation. */
     @Nonnull
-    public TaskletTestHarness<Input, State, Output, ChangeT> withWallClock(long fixedMillis) {
+    public TaskletTestHarness<Input, State, Output> withWallClock(long fixedMillis) {
         clockScript.clear();
         clockScript.add(fixedMillis);
         return this;
@@ -258,7 +284,7 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
 
     /** Serve one clock value per successive invocation; the last value repeats if inputs outrun it. */
     @Nonnull
-    public TaskletTestHarness<Input, State, Output, ChangeT> withWallClockScript(long... millis) {
+    public TaskletTestHarness<Input, State, Output> withWallClockScript(long... millis) {
         clockScript.clear();
         for (long m : millis) {
             clockScript.add(m);
@@ -266,7 +292,17 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
         return this;
     }
 
-    private long clockAt(int n) {
+    /**
+     * {@code ctx.now()} for the {@code n}-th invocation, served as the runtime serves the class's
+     * clock: the input's event time, the invocation's change seq, or the (injected) wall clock.
+     */
+    private long clockAt(int n, Input input) {
+        if (model.clock() == ClockKind.EVENT_TIME) {
+            return tasklet.eventTime(input);
+        }
+        if (model.clock() == ClockKind.LOGICAL) {
+            return n + 1L;
+        }
         if (clockScript.isEmpty()) {
             return System.currentTimeMillis();
         }
@@ -296,14 +332,14 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
         // Replay against a fresh baseline, with the clock served identically.
         List<Object> replayEmits = new ArrayList<>();
         List<EmitRecord> replayRecords = new ArrayList<>();
-        State fresh = tasklet.initState(Optional.empty(), Optional.empty());
-        List<ChangeT> replayChanges = new ArrayList<>();
+        State fresh = initialState(Optional.empty());
+        List<Change<State>> replayChanges = new ArrayList<>();
         int n = 0;
         for (Input input : inputs) {
-            StateHandle<State, ChangeT> handle = StateHandle.create(fresh, replayChanges, tasklet::applyChange);
-            TestTaskletCtx ctx = new TestTaskletCtx(replayEmits, replayRecords, clockAt(n++), keyed, cellKey);
+            TestCtx ctx = new TestCtx(fresh, replayChanges, replayEmits, replayRecords, clockAt(n, input));
+            n++;
             try {
-                tasklet.run(input, handle, ctx);
+                tasklet.run(input, ctx);
             } catch (TaskletException e) {
                 // Mirror applyInputs: record what happened and keep going.
             }
@@ -324,26 +360,40 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
         return Optional.empty();
     }
 
-    /** Internal {@link TaskletCtx} that records emits without invoking the wire path. */
-    static final class TestTaskletCtx implements TaskletCtx {
+    /** The harness's {@link Ctx}: records changes and emits without invoking the wire path. */
+    final class TestCtx implements Ctx<State, Output> {
 
         /** Stand-in Cell identity: the harness runs one Tasklet on one Cell. */
         private static final byte[] IDENTITY = "harness/op/key".getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
+        private final State cellState;
+        private final List<Change<State>> changes;
         private final List<Object> recorded;
         private final List<EmitRecord> records;
         private final long now;
-        private final boolean keyed;
-        private final Optional<String> cellKey;
         private int stableIdOrdinal;
 
-        TestTaskletCtx(
-                List<Object> recorded, List<EmitRecord> records, long now, boolean keyed, Optional<String> cellKey) {
+        TestCtx(
+                State cellState,
+                List<Change<State>> changes,
+                List<Object> recorded,
+                List<EmitRecord> records,
+                long now) {
+            this.cellState = cellState;
+            this.changes = changes;
             this.recorded = recorded;
             this.records = records;
             this.now = now;
-            this.keyed = keyed;
-            this.cellKey = cellKey;
+        }
+
+        @Override
+        public State state() {
+            return cellState;
+        }
+
+        @Override
+        public void change(@Nonnull Change<State> change) {
+            model.record(change, cellState, changes);
         }
 
         /**
@@ -391,7 +441,7 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
         }
 
         @Override
-        public <C> void emit(@Nonnull C value) throws TaskletException {
+        public void emit(@Nonnull Output value) throws TaskletException {
             record("", null, value, Map.of());
         }
 
@@ -401,7 +451,7 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
         }
 
         @Override
-        public <C> void emitWithMeta(@Nonnull C value, @Nonnull Map<String, String> meta) throws TaskletException {
+        public void emitWithMeta(@Nonnull Output value, @Nonnull Map<String, String> meta) throws TaskletException {
             record("", null, value, meta);
         }
 
@@ -412,12 +462,12 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
         }
 
         @Override
-        public <C> void emitKeyed(@Nonnull String key, @Nonnull C value) throws TaskletException {
+        public void emitKeyed(@Nonnull String key, @Nonnull Output value) throws TaskletException {
             record("", key, value, Map.of());
         }
 
         @Override
-        public <C> void emitKeyedWithMeta(@Nonnull String key, @Nonnull C value, @Nonnull Map<String, String> meta)
+        public void emitKeyedWithMeta(@Nonnull String key, @Nonnull Output value, @Nonnull Map<String, String> meta)
                 throws TaskletException {
             record("", key, value, meta);
         }
@@ -425,7 +475,7 @@ public final class TaskletTestHarness<Input, State, Output, ChangeT extends Chan
         /** Mirror the runtime: a user key in the runtime's namespace is refused, not dropped. */
         private static void rejectReserved(Map<String, String> meta) throws TaskletException {
             for (String k : meta.keySet()) {
-                if (k.startsWith(TaskletCtx.RESERVED_METADATA_PREFIX)) {
+                if (k.startsWith(Ctx.RESERVED_METADATA_PREFIX)) {
                     throw new TaskletException.ReservedMetadataKey(k);
                 }
             }

@@ -2,16 +2,10 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.UnboundedOperator;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.Stateless;
-import com.flezha.sdk.state.WallClock;
 import com.flezha.sdk.tasklet.SpawnHandle;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import java.nio.charset.StandardCharsets;
-import java.util.Optional;
 
 /**
  * Mirror of the Rust test app's {@code spawn_once_requester}: on each input it spawns
@@ -31,21 +25,11 @@ public final class SpawnOnceRequesterUnboundedOperator implements UnboundedOpera
         c.input(String.class, "in").into(SpawnOnceRequesterTasklet.class).sink("out");
     }
 
-    public static final class SpawnOnceRequesterTasklet
-            implements Tasklet<String, Stateless, String, NoChange, WallClock, Void> {
+    @Tasklet.Spec(name = "spawn_once_requester")
+    public static final class SpawnOnceRequesterTasklet implements Tasklet<String, Void, String> {
 
         @Override
-        public String name() {
-            return "spawn_once_requester";
-        }
-
-        @Override
-        public Stateless initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new Stateless();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Stateless, NoChange> state, TaskletCtx ctx) {
+        public void run(String input, Ctx<Void, String> ctx) {
             byte[] ticket = ("{\"text\":\"" + escape(input) + "\"}").getBytes(StandardCharsets.UTF_8);
             SpawnHandle handle = ctx.spawnBounded(TypedOnceBoundedOperator.FACTORY_ID, ticket);
             SpawnRequesterUnboundedOperator.SpawnRequesterTasklet.print("once", handle);

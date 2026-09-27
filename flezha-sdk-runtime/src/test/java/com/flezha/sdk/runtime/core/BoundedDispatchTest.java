@@ -6,6 +6,7 @@ import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.runtime.state.TimerOp;
 import com.flezha.sdk.state.TimerKind;
+import com.flezha.sdk.tasklet.Tasklet;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -196,9 +197,10 @@ class BoundedDispatchTest extends DispatchTestBase {
         }
     }
 
+    @Tasklet.Spec(name = "timer_after_task")
     public static final class TimerAfterTask extends Task<Void> {
         public TimerAfterTask() {
-            super("timer_after_task", (input, ctx) -> ctx.timerAfter(Duration.ofSeconds(1)));
+            super((input, ctx) -> ctx.timerAfter(Duration.ofSeconds(1)));
         }
     }
 

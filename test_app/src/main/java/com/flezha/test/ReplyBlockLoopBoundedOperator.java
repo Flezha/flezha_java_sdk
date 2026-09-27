@@ -3,9 +3,8 @@ package com.flezha.test;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.LoopMode;
 import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.time.Duration;
 import java.util.Optional;
@@ -52,15 +51,10 @@ public final class ReplyBlockLoopBoundedOperator implements BoundedOperator {
     }
 
     /** Blocks on the crash turn, then emits {@code reply:<input>} as the plain reply does. */
-    public static final class BlockingReply extends StatelessStep {
+    @Tasklet.Spec(name = "blocking_reply")
+    public static final class BlockingReply extends NoStateStep {
         @Override
-        public String name() {
-            return "blocking_reply";
-        }
-
-        @Override
-        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             if (REPLY_CRASH_TURN.equals(input)) {
                 BoundedE2eGate.blockUntilReleased();
             }

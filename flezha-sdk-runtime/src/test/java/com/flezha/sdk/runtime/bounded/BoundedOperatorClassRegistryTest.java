@@ -12,13 +12,10 @@ import com.flezha.sdk.operator.BoundedOperator;
 import com.flezha.sdk.operator.BoundedOperatorConfigurationException;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.operator.ChannelDescriptor;
-import com.flezha.sdk.runtime.operator.StatelessTestTasklet;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import java.util.Arrays;
-import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -177,37 +174,20 @@ class BoundedOperatorClassRegistryTest {
     // fixtures
     // ------------------------------------------------------------------
 
-    public static final class EchoTask extends StatelessTestTasklet<String, Object, String> {
-        @Override
-        public String name() {
-            return "echo";
-        }
+    @Tasklet.Spec(name = "echo")
+    public static final class EchoTask implements Tasklet<String, Void, String> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx)
-                throws com.flezha.sdk.tasklet.TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emit(input);
         }
     }
 
-    public static final class SinkTask extends StatelessTestTasklet<String, Object, Void> {
-        @Override
-        public String name() {
-            return "sink";
-        }
+    @Tasklet.Spec(name = "sink")
+    public static final class SinkTask implements Tasklet<String, Void, Void> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void run(String input, Ctx<Void, Void> ctx) {}
     }
 
     public static final class LinearBounded implements BoundedOperator {

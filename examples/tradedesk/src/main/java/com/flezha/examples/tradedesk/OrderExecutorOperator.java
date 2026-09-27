@@ -57,10 +57,10 @@ public final class OrderExecutorOperator implements BoundedOperator {
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
         c.input(OrderTicket.class, "order")
-                .into(ReserveFundsTasklet.class)
-                .into(PlaceOrderTasklet.class)
+                .into(ReserveFunds.class)                                  // step one
+                .into(PlaceOrder.class)                                    // step two, once step one is done
                 .branch(
-                        fill -> fill.into(ConfirmFillTasklet.class),
-                        book -> book.into(RecordOrderTasklet.class));
+                        fill -> fill.into(ConfirmFill.class),              // two arms, side by side
+                        book -> book.into(RecordOrder.class));
     }
 }

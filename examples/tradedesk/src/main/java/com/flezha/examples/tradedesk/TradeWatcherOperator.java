@@ -61,12 +61,12 @@ public final class TradeWatcherOperator implements UnboundedOperator {
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
         c.input(TradeMessage.class, "trades")
-                .filter(message -> "trade".equals(message.channel()))
-                .flatMap(Trade.class, TradeMessage::data)
-                .filter(trade -> "market".equals(trade.ord_type()))
-                .keyBy(Trade::symbol)
-                .into(TrackPricesTasklet.class)
-                .into(BuyAboveAverageTasklet.class)
+                .filter(message -> "trade".equals(message.channel())) // trade messages only
+                .flatMap(Trade.class, TradeMessage::data)            // a message into its trades
+                .filter(trade -> "market".equals(trade.ord_type()))  // market orders only
+                .keyBy(Trade::symbol)                                // one cell per symbol
+                .into(TrackPrices.class)
+                .into(BuyAboveAverage.class)
                 .sink("signals")
                 .sealed();
     }

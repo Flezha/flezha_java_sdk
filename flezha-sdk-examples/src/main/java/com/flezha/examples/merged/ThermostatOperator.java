@@ -18,7 +18,7 @@ public final class ThermostatOperator implements UnboundedOperator {
         c.merge(DetectorInput.class)
                 .from(c.input(Reading.class, "readings"), DetectorInput::ofReading)
                 .from(c.input(Threshold.class, "config"), DetectorInput::ofThreshold)
-                .into(DetectorTasklet.class)
+                .into(Detector.class)
                 .sink("alerts");
     }
 }

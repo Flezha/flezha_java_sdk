@@ -13,8 +13,6 @@ import com.flezha.sdk.runtime.state.PendingTimers;
 import com.flezha.sdk.runtime.state.TimerOp;
 import com.flezha.sdk.runtime.state.TimerPolicy;
 import com.flezha.sdk.runtime.state.TimerSession;
-import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.util.ArrayList;
@@ -74,13 +72,9 @@ public final class OperatorInstance {
         this.topology = topology;
         this.bounded = bounded;
         for (TaskletDescriptor desc : topology.tasklets()) {
-            Tasklet<?, ?, ?, ?, ?, ?> instance = instantiate(desc);
-            routers.add(instance);
-            // The descriptor's list, not the instance's: it starts as a
-            // copy of `kryoTypes()` and is where the wiring adds a type
-            // only the wiring knows (a `routeLatest` document class).
-            codecs.add(new KryoCodec(desc.kryoTypes()));
-            timerPolicies.add(TimerPolicy.of(instance.maxTimersPerCell(), desc.name(), desc.clockType()));
+            routers.add(instantiate(desc));
+            codecs.add(desc.codec());
+            timerPolicies.add(TimerPolicy.of(desc.model().maxTimersPerCell(), desc.name(), desc.clock()));
         }
         this.routing = new CellRouting(topology, routers, edgeCodec, bounded);
     }
@@ -102,7 +96,7 @@ public final class OperatorInstance {
         return factoryId;
     }
 
-    private static Tasklet<?, ?, ?, ?, ?, ?> instantiate(TaskletDescriptor desc) {
+    private static Tasklet<?, ?, ?> instantiate(TaskletDescriptor desc) {
         try {
             return RuntimeBridge.construct(desc.taskletClass());
         } catch (ReflectiveOperationException e) {
@@ -161,9 +155,7 @@ public final class OperatorInstance {
                 ? cell.timerPolicy.firingSession(new PendingTimers(), timer.scheduledAt(), timer.kind())
                 : cell.timerPolicy.session(new PendingTimers(), now);
         ctx.timers = session;
-        List<Change> buffer = new ArrayList<>();
         Tasklet tasklet = cell.tasklet;
-        StateHandle<Object, Change> handle = handleOver(cell, buffer);
 
         AtomicReference<List<TimerOp>> timerOps = new AtomicReference<>(List.of());
         // An entry payload is decoded and mapped before any user code runs, so
@@ -180,14 +172,14 @@ public final class OperatorInstance {
             List<Object> mapped = entryValues;
             verdict = runUserCode(() -> {
                 if (item instanceof WorkItem.Timer timer) {
-                    tasklet.onTimer(timer.scheduledAt(), timer.kind(), handle, ctx);
+                    tasklet.onTimer(timer.scheduledAt(), timer.kind(), ctx);
                 } else {
                     WorkItem.Input in = (WorkItem.Input) item;
                     List<Object> values = mapped != null
                             ? routing.routedToCell(cell, in.channel(), mapped)
                             : routing.valuesForCell(cell, in.channel(), in.payload());
                     for (Object value : values) {
-                        tasklet.run(value, handle, ctx);
+                        tasklet.run(value, ctx);
                     }
                 }
                 if (session != null) {
@@ -202,7 +194,7 @@ public final class OperatorInstance {
         }
         return new ItemEffect(
                 verdict,
-                StateExchange.serializeChanges(cell, buffer),
+                cell.codec.serializeAll(ctx.changes),
                 ctx.outputs,
                 offset,
                 now,
@@ -210,13 +202,6 @@ public final class OperatorInstance {
                 ctx.checkpointed,
                 Optional.empty(),
                 ctx.completion);
-    }
-
-    /** The state handle every user-code invocation writes through. */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static StateHandle<Object, Change> handleOver(Cell cell, List<Change> buffer) {
-        Tasklet tasklet = cell.tasklet;
-        return StateHandle.create(cell.state, (List) buffer, (s, c) -> tasklet.applyChange(s, c));
     }
 
     /**
@@ -280,13 +265,11 @@ public final class OperatorInstance {
         // same refusal the pre-core adapter enforced.
         EmitContext ctx = new EmitContext(
                 this, cell, activation.token(), activation.changeSeq(), System.currentTimeMillis(), false, -1);
-        List<Change> buffer = new ArrayList<>();
         Tasklet tasklet = cell.tasklet;
-        StateHandle<Object, Change> handle = handleOver(cell, buffer);
-        Verdict verdict = runUserCode(() -> tasklet.compensate(outputs, handle, ctx));
+        Verdict verdict = runUserCode(() -> tasklet.compensate(outputs, ctx));
         return new ActivationOutcome.Work(List.of(new ItemEffect(
                 verdict,
-                StateExchange.serializeChanges(cell, buffer),
+                cell.codec.serializeAll(ctx.changes),
                 ctx.outputs,
                 OptionalLong.empty(),
                 0,
@@ -325,8 +308,8 @@ public final class OperatorInstance {
         }
         // One Tasklet instance per Cell: a mutable field on a user's
         // Tasklet is per-Cell scratch, never shared across keys.
-        Tasklet tasklet = instantiate(desc);
-        Object state = tasklet.initState(cellKey, Optional.empty());
+        Tasklet<?, ?, ?> tasklet = instantiate(desc);
+        Object state = desc.model().initialState(tasklet, cellKey);
         return new Cell(
                 taskletId,
                 cellKey.orElse(""),

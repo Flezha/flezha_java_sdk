@@ -2,14 +2,9 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.WallClock;
-import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -44,25 +39,12 @@ public final class MergedInputUnboundedOperator implements UnboundedOperator {
         return payload -> new MergedInput(source, DynamicCellUnboundedOperator.key(payload), payload);
     }
 
-    public static final class MergeLabelTasklet
-            implements Tasklet<MergedInput, MergeLabelTasklet.State, String, NoChange, WallClock, Void> {
+    @Tasklet.Spec(name = "merge_label_tasklet")
+    public static final class MergeLabelTasklet implements Tasklet<MergedInput, Void, String> {
 
         @Override
-        public String name() {
-            return "merge_label_tasklet";
-        }
-
-        @Override
-        public State initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new State();
-        }
-
-        @Override
-        public void run(MergedInput input, StateHandle<State, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(MergedInput input, Ctx<Void, String> ctx) throws TaskletException {
             ctx.emit(input.source() + ":" + input.payload());
         }
-
-        public record State() {}
     }
 }

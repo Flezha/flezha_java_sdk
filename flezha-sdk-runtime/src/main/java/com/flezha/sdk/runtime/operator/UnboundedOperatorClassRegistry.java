@@ -1,6 +1,7 @@
 package com.flezha.sdk.runtime.operator;
 
 import com.flezha.sdk.internal.RuntimeBridge;
+import com.flezha.sdk.internal.ShortFormDeclaration;
 import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
@@ -40,8 +41,8 @@ public final class UnboundedOperatorClassRegistry {
      *     no-arg constructor.
      */
     @Nonnull
-    public static String registerClass(@Nonnull Class<? extends UnboundedOperator> operatorClass) {
-        UnboundedOperator operator = probe(operatorClass, "UnboundedOperator");
+    public static String registerClass(@Nonnull Class<?> operatorClass) {
+        UnboundedOperator operator = probe(operatorClass, UnboundedOperator.class);
         String factoryId = operator.factoryId();
 
         if (com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry.getTopology(factoryId) != null) {
@@ -56,25 +57,31 @@ public final class UnboundedOperatorClassRegistry {
     }
 
     /**
-     * Instantiate an operator class of either kind to read its declaration,
-     * refusing one with no public no-arg constructor or no factory id. Both
-     * class registries register through it.
+     * The operator a registered class declares, of either kind: an instance of an
+     * operator class, or the one a short-form tasklet class describes. Refuses an
+     * operator class with no public no-arg constructor, and any with no factory
+     * id. Both class registries register through it.
      *
      * @throws IllegalArgumentException naming {@code kind} and the class.
      */
     @Nonnull
-    public static <T extends Operator> T probe(@Nonnull Class<T> operatorClass, @Nonnull String kind) {
+    public static <T extends Operator> T probe(@Nonnull Class<?> operatorClass, @Nonnull Class<T> kind) {
+        ShortFormDeclaration shortForm = ShortFormDeclaration.of(operatorClass);
+        if (shortForm != null) {
+            return kind.cast(ShortForm.of(operatorClass, shortForm));
+        }
+        String label = kind.getSimpleName();
         T operator;
         try {
-            operator = RuntimeBridge.construct(operatorClass);
+            operator = kind.cast(RuntimeBridge.construct(operatorClass));
         } catch (ReflectiveOperationException e) {
             throw new IllegalArgumentException(
-                    kind + " class `" + operatorClass.getName() + "` must have a public no-arg constructor: " + e, e);
+                    label + " class `" + operatorClass.getName() + "` must have a public no-arg constructor: " + e, e);
         }
         String factoryId = operator.factoryId();
         if (factoryId == null || factoryId.isEmpty()) {
             throw new IllegalArgumentException(
-                    kind + " class `" + operatorClass.getName() + "` returned null/empty from factoryId()");
+                    label + " class `" + operatorClass.getName() + "` returned null/empty from factoryId()");
         }
         return operator;
     }
@@ -85,7 +92,7 @@ public final class UnboundedOperatorClassRegistry {
      * path), or {@code null} when the id is unknown. Reached reflectively from
      * the api module's {@code RegistryCore} on the pre-start path.
      */
-    public static Class<? extends UnboundedOperator> unregisterClass(@Nonnull String factoryId) {
+    public static Class<?> unregisterClass(@Nonnull String factoryId) {
         Entry removed = ENTRIES.remove(factoryId);
         return removed == null ? null : removed.operatorClass();
     }
@@ -109,5 +116,5 @@ public final class UnboundedOperatorClassRegistry {
         ENTRIES.clear();
     }
 
-    private record Entry(Class<? extends UnboundedOperator> operatorClass, UnboundedOperatorTopology topology) {}
+    private record Entry(Class<?> operatorClass, UnboundedOperatorTopology topology) {}
 }

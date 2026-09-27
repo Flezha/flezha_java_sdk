@@ -2,7 +2,6 @@ package com.flezha.sdk;
 
 import com.flezha.sdk.internal.LocalRunHandle;
 import com.flezha.sdk.internal.RuntimeBridge;
-import com.flezha.sdk.operator.UnboundedOperator;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.function.Consumer;
@@ -42,13 +41,14 @@ public final class LocalOperator implements AutoCloseable {
     }
 
     /**
-     * Register {@code type}'s declared graph and start it locally.
+     * Register {@code type}'s declared graph and start it locally. {@code type} is an unbounded
+     * operator class, or a tasklet class carrying the {@code @UnboundedOperator} short form.
      *
      * @throws RuntimeException naming the capability when the declaration
      *     needs a controller
      */
     @Nonnull
-    public static LocalOperator start(Class<? extends UnboundedOperator> type) {
+    public static LocalOperator start(Class<?> type) {
         return new LocalOperator((LocalRunHandle)
                 RuntimeBridge.invoke(IMPL, "start", new Class<?>[] {Class.class}, "Failed to start a local run", type));
     }

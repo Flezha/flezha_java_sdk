@@ -16,9 +16,9 @@ public final class WordCountOperator implements UnboundedOperator {
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
         c.input(String.class, "lines")
-                .into(SplitTasklet.class)
+                .into(Split.class)
                 .keyBy(word -> word)
-                .into(TallyTasklet.class)
+                .into(Tally.class)
                 .keyed()
                 .sink("totals");
     }

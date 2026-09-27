@@ -1,14 +1,13 @@
 package com.flezha.sdk.runtime.state;
 
 import com.flezha.sdk.runtime.cell.TimerCounters;
-import com.flezha.sdk.state.EventTimeFrom;
 import com.flezha.sdk.state.TimerKind;
 import javax.annotation.Nonnull;
 
 /**
  * What a Tasklet declares about its timers, resolved once per Tasklet
  * rather than at every invocation: the bound, the names a refusal reports, and
- * whether its Clock can serve an event-time deadline at all. Carries the
+ * whether its clock can serve an event-time deadline at all. Carries the
  * counter set too, so opening a session costs no registry lookup.
  *
  * <p>Mirrors the Rust SDK's {@code TimerPolicy}.
@@ -21,13 +20,9 @@ public record TimerPolicy(
         @Nonnull TimerCounters counters) {
 
     @Nonnull
-    public static TimerPolicy of(int maxPerCell, @Nonnull String tasklet, @Nonnull Class<?> clockType) {
+    public static TimerPolicy of(int maxPerCell, @Nonnull String tasklet, @Nonnull ClockKind clock) {
         return new TimerPolicy(
-                maxPerCell,
-                tasklet,
-                clockType == EventTimeFrom.class,
-                clockType.getSimpleName(),
-                TimerCounters.of(tasklet));
+                maxPerCell, tasklet, clock == ClockKind.EVENT_TIME, clock.wireName(), TimerCounters.of(tasklet));
     }
 
     /** Open a session over a COPY of {@code pending}. */

@@ -8,15 +8,13 @@ import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.operator.BoundedOperator;
 import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.TaskletModel;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.ChannelEntry;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.ClassFacts;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.PendingEdge;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.TaskletEntry;
-import com.flezha.sdk.state.EventTimeFrom;
-import com.flezha.sdk.state.LogicalClock;
-import com.flezha.sdk.state.NoChange;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -120,8 +118,10 @@ public final class HostClassDeclaration {
             decl.put("correction_window_ms", facts.correctionWindowMs());
             decl.put("beyond_window_policy", facts.beyondWindowPolicy().wireName());
         }
-        long compactAfterBytes =
-                tasklets.stream().mapToLong(p -> p.compactAfterBytes).min().orElse(DEFAULT_COMPACT_AFTER_BYTES);
+        long compactAfterBytes = tasklets.stream()
+                .mapToLong(p -> p.model.compactAfterBytes())
+                .min()
+                .orElse(DEFAULT_COMPACT_AFTER_BYTES);
         if (compactAfterBytes != DEFAULT_COMPACT_AFTER_BYTES) {
             decl.put("compact_after_bytes", compactAfterBytes);
         }
@@ -258,32 +258,33 @@ public final class HostClassDeclaration {
             TaskletEntry desc = tasklets.get(i);
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("name", desc.name);
+            TaskletModel model = desc.model;
             if (desc.dynamic) {
                 p.put("cell_mode", "dynamic");
-                desc.cellIdleTtl.ifPresent(ttl -> p.put("idle_ttl_ms", ttl.toMillis()));
-                desc.maxCells.ifPresent(cap -> p.put("max_cells", cap));
-            } else if (!desc.cellKeys.isEmpty()) {
+                model.cellIdleTtl().ifPresent(ttl -> p.put("idle_ttl_ms", ttl.toMillis()));
+                model.maxCells().ifPresent(cap -> p.put("max_cells", cap));
+            } else if (!model.cellKeys().isEmpty()) {
                 p.put("cell_mode", "static");
-                p.put("cell_keys", desc.cellKeys);
+                p.put("cell_keys", model.cellKeys());
             }
-            if (desc.cellsForOverridden) {
+            if (model.cellsForDeclared()) {
                 p.put("cells_for_overridden", true);
             }
-            if (desc.compensateOverridden) {
+            if (model.compensateDeclared()) {
                 p.put("compensate_overridden", true);
             }
-            p.put("clock", clockOf(desc.clockType));
+            p.put("clock", model.clock().wireName());
             p.put("mailbox_capacity", capacities[i]);
-            // A tasklet whose Change is the empty one journals nothing, so a
-            // logical clock over it never advances; the core names that.
-            if (desc.changeType == NoChange.class) {
+            // A Void state journals nothing, so a logical clock over it never
+            // advances; the core names that.
+            if (model.stateless()) {
                 p.put("change_is_nochange", true);
             }
             // Per Tasklet, never a class-wide maximum: one Tasklet's bump
             // would otherwise re-stamp its siblings' records with a version
             // they never declared.
-            p.put("schema_version", desc.schemaVersion);
-            p.put("min_readable_schema_version", desc.minReadableSchemaVersion);
+            p.put("schema_version", model.schemaVersion());
+            p.put("min_readable_schema_version", model.minReadableSchemaVersion());
             out.add(p);
         }
         return out;
@@ -295,16 +296,6 @@ public final class HostClassDeclaration {
             case INTER_TASKLET -> "inter_task";
             case PLUGIN_BOUND -> "plugin";
         };
-    }
-
-    private static String clockOf(Class<?> clockType) {
-        if (clockType == EventTimeFrom.class) {
-            return "event_time";
-        }
-        if (clockType == LogicalClock.class) {
-            return "logical";
-        }
-        return "wall";
     }
 
     private static byte[] encode(Map<String, Object> decl) {

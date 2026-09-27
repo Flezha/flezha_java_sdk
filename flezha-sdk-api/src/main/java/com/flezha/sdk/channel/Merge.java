@@ -79,12 +79,12 @@ public interface Merge<I> {
      * stream handle, so a merged node chains like any other.
      */
     @Nonnull
-    <O> Stream<O> into(Class<? extends Tasklet<I, ?, O, ?, ?, ?>> tasklet);
+    <O> Stream<O> into(Class<? extends Tasklet<I, ?, O>> tasklet);
 
     /**
      * Like {@link #into(Class)}, but the consumer is a distinct named node —
      * see {@link Stream#into(Class, String)}.
      */
     @Nonnull
-    <O> Stream<O> into(Class<? extends Tasklet<I, ?, O, ?, ?, ?>> tasklet, String nodeName);
+    <O> Stream<O> into(Class<? extends Tasklet<I, ?, O>> tasklet, String nodeName);
 }

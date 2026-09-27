@@ -2,15 +2,10 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.WallClock;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Mirror of the Rust test app's {@code TransformChainOperator}: every value
@@ -36,25 +31,12 @@ public final class TransformChainUnboundedOperator implements UnboundedOperator 
                 .sink("transformed");
     }
 
-    public static final class TransformLabelTasklet
-            implements Tasklet<String, TransformLabelTasklet.State, String, NoChange, WallClock, Void> {
+    @Tasklet.Spec(name = "transform_label_tasklet")
+    public static final class TransformLabelTasklet implements Tasklet<String, Void, String> {
 
         @Override
-        public String name() {
-            return "transform_label_tasklet";
-        }
-
-        @Override
-        public State initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new State();
-        }
-
-        @Override
-        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             ctx.emit(input);
         }
-
-        public record State() {}
     }
 }

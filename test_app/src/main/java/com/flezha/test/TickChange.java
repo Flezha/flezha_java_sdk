@@ -10,7 +10,12 @@ import java.util.Optional;
  * coalescing path: Changes with equal {@code (interval, ts)} collapse to the
  * latest within a flush window.
  */
-public record TickChange(int interval, long ts, long delta) implements Change {
+public record TickChange(int interval, long ts, long delta) implements Change<TickTasklet.State> {
+
+    @Override
+    public void applyTo(TickTasklet.State state) {
+        state.last = delta;
+    }
 
     @Override
     public Optional<CoalesceKey> coalesceKey() {

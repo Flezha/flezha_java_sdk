@@ -2,17 +2,11 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.Stateless;
-import com.flezha.sdk.state.WallClock;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Mirror of the Rust test app's {@code CellStressOperator}: four chained
@@ -22,6 +16,7 @@ import java.util.Optional;
  */
 public final class CellStressUnboundedOperator implements UnboundedOperator {
 
+    /** The eight static keys each stress tasklet declares in its {@code @Tasklet.Spec}. */
     static final List<String> STRESS_KEYS = List.of("p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7");
 
     @Override
@@ -43,26 +38,11 @@ public final class CellStressUnboundedOperator implements UnboundedOperator {
     }
 
     /** Shared stateless surface of the four stress tasklets; only the fan-out differs. */
-    abstract static class StressTasklet<O> implements Tasklet<String, Stateless, O, NoChange, WallClock, Void> {
-
-        @Override
-        public Stateless initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new Stateless();
-        }
-
-        @Override
-        public List<String> cellKeys() {
-            return STRESS_KEYS;
-        }
-    }
+    abstract static class StressTasklet<O> implements Tasklet<String, Void, O> {}
 
     /** Fans every input out to all eight Cells. */
+    @Tasklet.Spec(name = "stress_a", keys = {"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7"})
     public static final class StressTaskletA extends StressTasklet<String> {
-
-        @Override
-        public String name() {
-            return "stress_a";
-        }
 
         @Override
         public List<String> cellsFor(String input) {
@@ -70,19 +50,14 @@ public final class CellStressUnboundedOperator implements UnboundedOperator {
         }
 
         @Override
-        public void run(String input, StateHandle<Stateless, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             ctx.emit(input);
         }
     }
 
     /** Collapses the fan-out back onto {@code p0}. */
+    @Tasklet.Spec(name = "stress_b", keys = {"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7"})
     public static final class StressTaskletB extends StressTasklet<String> {
-
-        @Override
-        public String name() {
-            return "stress_b";
-        }
 
         @Override
         public List<String> cellsFor(String input) {
@@ -90,19 +65,14 @@ public final class CellStressUnboundedOperator implements UnboundedOperator {
         }
 
         @Override
-        public void run(String input, StateHandle<Stateless, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             ctx.emit(input);
         }
     }
 
     /** Second single-key hop. */
+    @Tasklet.Spec(name = "stress_c", keys = {"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7"})
     public static final class StressTaskletC extends StressTasklet<String> {
-
-        @Override
-        public String name() {
-            return "stress_c";
-        }
 
         @Override
         public List<String> cellsFor(String input) {
@@ -110,19 +80,14 @@ public final class CellStressUnboundedOperator implements UnboundedOperator {
         }
 
         @Override
-        public void run(String input, StateHandle<Stateless, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             ctx.emit(input);
         }
     }
 
     /** Terminal hop: hands the bytes to the {@code cell_stress_echo} plugin. */
+    @Tasklet.Spec(name = "stress_d", keys = {"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7"})
     public static final class StressTaskletD extends StressTasklet<byte[]> {
-
-        @Override
-        public String name() {
-            return "stress_d";
-        }
 
         @Override
         public List<String> cellsFor(String input) {
@@ -130,8 +95,7 @@ public final class CellStressUnboundedOperator implements UnboundedOperator {
         }
 
         @Override
-        public void run(String input, StateHandle<Stateless, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, byte[]> ctx) throws TaskletException {
             ctx.emit(input.getBytes(StandardCharsets.UTF_8));
         }
     }

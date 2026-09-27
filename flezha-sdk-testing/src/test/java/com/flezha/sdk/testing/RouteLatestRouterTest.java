@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.flezha.sdk.channel.RoutedDocument;
 import com.flezha.sdk.runtime.operator.builder.LatestDocumentRouter;
 import com.flezha.sdk.runtime.operator.builder.LatestDocumentRouter.Input;
-import com.flezha.sdk.runtime.operator.builder.LatestDocumentRouter.RouterChange;
 import com.flezha.sdk.runtime.operator.builder.LatestDocumentRouter.RouterState;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -22,7 +21,7 @@ import org.junit.jupiter.api.Test;
  */
 final class RouteLatestRouterTest {
 
-    private static TaskletTestHarness<Input, RouterState, RoutedDocument<Object>, RouterChange> harness() {
+    private static TaskletTestHarness<Input, RouterState, RoutedDocument<Object>> harness() {
         return TaskletTestHarness.of(new LatestDocumentRouter());
     }
 

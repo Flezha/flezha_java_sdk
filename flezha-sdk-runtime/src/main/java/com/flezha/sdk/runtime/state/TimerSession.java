@@ -10,7 +10,7 @@ import javax.annotation.Nonnull;
 
 /**
  * The timer surface for ONE invocation, held by the dispatcher's
- * {@code TaskletCtx}.
+ * {@code Ctx}.
  *
  * <p>It works on a <b>copy</b> of the Cell's pending set: the retry ladder
  * re-runs a failed attempt, and a registration that attempt made must not

@@ -10,8 +10,9 @@
  * live timer per click, and the earliest of them closes the session while it is still active.
  *
  * <p>{@code onTimer} is the second entry point into user code alongside {@code run}. It receives
- * the same state handle, so a timer expiry can record a change and emit output exactly as a message
- * can, and the two are indistinguishable from the perspective of durability.
+ * the same context, so a timer expiry can record a change through {@code ctx.change} and emit
+ * output exactly as a message can, and the two are indistinguishable from the perspective of
+ * durability.
  *
  * <p>The pending deadline is held in a plain field rather than in durable state. That is safe here
  * for two reasons: the runtime holds one tasklet instance per cell, so the field is not shared,

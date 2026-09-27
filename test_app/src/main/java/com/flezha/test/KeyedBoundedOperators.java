@@ -3,9 +3,8 @@ package com.flezha.test;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.Stream;
 import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.util.List;
 
@@ -54,42 +53,28 @@ public final class KeyedBoundedOperators {
         }
     }
 
-    public static final class KeySplit extends StatelessStep {
+    @Tasklet.Spec(name = "key_split")
+    public static final class KeySplit extends NoStateStep {
         @Override
-        public String name() {
-            return "key_split";
-        }
-
-        @Override
-        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             for (String key : input.split(",")) {
                 ctx.emit(key);
             }
         }
     }
 
+    @Tasklet.Spec(name = "keyed_commit")
     public static final class KeyedCommit extends DurableStep {
         @Override
-        public String name() {
-            return "keyed_commit";
-        }
-
-        @Override
-        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx) {
+        public void compensate(List<String> completedOutput, Ctx<SeenState, String> ctx) {
             // A no-op undo: the done marker it earns is what the scenarios read.
         }
     }
 
-    public static final class KeyedFail extends StatelessStep {
+    @Tasklet.Spec(name = "keyed_fail")
+    public static final class KeyedFail extends NoStateStep {
         @Override
-        public String name() {
-            return "keyed_fail";
-        }
-
-        @Override
-        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             throw new TaskletException("keyed_fail always fails");
         }
     }

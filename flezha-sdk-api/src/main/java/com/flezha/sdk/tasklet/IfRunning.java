@@ -3,7 +3,7 @@ package com.flezha.sdk.tasklet;
 import javax.annotation.Nonnull;
 
 /**
- * What {@link TaskletCtx#spawnBounded} does when the requested instance id is
+ * What {@link Ctx#spawnBounded} does when the requested instance id is
  * already running.
  */
 public enum IfRunning {

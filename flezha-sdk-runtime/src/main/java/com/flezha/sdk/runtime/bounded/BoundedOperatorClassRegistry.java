@@ -46,7 +46,7 @@ public final class BoundedOperatorClassRegistry {
      *     (external-stop-only, or a graph the core refuses).
      */
     @Nonnull
-    public static String registerClass(@Nonnull Class<? extends BoundedOperator> boundedClass) {
+    public static String registerClass(@Nonnull Class<?> boundedClass) {
         BoundedOperator probe = resolveProbe(boundedClass);
         String factoryId = probe.factoryId();
 
@@ -72,8 +72,8 @@ public final class BoundedOperatorClassRegistry {
      * whose only possible exit is an external stop, with no duration backstop.
      */
     @Nonnull
-    private static BoundedOperator resolveProbe(Class<? extends BoundedOperator> operatorClass) {
-        BoundedOperator probe = UnboundedOperatorClassRegistry.probe(operatorClass, "BoundedOperator");
+    private static BoundedOperator resolveProbe(Class<?> operatorClass) {
+        BoundedOperator probe = UnboundedOperatorClassRegistry.probe(operatorClass, BoundedOperator.class);
         if (!probe.selfTerminating() && probe.maxDuration().isEmpty()) {
             throw new BoundedOperatorConfigurationException("bounded operator `" + probe.factoryId()
                     + "` is not terminable: its only possible exit is an external stop. Add a terminal condition: "

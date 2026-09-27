@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
 import com.flezha.sdk.tasklet.SpawnOptions;
 import com.flezha.sdk.tasklet.SpawnRequests;
+import com.flezha.sdk.tasklet.Tasklet;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -135,9 +136,10 @@ class ActivationDispatcherTest extends DispatchTestBase {
     }
 
     /** Spawns once without an id and once under its input. */
+    @Tasklet.Spec(name = "spawn_probe_task")
     public static final class SpawnProbeTask extends Task<Void> {
         public SpawnProbeTask() {
-            super("spawn_probe_task", (input, ctx) -> {
+            super((input, ctx) -> {
                 ctx.spawnBounded("worker", new byte[0]);
                 ctx.spawnBounded("worker", new byte[0], SpawnOptions.id(input));
             });
@@ -151,9 +153,10 @@ class ActivationDispatcherTest extends DispatchTestBase {
     }
 
     /** Constructs at definition, then refuses once armed, as a resource gone by start time would. */
+    @Tasklet.Spec(name = "refusing_task")
     public static final class RefusingTask extends Task<Void> {
         public RefusingTask() {
-            super("refusing_task", (input, ctx) -> {});
+            super((input, ctx) -> {});
             if (REFUSE.get()) {
                 throw new IllegalStateException(REFUSAL);
             }

@@ -1,7 +1,7 @@
 package com.flezha.sdk.tasklet;
 
 /**
- * Why a {@link TaskletCtx#spawnBounded} request reached no instance. None of these fault the
+ * Why a {@link Ctx#spawnBounded} request reached no instance. None of these fault the
  * requesting tasklet: they are thrown by a read of its {@link SpawnHandle}. Each carries the
  * core's own sentence as its message.
  */

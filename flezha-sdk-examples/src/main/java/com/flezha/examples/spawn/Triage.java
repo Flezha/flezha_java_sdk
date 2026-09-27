@@ -1,12 +1,15 @@
 package com.flezha.examples.spawn;
 
-import com.flezha.sdk.authoring.Tasklet;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletException;
 
 /** Triages the alert the worker was spawned for. */
-@Tasklet(id = "triage")
-public final class Triage {
+@Tasklet.Spec(name = "triage")
+public final class Triage implements Tasklet<String, Void, String> {
 
-    public String run(String alert) {
-        return "triaged:" + alert;
+    @Override
+    public void run(String alert, Ctx<Void, String> ctx) throws TaskletException {
+        ctx.emit("triaged:" + alert);
     }
 }

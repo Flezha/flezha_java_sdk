@@ -1,11 +1,13 @@
 package com.flezha.sdk.runtime.state;
 
 import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.KryoException;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.flezha.sdk.state.CoalesceKey;
-import com.flezha.sdk.state.NoChange;
 import com.flezha.sdk.state.RestoreInitPayload;
+import com.flezha.sdk.state.StateSerializeException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -20,13 +22,12 @@ import javax.annotation.Nonnull;
 
 /**
  * Kryo-backed serializer for per-Cell state and per-Cell Change
- * payloads. Constructed once per {@code UnboundedOperatorInstance}; the {@code userTypes}
- * list aggregates the {@code Tasklet.kryoTypes()} returns across every Tasklet in
- * the UnboundedOperator class.
+ * payloads, one per tasklet. Its user types are the ones the tasklet lists in
+ * {@code kryoTypes()}, registered in list order, or the ones {@link KryoTypes}
+ * discovers, each under the id it derives from the type's name.
  *
- * <p>Stable type IDs are essential for cross-version compatibility under
- * additive Change evolution: a new Change variant added in v2 ships at id
- * N+1 without disturbing existing IDs (umbrella Decision 9).
+ * <p>Stable type ids are what let a saved record decode as the class that
+ * wrote it: a new change type must never move the id of an existing one.
  *
  * <p>The encode buffer is reused per thread rather than allocated per value,
  * which makes it shared mutable state for the duration of one encode. Two
@@ -74,8 +75,9 @@ public final class KryoCodec {
         }
     }
 
+    /** A codec registering {@code userTypes} after the built-ins, in list order. */
     public KryoCodec(@Nonnull List<Class<?>> userTypes) {
-        this(userTypes, true);
+        this(userTypes, true, null);
     }
 
     /**
@@ -84,57 +86,84 @@ public final class KryoCodec {
      * arbitrary user types must encode without a declared id table.
      */
     public KryoCodec(@Nonnull List<Class<?>> userTypes, boolean requireRegistration) {
+        this(userTypes, requireRegistration, null);
+    }
+
+    /** A codec registering each type under the id given beside it, as {@link KryoTypes#ids} derives them. */
+    @Nonnull
+    public static KryoCodec named(@Nonnull Map<Class<?>, Integer> idsByType) {
+        return new KryoCodec(List.copyOf(idsByType.keySet()), true, Map.copyOf(idsByType));
+    }
+
+    private KryoCodec(List<Class<?>> userTypes, boolean requireRegistration, Map<Class<?>, Integer> idsByType) {
         this.registeredTypes = List.copyOf(userTypes);
         this.locals = ThreadLocal.withInitial(() -> {
             Kryo kryo = new Kryo();
             kryo.setRegistrationRequired(requireRegistration);
-            registerBuiltins(kryo);
+            int next = FIRST_BUILTIN_ID;
+            for (Class<?> c : BUILTINS) {
+                if (kryo.getClassResolver().getRegistration(c) == null) {
+                    kryo.register(c, next++);
+                }
+            }
             for (Class<?> c : registeredTypes) {
-                kryo.register(c);
+                if (idsByType != null) {
+                    kryo.register(c, idsByType.get(c));
+                } else if (kryo.getClassResolver().getRegistration(c) == null) {
+                    kryo.register(c, next++);
+                }
             }
             return new Locals(kryo);
         });
     }
 
-    /**
-     * Built-in registrations. Stable IDs occupy the low IDs (0-N); user types
-     * land at N+1, N+2, ... in the order returned by {@code Tasklet.kryoTypes()}.
-     */
-    private static void registerBuiltins(Kryo kryo) {
-        // Common containers and primitives. Kryo's defaults handle primitives
-        // and arrays via its default serializers; these registrations stamp
-        // stable IDs across processes.
-        kryo.register(NoChange.class);
-        kryo.register(RestoreInitPayload.class);
-        kryo.register(CoalesceKey.class);
-        kryo.register(byte[].class);
-        kryo.register(int[].class);
-        kryo.register(long[].class);
-        kryo.register(double[].class);
-        kryo.register(String.class);
-        kryo.register(Long.class);
-        kryo.register(Integer.class);
-        kryo.register(Double.class);
-        kryo.register(Float.class);
-        kryo.register(Boolean.class);
-        kryo.register(Optional.class);
-        kryo.register(java.util.ArrayList.class);
-        kryo.register(java.util.LinkedList.class);
-        kryo.register(HashMap.class);
-        kryo.register(LinkedHashMap.class);
-        kryo.register(TreeMap.class);
-        kryo.register(HashSet.class);
-        kryo.register(LinkedHashSet.class);
-        kryo.register(TreeSet.class);
-        kryo.register(List.class);
-        kryo.register(Map.class);
-        kryo.register(Set.class);
-        kryo.register(java.time.Instant.class);
-        // Appended at the tail so existing IDs stay stable. `ArrayDeque` backs
-        // `@Journal(MAP_DEQUE)` map-of-deque state.
-        kryo.register(java.util.ArrayDeque.class);
-        kryo.register(java.util.Deque.class);
+    /** Whether {@code type} is one of the built-in registrations every codec carries. */
+    public static boolean isBuiltin(@Nonnull Class<?> type) {
+        return BUILTINS.contains(type);
     }
+
+    /**
+     * The first built-in id. Kryo's own defaults (the primitives and
+     * {@code String}) hold 0 to 8, and 9 is left unused so every built-in keeps
+     * the id saved records carry.
+     */
+    private static final int FIRST_BUILTIN_ID = 10;
+
+    /**
+     * Built-in registrations, in id order from {@link #FIRST_BUILTIN_ID}; a
+     * class Kryo already registers by default keeps its default id. A codec's
+     * listed user types take the ids after them in list order, except one
+     * already registered, which keeps its id and takes no slot; derived ids sit
+     * in a band above them. Append only: an insertion moves every later id.
+     */
+    private static final List<Class<?>> BUILTINS = List.of(
+            RestoreInitPayload.class,
+            CoalesceKey.class,
+            byte[].class,
+            int[].class,
+            long[].class,
+            double[].class,
+            String.class,
+            Long.class,
+            Integer.class,
+            Double.class,
+            Float.class,
+            Boolean.class,
+            Optional.class,
+            java.util.ArrayList.class,
+            java.util.LinkedList.class,
+            HashMap.class,
+            LinkedHashMap.class,
+            TreeMap.class,
+            HashSet.class,
+            LinkedHashSet.class,
+            TreeSet.class,
+            List.class,
+            Map.class,
+            Set.class,
+            java.time.Instant.class,
+            java.util.ArrayDeque.class,
+            java.util.Deque.class);
 
     /**
      * Serialize an arbitrary registered object into this thread's buffer and
@@ -155,12 +184,24 @@ public final class KryoCodec {
             mine.output.reset();
             mine.kryo.writeClassAndObject(mine.output, obj);
             return mine.output.toBytes();
+        } catch (IllegalArgumentException | KryoException e) {
+            throw unregistered(e);
         } finally {
             mine.encoding = false;
             if (mine.output.getBuffer().length > TRIM_ABOVE) {
                 mine.output.setBuffer(new byte[INITIAL_CAPACITY], -1);
             }
         }
+    }
+
+    /** Serialize each of {@code values}, in order: how a cell's recorded changes are flushed. */
+    @Nonnull
+    public List<byte[]> serializeAll(@Nonnull List<?> values) {
+        List<byte[]> out = new ArrayList<>(values.size());
+        for (Object value : values) {
+            out.add(serialize(value));
+        }
+        return out;
     }
 
     /** Deserialize bytes to the requested type. */
@@ -179,6 +220,26 @@ public final class KryoCodec {
             mine.input.setBuffer(NO_BYTES);
         }
     }
+
+    /**
+     * Kryo refuses an unregistered class with an {@link IllegalArgumentException}, wrapped in a
+     * {@link KryoException} when the class sits in a field. That refusal is named, with its fixes;
+     * any other failure is rethrown as it was.
+     */
+    private static RuntimeException unregistered(RuntimeException e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            String message = t.getMessage();
+            if (t instanceof IllegalArgumentException && message != null && message.startsWith(NOT_REGISTERED)) {
+                int end = message.indexOf('\n');
+                String name = message.substring(NOT_REGISTERED.length(), end < 0 ? message.length() : end)
+                        .trim();
+                return new StateSerializeException.UnregisteredClass(name, e);
+            }
+        }
+        return e;
+    }
+
+    private static final String NOT_REGISTERED = "Class is not registered:";
 
     private static String reentered(String method, String type) {
         return "KryoCodec."

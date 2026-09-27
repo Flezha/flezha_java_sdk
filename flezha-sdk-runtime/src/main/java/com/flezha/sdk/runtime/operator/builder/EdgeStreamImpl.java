@@ -84,18 +84,17 @@ abstract class EdgeStreamImpl<T> implements EdgeStream<T>, EdgeSite {
 
     @Override
     @Nonnull
-    public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<T, ?, O, ?, ?, ?>> taskletClass) {
+    public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<T, ?, O>> taskletClass) {
         return wireInto(taskletClass, null);
     }
 
     @Override
     @Nonnull
-    public <O> Stream<O> into(
-            @Nonnull Class<? extends Tasklet<T, ?, O, ?, ?, ?>> taskletClass, @Nonnull String nodeName) {
+    public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<T, ?, O>> taskletClass, @Nonnull String nodeName) {
         return wireInto(taskletClass, nodeName);
     }
 
-    <O> Stream<O> wireInto(Class<? extends Tasklet<T, ?, O, ?, ?, ?>> taskletClass, String nodeName) {
+    <O> Stream<O> wireInto(Class<? extends Tasklet<T, ?, O>> taskletClass, String nodeName) {
         owner.checkMutable();
         return new StreamImpl<>(owner, owner.wireConsumer(siteChannelId(), taskletClass, nodeName, pending));
     }

@@ -1,10 +1,9 @@
 package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
 import com.flezha.sdk.operator.BoundedOperator;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -34,32 +33,20 @@ public final class UndoOutboxBoundedOperator implements BoundedOperator {
     }
 
     /** Task UA: durable + compensable; the hook blocks, then emits the undo record. */
+    @Tasklet.Spec(name = "undo_outbox_a")
     public static final class UndoOutboxA extends DurableStep {
-
         @Override
-        public String name() {
-            return "undo_outbox_a";
-        }
-
-        @Override
-        public void compensate(List<String> completedOutput, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void compensate(List<String> completedOutput, Ctx<SeenState, String> ctx) throws TaskletException {
             BoundedE2eGate.blockUntilReleased();
             ctx.emit("undone");
         }
     }
 
     /** Task C: fails immediately, so the chain always rolls back. */
-    public static final class UndoC extends StatelessStep {
-
+    @Tasklet.Spec(name = "undo_outbox_c")
+    public static final class UndoC extends NoStateStep {
         @Override
-        public String name() {
-            return "undo_outbox_c";
-        }
-
-        @Override
-        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             throw new TaskletException("undo_outbox_c always fails");
         }
     }

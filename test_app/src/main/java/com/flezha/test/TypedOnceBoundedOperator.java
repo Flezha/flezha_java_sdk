@@ -2,15 +2,9 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.RestoreInitPayload;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.state.Stateless;
-import com.flezha.sdk.state.WallClock;
+import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletCtx;
 import com.flezha.sdk.tasklet.TaskletException;
-import java.util.Optional;
 
 /**
  * Mirror of the Rust test app's {@code typed_once_bounded}: a {@code ONCE} bounded operator whose entry
@@ -35,21 +29,11 @@ public final class TypedOnceBoundedOperator implements BoundedOperator {
         c.input(Ticket.class, "order").into(OncePlaced.class).sink("placed");
     }
 
-    public static final class OncePlaced implements Tasklet<Ticket, Stateless, String, NoChange, WallClock, Void> {
+    @Tasklet.Spec(name = "once_placed")
+    public static final class OncePlaced implements Tasklet<Ticket, Void, String> {
 
         @Override
-        public String name() {
-            return "once_placed";
-        }
-
-        @Override
-        public Stateless initState(Optional<String> cellKey, Optional<RestoreInitPayload> initPayload) {
-            return new Stateless();
-        }
-
-        @Override
-        public void run(Ticket ticket, StateHandle<Stateless, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(Ticket ticket, Ctx<Void, String> ctx) throws TaskletException {
             System.out.println("once_ran " + ticket.text());
             System.out.flush();
             ctx.emit("placed:" + ticket.text());

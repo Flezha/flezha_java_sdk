@@ -5,8 +5,8 @@ import com.flezha.sdk.runtime.operator.ChannelDescriptor;
 import com.flezha.sdk.runtime.operator.ConsumerEdge;
 import com.flezha.sdk.runtime.operator.TaskletDescriptor;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
+import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.runtime.state.KryoCodec;
-import com.flezha.sdk.state.EventTimeFrom;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.util.ArrayList;
@@ -185,7 +185,7 @@ final class CellRouting {
     private OptionalLong prepareEventTime(ChannelDescriptor channel, Object base) {
         for (ConsumerEdge edge : channel.consumers()) {
             TaskletDescriptor desc = topology.tasklet(edge.tasklet());
-            if (desc == null || desc.clockType() != EventTimeFrom.class) {
+            if (desc == null || desc.clock() != ClockKind.EVENT_TIME) {
                 continue;
             }
             List<Object> values = EdgeTransforms.valuesOf(edge, base);

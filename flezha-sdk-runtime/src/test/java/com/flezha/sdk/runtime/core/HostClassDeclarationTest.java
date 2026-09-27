@@ -13,11 +13,10 @@ import com.flezha.sdk.operator.LoopMode;
 import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.runtime.RepositoryFixture;
 import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
-import com.flezha.sdk.runtime.operator.StatelessTestTasklet;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.state.Change;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -134,7 +133,7 @@ class HostClassDeclarationTest {
         assertThat(byName.get("v1_task").get("min_readable_schema_version").asInt())
                 .isEqualTo(1);
         assertThat(byName.get("v1_task").get("change_is_nochange").asBoolean())
-                .as("a NoChange tasklet states it, so the core can refuse a logical clock over it")
+                .as("a Void-state tasklet states it, so the core can refuse a logical clock over it")
                 .isTrue();
     }
 
@@ -337,52 +336,24 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class FullyDeclaredDynamicTask extends StatelessTestTasklet<String, Object, String> {
-        @Override
-        public String name() {
-            return "decl_full_dynamic_task";
-        }
+    @Tasklet.Spec(name = "decl_full_dynamic_task", maxCells = 4096, idleTtlSeconds = 200)
+    public static final class FullyDeclaredDynamicTask implements Tasklet<String, Void, String> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public Optional<Duration> cellIdleTtl() {
-            return Optional.of(Duration.ofMillis(200));
-        }
-
-        @Override
-        public long maxCells() {
-            return 4096;
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx)
-                throws com.flezha.sdk.tasklet.TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emit(input);
         }
     }
 
     /** A static, compensating, persistent tasklet: the widest tasklet declaration. */
-    public static final class FullyDeclaredTask
-            implements com.flezha.sdk.tasklet.Tasklet<
-                    String, FullyDeclaredTask.State, String, DeclChange, com.flezha.sdk.state.EventTimeFrom, Void> {
+    @Tasklet.Spec(
+            name = "decl_full_task",
+            keys = {"a", "b"},
+            compactAfterBytes = 4096)
+    public static final class FullyDeclaredTask implements Tasklet<String, FullyDeclaredTask.State, String> {
 
         public static final class State {
             public int seen;
-        }
-
-        @Override
-        public String name() {
-            return "decl_full_task";
-        }
-
-        @Override
-        public State initState(
-                Optional<String> cellKey, Optional<com.flezha.sdk.state.RestoreInitPayload> initPayload) {
-            return new State();
         }
 
         @Override
@@ -391,49 +362,33 @@ class HostClassDeclarationTest {
         }
 
         @Override
-        public void applyChange(State state, DeclChange change) {
-            state.seen++;
-        }
-
-        @Override
-        public List<String> cellKeys() {
-            return List.of("a", "b");
-        }
-
-        @Override
         public List<String> cellsFor(String input) {
             return List.of("a");
         }
 
-        @Override
-        public long compactAfterBytes() {
-            return 4096;
-        }
-
         // `correctionWindow` needs an event-time clock: a correction rewinds to a
         // baseline before the late input's event time.
-        @Override
-        public Class<com.flezha.sdk.state.EventTimeFrom> clockType() {
-            return com.flezha.sdk.state.EventTimeFrom.class;
-        }
-
         @Override
         public long eventTime(String input) {
             return Long.parseLong(input.split(":")[0]);
         }
 
         @Override
-        public void run(String input, StateHandle<State, DeclChange> state, TaskletCtx ctx)
-                throws com.flezha.sdk.tasklet.TaskletException {
-            state.apply(new DeclChange(input));
+        public void run(String input, Ctx<State, String> ctx) throws com.flezha.sdk.tasklet.TaskletException {
+            ctx.change(new DeclChange(input));
             ctx.emitKeyed("a", input);
         }
 
         @Override
-        public void compensate(List<String> completedOutput, StateHandle<State, DeclChange> state, TaskletCtx ctx) {}
+        public void compensate(List<String> completedOutput, Ctx<State, String> ctx) {}
     }
 
-    public record DeclChange(String value) implements com.flezha.sdk.state.Change {}
+    public record DeclChange(String value) implements Change<FullyDeclaredTask.State> {
+        @Override
+        public void applyTo(FullyDeclaredTask.State state) {
+            state.seen++;
+        }
+    }
 
     /** Declares every bounded-side option the Java surface has a spelling for. */
     public static final class FullyDeclaredBounded implements BoundedOperator {
@@ -532,20 +487,11 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class ChainedSinkTask extends StatelessTestTasklet<String, Object, String> {
-        @Override
-        public String name() {
-            return "decl_chained_sink_task";
-        }
+    @Tasklet.Spec(name = "decl_chained_sink_task")
+    public static final class ChainedSinkTask implements Tasklet<String, Void, String> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx)
-                throws com.flezha.sdk.tasklet.TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emit(input);
         }
     }
@@ -666,48 +612,20 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class VersionTwoTask extends StatelessTestTasklet<String, Object, String> {
-        @Override
-        public String name() {
-            return "v2_task";
-        }
+    @Tasklet.Spec(name = "v2_task", schemaVersion = 2, minReadableSchemaVersion = 1)
+    public static final class VersionTwoTask implements Tasklet<String, Void, String> {
 
         @Override
-        public int schemaVersion() {
-            return 2;
-        }
-
-        @Override
-        public int minReadableSchemaVersion() {
-            return 1;
-        }
-
-        @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx)
-                throws com.flezha.sdk.tasklet.TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emit(input);
         }
     }
 
-    public static final class VersionOneTask extends StatelessTestTasklet<String, Object, String> {
-        @Override
-        public String name() {
-            return "v1_task";
-        }
+    @Tasklet.Spec(name = "v1_task")
+    public static final class VersionOneTask implements Tasklet<String, Void, String> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx)
-                throws com.flezha.sdk.tasklet.TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emit(input);
         }
     }
@@ -730,52 +648,29 @@ class HostClassDeclarationTest {
     }
 
     /**
-     * The tier fixtures' tasklet. It journals a Change because
-     * {@code effectivelyOnce()} requires it: the tier IS durable state.
+     * The tier fixtures' tasklet. It declares a state because
+     * {@code effectivelyOnce()} requires one: the tier IS durable state.
      */
-    public static final class DeclTask
-            implements com.flezha.sdk.tasklet.Tasklet<
-                    String, Object, String, DeclChange, com.flezha.sdk.state.WallClock, Void> {
-        @Override
-        public String name() {
-            return "decl_task";
-        }
+    @Tasklet.Spec(name = "decl_task")
+    public static final class DeclTask implements Tasklet<String, DeclTask.Kept, String> {
+        public static final class Kept {}
 
         @Override
-        public Object initState(
-                Optional<String> cellKey, Optional<com.flezha.sdk.state.RestoreInitPayload> initPayload) {
-            return new Object();
-        }
-
-        @Override
-        public void applyChange(Object state, DeclChange change) {}
-
-        @Override
-        public void run(String input, StateHandle<Object, DeclChange> state, TaskletCtx ctx)
-                throws com.flezha.sdk.tasklet.TaskletException {
+        public void run(String input, Ctx<Kept, String> ctx) throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emitKeyed("k", input);
         }
     }
 
-    public static final class UndoTask extends StatelessTestTasklet<String, Object, String> {
-        @Override
-        public String name() {
-            return "undo_task";
-        }
+    @Tasklet.Spec(name = "undo_task")
+    public static final class UndoTask implements Tasklet<String, Void, String> {
 
         @Override
-        protected Object initState(Optional<String> cellKey) {
-            return new Object();
-        }
-
-        @Override
-        public void run(String input, StateHandle<Object, NoChange> state, TaskletCtx ctx)
-                throws com.flezha.sdk.tasklet.TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emit(input);
         }
 
         @Override
-        public void compensate(List<String> completedOutput, StateHandle<Object, NoChange> state, TaskletCtx ctx) {}
+        public void compensate(List<String> completedOutput, Ctx<Void, String> ctx) {}
     }
 
     public static final class DeclBounded implements BoundedOperator {

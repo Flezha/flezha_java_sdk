@@ -6,5 +6,10 @@ import com.flezha.sdk.state.Change;
  * Per-input Change recorded by {@link CounterTasklet}: a delta to add to
  * {@code state.value}. Mirrors the Rust SDK's {@code CounterChange}.
  */
-public record CounterChange(long delta) implements Change {
+public record CounterChange(long delta) implements Change<CounterTasklet.State> {
+
+    @Override
+    public void applyTo(CounterTasklet.State state) {
+        state.value += delta;
+    }
 }

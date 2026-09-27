@@ -2,10 +2,9 @@ package com.flezha.test;
 
 import com.flezha.sdk.operator.BoundedOperator;
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.tasklet.TaskletCtx;
+import com.flezha.sdk.tasklet.Ctx;
+import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
-import com.flezha.sdk.state.NoChange;
-import com.flezha.sdk.state.StateHandle;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -50,66 +49,43 @@ public final class DiamondBoundedOperator implements BoundedOperator {
     }
 
     /** The shared root: commits durable state and fans out unchanged. */
-    public static final class DiamA extends DurableStep {
-        @Override
-        public String name() {
-            return "diam_a";
-        }
-    }
+    @Tasklet.Spec(name = "diam_a")
+    public static final class DiamA extends DurableStep {}
 
     /** The pass-through upper half of the blocked arm. */
-    public static final class DiamB1 extends DurableStep {
-        @Override
-        public String name() {
-            return "diam_b1";
-        }
-    }
+    @Tasklet.Spec(name = "diam_b1")
+    public static final class DiamB1 extends DurableStep {}
 
     /**
      * The blocked producer: parks BEFORE its durable change + emit, so the
      * kill window is deterministic — B2 is always the uncommitted producer
      * while the sibling arm committed.
      */
+    @Tasklet.Spec(name = "diam_b2")
     public static final class DiamB2 extends DurableStep {
         @Override
-        public String name() {
-            return "diam_b2";
-        }
-
-        @Override
-        public void run(String input, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<SeenState, String> ctx) throws TaskletException {
             BoundedE2eGate.blockUntilReleased();
-            state.apply(new Insert(name()));
+            ctx.change(new Insert(name()));
             ctx.emit("b:" + input);
         }
     }
 
     /** The fast producer: committed before the SIGKILL lands. */
+    @Tasklet.Spec(name = "diam_c")
     public static final class DiamC extends DurableStep {
         @Override
-        public String name() {
-            return "diam_c";
-        }
-
-        @Override
-        public void run(String input, StateHandle<SeenState, Insert> state, TaskletCtx ctx)
-                throws TaskletException {
-            state.apply(new Insert(name()));
+        public void run(String input, Ctx<SeenState, String> ctx) throws TaskletException {
+            ctx.change(new Insert(name()));
             ctx.emit("c:" + input);
         }
     }
 
     /** The join: one {@code j:}-tagged record per accumulated contribution. */
-    public static final class DiamJoin extends StatelessStep {
+    @Tasklet.Spec(name = "diam_join")
+    public static final class DiamJoin extends NoStateStep {
         @Override
-        public String name() {
-            return "diam_join";
-        }
-
-        @Override
-        public void run(String input, StateHandle<State, NoChange> state, TaskletCtx ctx)
-                throws TaskletException {
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             ctx.emit("j:" + input);
         }
     }
