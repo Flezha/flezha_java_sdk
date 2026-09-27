@@ -1,6 +1,6 @@
 package com.flezha.examples.tradedesk;
 
-import com.flezha.examples.tradedesk.PaperOrderOperator.OrderTicket;
+import com.flezha.examples.tradedesk.OrderExecutorOperator.OrderTicket;
 import com.flezha.examples.tradedesk.TrackPrices.Move;
 import com.flezha.sdk.authoring.Tasklet;
 import com.flezha.sdk.tasklet.TaskletCtx;
@@ -39,7 +39,7 @@ public final class BuyAboveAverage {
         // No id: the controller names the instance. A replay of this invocation issues no request,
         // so re-running an input never places a second order. The ticket travels as JSON, which
         // the order's entry channel decodes back into an OrderTicket.
-        ctx.spawnBounded("paper_order", new OrderTicket(move.symbol(), quantity));
+        ctx.spawnBounded("order_executor", new OrderTicket(move.symbol(), quantity));
 
         ctx.emit(String.format(
                 "%s %.4f is %.2f%% above its average of %.4f, buying %d",

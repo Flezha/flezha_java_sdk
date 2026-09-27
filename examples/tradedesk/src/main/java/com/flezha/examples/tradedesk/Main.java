@@ -20,8 +20,8 @@ public final class Main {
 
     public static void main(String[] args) throws Exception {
         FlezhaRunner runner = Flezha.createRunner(args.length > 0 ? args[0] : "trading")
-                .registerFactory(PricesOperator.class)
-                .registerFactory(PaperOrderOperator.class)
+                .registerFactory(TradeWatcherOperator.class)
+                .registerFactory(OrderExecutorOperator.class)
                 .start();
 
         runner.awaitTermination();

@@ -16,7 +16,7 @@ import javax.annotation.Nonnull;
  * messages, splits each into its trades before anything else sees them, drops what the desk does
  * not follow, and routes the rest to a cell per symbol.
  */
-public final class PricesOperator implements UnboundedOperator {
+public final class TradeWatcherOperator implements UnboundedOperator {
 
     /**
      * One message from the exchange: {@code channel} says what it is, and a trade message carries
@@ -30,7 +30,7 @@ public final class PricesOperator implements UnboundedOperator {
     @Override
     @Nonnull
     public String factoryId() {
-        return "prices";
+        return "trade_watcher";
     }
 
     /**

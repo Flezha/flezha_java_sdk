@@ -18,7 +18,7 @@ import javax.annotation.Nonnull;
  * methods: the order is cancelled, then the money is released. A step with no {@code compensate}
  * is skipped, which is why the desk's book is left alone.
  */
-public final class PaperOrderOperator implements BoundedOperator {
+public final class OrderExecutorOperator implements BoundedOperator {
 
     /**
      * The order an instance is started with. The entry channel declares this type, so the first
@@ -27,14 +27,14 @@ public final class PaperOrderOperator implements BoundedOperator {
     public record OrderTicket(String symbol, int quantity) {}
 
     /**
-     * The operator's stable identity, and the name {@code flz operator start paper_order}
+     * The operator's stable identity, and the name {@code flz operator start order_executor}
      * resolves. It is durable, so changing it declares a new operator rather than renaming this
      * one.
      */
     @Override
     @Nonnull
     public String factoryId() {
-        return "paper_order";
+        return "order_executor";
     }
 
     /**

@@ -10,10 +10,10 @@ write them one tasklet at a time.
 | File | What is in it |
 |---|---|
 | `Main.java` | the runner: this process joins the `trading` namespace and registers both factories |
-| `PricesOperator.java` | the ETL stream, an unbounded operator: the exchange's trade messages in, a cell per symbol, buy signals out |
+| `TradeWatcherOperator.java` | the ETL stream, an unbounded operator: the exchange's trade messages in, a cell per symbol, buy signals out |
 | `TrackPrices.java` | keeps each symbol's last ten prices, and compares a new price with their average |
 | `BuyAboveAverage.java` | starts an order when a price is 2 % or more above its average |
-| `PaperOrderOperator.java` | the workflow, a bounded operator: two steps in order, then two side by side. The order an instance is started with is the `OrderTicket` record here |
+| `OrderExecutorOperator.java` | the workflow, a bounded operator: two steps in order, then two side by side. The order an instance is started with is the `OrderTicket` record here |
 | `ReserveFunds.java` | step one: puts the money aside, and releases it again if the order is undone |
 | `PlaceOrder.java` | step two: places the paper order, and cancels it if the order is undone |
 | `ConfirmFill.java` | waits ten seconds for the exchange, confirms the fill and ends the order with its result, and refuses an order above the exchange's limit |
@@ -46,11 +46,11 @@ flz runner list --namespace trading
 
 ## Start an order by hand
 
-One instance of `paper_order` is one order. `--text` carries the order on the
+One instance of `order_executor` is one order. `--text` carries the order on the
 `order` channel:
 
 ```sh
-flz operator start paper_order --id order_1 --namespace trading \
+flz operator start order_executor --id order_1 --namespace trading \
   --text '{"symbol": "EUR/USD", "quantity": 10}' --channel order
 ```
 
@@ -81,7 +81,7 @@ The paper exchange fills at most 100 at a time, so `confirm_fill` refuses a
 larger order. Start one the same way, with a quantity above the limit:
 
 ```sh
-flz operator start paper_order --id order_2 --namespace trading \
+flz operator start order_executor --id order_2 --namespace trading \
   --text '{"symbol": "EUR/USD", "quantity": 500}' --channel order
 ```
 
