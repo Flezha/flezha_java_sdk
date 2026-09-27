@@ -168,6 +168,7 @@ public abstract class Stream<T> implements EdgeStream<T> {
      * declaration error).
      */
     @SafeVarargs
+    @SuppressWarnings("varargs")
     @Nonnull
     public final Stream<T> branch(Consumer<Stream<T>>... arms) {
         return branchArms(List.of(arms));
