@@ -10,13 +10,13 @@ write them one tasklet at a time.
 | File | What is in it |
 |---|---|
 | `Main.java` | the runner: this process joins the `trading` namespace and registers both factories |
-| `PricesOperator.java` | the ETL stream, an unbounded operator: trades in, a cell per symbol, buy signals out |
+| `PricesOperator.java` | the ETL stream, an unbounded operator: the exchange's trade messages in, a cell per symbol, buy signals out |
 | `TrackPrices.java` | keeps each symbol's last ten prices, and compares a new price with their average |
 | `BuyAboveAverage.java` | starts an order when a price is 2 % or more above its average |
 | `PaperOrderOperator.java` | the workflow, a bounded operator: two steps in order, then two side by side. The order an instance is started with is the `OrderTicket` record here |
 | `ReserveFunds.java` | step one: puts the money aside, and releases it again if the order is undone |
 | `PlaceOrder.java` | step two: places the paper order, and cancels it if the order is undone |
-| `ConfirmFill.java` | confirms the fill and ends the order with its result, and refuses an order above the exchange's limit |
+| `ConfirmFill.java` | waits ten seconds for the exchange, confirms the fill and ends the order with its result, and refuses an order above the exchange's limit |
 | `RecordOrder.java` | books the placed order, and has nothing to undo |
 
 Every tasklet is a class annotated `@Tasklet`. What a tasklet remembers, and the
@@ -61,7 +61,8 @@ The runner's terminal shows the order being booked. The ids come from
 [book] EUR/USD 10 as ord-6b2e13f521b6781afd9f710152cd2f25
 ```
 
-The instance then ends on its own, and `flz operator info` shows how:
+About ten seconds later, once the exchange has answered, the instance ends on
+its own, and `flz operator info` shows how:
 
 ```sh
 flz operator info order_1 --namespace trading
@@ -84,7 +85,8 @@ flz operator start paper_order --id order_2 --namespace trading \
   --text '{"symbol": "EUR/USD", "quantity": 500}' --channel order
 ```
 
-`confirm_fill` is tried three times, and then the order ends in failure. Every
+`confirm_fill` is tried three times, ten seconds each, and then the order ends
+in failure. Every
 step that had finished is undone, in reverse: the order is cancelled, then the
 money is released. `record_order` has no undo, so the booking stays:
 

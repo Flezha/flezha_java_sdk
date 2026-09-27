@@ -7,7 +7,8 @@ import com.flezha.sdk.tasklet.TaskletException;
 
 /**
  * Asks the exchange whether the order filled, on one arm of the fan-out. The paper exchange
- * rejects anything above its own size, which is what makes this the step that fails.
+ * rejects anything above its own size, which is what makes this the step that fails, and takes
+ * ten seconds to answer, which leaves time to stop the runner in the middle of an order.
  *
  * <p>It remembers nothing and has nothing to undo, so it declares only {@code run}. It
  * ends the instance with a result rather than emitting one: the order's outcome is the instance's
@@ -24,6 +25,12 @@ public final class ConfirmFill {
     private static final int EXCHANGE_MAX = 100;
 
     public void run(PlacedOrder placed, TaskletCtx ctx) throws TaskletException {
+        try {
+            Thread.sleep(10_000);
+        } catch (InterruptedException stopped) {
+            Thread.currentThread().interrupt();
+            throw new TaskletException("stopped while waiting for the exchange");
+        }
         int quantity = placed.order().quantity();
         if (quantity > EXCHANGE_MAX) {
             throw new TaskletException(

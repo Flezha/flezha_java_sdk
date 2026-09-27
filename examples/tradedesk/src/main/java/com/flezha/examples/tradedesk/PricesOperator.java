@@ -11,19 +11,21 @@ import javax.annotation.Nonnull;
  * The desk's stream: trades in, each price compared with its symbol's recent average, and an order
  * started when a price jumps far enough above it.
  *
- * <p>An unbounded operator runs for as long as the desk does. The exchange delivers several trades in
- * one message, so the wiring splits the message before anything else sees it, drops what the desk
- * does not follow, keeps only the fields the desk reads, and routes the rest to a cell per symbol.
+ * <p>An unbounded operator runs for as long as the desk does. The exchange sends other messages
+ * beside its trades and delivers several trades in one message, so the wiring keeps the trade
+ * messages, splits each into its trades before anything else sees them, drops what the desk does
+ * not follow, and routes the rest to a cell per symbol.
  */
 public final class PricesOperator implements UnboundedOperator {
 
     /**
-     * One message from the exchange, carrying one or more trades. The exchange sends more fields
-     * than the desk reads, and the default JSON decoding refuses a field the record does not name
-     * unless the record says to ignore it.
+     * One message from the exchange: {@code channel} says what it is, and a trade message carries
+     * one or more trades in {@code data}. The exchange sends more fields than the desk reads, and
+     * the default JSON decoding refuses a field the record does not name unless the record says
+     * to ignore it.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record TradeMessage(List<Trade> data) {}
+    public record TradeMessage(String channel, List<Trade> data) {}
 
     @Override
     @Nonnull
@@ -32,13 +34,15 @@ public final class PricesOperator implements UnboundedOperator {
     }
 
     /**
-     * Three transforms on the wiring, then two tasklets, and one place output leaves the desk.
+     * Four transforms on the wiring, then two tasklets, and one place output leaves the desk.
      *
-     * <p>{@code flatMap} turns one message into its trades, each routed on its own. {@code filter}
-     * keeps the market orders, the trades that went through at whatever the price was.
+     * <p>The first {@code filter} keeps the exchange's trade messages: the same connection also
+     * carries the confirmation of every subscription, which has no trades to split. {@code flatMap}
+     * turns one message into its trades, each routed on its own. The second {@code filter} keeps
+     * the market orders, the trades that went through at whatever the price was.
      * {@code keyBy} names the cell each trade belongs to, which is what gives every
      * symbol its own state and its own order of arrival; it has to be the last link before
-     * {@code into}, because it is evaluated on whatever the transforms above it produced. The three
+     * {@code into}, because it is evaluated on whatever the transforms above it produced. The four
      * run at the routing seam rather than as tasklets of their own: no cell, no mailbox, no
      * dispatch hop, which is why they must stay cheap and free of side effects.
      *
@@ -57,6 +61,7 @@ public final class PricesOperator implements UnboundedOperator {
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
         c.input(TradeMessage.class, "trades")
+                .filter(message -> "trade".equals(message.channel()))
                 .flatMap(Trade.class, TradeMessage::data)
                 .filter(trade -> "market".equals(trade.ord_type()))
                 .keyBy(Trade::symbol)
