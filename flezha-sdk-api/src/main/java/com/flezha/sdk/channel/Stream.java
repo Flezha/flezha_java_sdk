@@ -117,7 +117,7 @@ public abstract class Stream<T> implements EdgeStream<T> {
      * after it and the value then reaches both the consumer mailboxes (typed)
      * and the sink (as bytes). A channel with no consumers is the plugin-bound
      * terminal — terminality is the absence of further wiring, not a different
-     * method. {@link #sealed()} states that in the type.
+     * method.
      *
      * <p>The serializer runs once per emit regardless of consumer count.
      * Declaring a second sink on one channel fails registration, and so does
@@ -149,15 +149,6 @@ public abstract class Stream<T> implements EdgeStream<T> {
      */
     @Nonnull
     public abstract Stream<T> sink();
-
-    /**
-     * State that nothing follows this channel: the returned {@link Channel}
-     * exposes no builder methods, so a later consumer or transform does not
-     * type-check. Purely type-level — the topology is identical with or
-     * without it.
-     */
-    @Nonnull
-    public abstract Channel<T> sealed();
 
     /**
      * Branching sugar: each arm receives <b>this</b> handle, so

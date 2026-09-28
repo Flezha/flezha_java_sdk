@@ -53,10 +53,6 @@ public final class TradeWatcherOperator implements UnboundedOperator {
      * a plain {@code into} leaves its consumer single-cell. That is the right shape here, since
      * the second stage keeps nothing per symbol. A stage that did would need its own
      * {@code keyBy}, or one cell would hold every symbol at once.
-     *
-     * <p>{@code sealed()} states that the signals channel is where the desk's output ends. It
-     * is purely type-level: the declared topology is the same without it, but a later
-     * {@code into} on this chain no longer compiles.
      */
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
@@ -67,7 +63,6 @@ public final class TradeWatcherOperator implements UnboundedOperator {
                 .keyBy(Trade::symbol)                                // one cell per symbol
                 .into(TrackPrices.class)
                 .into(BuyAboveAverage.class)
-                .sink("signals")
-                .sealed();
+                .sink("signals");
     }
 }

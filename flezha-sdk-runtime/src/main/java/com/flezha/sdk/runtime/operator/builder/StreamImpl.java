@@ -1,6 +1,5 @@
 package com.flezha.sdk.runtime.operator.builder;
 
-import com.flezha.sdk.channel.Channel;
 import com.flezha.sdk.channel.EdgeStream;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.PlainPayload;
@@ -183,13 +182,6 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
             entry.pluginSinkSerializer = value -> serializer.apply(cast(value));
         }
         return this;
-    }
-
-    @Override
-    @Nonnull
-    public Channel<T> sealed() {
-        owner.checkMutable();
-        return new Channel<>();
     }
 
     @SuppressWarnings("unchecked")

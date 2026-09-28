@@ -447,23 +447,16 @@ class UnboundedOperatorTopologyBuilderTest {
         }
 
         @Test
-        @DisplayName("a sink with no consumers is the terminal; sealed() changes nothing")
+        @DisplayName("a sink with no consumers is the terminal")
         void sinkTerminalityIsDerivedFromTheWiring() {
             var terminal = UnboundedOperatorTopologyBuilder.build(
                     "g13",
                     c -> c.input(String.class, "in").into(SingleTasklet.class).sink("egress"));
-            var sealed = UnboundedOperatorTopologyBuilder.build("g14", c -> c.input(String.class, "in")
-                    .into(SingleTasklet.class)
-                    .sink("egress")
-                    .sealed());
             var hybrid = UnboundedOperatorTopologyBuilder.build("g15", c -> c.input(String.class, "in")
                     .into(SingleTasklet.class)
                     .sink("egress")
                     .into(GraphStage1.class));
 
-            assertThat(shape(sealed))
-                    .as("`.sealed()` must add no topology difference")
-                    .isEqualTo(shape(terminal));
             assertThat(sinkShape(terminal)).isEqualTo(List.of(ChannelKind.PLUGIN_BOUND.name(), "0", "egress"));
             assertThat(sinkShape(hybrid)).isEqualTo(List.of(ChannelKind.INTER_TASKLET.name(), "1", "egress"));
         }
@@ -483,21 +476,6 @@ class UnboundedOperatorTopologyBuilderTest {
                     .as("sink() derives exactly as a channel with no sink does")
                     .isEqualTo("single_tasklet");
             assertThat(derived.channels().get(1).pluginSink()).isPresent();
-        }
-
-        @Test
-        @DisplayName("sealing a leaf declares no channel")
-        void sealingALeafDeclaresNoChannel() {
-            // A leaf's output channel is created lazily, so this is the case
-            // where "sealing changes no topology" is falsifiable: a sealed()
-            // that reached the builder would conjure one.
-            var sealed = UnboundedOperatorTopologyBuilder.build(
-                    "g16",
-                    c -> c.input(String.class, "in").into(SingleTasklet.class).sealed());
-            var bare = UnboundedOperatorTopologyBuilder.build(
-                    "g17", c -> c.input(String.class, "in").into(SingleTasklet.class));
-
-            assertThat(shape(sealed)).isEqualTo(shape(bare));
         }
 
         /** Everything about the `egress` channel the sink declaration decides. */

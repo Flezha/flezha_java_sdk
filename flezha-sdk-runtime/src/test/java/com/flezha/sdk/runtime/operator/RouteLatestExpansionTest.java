@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.EntryChannel;
 import com.flezha.sdk.channel.RoutedDocument;
-import com.flezha.sdk.channel.Stream;
 import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import com.flezha.sdk.runtime.operator.builder.LatestDocumentRouter;
@@ -134,14 +133,11 @@ class RouteLatestExpansionTest {
             EntryChannel<Thresholds> thresholds = c.input(Thresholds.class, "thresholds");
             EntryChannel<Thresholds> alt = c.input(Thresholds.class, "alt_thresholds");
             EntryChannel<Trade> trades = c.input(Trade.class, "trades");
-            Stream<RoutedDocument<Thresholds>> primary =
-                    c.routeLatest(Thresholds.class, thresholds, trades, Trade::symbol, "primary");
-            // Sealed leaves, unnamed: `.named(...)` would conjure the output
+            // Leaves, unnamed: `.named(...)` would conjure the output
             // channel these routers never produce onto, which is an
             // inter-tasklet channel with no consumer.
-            primary.sealed();
-            c.routeLatest(Thresholds.class, alt, trades, Trade::symbol, "secondary")
-                    .sealed();
+            c.routeLatest(Thresholds.class, thresholds, trades, Trade::symbol, "primary");
+            c.routeLatest(Thresholds.class, alt, trades, Trade::symbol, "secondary");
         }
     }
 

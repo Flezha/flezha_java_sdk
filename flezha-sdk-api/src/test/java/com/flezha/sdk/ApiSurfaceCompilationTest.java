@@ -119,17 +119,6 @@ class ApiSurfaceCompilationTest {
     }
 
     @Test
-    @DisplayName("a sealed channel accepts no further declaration")
-    void sealedRefusesFurtherDeclaration() {
-        assertThat(compiles(usesUnbounded("s.sink(\"x\").sealed();")))
-                .as("sealing a sink is the supported terminator")
-                .isTrue();
-
-        assertDoesNotCompile(usesUnbounded("s.sink(\"x\").sealed().named(\"y\");"));
-        assertDoesNotCompile(usesUnbounded("s.sink(\"x\").sealed().keyed();"));
-    }
-
-    @Test
     @DisplayName("The retry knobs are gone from the interface")
     void theRetryKnobsAreGoneFromTheInterface() {
         assertThat(compiles(boundedWith("c.input(String.class, \"in\").retryMax(2).retryBackoffMs(20);", "")))
