@@ -16,8 +16,9 @@ import java.util.List;
  * vendors them at {@code contract/} rather than walking to a tree it has not got.
  *
  * <p>The directory is resolved once, in the order every SDK uses: {@code $FLEZHA_CONTRACT_DIR},
- * else {@code contract/} at the package root, else the tree this module sits in. Resolving nowhere
- * is a failure naming the three, never a skip.
+ * else the tree this module sits in, else {@code contract/} at the package root. The enclosing tree
+ * comes first so a stale copy fetched into a package inside the core's checkout never shadows the
+ * live files. Resolving nowhere is a failure naming the three, never a skip.
  */
 public final class RepositoryFixture {
 
@@ -52,7 +53,7 @@ public final class RepositoryFixture {
         if (Files.isRegularFile(beside.resolve(file))) {
             return linesOf(beside.resolve(file));
         }
-        Path tree = carrying(TEST_APP_IN_TREE + "/" + file);
+        Path tree = carrying(Path.of("").toAbsolutePath(), TEST_APP_IN_TREE + "/" + file);
         if (tree != null) {
             return linesOf(tree.resolve(TEST_APP_IN_TREE).resolve(file));
         }
@@ -88,19 +89,22 @@ public final class RepositoryFixture {
 
     /** The contract set's root, resolved once for every reader in this suite. */
     private static Path contractRoot() {
-        if (ROOT != null) {
-            return ROOT;
+        if (ROOT == null) {
+            ROOT = locateContract(Path.of("").toAbsolutePath(), System.getenv("FLEZHA_CONTRACT_DIR"));
         }
-        List<Path> candidates = candidates();
+        return ROOT;
+    }
+
+    /** Where the contract set is for a module directory one below its package root. */
+    static Path locateContract(Path module, String configured) {
+        List<Path> candidates = candidates(module, configured);
         for (Path candidate : candidates) {
             if (candidate != null && Files.isRegularFile(candidate.resolve(MANIFEST))) {
-                return ROOT = candidate;
+                return candidate;
             }
         }
-        List<String> unresolved = List.of(
-                "$FLEZHA_CONTRACT_DIR (unset)",
-                "",
-                "no directory above " + Path.of("").toAbsolutePath() + " carries " + MANIFEST);
+        List<String> unresolved =
+                List.of("$FLEZHA_CONTRACT_DIR (unset)", "no directory above " + module + " carries " + MANIFEST, "");
         StringBuilder tried = new StringBuilder();
         for (int at = 0; at < candidates.size(); at++) {
             Path candidate = candidates.get(at);
@@ -110,19 +114,16 @@ public final class RepositoryFixture {
                 + "\nUnpack flezha-fixtures-<version>.tar.gz at contract/, or set FLEZHA_CONTRACT_DIR.");
     }
 
-    private static List<Path> candidates() {
-        String configured = System.getenv("FLEZHA_CONTRACT_DIR");
-        // A module directory is one below the package root, whatever the suite
-        // was started from; the tree is whichever ancestor carries the manifest.
+    private static List<Path> candidates(Path module, String configured) {
         return Arrays.asList(
                 configured == null || configured.isEmpty() ? null : Path.of(configured),
-                Path.of("..", "contract").normalize(),
-                carrying(MANIFEST));
+                carrying(module, MANIFEST),
+                module.resolveSibling("contract"));
     }
 
-    /** The nearest ancestor of the working directory that carries {@code marker}. */
-    private static Path carrying(String marker) {
-        for (Path at = Path.of("").toAbsolutePath(); at != null; at = at.getParent()) {
+    /** The nearest ancestor of {@code from} that carries {@code marker}. */
+    private static Path carrying(Path from, String marker) {
+        for (Path at = from; at != null; at = at.getParent()) {
             if (Files.isRegularFile(at.resolve(marker))) {
                 return at;
             }

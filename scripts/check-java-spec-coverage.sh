@@ -66,8 +66,8 @@ FINDING = 1
 NO_ANSWER = 3
 
 # The spec is a member of the contract set, so it is read from where the
-# fixture tests read the set: `$FLEZHA_CONTRACT_DIR`, else `contract/`, else the
-# nearest enclosing tree that carries the set's manifest.
+# fixture tests read the set: `$FLEZHA_CONTRACT_DIR`, else the nearest enclosing
+# tree that carries the set's manifest, else `contract/`.
 MANIFEST = "test/fixtures/contract.txt"
 SPEC_MEMBER = "openspec/specs/java-sdk/spec.md"
 BASELINE = "scripts/java-spec-coverage-baseline.txt"
@@ -76,8 +76,9 @@ TEST_SOURCES = "*/src/test/java/**/*.java"
 
 
 def contract_root():
-    candidates = [os.environ.get("FLEZHA_CONTRACT_DIR") or None, "contract"]
+    candidates = [os.environ.get("FLEZHA_CONTRACT_DIR") or None]
     candidates += [str(p) for p in pathlib.Path.cwd().resolve().parents]
+    candidates += ["contract"]
     for candidate in candidates:
         if candidate and os.path.isfile(os.path.join(candidate, MANIFEST)):
             return candidate
