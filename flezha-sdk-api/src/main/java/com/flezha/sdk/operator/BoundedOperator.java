@@ -120,7 +120,10 @@ public interface BoundedOperator extends Operator {
      * {@link RollbackMode#KEEP_PROGRESS} keeps each finished loop iteration and
      * undoes only the in-flight one. The mode is irrelevant for a single-pass
      * chain (where both behave all-or-nothing) and for an operator with no
-     * compensation hooks.
+     * compensation hooks. A {@link LoopMode#PER_INPUT} loop declaring
+     * {@code KEEP_PROGRESS} does not terminate on a failed turn: the turn's
+     * message is dead-lettered, its tasklets are undone and the next message
+     * runs.
      */
     default RollbackMode rollbackMode() {
         return RollbackMode.ALL_OR_NOTHING;

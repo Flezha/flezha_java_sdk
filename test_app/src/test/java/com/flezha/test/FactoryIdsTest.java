@@ -48,6 +48,8 @@ class FactoryIdsTest {
             "echo_bounded",
             "event_timer_bounded",
             "failed_stage_bounded",
+            "failing_turn_all_or_nothing_bounded",
+            "failing_turn_loop_bounded",
             "cell_stress",
             "hybrid_channel",
             "keyed_block_bounded",

@@ -15,7 +15,8 @@ public enum RollbackMode {
     /**
      * Each finished loop iteration commits (is kept); a failure undoes only the
      * in-flight iteration's completed tasklets. Within a single iteration — or
-     * a no-loop pass — rollback is all-or-nothing.
+     * a no-loop pass — rollback is all-or-nothing. In a per-input loop a failed
+     * turn is dead-lettered and undone, and the loop takes its next message.
      */
     KEEP_PROGRESS
 }

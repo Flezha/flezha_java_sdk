@@ -117,6 +117,8 @@ public final class Main {
                 .registerFactory(NoStateLoopBoundedOperator.class)
                 .registerFactory(KeyedLoopBoundedOperator.class)
                 .registerFactory(ChatRewindBoundedOperator.class)
+                .registerFactory(FailingTurnLoopBoundedOperator.class)
+                .registerFactory(FailingTurnAllOrNothingBoundedOperator.class)
                 .registerFactory(ReplyBlockLoopBoundedOperator.class)
                 .registerFactory(RetryBoundedOperator.class)
                 .registerFactory(BranchBoundedOperator.class)
