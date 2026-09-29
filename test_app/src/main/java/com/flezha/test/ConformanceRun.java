@@ -13,6 +13,8 @@ import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.operator.BoundedOperator;
 import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.runtime.core.DerivedDeclaration;
+import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.operator.ChannelDescriptor;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
@@ -68,12 +70,12 @@ public final class ConformanceRun {
     private static final String FIXTURE = "test/fixtures/reference_topologies.txt";
 
     /**
-     * The authoring surfaces this builder carries — the same three this app's
+     * The authoring surfaces this builder carries — the same list this app's
      * {@code conformance.json} declares. A row needing anything else is skipped
      * BY NAME, which is what makes the skip checkable.
      */
     private static final List<String> SURFACES =
-            List.of("merge", "branch", "bounded", "shorthand", "shorthand_typed_output");
+            List.of("merge", "branch", "bounded", "shorthand", "shorthand_typed_output", "response");
 
     /** The capacity a row declared per role, read as the tasklet is minted. */
     private static final Map<String, Integer> MAILBOX = new HashMap<>();
@@ -287,6 +289,7 @@ public final class ConformanceRun {
                     producer.sink(call[1]);
                 }
             }
+            case "response" -> producer.response();
             case "keyed" -> producer.keyed();
             default -> throw new IllegalStateException(
                     "the fixture spells a link this interpreter does not map: " + call[0]);
@@ -531,6 +534,7 @@ public final class ConformanceRun {
      */
     private static ArrayNode derived(ObjectMapper json, UnboundedOperatorTopology topology) {
         ArrayNode channels = json.createArrayNode();
+        DerivedDeclaration answer = HostClassDeclaration.check(topology.declaration());
         for (int index = 0; index < topology.channels().size(); index++) {
             ChannelDescriptor channel = topology.channels().get(index);
             ObjectNode node = channels.addObject();
@@ -544,10 +548,9 @@ public final class ConformanceRun {
             }
             ArrayNode consumers = node.putArray("consumers");
             channel.consumerIds().forEach(consumers::add);
-            // A sink names the channel it terminates, so the descriptor has no
-            // name of its own: the one name is the channel's.
-            channel.pluginSink()
-                    .ifPresentOrElse(sink -> node.put("sink", channel.name()), () -> node.putNull("sink"));
+            // The core's answer: a response end serializes like a sink but is
+            // not one, so the descriptor alone cannot tell the two apart.
+            node.put("sink", answer.channel(index).sink());
         }
         return channels;
     }

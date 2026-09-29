@@ -36,7 +36,8 @@
     "branch",
     "bounded",
     "shorthand",
-    "shorthand_typed_output"
+    "shorthand_typed_output",
+    "response"
   ],
   "toolchain": "java -version",
   "deferred": [],
@@ -138,6 +139,12 @@
     ],
     "dynamic_cell": [
       "dynamic_cell"
+    ],
+    "call_response": [
+      "call_echo",
+      "call_downstream",
+      "call_split",
+      "call_turn"
     ],
     "partitioned": [
       "partition_relay",

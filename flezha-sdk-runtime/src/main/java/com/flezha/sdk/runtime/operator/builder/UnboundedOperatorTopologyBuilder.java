@@ -668,6 +668,12 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
         public final List<PendingEdge> chains = new ArrayList<>();
 
         Function<Object, byte[]> pluginSinkSerializer;
+        /**
+         * The plugin end is a {@code response()}. The core's answer names no
+         * sink for it, yet its emits leave as the plugin output a sink's do.
+         */
+        boolean response;
+
         public OverflowPolicy overflowPolicy;
         public int retryMaxAttempts = RetryPolicy.DEFAULT.maxAttempts();
         public long retryBackoffBaseMs = RetryPolicy.DEFAULT.backoffBaseMs();

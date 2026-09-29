@@ -8,8 +8,8 @@ import javax.annotation.Nullable;
 /**
  * One link of a declared chain, as the {@code HostClassDecl} record spells it.
  * A chain is one fluent sequence off a channel handle, in the order the author
- * called it; {@code into}, {@code merge}, {@code sink} and {@code branch} close
- * the chain they stand in.
+ * called it; {@code into}, {@code merge}, {@code sink}, {@code response} and
+ * {@code branch} close the chain they stand in.
  *
  * <p>Closures never enter the record — the builder keeps them beside it and
  * attaches them to the edge the core derived from the chain. What a chain
@@ -48,6 +48,12 @@ public record HostLink(
     @Nonnull
     public static HostLink sink(@Nullable String name) {
         return new HostLink("sink", name, null, null, null);
+    }
+
+    /** Terminates the channel on the answer to the call its input carried. */
+    @Nonnull
+    public static HostLink response() {
+        return new HostLink("response", null, null, null, null);
     }
 
     /** Closes the chain onto an edge into a tasklet index. */

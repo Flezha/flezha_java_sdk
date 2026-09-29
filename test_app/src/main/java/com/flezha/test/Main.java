@@ -131,6 +131,10 @@ public final class Main {
                 .registerFactory(BoundedTimerOperators.TimerLoop.class)
                 .registerFactory(BoundedTimerOperators.EventTimer.class)
                 .registerFactory(StaticCellBoundedOperator.class)
+                .registerFactory(CallOperators.CallEcho.class)
+                .registerFactory(CallOperators.CallDownstream.class)
+                .registerFactory(CallOperators.CallSplit.class)
+                .registerFactory(CallOperators.CallTurn.class)
                 // The §5 short forms, registered by the classes the author wrote, as
                 // every hand-written operator is: nothing collects itself.
                 .registerFactory(SugarDoNothing.class)

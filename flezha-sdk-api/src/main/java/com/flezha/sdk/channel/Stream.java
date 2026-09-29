@@ -151,6 +151,28 @@ public abstract class Stream<T> implements EdgeStream<T> {
     public abstract Stream<T> sink();
 
     /**
+     * Terminate this channel on the answer to the outside call its input
+     * carried: every value emitted on it is serialized once and answers that
+     * caller; nothing it carries reaches a plugin. It takes no name — the
+     * channel keeps the one it would have without it.
+     *
+     * <p>The handle is returned, so consumers may be wired after it exactly
+     * as after {@link #sink()}; a channel with none is the plugin-bound
+     * terminal. A channel ends in one sink or one response: both on one
+     * channel, or two responses, fail registration.
+     */
+    @Nonnull
+    public abstract Stream<T> response(Function<T, byte[]> serializer);
+
+    /**
+     * {@link #response(Function)} with the default serialization rules:
+     * passthrough for {@code byte[]}, UTF-8 for {@code String}, Jackson JSON
+     * otherwise.
+     */
+    @Nonnull
+    public abstract Stream<T> response();
+
+    /**
      * Branching sugar: each arm receives <b>this</b> handle, so
      * {@code s.branch(b -> b.into(A.class), b -> b.into(B.class))} builds
      * exactly the topology of two {@code s.into} statements — nothing more,

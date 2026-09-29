@@ -167,16 +167,34 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
         return attachSink(null, PlainPayload::encode);
     }
 
+    @Override
+    @Nonnull
+    public Stream<T> response(@Nonnull Function<T, byte[]> serializer) {
+        return attachPluginEnd(HostLink.response(), null, serializer);
+    }
+
+    @Override
+    @Nonnull
+    public Stream<T> response() {
+        return attachPluginEnd(HostLink.response(), null, PlainPayload::encode);
+    }
+
     private Stream<T> attachSink(@Nullable String channel, Function<T, byte[]> serializer) {
+        return attachPluginEnd(HostLink.sink(channel), channel, serializer);
+    }
+
+    /** Record a plugin end, a sink or a response; both leave as a plugin output. */
+    private Stream<T> attachPluginEnd(HostLink end, @Nullable String channel, Function<T, byte[]> serializer) {
         owner.checkMutable();
         ChannelEntry entry = owner.channel(channelId());
-        owner.closeChain(channelId(), null, HostLink.sink(channel));
+        owner.closeChain(channelId(), null, end);
+        entry.response |= end.link().equals("response");
         if (channel != null) {
             // The record is what the core reads; this keeps the builder's own
             // diagnostics naming the channel the author does.
             entry.name = channel;
         }
-        // First call wins on the builder's own side; a second sink is recorded
+        // First call wins on the builder's own side; a second end is recorded
         // and the core refuses the class, so nothing is registered either way.
         if (entry.pluginSinkSerializer == null) {
             entry.pluginSinkSerializer = value -> serializer.apply(cast(value));

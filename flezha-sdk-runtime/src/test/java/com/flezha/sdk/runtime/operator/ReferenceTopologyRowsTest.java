@@ -107,6 +107,21 @@ class ReferenceTopologyRowsTest {
                             .sink("out");
                     in.into(UnboundedOperatorTopologyBuilderTest.GraphStage1.class)
                             .sink("out");
+                }),
+                // entry(in); in.into(plain); plain.sink(out); plain.response
+                new Row("response_beside_sink", c -> {
+                    var plain =
+                            c.input(String.class, "in").into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
+                    plain.sink("out");
+                    plain.response();
+                }),
+                // entry(in); in.into(plain); plain.named(answer); plain.response; plain.response
+                new Row("two_responses", c -> {
+                    var plain =
+                            c.input(String.class, "in").into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
+                    plain.named("answer");
+                    plain.response();
+                    plain.response();
                 }));
     }
 
@@ -129,7 +144,27 @@ class ReferenceTopologyRowsTest {
                 // entry(in); in.into(plain); plain.sink(items_output)
                 new Row("sink_names_channel", c -> c.input(String.class, "in")
                         .into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class)
-                        .sink("items_output")));
+                        .sink("items_output")),
+                // entry(in); in.into(plain); in.into(second); plain.named(accepted); plain.response;
+                // second.named(refused); second.response
+                new Row("two_response_ends", c -> {
+                    var in = c.input(String.class, "in");
+                    in.into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class)
+                            .named("accepted")
+                            .response();
+                    in.into(UnboundedOperatorTopologyBuilderTest.GraphStage1.class)
+                            .named("refused")
+                            .response();
+                }),
+                // class.persistent; class.effectively_once; entry(in); in.into(plain); plain.named(answer);
+                // plain.response
+                new Row("eo_unkeyed_response", c -> {
+                    c.effectivelyOnce();
+                    c.input(String.class, "in")
+                            .into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class)
+                            .named("answer")
+                            .response();
+                }));
     }
 
     @Test
