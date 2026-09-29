@@ -160,6 +160,30 @@ class LocalModeCapabilitiesTest {
         assertThat(refused.details()).containsEntry("capability", "effectively_once");
     }
 
+    @Test
+    @DisplayName("parts: a local run drops every part and releases the output alone")
+    void aLocalRunDropsEveryPart() {
+        declares("parts", "part_echo");
+
+        List<SinkOutput> released = release(PartEchoUnboundedOperator.class, "in", "answer", List.of("3"));
+
+        assertThat(payloads(released)).containsExactly("done:3");
+    }
+
+    @Test
+    @DisplayName("parts: the core refuses a part whose channel ends in no sink")
+    void aPartWithNoSinkIsRefused() {
+        PART_REFUSALS.clear();
+        for (Class<?> operator : List.of(PartToTaskletUnboundedOperator.class, PartToResponseUnboundedOperator.class)) {
+            try (LocalOperator run = LocalOperator.start(operator)) {
+                run.feed("input", "x");
+                run.runUntilIdle(BUDGET);
+            }
+        }
+
+        assertThat(PART_REFUSALS).containsExactly("part.no_sink", "part.no_sink");
+    }
+
     /**
      * Run one class over {@code inputs} on {@code channel}, and return what {@code sink} released.
      *
@@ -322,6 +346,79 @@ class LocalModeCapabilitiesTest {
         @Override
         public void channels(ChannelBuilder c) {
             c.input(String.class, "input").into(SessionTimeoutTasklet.class).sink("kafka");
+        }
+    }
+
+    /** Parts {@code 1..n}, then {@code done:<n>}; the test app's twin also fails a {@code retry:} input once. */
+    @Tasklet.Spec(name = "part_echo")
+    public static final class PartEchoTasklet implements Tasklet<String, Void, String> {
+        @Override
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
+            for (int part = 1; part <= Integer.parseInt(input); part++) {
+                ctx.part(Integer.toString(part));
+            }
+            ctx.emit("done:" + input);
+        }
+    }
+
+    public static final class PartEchoUnboundedOperator implements UnboundedOperator {
+        @Override
+        public String factoryId() {
+            return "part_echo";
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "in")
+                    .retryBackoffMs(25)
+                    .into(PartEchoTasklet.class)
+                    .sink("answer");
+        }
+    }
+
+    /** The codes the core refused a part with. */
+    static final ConcurrentLinkedQueue<String> PART_REFUSALS = new ConcurrentLinkedQueue<>();
+
+    @Tasklet.Spec(name = "refused_part")
+    public static final class RefusedPartTasklet implements Tasklet<String, Void, String> {
+        @Override
+        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
+            try {
+                ctx.part(input);
+            } catch (FlezhaException refused) {
+                PART_REFUSALS.add(refused.code());
+            }
+            ctx.emit(input);
+        }
+    }
+
+    @Tasklet.Spec(name = "part_drain")
+    public static final class PartDrainTasklet implements Tasklet<String, Void, String> {
+        @Override
+        public void run(String input, Ctx<Void, String> ctx) {}
+    }
+
+    public static final class PartToTaskletUnboundedOperator implements UnboundedOperator {
+        @Override
+        public String factoryId() {
+            return "part_to_tasklet";
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "input").into(RefusedPartTasklet.class).into(PartDrainTasklet.class);
+        }
+    }
+
+    public static final class PartToResponseUnboundedOperator implements UnboundedOperator {
+        @Override
+        public String factoryId() {
+            return "part_to_response";
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "input").into(RefusedPartTasklet.class).response();
         }
     }
 

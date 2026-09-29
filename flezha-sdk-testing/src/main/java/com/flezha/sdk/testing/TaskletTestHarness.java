@@ -471,6 +471,13 @@ public final class TaskletTestHarness<Input, State, Output> {
             record("", key, value, meta);
         }
 
+        /**
+         * No-op: a part never reaches a sink, so it is not an emit to record, and the harness
+         * encodes no emit either, so there is no encoding to check.
+         */
+        @Override
+        public void part(@Nonnull Output value) {}
+
         /** Mirror the runtime: a user key in the runtime's namespace is refused, not dropped. */
         private static void rejectReserved(Map<String, String> meta) {
             for (String k : meta.keySet()) {

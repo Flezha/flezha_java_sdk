@@ -173,6 +173,15 @@ public final class FlzCore {
     public static native String spawnResult(long ctx, long handle, long timeoutMs);
 
     /**
+     * The ABI form of {@code ctx.part}: send a part of the invocation of work item {@code item}
+     * (its index in the polled activation {@code token}'s list) at once. The core numbers, stamps
+     * and, when it cannot leave at once, drops it. Throws {@code part.no_sink} when the tasklet's
+     * output channel ends in no sink, {@code part.outside_invocation} for a token no longer
+     * outstanding or an item it does not hold.
+     */
+    public static native void part(long ctx, long token, int item, byte[] payload);
+
+    /**
      * Administer the namespace this connection proved: one entry for the whole
      * surface, because the verb is data. {@code verb} names a function of the
      * controller's published consumer surface ({@code "Operator.start"}) and

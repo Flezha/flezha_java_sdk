@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 
 /**
@@ -104,9 +105,9 @@ public final class OperatorInstance {
         }
     }
 
-    ActivationOutcome dispatch(Activation activation) {
+    ActivationOutcome dispatch(Activation activation, ActivationDispatcher.Parts parts) {
         return switch (activation.kind()) {
-            case ActivationKind.Work work -> dispatchWork(activation, work.items());
+            case ActivationKind.Work work -> dispatchWork(activation, work.items(), parts);
             case ActivationKind.RestoreFold fold -> restoreFold(activation, fold);
             case ActivationKind.SnapshotRequest ignored -> {
                 Cell cell = cellFor(activation.target());
@@ -121,7 +122,7 @@ public final class OperatorInstance {
                 yield new ActivationOutcome.StateApplied();
             }
             case ActivationKind.KeyRequest request -> new ActivationOutcome.Prepared(routing.prepare(request));
-            case ActivationKind.CompensateRun comp -> compensateRun(activation, comp.outputs());
+            case ActivationKind.CompensateRun comp -> compensateRun(activation, comp.outputs(), parts);
         };
     }
 
@@ -129,11 +130,14 @@ public final class OperatorInstance {
     // Work
     // ------------------------------------------------------------------
 
-    private ActivationOutcome dispatchWork(Activation activation, List<WorkItem> items) {
+    private ActivationOutcome dispatchWork(
+            Activation activation, List<WorkItem> items, ActivationDispatcher.Parts parts) {
         Cell cell = cellFor(activation.target());
         List<ItemEffect> effects = new ArrayList<>(items.size());
-        for (WorkItem item : items) {
-            ItemEffect effect = runItem(activation, cell, item);
+        for (int index = 0; index < items.size(); index++) {
+            int item = index;
+            ItemEffect effect = runItem(
+                    activation, cell, items.get(index), payload -> parts.send(activation.token(), item, payload));
             effects.add(effect);
             // Stop at the first failed item; the core re-hands the tail.
             if (!(effect.verdict() instanceof Verdict.Ok)) {
@@ -144,7 +148,7 @@ public final class OperatorInstance {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private ItemEffect runItem(Activation activation, Cell cell, WorkItem item) {
+    private ItemEffect runItem(Activation activation, Cell cell, WorkItem item, Consumer<byte[]> parts) {
         long now = item instanceof WorkItem.Input in ? in.now() : ((WorkItem.Timer) item).scheduledAt();
         OptionalLong offset = item instanceof WorkItem.Input in ? in.consumedOffset() : OptionalLong.empty();
         boolean replay = item instanceof WorkItem.Input in && in.replay();
@@ -155,6 +159,7 @@ public final class OperatorInstance {
                 ? cell.timerPolicy.firingSession(new PendingTimers(), timer.scheduledAt(), timer.kind())
                 : cell.timerPolicy.session(new PendingTimers(), now);
         ctx.timers = session;
+        ctx.parts = parts;
         Tasklet tasklet = cell.tasklet;
 
         AtomicReference<List<TimerOp>> timerOps = new AtomicReference<>(List.of());
@@ -254,7 +259,8 @@ public final class OperatorInstance {
      * the outputs a rolled-back stage produced.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private ActivationOutcome compensateRun(Activation activation, List<byte[]> outputBytes) {
+    private ActivationOutcome compensateRun(
+            Activation activation, List<byte[]> outputBytes, ActivationDispatcher.Parts parts) {
         Cell cell = cellFor(activation.target());
         List<Object> outputs = new ArrayList<>(outputBytes.size());
         for (byte[] bytes : outputBytes) {
@@ -265,6 +271,8 @@ public final class OperatorInstance {
         // same refusal the pre-core adapter enforced.
         EmitContext ctx = new EmitContext(
                 this, cell, activation.token(), activation.changeSeq(), System.currentTimeMillis(), false, -1);
+        // A compensation runs no work item, so the core answers its part with `part.outside_invocation`.
+        ctx.parts = payload -> parts.send(activation.token(), -1, payload);
         Tasklet tasklet = cell.tasklet;
         Verdict verdict = runUserCode(() -> tasklet.compensate(outputs, ctx));
         return new ActivationOutcome.Work(List.of(new ItemEffect(

@@ -10,9 +10,9 @@ import javax.annotation.Nonnull;
  * The pure host layer over the poll core: {@link #dispatch} turns one
  * {@link Activation} into one {@link ActivationResult} by running user code —
  * no native calls, which is what makes the whole typed layer unit-testable
- * without the core. The only impurity is the api-side {@code SpawnRequests}
- * static, reached through {@code Ctx}'s default
- * {@code spawnBounded}.
+ * without the core. The impurities are the api-side {@code SpawnRequests}
+ * static, reached through {@code Ctx}'s default {@code spawnBounded}, and the
+ * {@link Parts} the runtime hands in, which {@code ctx.part} reaches.
  *
  * <p>The core guarantees per-Cell exclusivity — it never hands out a second
  * activation for the same Cell until the first completes — so there is no
@@ -23,7 +23,23 @@ public final class ActivationDispatcher {
 
     private static final Logger LOG = Flezha.log();
 
+    /** The core's part entry: one part of work item {@code item} of the activation {@code token}. */
+    @FunctionalInterface
+    public interface Parts {
+        void send(long token, int item, @Nonnull byte[] payload);
+    }
+
     private final ConcurrentHashMap<String, OperatorInstance> instances = new ConcurrentHashMap<>();
+    private final Parts parts;
+
+    /** A dispatcher with no core behind it: every part is dropped, as a run with no stream drops it. */
+    public ActivationDispatcher() {
+        this((token, item, payload) -> {});
+    }
+
+    public ActivationDispatcher(@Nonnull Parts parts) {
+        this.parts = parts;
+    }
 
     /** Live operator instances keyed by operator id — the {@code operators()} view. */
     @Nonnull
@@ -50,7 +66,7 @@ public final class ActivationDispatcher {
                     (id, existing) -> existing != null && existing.factoryId().equals(activation.factory())
                             ? existing
                             : OperatorInstance.materialize(id, activation.factory()));
-            return new ActivationResult(activation.token(), instance.dispatch(activation));
+            return new ActivationResult(activation.token(), instance.dispatch(activation, parts));
         } catch (Throwable t) {
             String message = t.getMessage() == null ? t.toString() : t.getMessage();
             LOG.error(

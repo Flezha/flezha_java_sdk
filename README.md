@@ -58,8 +58,9 @@ public final class Echo implements Tasklet<String, Void, String> {
 so nothing is kept between messages and nothing is journaled. A state class of
 your own makes the tasklet durable: `ctx.state()` reads it, and `ctx.change(...)`
 records a change, a record whose `applyTo` writes the state. The context also
-reads the clock, gives replay-stable ids and registers timers. The operator
-names this class itself; nothing is generated.
+reads the clock, gives replay-stable ids and registers timers, and
+`ctx.part(value)` sends a preview of the output to a listener while `run` is
+still working. The operator names this class itself; nothing is generated.
 
 **The operator** declares the graph and holds no logic of its own. A tasklet
 cannot be deployed alone, because nothing in the system knows where its messages

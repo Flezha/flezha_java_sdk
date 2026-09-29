@@ -135,6 +135,8 @@ public final class Main {
                 .registerFactory(CallOperators.CallDownstream.class)
                 .registerFactory(CallOperators.CallSplit.class)
                 .registerFactory(CallOperators.CallTurn.class)
+                .registerFactory(PartOperators.PartEcho.class)
+                .registerFactory(PartOperators.PartEchoBounded.class)
                 // The §5 short forms, registered by the classes the author wrote, as
                 // every hand-written operator is: nothing collects itself.
                 .registerFactory(SugarDoNothing.class)

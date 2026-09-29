@@ -332,5 +332,8 @@ class SpawnHandleTest {
 
         @Override
         public <C> void emitWithMeta(String channel, C value, Map<String, String> meta) {}
+
+        @Override
+        public void part(Object value) {}
     }
 }

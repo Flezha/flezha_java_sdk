@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -47,6 +48,9 @@ final class EmitContext implements Ctx<Object, Object> {
 
     @Nullable
     TimerSession timers;
+
+    /** Where this invocation's parts go: the core's part entry for its work item. */
+    Consumer<byte[]> parts;
 
     private byte[] identityBytes;
     private int stableIdOrdinal;
@@ -181,6 +185,19 @@ final class EmitContext implements Ctx<Object, Object> {
     @Override
     public void emitKeyedWithMeta(@Nonnull String key, @Nonnull Object value, @Nonnull Map<String, String> meta) {
         doEmit(defaultOutputChannel(), value, meta, key);
+    }
+
+    /**
+     * Encoded as an emit of {@code value} on this tasklet's output channel would be. The core
+     * refuses a channel that ends in no sink, so a channel with no plugin end sends no bytes.
+     */
+    @Override
+    public void part(@Nonnull Object value) {
+        ChannelDescriptor descriptor = instance.topology.channel(defaultOutputChannel());
+        byte[] bytes = descriptor == null || descriptor.pluginSink().isEmpty()
+                ? new byte[0]
+                : serializeOrThrow(descriptor.pluginSink().get().serializer(), value, descriptor.name());
+        parts.accept(bytes);
     }
 
     private int defaultOutputChannel() {

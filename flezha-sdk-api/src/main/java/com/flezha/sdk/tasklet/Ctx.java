@@ -314,6 +314,22 @@ public interface Ctx<State, Output> {
     void emit(Output value) throws TaskletException;
 
     /**
+     * Send a part: a preview of the output this invocation is producing, which leaves the runner
+     * now rather than when the invocation returns. A listener attached to the operator receives
+     * it; a sink never does, and nothing about the part is durable or replayed.
+     *
+     * <p>The part previews this tasklet's own output channel, and {@code value} is encoded exactly
+     * as {@link #emit} would encode it there. The call never waits: a part that cannot leave at
+     * once is dropped and counted, and a replayed input sends none. The runtime numbers the parts
+     * of each attempt from 0 and stamps the attempt, the Cell and the channel.
+     *
+     * @throws com.flezha.sdk.FlezhaException {@code part.no_sink} if the output channel does not
+     *     end in a sink (a {@code response()} end is not one), {@code part.outside_invocation} if
+     *     this context's invocation has already returned
+     */
+    void part(Output value);
+
+    /**
      * Emits on a named channel, for a tasklet that produces on more than one.
      *
      * @param channel the channel name to release on, as given to {@code named(...)} in the wiring

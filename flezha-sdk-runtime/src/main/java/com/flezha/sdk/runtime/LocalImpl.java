@@ -62,7 +62,9 @@ public final class LocalImpl implements LocalRunHandle {
             FlzCore.contextFree(core);
             throw e;
         }
-        LocalImpl handle = new LocalImpl(core, new ActivationDispatcher(), FlezhaEnv.resolveFromEnv());
+        ActivationDispatcher dispatcher =
+                new ActivationDispatcher((token, item, payload) -> FlzCore.part(core, token, item, payload));
+        LocalImpl handle = new LocalImpl(core, dispatcher, FlezhaEnv.resolveFromEnv());
         handle.pollHost.start();
         handle.outputs.start();
         return handle;

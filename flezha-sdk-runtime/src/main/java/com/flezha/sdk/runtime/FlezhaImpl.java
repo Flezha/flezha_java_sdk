@@ -87,7 +87,8 @@ public final class FlezhaImpl implements RunnerHandle {
             throw e;
         }
 
-        ActivationDispatcher dispatcher = new ActivationDispatcher();
+        ActivationDispatcher dispatcher =
+                new ActivationDispatcher((token, item, payload) -> FlzCore.part(core, token, item, payload));
         SpawnRequests.install(new CoreSpawnRequester(core));
 
         FlezhaImpl handle = new FlezhaImpl(

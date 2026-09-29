@@ -59,6 +59,8 @@ class FactoryIdsTest {
             "mixed_operator",
             "optout_commit_block",
             "outbox_block_bounded",
+            "part_echo",
+            "part_echo_bounded",
             "partition_relay",
             "persistence_off_counter",
             "poison_probe",
