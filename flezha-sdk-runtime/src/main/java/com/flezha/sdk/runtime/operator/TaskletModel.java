@@ -1,8 +1,8 @@
 package com.flezha.sdk.runtime.operator;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.internal.RuntimeBridge;
 import com.flezha.sdk.internal.ShortFormDeclaration;
-import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.runtime.state.KryoTypes;
@@ -14,6 +14,7 @@ import java.lang.reflect.Modifier;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
@@ -39,7 +40,7 @@ public final class TaskletModel {
     private final Class<?> taskletClass;
     private final String name;
     private final Tasklet.Spec spec;
-    private final List<String> errors = new ArrayList<>();
+    private final List<FlezhaException> errors = new ArrayList<>();
     private final boolean typesResolved;
     private final Class<?> inputType;
     private final Class<?> stateType;
@@ -59,7 +60,7 @@ public final class TaskletModel {
         Tasklet.Spec declared = taskletClass.getAnnotation(Tasklet.Spec.class);
         ShortFormDeclaration shortForm = ShortFormDeclaration.of(taskletClass);
         if (declared == null && shortForm == null) {
-            throw UnboundedOperatorConfigurationException.taskletSpecMissing(taskletClass.getName());
+            throw FlezhaException.of("topology.tasklet_name_missing", Map.of("tasklet", taskletClass.getName()));
         }
         this.spec = declared != null ? declared : DEFAULTS;
         this.name = declared != null ? declared.name() : shortForm.id();
@@ -82,8 +83,8 @@ public final class TaskletModel {
      * Read {@code taskletClass}. {@code probe} is an instance of it, used only to read a written
      * {@code kryoTypes()}; {@code null} when the class could not be constructed.
      *
-     * @throws UnboundedOperatorConfigurationException beginning {@code TaskletSpecMissing} when the
-     *     class carries no {@link Tasklet.Spec} and is not a short form
+     * @throws FlezhaException {@code topology.tasklet_name_missing} when the class carries no
+     *     {@link Tasklet.Spec} and is not a short form
      */
     @Nonnull
     public static TaskletModel read(@Nonnull Class<?> taskletClass, @Nullable Tasklet<?, ?, ?> probe) {
@@ -97,16 +98,15 @@ public final class TaskletModel {
                 TypeTokens.require(cls, TypeTokens.Token.STATE),
                 TypeTokens.require(cls, TypeTokens.Token.OUTPUT)
             };
-        } catch (UnboundedOperatorConfigurationException e) {
-            errors.add(e.getMessage());
+        } catch (FlezhaException e) {
+            errors.add(e);
             return null;
         }
     }
 
     private ClockKind clockOf(boolean eventTimeWritten) {
         if (eventTimeWritten && spec.logicalClock()) {
-            errors.add("tasklet `" + name + "` writes eventTime(Input) and declares @Tasklet.Spec(logicalClock ="
-                    + " true); a tasklet has one clock, so keep one of the two");
+            errors.add(FlezhaException.of("topology.two_clocks", Map.of("tasklet", name)));
         }
         if (eventTimeWritten) {
             return ClockKind.EVENT_TIME;
@@ -126,8 +126,8 @@ public final class TaskletModel {
                 // Refused below, naming the class.
             }
         }
-        errors.add("tasklet `" + name + "`: state class `" + stateType.getName()
-                + "` has no accessible no-arg constructor; add one, or override initState(cellKey)");
+        errors.add(FlezhaException.of(
+                "topology.state_not_constructible", Map.of("tasklet", name, "state", stateType.getName())));
         return null;
     }
 
@@ -139,16 +139,13 @@ public final class TaskletModel {
             return List.of();
         }
         List<Class<?>> discovered = KryoTypes.discover(taskletClass, stateType);
-        for (String collision : KryoTypes.collisions(KryoTypes.ids(discovered, taskletClass, name))) {
-            errors.add("tasklet `" + name + "`: " + collision);
-        }
+        errors.addAll(KryoTypes.collisions(name, KryoTypes.ids(discovered, taskletClass, name)));
         return discovered;
     }
 
     private void checkSettings() {
         if (name.isEmpty()) {
-            errors.add("tasklet class `" + taskletClass.getName() + "`: @Tasklet.Spec member `name` is empty;"
-                    + " it is where the tasklet's state is saved");
+            errors.add(FlezhaException.of("topology.tasklet_name_missing", Map.of("tasklet", taskletClass.getName())));
         }
         if (spec.capacity() != DEFAULTS.capacity()) {
             refuseNegative("capacity", spec.capacity());
@@ -163,8 +160,8 @@ public final class TaskletModel {
 
     private void refuseNegative(String member, long value) {
         if (value < 0) {
-            errors.add("tasklet `" + name + "`: @Tasklet.Spec member `" + member + "` is " + value
-                    + "; it must not be negative");
+            errors.add(FlezhaException.of(
+                    "topology.negative_setting", Map.of("tasklet", name, "setting", member, "value", value)));
         }
     }
 
@@ -211,9 +208,9 @@ public final class TaskletModel {
         return kryoTypesListed ? new KryoCodec(types) : KryoCodec.named(KryoTypes.ids(types, taskletClass, name));
     }
 
-    /** The refusals reading the class produced, each one sentence; empty when it is sound. */
+    /** The refusals reading the class produced; empty when it is sound. */
     @Nonnull
-    public List<String> errors() {
+    public List<FlezhaException> errors() {
         return List.copyOf(errors);
     }
 

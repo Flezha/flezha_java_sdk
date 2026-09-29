@@ -1,12 +1,9 @@
 package com.flezha.sdk.runtime.core;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.sdk.channel.ChannelKind;
-import com.flezha.sdk.native_.FlezhaNativeException;
 import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
 import com.flezha.sdk.runtime.operator.TaskletModel;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
@@ -21,7 +18,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 /**
  * Writes the poll core's {@code HostClassDecl} record — what the builder was
@@ -132,42 +128,19 @@ public final class HostClassDeclaration {
 
     /**
      * Submit a record to {@code flz_core}'s one check. Answers the derived
-     * declaration, or throws the verdict the core rendered — the names and
-     * sentences every SDK reports a refusal under.
+     * declaration; a refusal is the core's {@code FlezhaException}, whose
+     * {@code details.issues} names every refusal by its code.
      */
     @Nonnull
     public static DerivedDeclaration check(@Nonnull Map<String, Object> record) {
         long ctx = FlzCore.newContext();
         try {
             return DerivedDeclaration.of(JSON.readTree(FlzCore.checkClass(ctx, encode(record))));
-        } catch (FlezhaNativeException refusal) {
-            throw new UnboundedOperatorConfigurationException(refusal.getMessage(), refusals(refusal.body()));
-        } catch (Exception e) {
+        } catch (IOException e) {
             throw new IllegalStateException("the core's derived declaration did not decode: " + e.getMessage(), e);
         } finally {
             FlzCore.contextFree(ctx);
         }
-    }
-
-    /**
-     * The names the core listed in the verdict it handed out beside the
-     * refusal. Empty for a refusal that carried no verdict — a call the JNI
-     * layer could not even submit, which the core never named.
-     */
-    @Nonnull
-    private static List<String> refusals(@Nullable byte[] verdict) {
-        if (verdict == null || verdict.length == 0) {
-            return List.of();
-        }
-        List<String> names = new ArrayList<>();
-        try {
-            for (JsonNode issue : JSON.readTree(verdict).path("issues")) {
-                names.add(issue.path("name").asText());
-            }
-        } catch (IOException e) {
-            throw new IllegalStateException("the core's verdict did not decode: " + e.getMessage(), e);
-        }
-        return names;
     }
 
     /**

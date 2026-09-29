@@ -3,6 +3,7 @@ package com.flezha.sdk.tasklet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flezha.sdk.FlezhaException;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -87,49 +88,42 @@ class SpawnHandleTest {
     }
 
     @Test
-    @DisplayName("the error policy comes back as already running, in the core's own words")
+    @DisplayName("the error policy comes back as already running, carrying the controller's code")
     void theErrorPolicyComesBackAsAlreadyRunning() {
-        String message = "an instance of `w1` is already running and if_running was Error";
-        core.answer = failure("w1", "already_running", message);
+        core.refusal = FlezhaException.of("operator.already_running", Map.of("operator", "w1"));
         SpawnRequests.install(core);
 
         SpawnHandle handle = new StubCtx(false, 42)
                 .spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1").ifRunning(IfRunning.ERROR));
 
-        assertThatThrownBy(handle::await)
-                .isInstanceOf(SpawnException.AlreadyRunning.class)
-                .hasMessage(message);
+        assertThatThrownBy(handle::await).isSameAs(core.refusal);
     }
 
     @Test
-    @DisplayName("a refusal does not fault the call; a read reports it with the core's sentence unprefixed")
+    @DisplayName("a refusal does not fault the call; a read reports it with the controller's code")
     void aRefusalIsReportedOnlyByARead() {
-        String message = "the controller refused the spawn: quota";
-        core.answer = failure("", "refused", message);
+        core.refusal = FlezhaException.of("quota.exceeded", Map.of("kind", "max_operators", "current", 3, "limit", 3));
         SpawnRequests.install(core);
 
         SpawnHandle handle = new StubCtx(false, 42).spawnBounded("worker", PAYLOAD);
 
-        assertThatThrownBy(handle::tryResult)
-                .isInstanceOf(SpawnException.Refused.class)
-                .hasMessage(message);
+        assertThatThrownBy(handle::tryResult).isInstanceOfSatisfying(FlezhaException.class, e -> {
+            assertThat(e.code()).isEqualTo("quota.exceeded");
+            assertThat(e.details()).containsEntry("limit", 3);
+        });
     }
 
     @Test
-    @DisplayName("each failure kind is its own exception")
-    void eachFailureKindIsItsOwnException() {
-        Map<String, Class<? extends SpawnException>> kinds = Map.of(
-                "factory_unknown", SpawnException.FactoryUnknown.class,
-                "factory_not_bounded", SpawnException.FactoryNotBounded.class,
-                "timeout", SpawnException.Timeout.class,
-                "unavailable", SpawnException.Unavailable.class);
+    @DisplayName("each failure is the one exception, told apart by its code")
+    void eachFailureIsTheOneExceptionToldApartByItsCode() {
         SpawnRequests.install(core);
-        kinds.forEach((kind, type) -> {
-            core.answer = failure("", kind, "the core's sentence for " + kind);
+        for (String code : List.of(
+                "operator.factory_unknown", "operator.factory_not_bounded", "spawn.timeout", "spawn.unavailable")) {
+            core.refusal = FlezhaException.of(code, Map.of());
             assertThatThrownBy(new StubCtx(false, 42).spawnBounded("worker", PAYLOAD)::await)
-                    .isInstanceOf(type)
-                    .hasMessage("the core's sentence for " + kind);
-        });
+                    .isInstanceOfSatisfying(
+                            FlezhaException.class, e -> assertThat(e.code()).isEqualTo(code));
+        }
     }
 
     @Test
@@ -185,12 +179,13 @@ class SpawnHandleTest {
                 stderr, () -> new StubCtx(false, 42).spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1")));
 
         assertThat(stderr.toString(StandardCharsets.UTF_8))
-                .isEqualTo("[flezha] spawnBounded(factory `worker`, id `w1`) failed: no control plane to request a"
-                        + " spawn on" + System.lineSeparator());
-        assertThatThrownBy(handle::tryResult).isInstanceOf(SpawnException.Unavailable.class);
-        assertThatThrownBy(handle::await)
-                .isInstanceOf(SpawnException.Unavailable.class)
-                .hasMessage("no control plane to request a spawn on");
+                .startsWith("[flezha] spawnBounded(factory `worker`, id `w1`) failed: spawn.unavailable: ")
+                .endsWith(System.lineSeparator())
+                .hasLineCount(1);
+        assertThatThrownBy(handle::tryResult).isInstanceOfSatisfying(FlezhaException.class, e -> assertThat(e.code())
+                .isEqualTo("spawn.unavailable"));
+        assertThatThrownBy(handle::await).isInstanceOfSatisfying(FlezhaException.class, e -> assertThat(e.code())
+                .isEqualTo("spawn.unavailable"));
     }
 
     @Test
@@ -226,10 +221,6 @@ class SpawnHandleTest {
         assertThat(IfRunning.ERROR.wire()).isEqualTo("error");
     }
 
-    private static String failure(String id, String kind, String message) {
-        return "{\"id\":\"" + id + "\",\"error\":\"" + kind + "\",\"message\":\"" + message + "\"}";
-    }
-
     private static SpawnHandle capturingStderr(ByteArrayOutputStream into, Supplier<SpawnHandle> spawn) {
         PrintStream stderr = System.err;
         System.setErr(new PrintStream(into, true, StandardCharsets.UTF_8));
@@ -242,13 +233,15 @@ class SpawnHandleTest {
 
     /**
      * The core's two entries: every request recorded, and a handle's reads answering {@link #answer}
-     * until one is non-null, then that same answer, as the core does.
+     * until one is non-null, then that same answer, as the core does. A read throws {@link #refusal}
+     * when one is set, as the core throws a failed spawn.
      */
     private static final class FakeCore implements SpawnRequests.Requester {
         final List<String> requests = new CopyOnWriteArrayList<>();
         final List<Long> reads = new CopyOnWriteArrayList<>();
         final Map<Long, String> resolved = new ConcurrentHashMap<>();
         volatile String answer;
+        volatile FlezhaException refusal;
 
         @Override
         public long request(
@@ -273,6 +266,9 @@ class SpawnHandleTest {
         @Override
         public String result(long handle, long timeoutMs) {
             reads.add(timeoutMs);
+            if (refusal != null) {
+                throw refusal;
+            }
             return resolved.computeIfAbsent(handle, pending -> answer);
         }
     }

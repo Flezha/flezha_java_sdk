@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.internal.RunnerHandle;
 import java.util.Locale;
+import java.util.Map;
 import javax.annotation.Nonnull;
 
 /**
@@ -22,7 +24,8 @@ import javax.annotation.Nonnull;
  * <pre>{@code flz role bind runner@team-orders app team-orders}</pre>
  *
  * <p>Every method here is one line over a single native entry point, because
- * the verb travels as data. Adding a verb costs a method and no JNI.
+ * the verb travels as data. Adding a verb costs a method and no JNI. A refused call throws
+ * {@link FlezhaException} with the code the controller answered, such as {@code quota.exceeded}.
  */
 public final class Admin {
 
@@ -45,7 +48,7 @@ public final class Admin {
             String outcome = answer.required("outcome").asText().toUpperCase(Locale.ROOT);
             return new StartResult(answer.required("id").asText(), StartOutcome.valueOf(outcome));
         } catch (IllegalArgumentException e) {
-            throw new IllegalStateException("the controller answered a start this SDK cannot read: " + answer, e);
+            throw FlezhaException.of("admin.unreadable_answer", Map.of("verb", "Operator.start"), e);
         }
     }
 
@@ -109,14 +112,11 @@ public final class Admin {
         for (Object arg : args) {
             array.add(arg instanceof JsonNode node ? node : JsonNodeFactory.instance.textNode(String.valueOf(arg)));
         }
-        return read(handle.adminCall(verb, array.toString()));
-    }
-
-    private JsonNode read(String answer) {
+        String answer = handle.adminCall(verb, array.toString());
         try {
             return JSON.readTree(answer);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("the controller answered unreadable JSON: " + e.getMessage(), e);
+            throw FlezhaException.of("admin.unreadable_answer", Map.of("verb", verb), e);
         }
     }
 }

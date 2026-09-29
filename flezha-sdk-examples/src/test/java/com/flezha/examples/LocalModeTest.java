@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flezha.examples.local.WordCountOperator;
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.LocalOperator;
 import com.flezha.sdk.SinkOutput;
 import com.flezha.sdk.runtime.RepositoryFixture;
@@ -57,10 +58,14 @@ class LocalModeTest {
     @Test
     void a_channel_the_class_does_not_declare_is_refused_by_name() {
         try (LocalOperator run = LocalOperator.start(WordCountOperator.class)) {
-            assertThatThrownBy(() -> run.feed("nope", "x"))
-                    .hasMessageContaining("nope")
-                    .hasMessageContaining("lines");
-            assertThatThrownBy(() -> run.onSink("nope", out -> {})).hasMessageContaining("nope");
+            assertThatThrownBy(() -> run.feed("nope", "x")).isInstanceOfSatisfying(FlezhaException.class, e -> {
+                assertThat(e.code()).isEqualTo("runtime.channel_undeclared");
+                assertThat(e.details()).containsEntry("channel", "nope").containsEntry("channels", List.of("lines"));
+            });
+            assertThatThrownBy(() -> run.onSink("nope", out -> {})).isInstanceOfSatisfying(FlezhaException.class, e -> {
+                assertThat(e.code()).isEqualTo("runtime.channel_undeclared");
+                assertThat(e.details()).containsEntry("channel", "nope");
+            });
         }
     }
 

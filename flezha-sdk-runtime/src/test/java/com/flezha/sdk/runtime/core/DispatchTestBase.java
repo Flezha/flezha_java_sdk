@@ -489,6 +489,20 @@ abstract class DispatchTestBase {
         }
     }
 
+    public static final class LeafEmitOperator extends Op {
+        public LeafEmitOperator() {
+            super("leaf_emit_op", c -> c.input(String.class, "in").into(LeafEmitTask.class));
+        }
+    }
+
+    /** Emits although nothing is wired after it, so it owns no output channel. */
+    @Tasklet.Spec(name = "leaf_emit_task")
+    public static final class LeafEmitTask extends Task<String> {
+        public LeafEmitTask() {
+            super((input, ctx) -> ctx.emit(input));
+        }
+    }
+
     public static final class CheckpointOperator extends Op {
         public CheckpointOperator() {
             super("ckpt_op", c -> {

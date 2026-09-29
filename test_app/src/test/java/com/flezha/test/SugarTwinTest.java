@@ -164,9 +164,10 @@ class SugarTwinTest {
         var runner = com.flezha.sdk.Flezha.createRunner("sugar_twin_dup_ns").registerFactory(ShorthandDupUnbounded.class);
 
         assertThatThrownBy(() -> runner.registerFactory(ShorthandDupBounded.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("DuplicateFactoryId")
-                .hasMessageContaining("plain");
+                .isInstanceOfSatisfying(com.flezha.sdk.FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("topology.duplicate_factory_id");
+                    assertThat(e.details()).containsEntry("factory_id", "plain");
+                });
 
         assertThat(com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry.factoryIds())
                 .doesNotContain("plain");

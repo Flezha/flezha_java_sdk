@@ -1,21 +1,22 @@
 package com.flezha.sdk.runtime.bounded;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.operator.BoundedOperatorConfigurationException;
+import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.operator.ChannelDescriptor;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import java.util.Arrays;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,35 +55,32 @@ class BoundedOperatorClassRegistryTest {
     @Test
     @DisplayName("a bounded operator that declares no tasklet is refused")
     void noTaskletsIsRefused() {
-        assertThatThrownBy(() -> BoundedOperatorClassRegistry.registerClass(NoTaskletsBounded.class))
-                .isInstanceOf(BoundedOperatorConfigurationException.class)
-                .hasMessageContaining("vb_no_tasklets")
-                .hasMessageContaining("at least one tasklet");
+        Refused.by("topology.no_tasklets", () -> BoundedOperatorClassRegistry.registerClass(NoTaskletsBounded.class));
     }
 
     @Test
     @DisplayName("The tier on a bounded class is refused by the core's name")
     void theTierOnABoundedClassIsRefusedByTheCoresName() {
-        assertRefusedAtRegistration(TierBounded.class, "EffectivelyOnceOnBounded");
+        assertRefusedAtRegistration(TierBounded.class, "topology.effectively_once_on_bounded");
     }
 
     @Test
     @DisplayName("A checkpoint setting on a bounded class is refused by its own name")
     void aCheckpointSettingOnABoundedClassIsRefusedByItsOwnName() {
-        assertThat(assertRefusedAtRegistration(CheckpointBounded.class, "CheckpointOnBounded"))
+        assertThat(assertRefusedAtRegistration(CheckpointBounded.class, "topology.checkpoint_on_bounded"))
                 .as("the reason is the kind, not the tier the unbounded rule would ask for")
-                .doesNotContain("CheckpointAckWithoutTier");
+                .doesNotContain("topology.checkpoint_ack_without_tier");
     }
 
     @Test
     @DisplayName("a correction window on a bounded class is refused by its own name")
     void aCorrectionWindowOnABoundedClassIsRefusedByItsOwnName() {
-        assertRefusedAtRegistration(CorrectionBounded.class, "CorrectionWindowOnBounded");
+        assertRefusedAtRegistration(CorrectionBounded.class, "topology.correction_window_on_bounded");
     }
 
     @Test
     @DisplayName("The edge's budget bounds the ladder: retryMax(2) reaches the core as the slot's budget,"
-            + " retryMax(0) is refused naming RetryMaxZero")
+            + " retryMax(0) is refused naming topology.retry_max_zero")
     void theEdgesBudgetBoundsTheLadder() throws Exception {
         // The core's stage barrier runs each slot's ladder from this record, whatever the host.
         String factoryId = BoundedOperatorClassRegistry.registerClass(TwoRetryMaxBounded.class);
@@ -92,21 +90,19 @@ class BoundedOperatorClassRegistryTest {
         assertThat(seed.get("name").asText()).isEqualTo("seed");
         assertThat(seed.get("retry_max").asInt()).isEqualTo(2);
 
-        assertRefusedAtRegistration(ZeroRetryMaxBounded.class, "RetryMaxZero");
+        assertRefusedAtRegistration(ZeroRetryMaxBounded.class, "topology.retry_max_zero");
     }
 
     /**
      * Registers {@code boundedClass} the way {@code registerFactory} does and asserts the core
-     * refused it by {@code name}, leaving nothing registered; the message, for further checks.
+     * refused it by {@code code}, leaving nothing registered; every code it listed, for further checks.
      */
-    private static String assertRefusedAtRegistration(Class<? extends BoundedOperator> boundedClass, String name) {
+    private static List<String> assertRefusedAtRegistration(
+            Class<? extends BoundedOperator> boundedClass, String code) {
         BoundedOperatorClassRegistry.reset();
-        Throwable thrown = catchThrowable(() -> BoundedOperatorClassRegistry.registerClass(boundedClass));
-
-        assertThat(thrown).isInstanceOf(BoundedOperatorConfigurationException.class);
-        assertThat(thrown.getMessage()).contains(name);
+        FlezhaException refused = Refused.by(code, () -> BoundedOperatorClassRegistry.registerClass(boundedClass));
         assertThat(BoundedOperatorClassRegistry.factoryIds()).isEmpty();
-        return thrown.getMessage();
+        return refused.issueCodes();
     }
 
     /** Registers {@code boundedClass} and answers the topology it froze. */
@@ -144,17 +140,16 @@ class BoundedOperatorClassRegistryTest {
     @Test
     @DisplayName("a cycle is refused — a bounded topology is a DAG")
     void cycleIsRefused() {
-        assertThatThrownBy(() -> BoundedOperatorClassRegistry.registerClass(CyclicBounded.class))
-                .isInstanceOf(BoundedOperatorConfigurationException.class)
-                .hasMessageContaining("cycle");
+        Refused.by("topology.cycle", () -> BoundedOperatorClassRegistry.registerClass(CyclicBounded.class));
     }
 
     @Test
     @DisplayName("an operator whose only exit is an external stop is refused")
     void externalStopOnlyIsRefused() {
-        assertThatThrownBy(() -> BoundedOperatorClassRegistry.registerClass(NeverEndingBounded.class))
-                .isInstanceOf(BoundedOperatorConfigurationException.class)
-                .hasMessageContaining("terminable");
+        FlezhaException refused = Refused.by(
+                "topology.external_stop_only",
+                () -> BoundedOperatorClassRegistry.registerClass(NeverEndingBounded.class));
+        assertThat(refused.details()).containsEntry("factory_id", "vb_never_ending");
     }
 
     @Test

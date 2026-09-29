@@ -99,7 +99,8 @@ class EmitContextTest extends DispatchTestBase {
         ItemEffect effect = soleEffect(work("keyed_op", 0, Optional.empty(), 5, input(0, "plain:v", 1_000)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
-        assertThat(((Verdict.RetryableError) effect.verdict()).message()).contains("single-cell");
+        assertThat(((Verdict.RetryableError) effect.verdict()).message())
+                .contains("runtime.key_required_on_keyed_channel");
         assertThat(effect.outputs()).as("nothing may be emitted").isEmpty();
     }
 
@@ -110,7 +111,8 @@ class EmitContextTest extends DispatchTestBase {
         ItemEffect effect = soleEffect(work("counter_op", 0, Optional.of("BTC/USD"), 7, input(0, "key:x", 1_000)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
-        assertThat(((Verdict.RetryableError) effect.verdict()).message()).contains("not declared keyed");
+        assertThat(((Verdict.RetryableError) effect.verdict()).message())
+                .contains("runtime.key_not_allowed_on_non_keyed_channel");
         assertThat(effect.outputs()).as("nothing may be emitted").isEmpty();
     }
 
@@ -135,12 +137,24 @@ class EmitContextTest extends DispatchTestBase {
     }
 
     @Test
+    @DisplayName("an emit from a tasklet that owns no output channel is refused naming the tasklet")
+    void anEmitWithNoOutputChannelIsRefused() {
+        UnboundedOperatorClassRegistry.registerClass(LeafEmitOperator.class);
+        ItemEffect effect = soleEffect(work("leaf_emit_op", 0, Optional.empty(), 0, input(0, "x", 1)));
+
+        assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
+        assertThat(((Verdict.RetryableError) effect.verdict()).message()).contains("runtime.no_output_channel");
+        assertThat(effect.outputs()).isEmpty();
+    }
+
+    @Test
     @DisplayName("an event-time timer under a wall clock is refused inside the invocation")
     void eventTimeTimerWithoutEventTimeClockIsRefused() {
         UnboundedOperatorClassRegistry.registerClass(WallTimerOperator.class);
         ItemEffect effect = soleEffect(work("wall_timer_op", 0, Optional.empty(), 0, input(0, "x", 1)));
         assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
-        assertThat(((Verdict.RetryableError) effect.verdict()).message()).contains("event");
+        assertThat(((Verdict.RetryableError) effect.verdict()).message())
+                .contains("runtime.event_time_timer_without_event_time_clock");
     }
 
     @Test

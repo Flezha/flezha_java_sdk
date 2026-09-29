@@ -1,5 +1,6 @@
 package com.flezha.sdk.runtime.operator.builder;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.BeyondWindowPolicy;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.ChannelKind;
@@ -15,7 +16,6 @@ import com.flezha.sdk.internal.RuntimeBridge;
 import com.flezha.sdk.operator.BoundedOperator;
 import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.operator.UnboundedOperator;
-import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.core.HostLink;
 import com.flezha.sdk.runtime.operator.EdgeYield;
@@ -80,7 +80,7 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
     private final List<PendingEdge> pending = new ArrayList<>();
 
     private final Map<String, Integer> taskletNameToId = new LinkedHashMap<>();
-    private final List<String> errors = new ArrayList<>();
+    private final List<FlezhaException> errors = new ArrayList<>();
     /** Ties the sources of one merge together across the channels they sit on. */
     private int mergeGroups;
 
@@ -112,7 +112,7 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
      * builder; a {@link BoundedOperator} submits its own settings beside it,
      * so the core judges it as a bounded operator.
      *
-     * @throws UnboundedOperatorConfigurationException if any validation rule fails.
+     * @throws FlezhaException if any validation rule fails.
      */
     @Nonnull
     public static UnboundedOperatorTopology build(@Nonnull Operator operator) {
@@ -127,7 +127,7 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
     /**
      * {@link #build(Operator)} for an authoring lambda, judged as an unbounded class.
      *
-     * @throws UnboundedOperatorConfigurationException if any validation rule fails.
+     * @throws FlezhaException if any validation rule fails.
      */
     @Nonnull
     public static UnboundedOperatorTopology build(
@@ -282,7 +282,7 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
         if (!errors.isEmpty()) {
             // The record's edges are meaningless once a payload type does not
             // reach its consumer, so the core is never asked about them.
-            throw refused(errors);
+            throw FlezhaException.ofIssues(errors);
         }
         // A superseded entry is an intermediate link the chain it grew into
         // already carries; only a tip names a whole declared sequence.
@@ -340,22 +340,6 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
                 }
             }
         }
-    }
-
-    /**
-     * The refusals erasure makes and no record could carry. Rendered and named
-     * the way the core renders and names its own — {@code Declaration} is the
-     * vocabulary's one unnamed shape — so a reader branches on the same names
-     * whichever side refused.
-     */
-    private static UnboundedOperatorConfigurationException refused(List<String> sentences) {
-        List<String> names = java.util.Collections.nCopies(sentences.size(), "Declaration");
-        StringBuilder out = new StringBuilder("topology rejected [");
-        out.append(String.join(", ", names)).append("]:");
-        for (String sentence : sentences) {
-            out.append("\n  - ").append(sentence);
-        }
-        return new UnboundedOperatorConfigurationException(out.toString(), names);
     }
 
     /** The class-level facts the record states, exactly as declared. */
@@ -439,7 +423,7 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
         TaskletEntry existingEntry = tasklets.get(existing);
         // A claim by a different class, or by the other of the named/unnamed
         // spellings, is a SECOND node under one identity: it is recorded as
-        // one, and the core answers NodeIdentityCollision off the record.
+        // one, and the core answers topology.node_identity_collision off the record.
         boolean sameNode = existingEntry.model.taskletClass().equals(taskletClass) && existingEntry.named == named;
         return sameNode ? existing : null;
     }
@@ -450,21 +434,22 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
      * it cannot be built.
      */
     private Tasklet<?, ?, ?> instantiate(Class<? extends Tasklet<?, ?, ?>> taskletClass) {
-        String refusal;
+        String reason;
         try {
             return RuntimeBridge.construct(taskletClass);
-        } catch (ReflectiveOperationException e) {
-            refusal = "must have a public no-arg constructor: " + e;
-        } catch (RuntimeException e) {
-            refusal = "constructor threw " + e;
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            reason = e.toString();
         }
-        refuse("tasklet class `" + taskletClass.getName() + "` " + refusal);
+        refuse(FlezhaException.of(
+                "topology.class_not_constructible", Map.of("class", taskletClass.getName(), "reason", reason)));
         return null;
     }
 
     /** Record one refusal; a class mentioned twice reports it once. */
-    private void refuse(String error) {
-        if (!errors.contains(error)) {
+    private void refuse(FlezhaException error) {
+        boolean known = errors.stream()
+                .anyMatch(e -> e.code().equals(error.code()) && e.details().equals(error.details()));
+        if (!known) {
             errors.add(error);
         }
     }
@@ -637,17 +622,17 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
         if (deliveredType.equals(tasklet.model.inputType()) || !tasklet.model.typesResolved() || placeholderProducer) {
             return;
         }
-        String producedBy = deliveredTypeOverride != null
-                ? "merge maps into"
-                : chainType != null
-                        ? "edge transforms produce"
-                        : channel.producer == null
-                                ? "payload type"
-                                : "producer tasklet `" + tasklets.get(channel.producer).name + "` output type";
-        errors.add("channel `" + channel.name + "`: " + producedBy + " "
-                + describe(deliveredType)
-                + " does not match consumer tasklet `" + tasklet.name
-                + "` input type " + describe(tasklet.model.inputType()));
+        errors.add(FlezhaException.of(
+                "topology.payload_type_mismatch",
+                Map.of(
+                        "channel",
+                        channel.name,
+                        "delivered",
+                        describe(deliveredType),
+                        "tasklet",
+                        tasklet.name,
+                        "input",
+                        describe(tasklet.model.inputType()))));
     }
 
     /**

@@ -1,6 +1,6 @@
 package com.flezha.sdk.runtime;
 
-import com.flezha.sdk.OperatorTypeInUseException;
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.internal.RunnerHandle;
 import java.util.ArrayList;
 import java.util.List;
@@ -93,8 +93,8 @@ public final class FlezhaImpl implements RunnerHandle {
     public void removeType(@Nonnull String factoryId) {
         int live = LIVE_INSTANCES.getOrDefault(factoryId, 0);
         if (live > 0) {
-            throw new OperatorTypeInUseException("factory '" + factoryId + "' has " + live
-                    + " live operator instance(s); stop them before removing the type");
+            throw FlezhaException.of(
+                    "runtime.operator_type_in_use", java.util.Map.of("factory_id", factoryId, "live_instances", live));
         }
         com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry.unregisterClass(factoryId);
     }

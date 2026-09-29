@@ -32,7 +32,7 @@ public interface RunnerHandle {
     /**
      * Remove {@code factoryId}'s class from the runtime class registries —
      * unregister-first, then scan live instances; a live hit re-registers the
-     * class and throws {@link com.flezha.sdk.OperatorTypeInUseException}
+     * class and throws {@code runtime.operator_type_in_use}
      * (the transient unregistered window is benign: a failing
      * {@code AddOperator} is re-placed by convergence).
      */

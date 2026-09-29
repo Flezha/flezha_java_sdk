@@ -12,7 +12,7 @@ package com.flezha.sdk.native_;
  * <p>Native method names are the short JNI form
  * ({@code Java_com_flezha_sdk_native_1_FlzCore_<method>}), matching the
  * exports in {@code flz_core_ffi/src/jni_glue.rs} 1:1. Failures throw
- * {@link FlezhaNativeException}.
+ * {@link com.flezha.sdk.FlezhaException}, built from the core's error document.
  */
 public final class FlzCore {
 
@@ -46,13 +46,10 @@ public final class FlzCore {
      * Judge one host class declaration without registering it: the one seam
      * every SDK's builder submits its record to. Returns the DERIVED
      * declaration's JSON bytes — the consumers, channel kinds, sink names and
-     * acknowledgement granularity the core read off the record. Throws
-     * carrying the core's rendered verdict
-     * ({@code topology rejected [Name, Name]:} and one sentence per refusal)
-     * as the message, and the same verdict's JSON
-     * ({@code {"issues":[{"name","text"}]}}) as
-     * {@link FlezhaNativeException#body()} — so a caller reads the refusal
-     * names as data rather than back out of the sentence.
+     * acknowledgement granularity the core read off the record. A refused
+     * declaration throws with the first refusal's code, and
+     * {@code details.issues} lists every refusal as {@code {code, message,
+     * details}}, so a caller reads which fired as data.
      */
     public static native byte[] checkClass(long ctx, byte[] json);
 
@@ -167,9 +164,11 @@ public final class FlzCore {
     /**
      * Read a spawn handle, waiting up to {@code timeoutMs} (0 never waits):
      * {@code null} while pending, otherwise its answer as JSON,
-     * {@code {"id","outcome"}} or {@code {"id","error","message"}}. Every
-     * read of a resolved handle answers the same until the activation that
-     * made it ends, which releases it; reading a released handle throws.
+     * {@code {"id","outcome"}}. A failed spawn throws with the controller's
+     * code, or {@code spawn.timeout} / {@code spawn.unavailable}. Every read
+     * of a resolved handle answers the same until the activation that made it
+     * ends, which releases it; reading a released handle throws
+     * {@code runtime.spawn_handle_released}.
      */
     public static native String spawnResult(long ctx, long handle, long timeoutMs);
 

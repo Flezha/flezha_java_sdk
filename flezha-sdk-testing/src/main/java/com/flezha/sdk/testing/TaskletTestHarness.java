@@ -1,5 +1,6 @@
 package com.flezha.sdk.testing;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.runtime.operator.TaskletModel;
 import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.runtime.state.KryoCodec;
@@ -92,13 +93,14 @@ public final class TaskletTestHarness<Input, State, Output> {
      * {@code initState(Optional.empty())}. Override via {@link #withInitialState(Object)} or
      * {@link #withPayload(Optional, RestoreInitPayload)}.
      *
-     * @throws IllegalArgumentException naming every refusal registration would raise for the class
+     * @throws FlezhaException naming every refusal registration would raise for the class, in
+     *     {@code details.issues}
      */
     @Nonnull
     public static <I, S, O> TaskletTestHarness<I, S, O> of(@Nonnull Tasklet<I, S, O> tasklet) {
         TaskletModel model = TaskletModel.read(tasklet.getClass(), tasklet);
         if (!model.errors().isEmpty()) {
-            throw new IllegalArgumentException(String.join("\n", model.errors()));
+            throw FlezhaException.ofIssues(model.errors());
         }
         return new TaskletTestHarness<>(tasklet, model);
     }
@@ -160,7 +162,7 @@ public final class TaskletTestHarness<Input, State, Output> {
             int recorded = recordedChanges.size();
             try {
                 tasklet.run(input, ctx);
-            } catch (TaskletException e) {
+            } catch (TaskletException | FlezhaException e) {
                 // Test harness is forgiving — record but keep going.
             }
             // Encode what the invocation recorded, as the runtime's flush does, so a change the
@@ -340,7 +342,7 @@ public final class TaskletTestHarness<Input, State, Output> {
             n++;
             try {
                 tasklet.run(input, ctx);
-            } catch (TaskletException e) {
+            } catch (TaskletException | FlezhaException e) {
                 // Mirror applyInputs: record what happened and keep going.
             }
         }
@@ -402,8 +404,7 @@ public final class TaskletTestHarness<Input, State, Output> {
          * anything is recorded. {@code key} is {@code null} for "none supplied";
          * {@link EmitRecord} keeps the empty string for "none carried".
          */
-        private void record(String channel, @Nullable String key, Object value, Map<String, String> meta)
-                throws TaskletException {
+        private void record(String channel, @Nullable String key, Object value, Map<String, String> meta) {
             key = EmitKeys.resolve(channelName(channel), keyed, key, cellKey);
             rejectReserved(meta);
             recorded.add(value);
@@ -441,42 +442,40 @@ public final class TaskletTestHarness<Input, State, Output> {
         }
 
         @Override
-        public void emit(@Nonnull Output value) throws TaskletException {
+        public void emit(@Nonnull Output value) {
             record("", null, value, Map.of());
         }
 
         @Override
-        public <C> void emit(@Nonnull String channel, @Nonnull C value) throws TaskletException {
+        public <C> void emit(@Nonnull String channel, @Nonnull C value) {
             record(channel, null, value, Map.of());
         }
 
         @Override
-        public void emitWithMeta(@Nonnull Output value, @Nonnull Map<String, String> meta) throws TaskletException {
+        public void emitWithMeta(@Nonnull Output value, @Nonnull Map<String, String> meta) {
             record("", null, value, meta);
         }
 
         @Override
-        public <C> void emitWithMeta(@Nonnull String channel, @Nonnull C value, @Nonnull Map<String, String> meta)
-                throws TaskletException {
+        public <C> void emitWithMeta(@Nonnull String channel, @Nonnull C value, @Nonnull Map<String, String> meta) {
             record(channel, null, value, meta);
         }
 
         @Override
-        public void emitKeyed(@Nonnull String key, @Nonnull Output value) throws TaskletException {
+        public void emitKeyed(@Nonnull String key, @Nonnull Output value) {
             record("", key, value, Map.of());
         }
 
         @Override
-        public void emitKeyedWithMeta(@Nonnull String key, @Nonnull Output value, @Nonnull Map<String, String> meta)
-                throws TaskletException {
+        public void emitKeyedWithMeta(@Nonnull String key, @Nonnull Output value, @Nonnull Map<String, String> meta) {
             record("", key, value, meta);
         }
 
         /** Mirror the runtime: a user key in the runtime's namespace is refused, not dropped. */
-        private static void rejectReserved(Map<String, String> meta) throws TaskletException {
+        private static void rejectReserved(Map<String, String> meta) {
             for (String k : meta.keySet()) {
                 if (k.startsWith(Ctx.RESERVED_METADATA_PREFIX)) {
-                    throw new TaskletException.ReservedMetadataKey(k);
+                    throw FlezhaException.of("runtime.reserved_metadata_key", Map.of("key", k));
                 }
             }
         }

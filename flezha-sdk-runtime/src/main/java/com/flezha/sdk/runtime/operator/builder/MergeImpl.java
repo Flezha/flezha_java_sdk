@@ -25,7 +25,7 @@ final class MergeImpl<I> implements Merge<I> {
     /**
      * The one key function a merge declares, applied to the merged value on
      * every source's edge. Declaring it twice records two `key` links on each
-     * source's chain, which the core answers as DuplicateKeyBy.
+     * source's chain, which the core answers as topology.duplicate_key_by.
      */
     private Function<Object, String> key;
 

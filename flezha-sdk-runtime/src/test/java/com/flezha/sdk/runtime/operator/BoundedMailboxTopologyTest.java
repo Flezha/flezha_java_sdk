@@ -1,12 +1,12 @@
 package com.flezha.sdk.runtime.operator;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.operator.UnboundedOperator;
-import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
+import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -73,20 +73,22 @@ class BoundedMailboxTopologyTest {
     @Test
     @DisplayName("capacity = 0 fails registration, named by the core")
     void zeroCapacityRejected() {
-        assertThatThrownBy(() -> UnboundedOperatorTopologyBuilder.build(new ZeroCapacityUnboundedOperator()))
-                .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                .hasMessageContaining("MailboxCapacityZero")
-                .hasMessageContaining("tasklet `zero_capacity_tasklet` declared mailbox_capacity = 0");
+        FlezhaException refused = Refused.by(
+                "topology.mailbox_capacity_zero",
+                () -> UnboundedOperatorTopologyBuilder.build(new ZeroCapacityUnboundedOperator()));
+        assertThat(Refused.details(refused, "topology.mailbox_capacity_zero"))
+                .containsEntry("tasklet", "zero_capacity_tasklet");
     }
 
     @Test
     @DisplayName("mailboxCapacity above MAX is rejected, named by the core with the value")
     void tooLargeRejected() {
-        assertThatThrownBy(() -> UnboundedOperatorTopologyBuilder.build(new HugeCapacityUnboundedOperator()))
-                .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                .hasMessageContaining("MailboxCapacityTooLarge")
-                .hasMessageContaining("huge_capacity_tasklet")
-                .hasMessageContaining("9999999");
+        FlezhaException refused = Refused.by(
+                "topology.mailbox_capacity_too_large",
+                () -> UnboundedOperatorTopologyBuilder.build(new HugeCapacityUnboundedOperator()));
+        assertThat(Refused.details(refused, "topology.mailbox_capacity_too_large"))
+                .containsEntry("tasklet", "huge_capacity_tasklet")
+                .containsEntry("value", 9999999);
     }
 
     // ---- Test tasklets / operators ----------------------------------------------------
@@ -140,11 +142,12 @@ class BoundedMailboxTopologyTest {
     @Test
     @DisplayName("a dropping policy under effectivelyOnce() is refused, naming the channel")
     void droppingPolicyUnderTheTierIsRefused() {
-        assertThatThrownBy(() -> UnboundedOperatorTopologyBuilder.build(new TierShedsUnboundedOperator()))
-                .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                .hasMessageContaining("DroppingPolicyUnderEffectivelyOnce")
-                .hasMessageContaining("channel `input` declares .on_full(drop_newest)")
-                .hasMessageContaining("effectively_once()");
+        FlezhaException refused = Refused.by(
+                "topology.dropping_policy_under_effectively_once",
+                () -> UnboundedOperatorTopologyBuilder.build(new TierShedsUnboundedOperator()));
+        assertThat(Refused.details(refused, "topology.dropping_policy_under_effectively_once"))
+                .containsEntry("channel", "input")
+                .containsEntry("policy", "drop_newest");
     }
 
     @Test

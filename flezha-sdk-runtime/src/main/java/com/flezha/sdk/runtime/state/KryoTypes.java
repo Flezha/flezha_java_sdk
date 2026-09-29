@@ -1,5 +1,6 @@
 package com.flezha.sdk.runtime.state;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.state.Change;
 import java.lang.reflect.Field;
 import java.lang.reflect.GenericArrayType;
@@ -97,16 +98,17 @@ public final class KryoTypes {
         return List.copyOf(found);
     }
 
-    /** One sentence per pair of types deriving the same id; empty when every id is distinct. */
+    /** One refusal per pair of {@code tasklet}'s types deriving the same id; empty when every id is distinct. */
     @Nonnull
-    public static List<String> collisions(@Nonnull Map<Class<?>, Integer> ids) {
+    public static List<FlezhaException> collisions(@Nonnull String tasklet, @Nonnull Map<Class<?>, Integer> ids) {
         Map<Integer, Class<?>> byId = new HashMap<>();
-        List<String> out = new ArrayList<>();
+        List<FlezhaException> out = new ArrayList<>();
         ids.forEach((type, id) -> {
             Class<?> prior = byId.putIfAbsent(id, type);
             if (prior != null) {
-                out.add("classes `" + prior.getName() + "` and `" + type.getName() + "` derive the same Kryo id " + id
-                        + "; rename one, or list the types in kryoTypes() to own their ids");
+                out.add(FlezhaException.of(
+                        "topology.state_type_id_collision",
+                        Map.of("tasklet", tasklet, "first", prior.getName(), "second", type.getName(), "id", id)));
             }
         });
         return out;

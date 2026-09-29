@@ -66,8 +66,8 @@ import javax.annotation.Nonnull;
  *
  * <p>A bounded operator carries none of an unbounded operator's delivery settings: the effectively-once tier, the
  * checkpoint settings and the correction window are refused at registration by name
- * ({@code EffectivelyOnceOnBounded}, {@code CheckpointOnBounded},
- * {@code CorrectionWindowOnBounded}), because a durable bounded operator already commits stage by stage.
+ * ({@code topology.effectively_once_on_bounded}, {@code topology.checkpoint_on_bounded},
+ * {@code topology.correction_window_on_bounded}), because a durable bounded operator already commits stage by stage.
  * A tasklet running inside a bounded operator registers timers as an unbounded tasklet does. Its firing is a
  * trigger of the run: it opens a pass at that tasklet, joins the tasklet's stage while it runs, or
  * waits for the pass in flight; and its removal is durable when that stage commits. A sleeping
@@ -145,7 +145,7 @@ public interface BoundedOperator extends Operator {
      * for {@code FLEZHA_PARK_IDLE_MS} is evicted from its runner and wakes on
      * its next message or its wake deadline. Defaults to
      * {@link #persistenceEnabled()}; declaring it with persistence off is
-     * refused at registration as {@code SleepWithoutPersistence}.
+     * refused at registration as {@code topology.sleep_without_persistence}.
      */
     default boolean sleepWhenIdle() {
         return persistenceEnabled();

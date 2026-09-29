@@ -3,6 +3,7 @@ package com.flezha.test;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.FlezhaRunner;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.EdgeStream;
@@ -10,9 +11,7 @@ import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.Stream;
 import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.operator.UnboundedOperator;
-import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.operator.BoundedOperatorConfigurationException;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.runtime.operator.ChannelDescriptor;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
@@ -443,10 +442,10 @@ public final class ConformanceRun {
             UnboundedOperatorTopology topology = topologyOf(row);
             entry.put("outcome", "accepted");
             entry.set("derived", derived(json, topology));
-        } catch (UnboundedOperatorConfigurationException refusal) {
+        } catch (FlezhaException refusal) {
             entry.put("outcome", "refused");
             ArrayNode names = entry.putArray("names");
-            refusal.refusals().forEach(names::add);
+            refusal.issueCodes().forEach(names::add);
         }
         return entry;
     }
@@ -506,9 +505,9 @@ public final class ConformanceRun {
         try {
             drive(com.flezha.sdk.Flezha.createRunner("conformance_shorthand"), declarations);
             entry.put("outcome", "accepted");
-        } catch (IllegalArgumentException refusal) {
+        } catch (FlezhaException refusal) {
             entry.put("outcome", "refused");
-            entry.putArray("names").add(refusalName(refusal.getMessage()));
+            entry.putArray("names").add(refusal.code());
         }
         return entry;
     }
@@ -524,12 +523,6 @@ public final class ConformanceRun {
         } else {
             runner.registerFactory(declarations.get(0).declared());
         }
-    }
-
-    /** The leading refusal name of a message the contract requires to begin with one. */
-    private static String refusalName(String message) {
-        int colon = message.indexOf(':');
-        return colon < 0 ? message : message.substring(0, colon).trim();
     }
 
     /**
@@ -611,7 +604,7 @@ public final class ConformanceRun {
         if (!shorthand.isEmpty()) {
             try {
                 drive(runner, shorthand);
-            } catch (IllegalArgumentException refusal) {
+            } catch (FlezhaException refusal) {
                 System.err.println(topology + ": " + refusal.getMessage());
                 System.exit(1);
             }
@@ -625,8 +618,9 @@ public final class ConformanceRun {
         load(row);
         try {
             runner.registerFactory(row.bounded() ? RowBoundedOperator.class : RowUnboundedOperator.class);
-        } catch (UnboundedOperatorConfigurationException | BoundedOperatorConfigurationException refusal) {
-            System.err.println(topology + ": " + refusal.getMessage());
+        } catch (FlezhaException refusal) {
+            System.err.println(
+                    topology + ": " + refusal.getMessage() + "; issues: " + String.join(", ", refusal.issueCodes()));
             System.exit(1);
         }
     }

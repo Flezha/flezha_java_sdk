@@ -3,6 +3,7 @@ package com.flezha.sdk.testing;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.runtime.state.KryoTypes;
 import com.flezha.sdk.state.Change;
@@ -294,12 +295,51 @@ class HarnessBehaviourTest {
      * channel — it has no key to default to, so the record would ship keyless.
      */
     @Test
+    @DisplayName("A key-less emit on a keyed channel is refused without a Cell key")
     void aSingleCellKeyLessEmitOnAKeyedChannelIsRefused() {
-        TaskletTestHarness<Long, Void, String> h = TaskletTestHarness.of(new KeyLessEmitTasklet())
-                .withKeyedChannel()
-                .applyInputs(List.of(1L));
+        RefusalProbe probe = new RefusalProbe(ctx -> ctx.emit("v"));
+        TaskletTestHarness<Long, Void, String> h =
+                TaskletTestHarness.of(probe).withKeyedChannel().applyInputs(List.of(1L));
 
+        assertThat(probe.refusal).isNotNull();
+        assertThat(probe.refusal.code()).isEqualTo("runtime.key_required_on_keyed_channel");
         assertThat(h.emitRecords()).as("the refusal leaves nothing recorded").isEmpty();
+    }
+
+    @Test
+    @DisplayName("A reserved metadata key is rejected in the harness too")
+    void aReservedMetadataKeyIsRejectedInTheHarnessToo() {
+        RefusalProbe probe = new RefusalProbe(ctx -> ctx.emitWithMeta("v", java.util.Map.of("flz.seq", "1.0")));
+        TaskletTestHarness<Long, Void, String> h = TaskletTestHarness.of(probe).applyInputs(List.of(1L));
+
+        assertThat(probe.refusal).isNotNull();
+        assertThat(probe.refusal.code()).isEqualTo("runtime.reserved_metadata_key");
+        assertThat(probe.refusal.details()).containsEntry("key", "flz.seq");
+        assertThat(h.emitRecords()).isEmpty();
+    }
+
+    /** Runs one emit and keeps the refusal the harness ctx threw. */
+    @Tasklet.Spec(name = "refusal_probe")
+    public static final class RefusalProbe implements Tasklet<Long, Void, String> {
+        interface Emit {
+            void on(Ctx<Void, String> ctx) throws TaskletException;
+        }
+
+        private final Emit emit;
+        FlezhaException refusal;
+
+        RefusalProbe(Emit emit) {
+            this.emit = emit;
+        }
+
+        @Override
+        public void run(Long input, Ctx<Void, String> ctx) throws TaskletException {
+            try {
+                emit.on(ctx);
+            } catch (FlezhaException e) {
+                refusal = e;
+            }
+        }
     }
 
     /** A harness that declares no keyed channel is unchanged: no key, no refusal. */

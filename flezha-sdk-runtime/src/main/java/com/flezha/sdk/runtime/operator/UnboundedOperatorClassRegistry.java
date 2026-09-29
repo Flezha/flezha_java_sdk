@@ -1,10 +1,10 @@
 package com.flezha.sdk.runtime.operator;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.internal.RuntimeBridge;
 import com.flezha.sdk.internal.ShortFormDeclaration;
 import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.operator.UnboundedOperator;
-import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
 import java.util.List;
 import java.util.Map;
@@ -36,9 +36,8 @@ public final class UnboundedOperatorClassRegistry {
      * registration of the id. Returns the controller-facing
      * factory id so the caller can de-duplicate on its side.
      *
-     * @throws UnboundedOperatorConfigurationException if topology validation fails.
-     * @throws IllegalArgumentException if the UnboundedOperator class lacks a public
-     *     no-arg constructor.
+     * @throws FlezhaException if topology validation fails, the class lacks a public no-arg
+     *     constructor, or its factory id is already a bounded operator's.
      */
     @Nonnull
     public static String registerClass(@Nonnull Class<?> operatorClass) {
@@ -46,8 +45,7 @@ public final class UnboundedOperatorClassRegistry {
         String factoryId = operator.factoryId();
 
         if (com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry.getTopology(factoryId) != null) {
-            throw new IllegalArgumentException("DuplicateFactoryId: `" + factoryId + "` for UnboundedOperator class `"
-                    + operatorClass.getName() + "` (already registered as a BoundedOperator)");
+            throw FlezhaException.of("topology.duplicate_factory_id", Map.of("factory_id", factoryId));
         }
 
         UnboundedOperatorTopology topology = UnboundedOperatorTopologyBuilder.build(operator);
@@ -62,7 +60,8 @@ public final class UnboundedOperatorClassRegistry {
      * operator class with no public no-arg constructor, and any with no factory
      * id. Both class registries register through it.
      *
-     * @throws IllegalArgumentException naming {@code kind} and the class.
+     * @throws FlezhaException {@code topology.class_not_constructible} or
+     *     {@code topology.missing_factory_id}, naming the class.
      */
     @Nonnull
     public static <T extends Operator> T probe(@Nonnull Class<?> operatorClass, @Nonnull Class<T> kind) {
@@ -70,18 +69,18 @@ public final class UnboundedOperatorClassRegistry {
         if (shortForm != null) {
             return kind.cast(ShortForm.of(operatorClass, shortForm));
         }
-        String label = kind.getSimpleName();
         T operator;
         try {
             operator = kind.cast(RuntimeBridge.construct(operatorClass));
         } catch (ReflectiveOperationException e) {
-            throw new IllegalArgumentException(
-                    label + " class `" + operatorClass.getName() + "` must have a public no-arg constructor: " + e, e);
+            throw FlezhaException.of(
+                    "topology.class_not_constructible",
+                    Map.of("class", operatorClass.getName(), "reason", e.toString()),
+                    e);
         }
         String factoryId = operator.factoryId();
         if (factoryId == null || factoryId.isEmpty()) {
-            throw new IllegalArgumentException(
-                    label + " class `" + operatorClass.getName() + "` returned null/empty from factoryId()");
+            throw FlezhaException.of("topology.missing_factory_id", Map.of("operator", operatorClass.getName()));
         }
         return operator;
     }

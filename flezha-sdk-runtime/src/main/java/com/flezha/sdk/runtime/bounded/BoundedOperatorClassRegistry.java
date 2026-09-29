@@ -1,8 +1,7 @@
 package com.flezha.sdk.runtime.bounded;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.operator.BoundedOperatorConfigurationException;
-import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
@@ -39,10 +38,8 @@ public final class BoundedOperatorClassRegistry {
      * reaches through {@code declareClass}. Rejects a factory id that collides
      * with a registered unbounded operator. Returns the controller-facing factory id.
      *
-     * @throws IllegalArgumentException if the BoundedOperator class lacks a public
-     *     no-arg constructor, returns a null/empty factory id, or collides with
-     *     an existing operator/bounded.
-     * @throws BoundedOperatorConfigurationException if the authoring is invalid
+     * @throws FlezhaException if the class lacks a public no-arg constructor, returns a
+     *     null/empty factory id, collides with an existing operator, or its authoring is invalid
      *     (external-stop-only, or a graph the core refuses).
      */
     @Nonnull
@@ -50,17 +47,10 @@ public final class BoundedOperatorClassRegistry {
         BoundedOperator probe = resolveProbe(boundedClass);
         String factoryId = probe.factoryId();
 
-        UnboundedOperatorTopology topology;
-        try {
-            topology = UnboundedOperatorTopologyBuilder.build(probe);
-        } catch (UnboundedOperatorConfigurationException e) {
-            throw new BoundedOperatorConfigurationException(
-                    "bounded operator `" + factoryId + "` has an invalid topology: " + e.getMessage(), e);
-        }
+        UnboundedOperatorTopology topology = UnboundedOperatorTopologyBuilder.build(probe);
 
         if (UnboundedOperatorClassRegistry.getTopology(factoryId) != null) {
-            throw new IllegalArgumentException("DuplicateFactoryId: `" + factoryId + "` for BoundedOperator class `"
-                    + boundedClass.getName() + "` (already registered as an UnboundedOperator)");
+            throw FlezhaException.of("topology.duplicate_factory_id", Map.of("factory_id", factoryId));
         }
 
         ENTRIES.put(factoryId, topology);
@@ -75,9 +65,7 @@ public final class BoundedOperatorClassRegistry {
     private static BoundedOperator resolveProbe(Class<?> operatorClass) {
         BoundedOperator probe = UnboundedOperatorClassRegistry.probe(operatorClass, BoundedOperator.class);
         if (!probe.selfTerminating() && probe.maxDuration().isEmpty()) {
-            throw new BoundedOperatorConfigurationException("bounded operator `" + probe.factoryId()
-                    + "` is not terminable: its only possible exit is an external stop. Add a terminal condition: "
-                    + "let the chain complete, have a tasklet call ctx.complete, or declare maxDuration().");
+            throw FlezhaException.of("topology.external_stop_only", Map.of("factory_id", probe.factoryId()));
         }
         return probe;
     }

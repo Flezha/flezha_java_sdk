@@ -23,8 +23,8 @@
  *
  * <p>The remaining types in this package are the supporting surface for those two paths:
  * {@link com.flezha.sdk.SinkOutput} is the frame handed to a local-mode sink callback, and
- * {@link com.flezha.sdk.OperatorTypeInUseException} is raised when an operator class is removed
- * from a started runner while instances of it are still live.
+ * {@link com.flezha.sdk.FlezhaException} is the one exception thrown for anything Flezha refuses,
+ * carrying a stable {@code code} to branch on.
  *
  * <p>{@link com.flezha.sdk.Logger} is where the SDK's own diagnostics go. The default,
  * {@link com.flezha.sdk.ConsoleLogger}, writes to standard error at the

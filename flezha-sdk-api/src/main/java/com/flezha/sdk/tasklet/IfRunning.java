@@ -9,7 +9,7 @@ import javax.annotation.Nonnull;
 public enum IfRunning {
     /** Deliver the payload to the running instance's inbox. */
     DELIVER("deliver"),
-    /** Leave the running instance alone and report {@link SpawnException.AlreadyRunning}. */
+    /** Leave the running instance alone and report {@code operator.already_running}. */
     ERROR("error");
 
     private final String wire;

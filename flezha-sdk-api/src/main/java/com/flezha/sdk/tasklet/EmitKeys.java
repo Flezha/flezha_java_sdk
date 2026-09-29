@@ -1,5 +1,7 @@
 package com.flezha.sdk.tasklet;
 
+import com.flezha.sdk.FlezhaException;
+import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
 
@@ -26,21 +28,22 @@ public final class EmitKeys {
      * and refuses one.
      *
      * @return the key to carry, or {@code null} on a non-keyed channel
-     * @throws TaskletException.KeyRequiredOnKeyedChannel a keyed channel with no key to carry
-     * @throws TaskletException.KeyNotAllowedOnNonKeyedChannel a key on a non-keyed channel
+     * @throws FlezhaException {@code runtime.key_required_on_keyed_channel} for a keyed channel with
+     *     no key to carry, {@code runtime.key_not_allowed_on_non_keyed_channel} for a key on a
+     *     non-keyed channel
      */
     @Nullable
-    public static String resolve(String channel, boolean keyed, @Nullable String supplied, Optional<String> cellKey)
-            throws TaskletException {
+    public static String resolve(String channel, boolean keyed, @Nullable String supplied, Optional<String> cellKey) {
         if (!keyed) {
             if (supplied != null) {
-                throw new TaskletException.KeyNotAllowedOnNonKeyedChannel(channel);
+                throw FlezhaException.of("runtime.key_not_allowed_on_non_keyed_channel", Map.of("channel", channel));
             }
             return null;
         }
         if (supplied != null) {
             return supplied;
         }
-        return cellKey.orElseThrow(() -> new TaskletException.KeyRequiredOnKeyedChannel(channel));
+        return cellKey.orElseThrow(
+                () -> FlezhaException.of("runtime.key_required_on_keyed_channel", Map.of("channel", channel)));
     }
 }

@@ -3,6 +3,7 @@ package com.flezha.sdk.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.runtime.FlezhaImpl;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -46,11 +47,14 @@ class AdminTest {
     void aStartAnswerOfAnotherShapeIsRefused() {
         FlezhaImpl.ADMIN_ANSWER = "{\"id\":\"my_echo\",\"outcome\":\"duplicate\"}";
         assertThatThrownBy(() -> admin.startOperator(OperatorSpec.of("echo").id("my_echo")))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("duplicate");
+                .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("admin.unreadable_answer");
+                    assertThat(e.details()).containsEntry("verb", "Operator.start");
+                });
 
         FlezhaImpl.ADMIN_ANSWER = "{\"outcome\":\"started\"}";
         assertThatThrownBy(() -> admin.startOperator(OperatorSpec.of("echo")))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOfSatisfying(
+                        FlezhaException.class, e -> assertThat(e.code()).isEqualTo("admin.unreadable_answer"));
     }
 }

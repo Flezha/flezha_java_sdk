@@ -163,8 +163,10 @@ class RunnerLifecycleTest {
         int startsBefore = com.flezha.sdk.runtime.FlezhaImpl.STARTS.get();
 
         assertThatThrownBy(() -> Flezha.createRunner("ns2").start())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ns1");
+                .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("runtime.runner_already_running");
+                    assertThat(e.details()).containsEntry("namespace", "ns1");
+                });
 
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.STARTS.get())
                 .as("a rejected start() must not reach the runtime")
@@ -194,9 +196,9 @@ class RunnerLifecycleTest {
         FlezhaRunner runner = Flezha.createRunner("ns_double")
                 .registerFactory(OperatorA.class)
                 .start();
-        assertThatThrownBy(runner::start)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("already started");
+        assertThatThrownBy(runner::start).isInstanceOfSatisfying(FlezhaException.class, e -> {
+            assertThat(e.code()).isEqualTo("runtime.runner_already_running");
+        });
     }
 
     @Test
@@ -271,16 +273,19 @@ class RunnerLifecycleTest {
     }
 
     @Test
-    @DisplayName("removing a type with live instances throws OperatorTypeInUseException and keeps it defined")
+    @DisplayName("removing a type with live instances throws runtime.operator_type_in_use and keeps it defined")
     void removeWithLiveInstancesRefuses() {
         FlezhaRunner runner =
                 Flezha.createRunner("ns_live").registerFactory(OperatorA.class).start();
         com.flezha.sdk.runtime.FlezhaImpl.LIVE_INSTANCES.put("lifecycle_a", 1);
 
         assertThatThrownBy(() -> runner.unregisterFactory(OperatorA.class))
-                .isInstanceOf(OperatorTypeInUseException.class)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("lifecycle_a");
+                .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("runtime.operator_type_in_use");
+                    assertThat(e.details())
+                            .containsEntry("factory_id", "lifecycle_a")
+                            .containsEntry("live_instances", 1);
+                });
 
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
                 .as("the type stays defined after a refused removal")
@@ -296,17 +301,21 @@ class RunnerLifecycleTest {
     }
 
     @Test
-    @DisplayName("removing an undefined type throws IllegalArgumentException naming the factory id")
+    @DisplayName("removing an undefined type throws runtime.class_not_registered naming the factory id")
     void removeUndefinedTypeIsRejected() {
         FlezhaRunner runner = Flezha.createRunner("ns_undef").registerFactory(OperatorA.class);
         assertThatThrownBy(() -> runner.unregisterFactory(OperatorB.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("lifecycle_b");
+                .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("runtime.class_not_registered");
+                    assertThat(e.details()).containsEntry("factory", "lifecycle_b");
+                });
         // Already-removed counts as undefined too.
         runner.unregisterFactory(OperatorA.class);
         assertThatThrownBy(() -> runner.unregisterFactory(OperatorA.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("lifecycle_a");
+                .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("runtime.class_not_registered");
+                    assertThat(e.details()).containsEntry("factory", "lifecycle_a");
+                });
     }
 
     @Test
@@ -314,9 +323,10 @@ class RunnerLifecycleTest {
     void duplicateFactoryIdIsRejected() {
         FlezhaRunner runner = Flezha.createRunner("ns_dup").registerFactory(OperatorA.class);
         assertThatThrownBy(() -> runner.registerFactory(OperatorA.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("DuplicateFactoryId")
-                .hasMessageContaining("lifecycle_a");
+                .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("topology.duplicate_factory_id");
+                    assertThat(e.details()).containsEntry("factory_id", "lifecycle_a");
+                });
     }
 
     @Test
@@ -342,20 +352,22 @@ class RunnerLifecycleTest {
         FlezhaRunner runner = Flezha.createRunner("ns_kind_refusals");
 
         assertThatThrownBy(() -> runner.registerFactory(BothKinds.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("AmbiguousOperatorKind")
-                .hasMessageContaining("BothKinds");
+                .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("topology.ambiguous_operator_kind");
+                    assertThat(e.details()).containsEntry("module", BothKinds.class.getName());
+                });
 
         assertThatThrownBy(() -> runner.registerFactory(NeitherKind.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("UnknownOperatorKind")
-                .hasMessageContaining("NeitherKind");
+                .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("topology.unknown_operator_kind");
+                    assertThat(e.details()).containsEntry("module", NeitherKind.class.getName());
+                });
 
         assertThatThrownBy(() -> runner.registerFactory(NotAnOperator.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("UnknownOperatorKind")
-                .hasMessageContaining("NotAnOperator")
-                .hasMessageContaining("@UnboundedOperator");
+                .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("topology.unknown_operator_kind");
+                    assertThat(e.details()).containsEntry("module", NotAnOperator.class.getName());
+                });
 
         assertThat(com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry.registeredIds())
                 .isEmpty();
@@ -382,21 +394,22 @@ class RunnerLifecycleTest {
         FlezhaRunner runner = Flezha.createRunner("ns_both");
 
         assertThatThrownBy(() -> runner.registerFactory(BothShortForms.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("AmbiguousOperatorKind")
-                .hasMessageContaining(BothShortForms.class.getName());
+                .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("topology.ambiguous_operator_kind");
+                    assertThat(e.details()).containsEntry("module", BothShortForms.class.getName());
+                });
     }
 
     @Test
-    @DisplayName("pre-start awaitTermination()/getOperators() throw ISE; close() is a no-op")
+    @DisplayName("pre-start awaitTermination()/getOperators() throw runtime.runner_not_started; close() is a no-op")
     void preStartLifecycleCalls() {
         FlezhaRunner runner = Flezha.createRunner("ns_cold");
-        assertThatThrownBy(runner::awaitTermination)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("not started");
-        assertThatThrownBy(runner::getOperators)
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("not started");
+        assertThatThrownBy(runner::awaitTermination).isInstanceOfSatisfying(FlezhaException.class, e -> {
+            assertThat(e.code()).isEqualTo("runtime.runner_not_started");
+        });
+        assertThatThrownBy(runner::getOperators).isInstanceOfSatisfying(FlezhaException.class, e -> {
+            assertThat(e.code()).isEqualTo("runtime.runner_not_started");
+        });
         assertThatCode(runner::close).doesNotThrowAnyException();
         assertThat(Flezha.currentRunner())
                 .as("a never-started runner never appears")
@@ -414,17 +427,25 @@ class RunnerLifecycleTest {
         // close() destroys the core context; a mutation that got through would
         // carry the freed handle back across the JNI boundary.
         assertThatThrownBy(() -> runner.registerFactory(OperatorB.class))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ns_closed");
+                .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("runtime.runner_closed");
+                    assertThat(e.details()).containsEntry("namespace", "ns_closed");
+                });
         assertThatThrownBy(() -> runner.registerFactory(BoundedD.class))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ns_closed");
+                .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("runtime.runner_closed");
+                    assertThat(e.details()).containsEntry("namespace", "ns_closed");
+                });
         assertThatThrownBy(() -> runner.unregisterFactory(OperatorA.class))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ns_closed");
+                .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("runtime.runner_closed");
+                    assertThat(e.details()).containsEntry("namespace", "ns_closed");
+                });
         assertThatThrownBy(() -> runner.unregisterFactory(BoundedD.class))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ns_closed");
+                .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                    assertThat(e.code()).isEqualTo("runtime.runner_closed");
+                    assertThat(e.details()).containsEntry("namespace", "ns_closed");
+                });
 
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.SYNCED_SETS)
                 .as("a refused mutation must not reach the runtime")
@@ -508,17 +529,17 @@ class RunnerLifecycleTest {
             Object o2 = f2.get(10, TimeUnit.SECONDS);
 
             FlezhaRunner winner;
-            IllegalStateException loser;
+            FlezhaException loser;
             if (o1 instanceof FlezhaRunner w) {
                 winner = w;
-                loser = (IllegalStateException) o2;
+                loser = (FlezhaException) o2;
             } else {
                 winner = (FlezhaRunner) o2;
-                loser = (IllegalStateException) o1;
+                loser = (FlezhaException) o1;
             }
-            assertThat(loser)
+            assertThat(loser.details())
                     .as("the loser must be told the winner's namespace")
-                    .hasMessageContaining(winner.getNamespace());
+                    .containsEntry("namespace", winner.getNamespace());
             assertThat(Flezha.currentRunner()).containsSame(winner);
         } finally {
             pool.shutdownNow();
@@ -543,7 +564,7 @@ class RunnerLifecycleTest {
         barrier.await();
         try {
             return runner.start();
-        } catch (IllegalStateException e) {
+        } catch (FlezhaException e) {
             return e;
         }
     }

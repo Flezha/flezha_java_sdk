@@ -3,7 +3,9 @@ package com.flezha.sdk.tasklet;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.flezha.sdk.Flezha;
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.Logger;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -53,16 +55,19 @@ public final class SpawnRequests {
             long token, String factoryId, String id, byte[] payload, IfRunning ifRunning, boolean replay, long offset) {
         Requester current = requester;
         if (current == null) {
-            ObjectNode answer = JsonNodeFactory.instance.objectNode().put("id", id);
             if (replay) {
-                answer.put("outcome", "skipped_on_replay");
-            } else {
-                String message = "no control plane to request a spawn on";
-                answer.put("error", "unavailable").put("message", message);
-                LOG.warn("spawnBounded(factory `{}`, id `{}`) failed: {}", factoryId, id, message);
+                ObjectNode answer = JsonNodeFactory.instance.objectNode().put("id", id);
+                String json = answer.put("outcome", "skipped_on_replay").toString();
+                return new SpawnHandle(timeoutMs -> json);
             }
-            String json = answer.toString();
-            return new SpawnHandle(timeoutMs -> json);
+            LOG.warn(
+                    "spawnBounded(factory `{}`, id `{}`) failed: {}",
+                    factoryId,
+                    id,
+                    FlezhaException.of("spawn.unavailable", Map.of()).getMessage());
+            return new SpawnHandle(timeoutMs -> {
+                throw FlezhaException.of("spawn.unavailable", Map.of());
+            });
         }
         long handle = current.request(token, factoryId, id, payload, ifRunning.wire(), replay, offset);
         return new SpawnHandle(timeoutMs -> current.result(handle, timeoutMs));

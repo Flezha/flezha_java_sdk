@@ -5,6 +5,7 @@ import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
+import com.flezha.sdk.FlezhaException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -42,9 +43,9 @@ public final class HybridChannelUnboundedOperator implements UnboundedOperator {
             }
             try {
                 ctx.emit(n);
-            } catch (TaskletException.PluginSerializerFailure e) {
-                System.err.println("hybrid_producer_tasklet: serializer failed on `" + e.channel() + "`: "
-                        + e.getMessage());
+            } catch (FlezhaException e) {
+                System.err.println("hybrid_producer_tasklet: serializer failed on `" + e.details().get("channel")
+                        + "`: " + e.getMessage());
             }
         }
     }

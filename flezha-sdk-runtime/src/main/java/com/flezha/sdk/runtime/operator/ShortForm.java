@@ -1,5 +1,6 @@
 package com.flezha.sdk.runtime.operator;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.EdgeStream;
 import com.flezha.sdk.channel.OverflowPolicy;
@@ -11,6 +12,7 @@ import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.tasklet.Tasklet;
 import java.util.Locale;
+import java.util.Map;
 import javax.annotation.Nonnull;
 
 /**
@@ -63,32 +65,28 @@ final class ShortForm {
     /** The class's model, once every short-form refusal has passed. */
     private static TaskletModel refuse(Class<?> cls, ShortFormDeclaration d) {
         if (!Tasklet.class.isAssignableFrom(cls)) {
-            throw new IllegalArgumentException(
-                    cls.getName() + " is annotated " + d.annotation() + " but does not implement Tasklet");
+            throw FlezhaException.of(
+                    "topology.short_form_not_a_tasklet", Map.of("class", cls.getName(), "annotation", d.annotation()));
         }
         if (Operator.class.isAssignableFrom(cls)) {
-            throw new IllegalArgumentException("ShortFormWithTopology: " + d.annotation() + " makes "
-                    + cls.getName() + " a whole operator, and it also implements an operator interface;"
-                    + " keep one of the two");
+            throw FlezhaException.of("topology.short_form_with_topology", Map.of("factory_id", d.id()));
         }
         if (d.id().isEmpty()) {
-            throw new IllegalArgumentException(d.annotation() + " on " + cls.getName() + " requires `id`: an"
-                    + " operator's factory id is an address a user types, never derived from the class name");
+            throw FlezhaException.of("topology.missing_factory_id", Map.of("operator", cls.getName()));
         }
         Tasklet.Spec spec = cls.getAnnotation(Tasklet.Spec.class);
         if (spec != null && !spec.name().equals(d.id())) {
-            throw new IllegalArgumentException("ShortFormNameMismatch: " + cls.getName() + " declares operator id `"
-                    + d.id() + "` and @Tasklet.Spec name `" + spec.name() + "`; a short form's tasklet is"
-                    + " named after its id, so the two must be equal");
+            throw FlezhaException.of(
+                    "topology.short_form_name_mismatch",
+                    Map.of("class", cls.getName(), "factory_id", d.id(), "name", spec.name()));
         }
         TaskletModel model = TaskletModel.read(cls, null);
         if (!d.sink().isEmpty() && model.typesResolved() && model.outputType() == Void.class) {
-            throw new IllegalArgumentException("SinkWithoutOutput: " + cls.getName() + " declares sink `" + d.sink()
-                    + "`, but its Output is Void; a sink needs an output to feed the plugin");
+            throw FlezhaException.of("topology.sink_without_output", Map.of("factory_id", d.id()));
         }
         if (!d.onFull().isEmpty() && overflow(d.onFull()) == null) {
-            throw new IllegalArgumentException(d.annotation() + " on " + cls.getName() + ": onFull must be one of"
-                    + " drop_nothing, drop_newest, drop_oldest");
+            throw FlezhaException.of(
+                    "topology.invalid_mode", Map.of("factory_id", d.id(), "knob", "onFull", "value", d.onFull()));
         }
         return model;
     }

@@ -1,5 +1,6 @@
 package com.flezha.sdk.tasklet;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.PlainPayload;
 import java.time.Duration;
 import java.util.Map;
@@ -114,7 +115,7 @@ public interface Ctx<State, Output> {
      * chain and, within it, of the greatest cell key.
      *
      * <p>An unbounded operator never completes: an unbounded tasklet calling this fails its input with a
-     * non-retryable {@code CompleteOutsideBounded} error.
+     * non-retryable {@code runtime.complete_outside_bounded} error.
      */
     void complete(byte[] result);
 
@@ -167,7 +168,7 @@ public interface Ctx<State, Output> {
      * Ask the controller for the bounded instance {@code options} names: start {@code factoryId}
      * under that id if it is free, otherwise apply its {@link IfRunning} policy
      * ({@link IfRunning#DELIVER}, the default, feeds the running instance; {@link IfRunning#ERROR}
-     * reports {@link SpawnException.AlreadyRunning}). {@code payload} is the instance's first input
+     * reports {@code operator.already_running}). {@code payload} is the instance's first input
      * on a spawn, one more input on a delivery.
      *
      * <p>Concurrent requests for one id resolve controller-side: exactly one spawns and every other
@@ -231,15 +232,14 @@ public interface Ctx<State, Output> {
      * wall-clock time passes. That is inherent to event time;
      * {@link #timerAfter} is the answer to "nothing has arrived".
      *
-     * <p>Refused with
-     * {@link TaskletException.EventTimeTimerWithoutEventTimeClock} unless the
+     * <p>Refused with {@code runtime.event_time_timer_without_event_time_clock} unless the
      * tasklet writes {@link Tasklet#eventTime}.
      *
      * <p>Registering the same timestamp twice is idempotent — pending timers are
      * a set. Handle the firing in {@link Tasklet#onTimer}.
      */
-    default long timerAtEventTime(long scheduledAt) throws TaskletException {
-        throw new TaskletException.TimersUnavailable();
+    default long timerAtEventTime(long scheduledAt) {
+        throw FlezhaException.of("runtime.timers_unavailable", Map.of());
     }
 
     /**
@@ -253,24 +253,24 @@ public interface Ctx<State, Output> {
      * schedules the same instant a wall clock would, and one replaying history
      * schedules a past instant, which fires at once.
      */
-    default long timerAfter(Duration delay) throws TaskletException {
-        throw new TaskletException.TimersUnavailable();
+    default long timerAfter(Duration delay) {
+        throw FlezhaException.of("runtime.timers_unavailable", Map.of());
     }
 
     /**
      * Cancel a pending event-time timer by the timestamp
      * {@link #timerAtEventTime} returned. {@code false} if none was pending.
      */
-    default boolean cancelEventTimeTimer(long scheduledAt) throws TaskletException {
-        throw new TaskletException.TimersUnavailable();
+    default boolean cancelEventTimeTimer(long scheduledAt) {
+        throw FlezhaException.of("runtime.timers_unavailable", Map.of());
     }
 
     /**
      * Cancel a pending processing-time timer by the timestamp
      * {@link #timerAfter} returned. {@code false} if none was pending.
      */
-    default boolean cancelProcessingTimeTimer(long scheduledAt) throws TaskletException {
-        throw new TaskletException.TimersUnavailable();
+    default boolean cancelProcessingTimeTimer(long scheduledAt) {
+        throw FlezhaException.of("runtime.timers_unavailable", Map.of());
     }
 
     /**
@@ -285,7 +285,7 @@ public interface Ctx<State, Output> {
      * <p>The key must itself be replay-stable by the determinism contract —
      * derived from the input, the state, or {@code ctx}, never from an ambient
      * source. Emitting a key on a channel not declared {@code .keyed()} throws
-     * {@link TaskletException.KeyNotAllowedOnNonKeyedChannel}.
+     * {@code runtime.key_not_allowed_on_non_keyed_channel}.
      */
     void emitKeyed(String key, Output value) throws TaskletException;
 
@@ -308,7 +308,7 @@ public interface Ctx<State, Output> {
      * <p>Channels declared {@code .keyed()}: the emit carries this Cell's own
      * key ({@link #cellKey}) — equal to the routing key by construction, so
      * it cannot drift from it. A single-cell Tasklet has no such key and
-     * throws {@link TaskletException.KeyRequiredOnKeyedChannel}; an output
+     * throws {@code runtime.key_required_on_keyed_channel}; an output
      * whose natural key differs from the Cell's uses {@link #emitKeyed}.
      */
     void emit(Output value) throws TaskletException;
@@ -318,21 +318,21 @@ public interface Ctx<State, Output> {
      *
      * @param channel the channel name to release on, as given to {@code named(...)} in the wiring
      * @param value the value to emit
-     * @throws TaskletException if the channel is unknown, or the channel is keyed and this cell
-     *     has no key to stamp
+     * @throws com.flezha.sdk.FlezhaException {@code runtime.unknown_channel} if the channel is
+     *     unknown, {@code runtime.key_required_on_keyed_channel} if it is keyed and this cell has no
+     *     key to stamp
      */
     <C> void emit(String channel, C value) throws TaskletException;
 
     /**
      * Emit with user-attached string-keyed metadata. Valid only on plugin-bound
      * channels; inter-tasklet emits throw
-     * {@link TaskletException.MetadataNotAllowedOnInterTaskletChannel} naming the
-     * channel.
+     * {@code runtime.metadata_on_inter_tasklet_channel} naming the channel.
      *
      * <p>The reserved {@code channel} key is dropped from the user map and
      * overwritten with the channel's actual name during framing. Keys in the
      * {@link #RESERVED_METADATA_PREFIX} namespace are rejected with
-     * {@link TaskletException.ReservedMetadataKey}.
+     * {@code runtime.reserved_metadata_key}.
      */
     void emitWithMeta(Output value, Map<String, String> meta) throws TaskletException;
 

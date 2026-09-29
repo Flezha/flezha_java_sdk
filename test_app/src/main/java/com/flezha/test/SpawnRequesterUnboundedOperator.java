@@ -4,7 +4,7 @@ import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.SpawnException;
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.tasklet.SpawnHandle;
 import com.flezha.sdk.tasklet.SpawnOptions;
 import com.flezha.sdk.tasklet.SpawnResult;
@@ -48,8 +48,8 @@ public final class SpawnRequesterUnboundedOperator implements UnboundedOperator 
             try {
                 SpawnResult result = handle.await();
                 answer = result.id() + " " + result.outcome().name().toLowerCase(Locale.ROOT);
-            } catch (SpawnException e) {
-                answer = "error " + e.getMessage();
+            } catch (FlezhaException e) {
+                answer = "error " + e.code();
             }
             System.out.println("spawn_result " + label + " " + answer);
             System.out.flush();

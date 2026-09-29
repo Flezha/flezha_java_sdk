@@ -1,5 +1,6 @@
 package com.flezha.sdk.internal;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.operator.Operator;
 import java.lang.reflect.InvocationTargetException;
 import java.util.LinkedHashMap;
@@ -46,8 +47,8 @@ public final class RegistryCore {
      * core owns only its own runner's set.
      *
      * @return the controller-facing factory id.
-     * @throws IllegalArgumentException on a null class or a duplicate factory
-     *     id; the message begins with {@code DuplicateFactoryId}.
+     * @throws IllegalArgumentException on a null class.
+     * @throws FlezhaException {@code topology.duplicate_factory_id} on a duplicate factory id.
      */
     public String register(Class<?> cls) {
         if (cls == null) {
@@ -63,8 +64,7 @@ public final class RegistryCore {
                     "Failed to register " + kindLabel + " '" + cls.getName() + "'",
                     cls);
             if (entries.containsKey(factoryId)) {
-                throw new IllegalArgumentException(
-                        "DuplicateFactoryId: '" + factoryId + "' is already defined on this runner");
+                throw FlezhaException.of("topology.duplicate_factory_id", Map.of("factory_id", factoryId));
             }
             entries.put(factoryId, cls);
             return factoryId;
@@ -83,8 +83,8 @@ public final class RegistryCore {
     /**
      * The factory id under which {@code cls} is defined in this core.
      *
-     * @throws IllegalArgumentException naming the class's factory id when it
-     *     is not defined here (never defined, or already removed).
+     * @throws FlezhaException {@code runtime.class_not_registered} naming the class's factory id
+     *     when it is not defined here (never defined, or already removed).
      */
     @Nonnull
     public String definedFactoryIdOf(Class<?> cls) {
@@ -154,7 +154,7 @@ public final class RegistryCore {
      * no-arg constructor cannot be called. What that constructor throws is the
      * refusal's cause.
      */
-    private IllegalArgumentException notDefined(Class<?> cls) {
+    private FlezhaException notDefined(Class<?> cls) {
         ShortFormDeclaration shortForm = ShortFormDeclaration.of(cls);
         String factoryId = shortForm == null ? null : shortForm.id();
         Throwable cause = null;
@@ -167,9 +167,9 @@ public final class RegistryCore {
         } catch (ReflectiveOperationException e) {
             // No callable constructor: the class name stands in for the id.
         }
-        return new IllegalArgumentException(
-                kindLabel + " factory '" + (factoryId == null ? cls.getName() : factoryId)
-                        + "' is not defined on this runner",
+        return FlezhaException.of(
+                "runtime.class_not_registered",
+                Map.of("factory", factoryId == null ? cls.getName() : factoryId),
                 cause);
     }
 }

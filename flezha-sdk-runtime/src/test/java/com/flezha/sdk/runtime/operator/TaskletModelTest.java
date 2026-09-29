@@ -1,9 +1,9 @@
 package com.flezha.sdk.runtime.operator;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
+import com.flezha.sdk.FlezhaException;
+import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.operator.TaskletModel.Hook;
 import com.flezha.sdk.runtime.state.CellId;
 import com.flezha.sdk.state.Change;
@@ -70,10 +70,12 @@ class TaskletModelTest {
     @Test
     @DisplayName("Unresolvable type fails registration by name")
     void unresolvableTypeFailsRegistrationByName() {
-        assertThat(TaskletModel.read(StillGeneric.class, null).errors())
-                .singleElement(org.assertj.core.api.InstanceOfAssertFactories.STRING)
-                .contains(StillGeneric.class.getName())
-                .contains("`Input`");
+        FlezhaException refused =
+                TaskletModel.read(StillGeneric.class, null).errors().get(0);
+        assertThat(refused.code()).isEqualTo("topology.unresolved_type_argument");
+        assertThat(refused.details())
+                .containsEntry("tasklet", StillGeneric.class.getName())
+                .containsEntry("parameter", "Input");
     }
 
     @Test
@@ -115,24 +117,26 @@ class TaskletModelTest {
     }
 
     @Test
-    @DisplayName("A tasklet without the annotation is refused with TaskletSpecMissing")
+    @DisplayName("A tasklet without the annotation is refused with topology.tasklet_name_missing")
     void aTaskletWithoutTheAnnotationIsRefused() {
-        assertThatThrownBy(() -> TaskletModel.read(NoSpec.class, null))
-                .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                .hasMessageStartingWith("TaskletSpecMissing")
-                .hasMessageContaining(NoSpec.class.getName());
+        FlezhaException refused =
+                Refused.by("topology.tasklet_name_missing", () -> TaskletModel.read(NoSpec.class, null));
+        assertThat(refused.details()).containsEntry("tasklet", NoSpec.class.getName());
     }
 
     @Test
     @DisplayName("A negative member is refused naming it and its value; an empty name too")
     void aNegativeMemberIsRefused() {
-        assertThat(TaskletModel.read(NegativeTtl.class, null).errors())
-                .singleElement(org.assertj.core.api.InstanceOfAssertFactories.STRING)
-                .contains("idleTtlSeconds")
-                .contains("-1");
+        FlezhaException negative =
+                TaskletModel.read(NegativeTtl.class, null).errors().get(0);
+        assertThat(negative.code()).isEqualTo("topology.negative_setting");
+        assertThat(negative.details())
+                .containsEntry("setting", "idleTtlSeconds")
+                .containsEntry("value", -1L);
         assertThat(TaskletModel.read(EmptyName.class, null).errors())
-                .singleElement(org.assertj.core.api.InstanceOfAssertFactories.STRING)
-                .contains("`name` is empty");
+                .singleElement()
+                .extracting(FlezhaException::code)
+                .isEqualTo("topology.tasklet_name_missing");
     }
 
     @Test
@@ -156,10 +160,10 @@ class TaskletModelTest {
     @Test
     @DisplayName("A state class without a constructor is refused naming the class")
     void aStateClassWithoutAConstructorIsRefused() {
-        assertThat(TaskletModel.read(NoConstructor.class, null).errors())
-                .singleElement(org.assertj.core.api.InstanceOfAssertFactories.STRING)
-                .contains(Span.class.getName())
-                .contains("initState");
+        FlezhaException refused =
+                TaskletModel.read(NoConstructor.class, null).errors().get(0);
+        assertThat(refused.code()).isEqualTo("topology.state_not_constructible");
+        assertThat(refused.details()).containsEntry("state", Span.class.getName());
     }
 
     @Tasklet.Spec(name = "bare")

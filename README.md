@@ -125,6 +125,12 @@ the runner to be closed explicitly.
 Declare every operator on the builder before the runner starts. One runner can
 serve several, and `registerFactory(...)` is the same call for the bounded kind.
 
+Anything Flezha refuses throws one unchecked type, `com.flezha.sdk.FlezhaException`:
+a registration, a refused connect, an administration call, a spawn read, and a
+misuse such as an emit on a channel the tasklet does not own. Branch on its
+`code()`, for example `topology.duplicate_factory_id` or `quota.exceeded`, and read
+the values its message names from `details()`.
+
 To run this without a controller, replace the main with `LocalOperator`, which
 executes the same declared wiring inside the calling JVM and delivers sink output
 to a callback. Nothing is durable in that mode, and declarations requiring a

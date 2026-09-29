@@ -159,7 +159,7 @@ public interface ChannelBuilder {
      *
      * <p>Requires {@link #effectivelyOnce()} — there is no offset to withhold
      * without the tier — and declaring it alone fails registration with
-     * {@code CheckpointAckWithoutTier}.
+     * {@code topology.checkpoint_ack_without_tier}.
      *
      * <p>Emits made before a checkpoint are still flushed as they happen —
      * checkpointing moves the <em>acknowledgement</em>, not the output. To hold

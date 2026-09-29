@@ -3,6 +3,7 @@ package com.flezha.sdk.runtime.state;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.runtime.operator.TaskletModel;
 import com.flezha.sdk.runtime.state.moved.MovedDesk;
 import com.flezha.sdk.state.Change;
@@ -69,14 +70,15 @@ class KryoTypesTest {
                 KryoTypes.ids(List.of(Colliding.C150.class, Colliding.C917.class), Colliding.class, "colliding");
         assertThat(ids.get(Colliding.C150.class)).isEqualTo(ids.get(Colliding.C917.class));
 
-        List<String> errors =
+        List<FlezhaException> errors =
                 TaskletModel.read(Colliding.class, new Colliding()).errors();
 
-        assertThat(errors)
-                .singleElement(org.assertj.core.api.InstanceOfAssertFactories.STRING)
-                .contains(Colliding.C150.class.getName())
-                .contains(Colliding.C917.class.getName())
-                .contains("kryoTypes()");
+        assertThat(errors).hasSize(1);
+        assertThat(errors.get(0).code()).isEqualTo("topology.state_type_id_collision");
+        assertThat(List.of(
+                        errors.get(0).details().get("first"),
+                        errors.get(0).details().get("second")))
+                .containsExactlyInAnyOrder(Colliding.C150.class.getName(), Colliding.C917.class.getName());
     }
 
     @Test

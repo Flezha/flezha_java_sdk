@@ -3,11 +3,13 @@ package com.flezha.sdk.runtime.core;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.authoring.BoundedOperator;
 import com.flezha.sdk.authoring.UnboundedOperator;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.operator.LoopMode;
+import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
@@ -112,38 +114,30 @@ class ShortFormTest extends DispatchTestBase {
     @Test
     @DisplayName("An annotation with no id is refused naming the required id")
     void anAnnotationWithNoIdIsRefused() {
-        assertThatThrownBy(() -> UnboundedOperatorClassRegistry.registerClass(Upcase.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining(Upcase.class.getName())
-                .hasMessageContaining("requires `id`");
+        FlezhaException refused = Refused.by(
+                "topology.missing_factory_id", () -> UnboundedOperatorClassRegistry.registerClass(Upcase.class));
+        assertThat(refused.details()).containsEntry("operator", Upcase.class.getName());
     }
 
     @Test
-    @DisplayName("An annotated class implementing an operator interface is refused as ShortFormWithTopology")
+    @DisplayName(
+            "An annotated class implementing an operator interface is refused as topology.short_form_with_topology")
     void anAnnotatedClassImplementingAnOperatorInterfaceIsRefused() {
-        assertThatThrownBy(() -> UnboundedOperatorClassRegistry.registerClass(Both.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("ShortFormWithTopology")
-                .hasMessageContaining(Both.class.getName());
+        Refused.by("topology.short_form_with_topology", () -> UnboundedOperatorClassRegistry.registerClass(Both.class));
     }
 
     @Test
-    @DisplayName("A short form whose tasklet name differs from its id is refused as ShortFormNameMismatch")
+    @DisplayName("A short form whose tasklet name differs from its id is refused as topology.short_form_name_mismatch")
     void aShortFormWhoseTaskletNameDiffersFromItsIdIsRefused() {
-        assertThatThrownBy(() -> UnboundedOperatorClassRegistry.registerClass(Tally.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("ShortFormNameMismatch")
-                .hasMessageContaining("`counter`")
-                .hasMessageContaining("`tally`");
+        FlezhaException refused = Refused.by(
+                "topology.short_form_name_mismatch", () -> UnboundedOperatorClassRegistry.registerClass(Tally.class));
+        assertThat(refused.details()).containsEntry("factory_id", "counter").containsEntry("name", "tally");
     }
 
     @Test
-    @DisplayName("A sink on a Void output is refused as SinkWithoutOutput")
+    @DisplayName("A sink on a Void output is refused as topology.sink_without_output")
     void aSinkOnAVoidOutputIsRefused() {
-        assertThatThrownBy(() -> UnboundedOperatorClassRegistry.registerClass(Drain.class))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageStartingWith("SinkWithoutOutput")
-                .hasMessageContaining(Drain.class.getName());
+        Refused.by("topology.sink_without_output", () -> UnboundedOperatorClassRegistry.registerClass(Drain.class));
     }
 
     @Test

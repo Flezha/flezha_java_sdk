@@ -15,8 +15,8 @@
  *
  * <p>{@link com.flezha.sdk.operator.UnboundedOperator} runs its graph continuously, holds per-cell
  * state, and is the right choice when work is expressed as messages flowing through one or more
- * tasklets. A refusal of its graph raises
- * {@link com.flezha.sdk.operator.UnboundedOperatorConfigurationException}.
+ * tasklets. A refusal of its graph raises {@link com.flezha.sdk.FlezhaException} with the refusal's
+ * {@code topology.*} code.
  *
  * <p>{@link com.flezha.sdk.operator.BoundedOperator} runs its graph to completion, for work that
  * must not be re-executed as a unit after a partial failure, such as a transaction spanning

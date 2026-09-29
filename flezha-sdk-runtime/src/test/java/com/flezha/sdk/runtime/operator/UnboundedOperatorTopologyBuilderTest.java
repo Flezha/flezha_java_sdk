@@ -3,10 +3,11 @@ package com.flezha.sdk.runtime.operator;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.operator.UnboundedOperator;
-import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
+import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -61,18 +62,19 @@ class UnboundedOperatorTopologyBuilderTest {
         @Test
         @DisplayName("wiring mismatch fails registration with diagnosable error")
         void wiringMismatchRejected() {
-            assertThatThrownBy(() -> UnboundedOperatorTopologyBuilder.build(new TypeMismatchUnboundedOperator()))
-                    .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                    .hasMessageContaining("trade.parsed");
+            FlezhaException refused = Refused.by(
+                    "topology.payload_type_mismatch",
+                    () -> UnboundedOperatorTopologyBuilder.build(new TypeMismatchUnboundedOperator()));
+            assertThat(Refused.details(refused, "topology.payload_type_mismatch"))
+                    .containsEntry("channel", "trade.parsed");
         }
 
         @Test
         @DisplayName("static-mode tasklet that declares no cellsFor is rejected")
         void staticWithoutCellsForRejected() {
-            assertThatThrownBy(() -> UnboundedOperatorTopologyBuilder.build(new MissingCellsForUnboundedOperator()))
-                    .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                    .hasMessageContaining("CellsForMissing")
-                    .hasMessageContaining("declares non-empty cell_keys() but does not override cells_for");
+            Refused.by(
+                    "topology.cells_for_missing",
+                    () -> UnboundedOperatorTopologyBuilder.build(new MissingCellsForUnboundedOperator()));
         }
 
         @Test
@@ -81,22 +83,26 @@ class UnboundedOperatorTopologyBuilderTest {
             // The defaults read the implements clause; what they cannot read
             // they refuse by name here, rather than guessing and failing at
             // dispatch with a type mismatch far from this declaration.
-            assertThatThrownBy(() -> UnboundedOperatorTopologyBuilder.build(new UnresolvedTokenUnboundedOperator()))
-                    .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                    .hasMessageContaining(UnresolvedInputTasklet.class.getName())
-                    .hasMessageContaining("Input");
+            FlezhaException refused = Refused.by(
+                    "topology.unresolved_type_argument",
+                    () -> UnboundedOperatorTopologyBuilder.build(new UnresolvedTokenUnboundedOperator()));
+            assertThat(Refused.details(refused, "topology.unresolved_type_argument"))
+                    .containsEntry("tasklet", UnresolvedInputTasklet.class.getName())
+                    .containsEntry("parameter", "Input");
         }
 
         @Test
         @DisplayName("a throwing tasklet constructor is collected with the other refusals, naming the author's error")
         void throwingTaskletConstructorIsCollectedWithTheOtherRefusals() {
-            assertThatThrownBy(() -> UnboundedOperatorTopologyBuilder.build(new ThrowingTaskletUnboundedOperator()))
-                    .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                    .hasMessageStartingWith("topology rejected [Declaration, Declaration")
-                    .hasMessageContaining("`two_clocks` writes eventTime(Input) and declares")
-                    .hasMessageContaining(ThrowingConstructorTasklet.REFUSAL)
-                    .hasMessageNotContaining("no-arg constructor")
-                    .hasMessageNotContaining("does not match");
+            FlezhaException refused = Refused.by(
+                    "topology.two_clocks",
+                    () -> UnboundedOperatorTopologyBuilder.build(new ThrowingTaskletUnboundedOperator()));
+            assertThat(refused.issueCodes())
+                    .containsExactlyInAnyOrder("topology.two_clocks", "topology.class_not_constructible");
+            assertThat(Refused.details(refused, "topology.class_not_constructible")
+                            .get("reason"))
+                    .asString()
+                    .contains(ThrowingConstructorTasklet.REFUSAL);
         }
 
         @Test
@@ -330,9 +336,9 @@ class UnboundedOperatorTopologyBuilderTest {
             assertThatThrownBy(() -> UnboundedOperatorTopologyBuilder.build("g3", c -> c.input(String.class, "in")
                             .into(SingleTasklet.class)
                             .branch(b -> b.into(GraphStage1.class))))
-                    .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                    .hasMessageContaining("BranchTooFewArms")
-                    .hasMessageContaining("branch(...) requires at least two arms; 1 given");
+                    .isInstanceOfSatisfying(
+                            FlezhaException.class, e -> assertThat(Refused.details(e, "topology.branch_too_few_arms"))
+                                    .containsEntry("arms", 1));
         }
 
         @Test
@@ -361,9 +367,9 @@ class UnboundedOperatorTopologyBuilderTest {
                         validated.into(GraphStage2.class, "graph_stage1");
                         validated.into(GraphStage1.class);
                     }))
-                    .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                    .hasMessageContaining("NodeIdentityCollision")
-                    .hasMessageContaining("graph_stage1");
+                    .isInstanceOfSatisfying(FlezhaException.class, e -> assertThat(
+                                    Refused.details(e, "topology.node_identity_collision"))
+                            .containsEntry("name", "graph_stage1"));
         }
 
         @Test
@@ -380,9 +386,9 @@ class UnboundedOperatorTopologyBuilderTest {
                             UnboundedOperatorTopologyBuilder.build("g7", c -> c.input(String.class, "single_tasklet")
                                     .into(SingleTasklet.class)
                                     .into(GraphStage1.class)))
-                    .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                    .hasMessageContaining("DuplicateChannel")
-                    .hasMessageContaining("single_tasklet");
+                    .isInstanceOfSatisfying(
+                            FlezhaException.class, e -> assertThat(Refused.details(e, "topology.duplicate_channel"))
+                                    .containsEntry("channel", "single_tasklet"));
         }
 
         @Test
@@ -392,9 +398,8 @@ class UnboundedOperatorTopologyBuilderTest {
                             .into(GraphStage1.class)
                             .into(GraphStage2.class)
                             .into(GraphStage1.class)))
-                    .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                    .hasMessageContaining("Cycle")
-                    .hasMessageContaining("is on a cycle");
+                    .isInstanceOfSatisfying(FlezhaException.class, e -> assertThat(e.issueCodes())
+                            .contains("topology.cycle"));
         }
 
         @Test
@@ -505,9 +510,8 @@ class UnboundedOperatorTopologyBuilderTest {
      * The verdict a build was refused with, or {@code null} if the build was accepted. Package
      * private: {@link ReferenceTopologyRowsTest} reads the same verdict off the same builder.
      */
-    static UnboundedOperatorConfigurationException catchConfigException(Runnable build) {
-        return org.assertj.core.api.Assertions.catchThrowableOfType(
-                UnboundedOperatorConfigurationException.class, build::run);
+    static FlezhaException catchConfigException(Runnable build) {
+        return org.assertj.core.api.Assertions.catchThrowableOfType(FlezhaException.class, build::run);
     }
 
     /**
@@ -522,15 +526,16 @@ class UnboundedOperatorTopologyBuilderTest {
         @Test
         @DisplayName("a zero correction window, and the two things a window rests on")
         void correctionWindowRefusals() {
-            UnboundedOperatorConfigurationException refused =
-                    catchConfigException(() -> UnboundedOperatorTopologyBuilder.build("r1", c -> {
-                        c.correctionWindow(0);
-                        c.input(String.class, "in").into(SingleTasklet.class);
-                    }));
-            assertThat(refused.refusals())
+            FlezhaException refused = catchConfigException(() -> UnboundedOperatorTopologyBuilder.build("r1", c -> {
+                c.correctionWindow(0);
+                c.input(String.class, "in").into(SingleTasklet.class);
+            }));
+            assertThat(refused.issueCodes())
                     .as("`correctionWindow(0)` is the one shape Java accepted before the core held the rules")
-                    .contains("CorrectionWindowZero", "CorrectionWithoutTier", "CorrectionWithoutEventTime");
-            assertThat(refused).hasMessageContaining("a zero window can correct nothing");
+                    .contains(
+                            "topology.correction_window_zero",
+                            "topology.correction_without_tier",
+                            "topology.correction_without_event_time");
         }
 
         @Test
@@ -538,9 +543,9 @@ class UnboundedOperatorTopologyBuilderTest {
         void retryMaxZeroRefused() {
             assertThatThrownBy(() -> UnboundedOperatorTopologyBuilder.build(
                             "r2", c -> c.input(String.class, "in").retryMax(0).into(SingleTasklet.class)))
-                    .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                    .hasMessageContaining("RetryMaxZero")
-                    .hasMessageContaining("channel `in` declared retry_max = 0");
+                    .isInstanceOfSatisfying(
+                            FlezhaException.class, e -> assertThat(Refused.details(e, "topology.retry_max_zero"))
+                                    .containsEntry("channel", "in"));
         }
 
         @Test
@@ -550,9 +555,9 @@ class UnboundedOperatorTopologyBuilderTest {
                             .into(SingleTasklet.class)
                             .sink("egress")
                             .sink()))
-                    .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                    .hasMessageContaining("DuplicatePluginSink")
-                    .hasMessageContaining("channel `egress` was declared with `sink(...)` more than once");
+                    .isInstanceOfSatisfying(
+                            FlezhaException.class, e -> assertThat(Refused.details(e, "topology.duplicate_plugin_sink"))
+                                    .containsEntry("channel", "egress"));
         }
 
         @Test
@@ -562,9 +567,10 @@ class UnboundedOperatorTopologyBuilderTest {
                             .into(SingleTasklet.class)
                             .named("a")
                             .sink("b")))
-                    .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                    .hasMessageContaining("ChannelNamedTwice")
-                    .hasMessageContaining(".named(`a`) and .sink(`b`) both name it");
+                    .isInstanceOfSatisfying(
+                            FlezhaException.class, e -> assertThat(Refused.details(e, "topology.channel_named_twice"))
+                                    .containsEntry("named", "a")
+                                    .containsEntry("sink", "b"));
         }
 
         @Test
@@ -575,9 +581,9 @@ class UnboundedOperatorTopologyBuilderTest {
                         in.into(SingleTasklet.class).sink("shared");
                         in.into(GraphStage1.class).sink("shared");
                     }))
-                    .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                    .hasMessageContaining("DuplicateSinkName")
-                    .hasMessageContaining("channel `shared` is named by two plugin sinks");
+                    .isInstanceOfSatisfying(
+                            FlezhaException.class, e -> assertThat(Refused.details(e, "topology.duplicate_sink_name"))
+                                    .containsEntry("channel", "shared"));
         }
 
         @Test
@@ -587,9 +593,9 @@ class UnboundedOperatorTopologyBuilderTest {
                         c.effectivelyOnce();
                         c.input(String.class, "in").into(SingleTasklet.class).sink("egress");
                     }))
-                    .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                    .hasMessageContaining("UnkeyedChannelUnderEffectivelyOnce")
-                    .hasMessageContaining("must opt in with .keyed()");
+                    .isInstanceOfSatisfying(FlezhaException.class, e -> assertThat(
+                                    Refused.details(e, "topology.unkeyed_channel_under_effectively_once"))
+                            .containsEntry("channel", "egress"));
         }
     }
 

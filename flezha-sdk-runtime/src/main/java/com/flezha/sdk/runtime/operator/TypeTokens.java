@@ -1,6 +1,6 @@
 package com.flezha.sdk.runtime.operator;
 
-import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.tasklet.Tasklet;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -51,7 +51,9 @@ final class TypeTokens {
     static Class<?> require(Class<?> impl, Token token) {
         Class<?> resolved = find(impl, token);
         if (resolved == null) {
-            throw UnboundedOperatorConfigurationException.unresolvedTypeToken(impl.getName(), token.parameter);
+            throw FlezhaException.of(
+                    "topology.unresolved_type_argument",
+                    Map.of("tasklet", impl.getName(), "parameter", token.parameter));
         }
         return resolved;
     }

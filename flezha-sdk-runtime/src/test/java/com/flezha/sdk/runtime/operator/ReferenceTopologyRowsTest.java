@@ -3,8 +3,8 @@ package com.flezha.sdk.runtime.operator;
 import static com.flezha.sdk.runtime.operator.UnboundedOperatorTopologyBuilderTest.catchConfigException;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
 import com.flezha.sdk.runtime.RepositoryFixture;
 import com.flezha.sdk.runtime.core.DerivedDeclaration;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
@@ -33,13 +33,10 @@ import org.junit.jupiter.api.Test;
  * half, pinning the SENTENCES for the shapes this SDK used to judge in its own words; its tasklets
  * and its verdict catcher are reused here rather than declared a second time.
  *
- * <p>What makes the refusal case a statement about the core rather than about a string:
- * {@code UnboundedOperatorConfigurationException.refusals()} carries the names of the verdict, and
- * nothing the builder still refuses itself can put a reference variant there. {@code TypeTokens}
- * throws with no names at all, and {@code UnboundedOperatorTopologyBuilder.refused} names every
- * sentence it aggregates {@code Declaration}, which the fixture gives no row, on purpose. Note
- * what that rules out: {@code refusals()} being EMPTY does not mean "the builder refused this",
- * and asserting so would fail on every refusal that goes through {@code refused}.
+ * <p>What makes the refusal case a statement about the core rather than about a string: the
+ * {@code FlezhaException}'s {@code details.issues} carries the code of every refusal the core's
+ * verdict found, and nothing the builder still refuses itself carries a code the fixture gives a
+ * row.
  */
 class ReferenceTopologyRowsTest {
 
@@ -140,24 +137,19 @@ class ReferenceTopologyRowsTest {
     void aMalformedRowRefusesWithTheReferenceName() throws Exception {
         for (Row row : malformed()) {
             String name = refusalOf(row.topology());
-            UnboundedOperatorConfigurationException refused =
+            FlezhaException refused =
                     catchConfigException(() -> UnboundedOperatorTopologyBuilder.build(row.topology(), row.authoring()));
 
             assertThat(refused)
                     .as("%s is a refusal row of %s and this builder accepted it", row.topology(), FIXTURE)
                     .isNotNull();
-            assertThat(refused.refusals())
+            assertThat(refused.issueCodes())
                     .as(
-                            "the names the core listed in its verdict for %s. What the builder"
-                                    + " still refuses itself names no reference variant: an"
-                                    + " unresolved type token carries no names at all and the"
-                                    + " rest are all `Declaration`, which the fixture gives no"
-                                    + " row, so a reference name here can only be the core's",
+                            "the codes the core listed in its verdict for %s. What the builder still"
+                                    + " refuses itself carries no code the fixture gives a row, so a"
+                                    + " reference code here can only be the core's",
                             row.topology())
                     .contains(name);
-            assertThat(refused)
-                    .as("the rendered verdict an author reads for %s", row.topology())
-                    .hasMessageContaining(name);
         }
     }
 

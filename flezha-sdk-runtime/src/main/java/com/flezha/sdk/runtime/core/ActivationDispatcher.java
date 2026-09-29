@@ -31,9 +31,11 @@ public final class ActivationDispatcher {
         return instances;
     }
 
-    /** Whether any live instance belongs to {@code factoryId}. */
-    public boolean hasInstanceOf(@Nonnull String factoryId) {
-        return instances.values().stream().anyMatch(i -> factoryId.equals(i.factoryId()));
+    /** How many live instances belong to {@code factoryId}. */
+    public long instancesOf(@Nonnull String factoryId) {
+        return instances.values().stream()
+                .filter(i -> factoryId.equals(i.factoryId()))
+                .count();
     }
 
     @Nonnull

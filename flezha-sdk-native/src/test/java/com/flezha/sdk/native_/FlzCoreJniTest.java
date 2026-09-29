@@ -3,6 +3,7 @@ package com.flezha.sdk.native_;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flezha.sdk.FlezhaException;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -35,10 +36,25 @@ class FlzCoreJniTest {
     @Test
     @DisplayName("schema version mismatch throws, naming both versions")
     void versionMismatchThrows() {
-        assertThatThrownBy(() -> FlzCore.contextNew(999))
-                .isInstanceOf(FlezhaNativeException.class)
-                .hasMessageContaining("999")
-                .hasMessageContaining(String.valueOf(FlzCore.SCHEMA_VERSION));
+        assertThatThrownBy(() -> FlzCore.contextNew(999)).isInstanceOfSatisfying(FlezhaException.class, e -> {
+            assertThat(e.code()).isEqualTo("runtime.schema_mismatch");
+            assertThat(e.details()).containsEntry("shim", 999).containsEntry("core", FlzCore.SCHEMA_VERSION);
+        });
+    }
+
+    @Test
+    @DisplayName("a value the binding cannot map is refused as uncatalogued, naming why")
+    void anUnmappableArgumentIsUncatalogued() {
+        long ctx = FlzCore.newContext();
+        try {
+            assertThatThrownBy(() -> FlzCore.localOnSink(ctx, "a\u0000b"))
+                    .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                        assertThat(e.code()).isEqualTo("internal.uncatalogued");
+                        assertThat(e.details()).containsKey("reason");
+                    });
+        } finally {
+            FlzCore.contextFree(ctx);
+        }
     }
 
     @Test

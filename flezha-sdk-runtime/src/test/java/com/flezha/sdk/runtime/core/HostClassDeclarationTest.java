@@ -5,12 +5,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.native_.FlezhaNativeException;
 import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.operator.BoundedOperator;
 import com.flezha.sdk.operator.LoopMode;
 import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.RepositoryFixture;
 import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
@@ -198,10 +199,12 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("sleeping without persistence is refused by name, for either kind")
     void sleepingWithoutPersistenceIsRefused() {
-        assertThatThrownBy(() -> UnboundedOperatorClassRegistry.registerClass(SleeplessUnboundedOperator.class))
-                .hasMessageContaining("SleepWithoutPersistence");
-        assertThatThrownBy(() -> BoundedOperatorClassRegistry.registerClass(SleeplessBounded.class))
-                .hasMessageContaining("SleepWithoutPersistence");
+        Refused.by(
+                "topology.sleep_without_persistence",
+                () -> UnboundedOperatorClassRegistry.registerClass(SleeplessUnboundedOperator.class));
+        Refused.by(
+                "topology.sleep_without_persistence",
+                () -> BoundedOperatorClassRegistry.registerClass(SleeplessBounded.class));
     }
 
     @Test
@@ -442,8 +445,9 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("an interval option without the tier is refused, naming the missing tier")
     void checkpointOptionsWithoutTier() {
-        assertThatThrownBy(() -> UnboundedOperatorClassRegistry.registerClass(NoTierBatchedOperator.class))
-                .hasMessageContaining("CheckpointAckWithoutTier");
+        Refused.by(
+                "topology.checkpoint_ack_without_tier",
+                () -> UnboundedOperatorClassRegistry.registerClass(NoTierBatchedOperator.class));
     }
 
     @Test
@@ -460,10 +464,10 @@ class HostClassDeclarationTest {
 
         long ctx = FlzCore.newContext();
         try {
-            assertThatThrownBy(() -> FlzCore.declareClass(ctx, declaration))
-                    .isInstanceOf(FlezhaNativeException.class)
-                    .hasMessageContaining("releases no inter-tasklet handoff")
-                    .hasMessageContaining("decl_chained_sink_task");
+            FlezhaException refused = Refused.by(
+                    "topology.chained_loop_terminal_without_handoff", () -> FlzCore.declareClass(ctx, declaration));
+            assertThat(Refused.details(refused, "topology.chained_loop_terminal_without_handoff"))
+                    .containsEntry("tasklet", "decl_chained_sink_task");
         } finally {
             FlzCore.contextFree(ctx);
         }

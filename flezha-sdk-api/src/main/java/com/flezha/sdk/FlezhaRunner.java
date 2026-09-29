@@ -84,8 +84,7 @@ public final class FlezhaRunner implements AutoCloseable {
      * implements, never named by the call. Calls the class's {@code channels(...)} once and
      * records the topology in the class registry of its kind.
      * Legal before and after {@link #start()}. Invalid authoring is reported here, at the declaring
-     * call site, as {@code UnboundedOperatorConfigurationException} or
-     * {@code BoundedOperatorConfigurationException}.
+     * call site, as a {@link FlezhaException} whose code names the refusal.
      *
      * <p>A short form is registered by the tasklet class the author wrote, annotated
      * {@link com.flezha.sdk.authoring.UnboundedOperator @UnboundedOperator} or
@@ -95,15 +94,15 @@ public final class FlezhaRunner implements AutoCloseable {
      * <p>Unbounded and bounded operators share one factory-id namespace per runner, so a second class under
      * an id this runner already holds is refused whichever kind either one is.
      *
-     * @throws IllegalArgumentException on a duplicate factory id (the message begins with
-     *     {@code DuplicateFactoryId}), when the class implements both kind interfaces or carries both
-     *     annotations ({@code AmbiguousOperatorKind}), when it is neither an operator nor a short
-     *     form ({@code UnknownOperatorKind}), or when a short form is refused.
-     * @throws IllegalStateException on a closed runner.
+     * @throws FlezhaException on a duplicate factory id ({@code topology.duplicate_factory_id}), when
+     *     the class implements both kind interfaces or carries both annotations
+     *     ({@code topology.ambiguous_operator_kind}), when it is neither an operator nor a short form
+     *     ({@code topology.unknown_operator_kind}), when its authoring is refused, and on a closed
+     *     runner ({@code runtime.runner_closed}).
      */
     @Nonnull
     public FlezhaRunner registerFactory(Class<?> operatorClass) {
-        open("registerFactory()");
+        open();
         coreOf(operatorClass, "registerFactory()").register(operatorClass);
         syncFactoriesIfStarted();
         return this;
@@ -114,15 +113,15 @@ public final class FlezhaRunner implements AutoCloseable {
      * {@link #registerFactory(Class)}, taking what it took. Legal before and after
      * {@link #start()}.
      *
-     * @throws IllegalArgumentException if the class's factory id is not currently defined on this
-     *     runner, or its kind cannot be read.
-     * @throws OperatorTypeInUseException if the runner is started and live operator instances of
-     *     the factory exist — the type stays defined.
-     * @throws IllegalStateException on a closed runner.
+     * @throws FlezhaException {@code runtime.class_not_registered} if the class's factory id is not
+     *     currently defined on this runner, {@code runtime.operator_type_in_use} if the runner is
+     *     started and live operator instances of the factory exist (the type stays defined),
+     *     {@code runtime.runner_closed} on a closed runner, and the kind refusals
+     *     {@link #registerFactory} names.
      */
     @Nonnull
     public FlezhaRunner unregisterFactory(Class<?> operatorClass) {
-        open("unregisterFactory()");
+        open();
         return remove(coreOf(operatorClass, "unregisterFactory()"), operatorClass);
     }
 
@@ -140,13 +139,10 @@ public final class FlezhaRunner implements AutoCloseable {
         boolean isBounded = BoundedOperator.class.isAssignableFrom(declared)
                 || declared.isAnnotationPresent(com.flezha.sdk.authoring.BoundedOperator.class);
         if (isUnbounded && isBounded) {
-            throw new IllegalArgumentException("AmbiguousOperatorKind: " + declared.getName()
-                    + " declares both an unbounded and a bounded operator, so its kind cannot be read");
+            throw FlezhaException.of("topology.ambiguous_operator_kind", Map.of("module", declared.getName()));
         }
         if (!isUnbounded && !isBounded) {
-            throw new IllegalArgumentException("UnknownOperatorKind: " + declared.getName()
-                    + " implements neither UnboundedOperator nor BoundedOperator, and is annotated with"
-                    + " neither @UnboundedOperator nor @BoundedOperator");
+            throw FlezhaException.of("topology.unknown_operator_kind", Map.of("module", declared.getName()));
         }
         return isBounded ? bounded : stream;
     }
@@ -206,24 +202,22 @@ public final class FlezhaRunner implements AutoCloseable {
      * Starting with zero declared operator types is legal — the init frame
      * carries an empty factory list, and types may be defined later.
      *
-     * @throws IllegalStateException if a runner is already running in this JVM
-     *     (names the running namespace), or on a second {@code start()} of
-     *     this runner.
+     * @throws FlezhaException {@code runtime.runner_already_running} if a runner is already
+     *     running in this JVM, or on a second {@code start()} of this runner; the core's own code
+     *     when the connect is refused (for example {@code runner.namespace_not_proven}).
      */
     @Nonnull
     public FlezhaRunner start() {
         if (!everStarted.compareAndSet(false, true)) {
-            throw new IllegalStateException("this runner for namespace '" + namespace + "' was already started; "
-                    + "a FlezhaRunner starts at most once");
+            throw FlezhaException.of("runtime.runner_already_running", Map.of("namespace", namespace));
         }
         // Claim the JVM-wide slot: exactly one concurrent start() wins, and
         // the loser must not connect or mutate any shared state.
         if (!Flezha.RUNNING_NAMESPACE.compareAndSet(null, namespace)) {
             everStarted.set(false);
             String running = Flezha.RUNNING_NAMESPACE.get();
-            throw new IllegalStateException("a Flezha runner is already running in this JVM"
-                    + (running != null ? " for namespace '" + running + "'" : "")
-                    + "; at most one runner may be started per process — close() it before starting another");
+            throw FlezhaException.of(
+                    "runtime.runner_already_running", Map.of("namespace", running == null ? "" : running));
         }
         try {
             handle.set(startRuntime());
@@ -256,22 +250,22 @@ public final class FlezhaRunner implements AutoCloseable {
      * {@code flz role bind runner@<namespace> app <namespace>}; until then
      * every call is refused.
      *
-     * @throws IllegalStateException on a never-started runner.
+     * @throws FlezhaException {@code runtime.runner_not_started} on a never-started runner.
      */
     @Nonnull
     public Admin admin() {
-        return new Admin(started("admin()"));
+        return new Admin(started());
     }
 
     /**
      * Returns a snapshot of currently-spawned Operator instances keyed by
      * what the wire calls {@code operator_id}.
      *
-     * @throws IllegalStateException on a never-started runner.
+     * @throws FlezhaException {@code runtime.runner_not_started} on a never-started runner.
      */
     @Nonnull
     public Map<String, ?> getOperators() {
-        return started("getOperators()").operators();
+        return started().operators();
     }
 
     /**
@@ -280,10 +274,10 @@ public final class FlezhaRunner implements AutoCloseable {
      * shutdown. Replaces every hand-rolled keep-alive loop; a standalone
      * {@code main()} that wants this behaviour in one call uses {@link #run()}.
      *
-     * @throws IllegalStateException on a never-started runner.
+     * @throws FlezhaException {@code runtime.runner_not_started} on a never-started runner.
      */
     public void awaitTermination() throws InterruptedException {
-        started("awaitTermination()").awaitTermination();
+        started().awaitTermination();
     }
 
     /**
@@ -303,10 +297,10 @@ public final class FlezhaRunner implements AutoCloseable {
         }
     }
 
-    private RunnerHandle started(String what) {
+    private RunnerHandle started() {
         RunnerHandle h = handle.get();
         if (h == null) {
-            throw new IllegalStateException(what + " requires a started runner — runner not started");
+            throw FlezhaException.of("runtime.runner_not_started", Map.of());
         }
         return h;
     }
@@ -316,10 +310,9 @@ public final class FlezhaRunner implements AutoCloseable {
      * destroys the core context, so carrying the change to the handle would
      * hand a freed pointer back across the JNI boundary.
      */
-    private void open(String what) {
+    private void open() {
         if (closed.get()) {
-            throw new IllegalStateException(what + " on the closed runner for namespace '" + namespace
-                    + "'; a closed runner declares nothing — create a new one");
+            throw FlezhaException.of("runtime.runner_closed", Map.of("namespace", namespace));
         }
     }
 

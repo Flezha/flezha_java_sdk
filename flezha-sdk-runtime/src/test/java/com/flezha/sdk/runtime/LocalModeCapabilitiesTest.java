@@ -1,10 +1,10 @@
 package com.flezha.sdk.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.LocalOperator;
 import com.flezha.sdk.SinkOutput;
 import com.flezha.sdk.channel.ChannelBuilder;
@@ -155,9 +155,9 @@ class LocalModeCapabilitiesTest {
         // instead of running the graph.
         declares("effectively_once", "tier_store");
 
-        assertThatThrownBy(() -> LocalOperator.start(TierStoreUnboundedOperator.class))
-                .hasMessageContaining("effectively_once")
-                .hasMessageContaining("requires a controller");
+        FlezhaException refused = Refused.by(
+                "runtime.local_needs_controller", () -> LocalOperator.start(TierStoreUnboundedOperator.class));
+        assertThat(refused.details()).containsEntry("capability", "effectively_once");
     }
 
     /**

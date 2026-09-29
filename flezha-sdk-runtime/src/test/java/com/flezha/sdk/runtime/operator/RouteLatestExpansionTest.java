@@ -1,13 +1,13 @@
 package com.flezha.sdk.runtime.operator;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.EntryChannel;
 import com.flezha.sdk.channel.RoutedDocument;
 import com.flezha.sdk.operator.UnboundedOperator;
-import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
+import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.operator.builder.LatestDocumentRouter;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
 import com.flezha.sdk.tasklet.Ctx;
@@ -147,10 +147,12 @@ class RouteLatestExpansionTest {
         // fails when: two routers over one traffic stream silently collapse into
         // one node — they would share one retained document and one delivered
         // map, so each document stream would overwrite the other's.
-        assertThatThrownBy(() -> UnboundedOperatorTopologyBuilder.build(new TwoUnnamedRoutersOperator()))
-                .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                .hasMessageContaining("trades")
-                .hasMessageContaining(LatestDocumentRouter.NODE_NAME);
+        FlezhaException refused = Refused.by(
+                "topology.edge_already_wired",
+                () -> UnboundedOperatorTopologyBuilder.build(new TwoUnnamedRoutersOperator()));
+        assertThat(Refused.details(refused, "topology.edge_already_wired"))
+                .containsEntry("channel", "trades")
+                .containsEntry("tasklet", LatestDocumentRouter.NODE_NAME);
 
         UnboundedOperatorTopology topology = UnboundedOperatorTopologyBuilder.build(new TwoNamedRoutersOperator());
         assertThat(topology.taskletNameToId()).containsKeys("primary", "secondary");
@@ -176,8 +178,9 @@ class RouteLatestExpansionTest {
     void oneChannelCannotBeBothStreams() {
         // fails when: the router would retain traffic items as documents and
         // deliver them back to their own keys.
-        assertThatThrownBy(() -> UnboundedOperatorTopologyBuilder.build(new SelfRoutedOperator()))
-                .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                .hasMessageContaining("trades");
+        FlezhaException refused = Refused.by(
+                "topology.duplicate_merge_source",
+                () -> UnboundedOperatorTopologyBuilder.build(new SelfRoutedOperator()));
+        assertThat(Refused.details(refused, "topology.duplicate_merge_source")).containsEntry("channel", "trades");
     }
 }

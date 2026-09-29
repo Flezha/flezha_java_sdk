@@ -15,7 +15,7 @@ import java.util.OptionalInt;
  *
  * <p>The resolved value is written into the record as declared — an
  * out-of-range one included. {@code flz_core} names it
- * ({@code MailboxCapacityZero}, {@code MailboxCapacityTooLarge}), so
+ * ({@code topology.mailbox_capacity_zero}, {@code topology.mailbox_capacity_too_large}), so
  * resolving and judging stay apart. Unparseable env values fall through to
  * the default — runners tolerate typos in env values during development.
  * Split into a pure-function core so operator tests don't have to mutate

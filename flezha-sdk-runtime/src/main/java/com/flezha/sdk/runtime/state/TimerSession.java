@@ -1,11 +1,12 @@
 package com.flezha.sdk.runtime.state;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.runtime.cell.TimerCounters;
 import com.flezha.sdk.state.TimerKind;
-import com.flezha.sdk.tasklet.TaskletException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nonnull;
 
 /**
@@ -49,23 +50,26 @@ public final class TimerSession {
     }
 
     /** Register an event-time timer at an absolute timestamp. */
-    public long registerAtEventTime(long scheduledAt) throws TaskletException {
+    public long registerAtEventTime(long scheduledAt) {
         if (!policy.eventTimeClock()) {
             policy.counters().refused().incrementAndGet();
-            throw new TaskletException.EventTimeTimerWithoutEventTimeClock(policy.tasklet(), policy.clock());
+            throw FlezhaException.of(
+                    "runtime.event_time_timer_without_event_time_clock",
+                    Map.of("tasklet", policy.tasklet(), "clock", policy.clock()));
         }
         return register(TimerKind.EVENT_TIME, scheduledAt);
     }
 
     /** Register a processing-time timer {@code delay} after {@code ctx.now()}. */
-    public long registerAfter(@Nonnull Duration delay) throws TaskletException {
+    public long registerAfter(@Nonnull Duration delay) {
         return register(TimerKind.PROCESSING_TIME, now + delay.toMillis());
     }
 
-    private long register(TimerKind kind, long scheduledAt) throws TaskletException {
+    private long register(TimerKind kind, long scheduledAt) {
         if (!pending.contains(kind, scheduledAt) && pending.size() >= policy.maxPerCell()) {
             policy.counters().refused().incrementAndGet();
-            throw new TaskletException.TimerCapExceeded(policy.tasklet(), policy.maxPerCell());
+            throw FlezhaException.of(
+                    "runtime.timer_cap_exceeded", Map.of("tasklet", policy.tasklet(), "max", policy.maxPerCell()));
         }
         TimerOp op = TimerOp.register(kind, scheduledAt);
         if (pending.apply(op)) {

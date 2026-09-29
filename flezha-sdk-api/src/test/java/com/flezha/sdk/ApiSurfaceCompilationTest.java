@@ -74,7 +74,6 @@ class ApiSurfaceCompilationTest {
                         import com.flezha.sdk.operator.RollbackMode;
                         import com.flezha.sdk.operator.UnboundedOperator;
                         import com.flezha.sdk.operator.BoundedOperator;
-                        import com.flezha.sdk.operator.BoundedOperatorConfigurationException;
                         public final class UsesLegacyApi {
                             // Both kinds are the base, so one return type holds either.
                             Operator eitherKind(UnboundedOperator s, BoundedOperator w, boolean b) {
@@ -83,7 +82,6 @@ class ApiSurfaceCompilationTest {
 
                             LoopMode loop;
                             RollbackMode rollback;
-                            BoundedOperatorConfigurationException refusal;
                         }
                         """))
                 .as("the base, both kinds and the bounded supporting types resolve from one package")

@@ -69,7 +69,7 @@ public interface UnboundedOperator extends Operator {
      * is evicted from its runner, holding no memory there, and wakes on its next message with its
      * cells restored. Its input is then kept durably by the controller, one log append per
      * message. A class that sleeps with {@link #persistenceEnabled()} off is refused at
-     * registration as {@code SleepWithoutPersistence}.
+     * registration as {@code topology.sleep_without_persistence}.
      */
     default boolean sleepWhenIdle() {
         return false;

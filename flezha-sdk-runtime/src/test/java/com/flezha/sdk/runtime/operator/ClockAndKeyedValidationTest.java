@@ -1,12 +1,12 @@
 package com.flezha.sdk.runtime.operator;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.operator.UnboundedOperator;
-import com.flezha.sdk.operator.UnboundedOperatorConfigurationException;
+import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -49,29 +49,25 @@ class ClockAndKeyedValidationTest {
     @Test
     @DisplayName("Two clocks are refused: eventTime written and logicalClock declared")
     void twoClocksAreRefused() {
-        assertThatThrownBy(() -> UnboundedOperatorClassRegistry.registerClass(TwoClocksOperator.class))
-                .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                .hasMessageContaining("two_clocks")
-                .hasMessageContaining("eventTime")
-                .hasMessageContaining("logicalClock");
+        FlezhaException refused = Refused.by(
+                "topology.two_clocks", () -> UnboundedOperatorClassRegistry.registerClass(TwoClocksOperator.class));
+        assertThat(Refused.details(refused, "topology.two_clocks")).containsEntry("tasklet", "two_clocks");
     }
 
     @Test
-    @DisplayName("A logical clock without state is refused as UnservableClock")
+    @DisplayName("A logical clock without state is refused as topology.unservable_clock")
     void aLogicalClockWithoutStateIsRefused() {
-        assertThatThrownBy(() -> UnboundedOperatorClassRegistry.registerClass(UnservableClockOperator.class))
-                .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                .hasMessageContaining("UnservableClock")
-                .hasMessageContaining("unservable");
+        Refused.by(
+                "topology.unservable_clock",
+                () -> UnboundedOperatorClassRegistry.registerClass(UnservableClockOperator.class));
     }
 
     @Test
     @DisplayName("a keyed channel with no plugin wire is refused")
     void keyedChannelWithoutPluginWireIsRefused() {
-        assertThatThrownBy(() -> UnboundedOperatorClassRegistry.registerClass(KeyedNoPluginOperator.class))
-                .isInstanceOf(UnboundedOperatorConfigurationException.class)
-                .hasMessageContaining("KeyedChannelWithoutPluginWire")
-                .hasMessageContaining("is declared .keyed() but has no plugin wire");
+        Refused.by(
+                "topology.keyed_channel_without_plugin_wire",
+                () -> UnboundedOperatorClassRegistry.registerClass(KeyedNoPluginOperator.class));
     }
 
     @Test

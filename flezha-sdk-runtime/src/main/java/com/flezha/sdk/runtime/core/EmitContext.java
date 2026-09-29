@@ -1,5 +1,6 @@
 package com.flezha.sdk.runtime.core;
 
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.runtime.operator.ChannelDescriptor;
 import com.flezha.sdk.runtime.operator.ConsumerEdge;
@@ -12,7 +13,6 @@ import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.EmitKeys;
 import com.flezha.sdk.tasklet.StableId;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -126,77 +126,77 @@ final class EmitContext implements Ctx<Object, Object> {
         return cell.cellKey.isEmpty() ? Optional.empty() : Optional.of(cell.cellKey);
     }
 
-    private TimerSession session() throws TaskletException {
+    private TimerSession session() {
         if (timers == null) {
-            throw new TaskletException.TimersUnavailable();
+            throw FlezhaException.of("runtime.timers_unavailable", Map.of());
         }
         return timers;
     }
 
     @Override
-    public long timerAtEventTime(long scheduledAt) throws TaskletException {
+    public long timerAtEventTime(long scheduledAt) {
         return session().registerAtEventTime(scheduledAt);
     }
 
     @Override
-    public long timerAfter(@Nonnull Duration delay) throws TaskletException {
+    public long timerAfter(@Nonnull Duration delay) {
         return session().registerAfter(delay);
     }
 
     @Override
-    public boolean cancelEventTimeTimer(long scheduledAt) throws TaskletException {
+    public boolean cancelEventTimeTimer(long scheduledAt) {
         return session().cancel(TimerKind.EVENT_TIME, scheduledAt);
     }
 
     @Override
-    public boolean cancelProcessingTimeTimer(long scheduledAt) throws TaskletException {
+    public boolean cancelProcessingTimeTimer(long scheduledAt) {
         return session().cancel(TimerKind.PROCESSING_TIME, scheduledAt);
     }
 
     @Override
-    public void emit(@Nonnull Object value) throws TaskletException {
+    public void emit(@Nonnull Object value) {
         doEmit(defaultOutputChannel(), value, null, null);
     }
 
     @Override
-    public <C> void emit(@Nonnull String channelName, @Nonnull C value) throws TaskletException {
+    public <C> void emit(@Nonnull String channelName, @Nonnull C value) {
         doEmit(resolveChannel(channelName), value, null, null);
     }
 
     @Override
-    public void emitWithMeta(@Nonnull Object value, @Nonnull Map<String, String> meta) throws TaskletException {
+    public void emitWithMeta(@Nonnull Object value, @Nonnull Map<String, String> meta) {
         doEmit(defaultOutputChannel(), value, meta, null);
     }
 
     @Override
-    public <C> void emitWithMeta(@Nonnull String channelName, @Nonnull C value, @Nonnull Map<String, String> meta)
-            throws TaskletException {
+    public <C> void emitWithMeta(@Nonnull String channelName, @Nonnull C value, @Nonnull Map<String, String> meta) {
         doEmit(resolveChannel(channelName), value, meta, null);
     }
 
     @Override
-    public void emitKeyed(@Nonnull String key, @Nonnull Object value) throws TaskletException {
+    public void emitKeyed(@Nonnull String key, @Nonnull Object value) {
         doEmit(defaultOutputChannel(), value, null, key);
     }
 
     @Override
-    public void emitKeyedWithMeta(@Nonnull String key, @Nonnull Object value, @Nonnull Map<String, String> meta)
-            throws TaskletException {
+    public void emitKeyedWithMeta(@Nonnull String key, @Nonnull Object value, @Nonnull Map<String, String> meta) {
         doEmit(defaultOutputChannel(), value, meta, key);
     }
 
-    private int defaultOutputChannel() throws TaskletException {
+    private int defaultOutputChannel() {
         TaskletDescriptor desc = instance.topology.tasklet(cell.taskletId);
         if (desc == null || desc.outputChannelId().isEmpty()) {
-            throw new TaskletException.UnknownChannel("<no output channel declared on this tasklet>");
+            throw FlezhaException.of(
+                    "runtime.no_output_channel",
+                    Map.of("tasklet", desc == null ? String.valueOf(cell.taskletId) : desc.name()));
         }
         return desc.outputChannelId().getAsInt();
     }
 
-    private int resolveChannel(String name) throws TaskletException {
+    private int resolveChannel(String name) {
         Integer id = instance.topology.lookupChannelId(name);
         if (id == null) {
-            throw new TaskletException.UnknownChannel(name);
+            throw FlezhaException.of("runtime.unknown_channel", Map.of("channel", name));
         }
         return id;
     }
@@ -208,24 +208,34 @@ final class EmitContext implements Ctx<Object, Object> {
      * defaulted emit and an explicit {@code emitKeyed} are one path from
      * this point on and their stamping cannot diverge.
      */
-    private void doEmit(int channelId, Object value, @Nullable Map<String, String> meta, @Nullable String key)
-            throws TaskletException {
+    private void doEmit(int channelId, Object value, @Nullable Map<String, String> meta, @Nullable String key) {
         ChannelDescriptor descriptor = instance.topology.channel(channelId);
         if (descriptor == null) {
-            throw new TaskletException.UnknownChannel("<channel " + channelId + ">");
+            throw FlezhaException.of("runtime.unknown_channel", Map.of("channel", "<channel " + channelId + ">"));
         }
         if (descriptor.kind() == ChannelKind.ENTRY) {
-            throw new TaskletException("cannot emit on entry channel `" + descriptor.name() + "` from a tasklet");
+            throw FlezhaException.of(
+                    "runtime.channel_wrong_kind",
+                    Map.of(
+                            "operator",
+                            instance.factoryId(),
+                            "channel",
+                            descriptor.name(),
+                            "declared",
+                            "entry",
+                            "kind",
+                            "output"));
         }
         key = EmitKeys.resolve(descriptor.name(), descriptor.keyed(), key, cellKey());
         if (meta != null) {
             for (String k : meta.keySet()) {
                 if (k.startsWith(Ctx.RESERVED_METADATA_PREFIX)) {
-                    throw new TaskletException.ReservedMetadataKey(k);
+                    throw FlezhaException.of("runtime.reserved_metadata_key", Map.of("key", k));
                 }
             }
             if (descriptor.pluginSink().isEmpty()) {
-                throw new TaskletException.MetadataNotAllowedOnInterTaskletChannel(descriptor.name());
+                throw FlezhaException.of(
+                        "runtime.metadata_on_inter_tasklet_channel", Map.of("channel", descriptor.name()));
             }
         }
         // Fan out to the consumer edges, then to the plugin sink if the
@@ -238,12 +248,12 @@ final class EmitContext implements Ctx<Object, Object> {
         }
     }
 
-    private static byte[] serializeOrThrow(Function<Object, byte[]> serializer, Object value, String channel)
-            throws TaskletException {
+    private static byte[] serializeOrThrow(Function<Object, byte[]> serializer, Object value, String channel) {
         try {
             return serializer.apply(value);
         } catch (RuntimeException | Error e) {
-            throw new TaskletException.PluginSerializerFailure(channel, e.toString(), e);
+            throw FlezhaException.of(
+                    "runtime.plugin_serializer_panicked", Map.of("channel", channel, "reason", e.toString()), e);
         }
     }
 
