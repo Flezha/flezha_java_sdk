@@ -5,6 +5,8 @@ services:
     environment:
       FLEZHA_AUTHZ_ENABLED: "false"
       FLEZHA_DURABILITY_BACKEND: none
+    ports:
+      - "127.0.0.1:8080:8080"              # the gateway's HTTP port, on this machine only
     volumes:
       - app_data:/flezha/app_data
       - sockets:/flezha/app_data/sockets

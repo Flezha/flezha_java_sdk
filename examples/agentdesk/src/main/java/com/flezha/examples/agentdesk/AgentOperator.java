@@ -33,5 +33,8 @@ public final class AgentOperator implements BoundedOperator {
                 .sink("answer")                          // to whoever listens
                 .into(Deliver.class)
                 .response();                             // to whoever called
+        c.input(Message.class, "message")                // from the gateway
+                .map(String.class, Message::text)
+                .into(Reply.class);
     }
 }

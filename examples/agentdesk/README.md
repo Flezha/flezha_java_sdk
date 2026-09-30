@@ -10,16 +10,27 @@ answered by a demo model that lives in this project. It is a stand-in, not a mod
 it answers every message with the same sentence, one token at a time, and reports how
 many tokens it used. `DemoModel.java` is where a real model's client would be called.
 
+In front of the sessions is `gateway`, an unbounded operator that carries the HTTP
+plugin: a POST is a message for a user's session, answered 202 at once, a GET streams
+the session's answer as it is written, and each user has a daily token budget.
+
 | File | What is in it |
 |---|---|
-| `Main.java` | the runner: this process joins the `agents` namespace and registers the `agent` factory |
+| `Main.java` | the runner: this process joins the `agents` namespace and registers the `agent` and `gateway` factories |
 | `AgentOperator.java` | a session, a bounded operator: one turn per message, and a failed turn fails alone |
 | `Reply.java` | answers a message with the demo model, sends the answer as it grows, and keeps the conversation |
 | `Deliver.java` | hands the finished answer to whoever called |
 | `DemoModel.java` | the demo model |
+| `Message.java` | a message for a user's session, as the gateway sends it |
+| `GatewayOperator.java` | the HTTP side, an unbounded operator: it carries the HTTP plugin, answers every request, and calls the session a message is for |
+| `Request.java` | one HTTP request, as the plugin hands it to the gateway, and the two routes the gateway knows |
+| `Http.java` | the gateway's answer to a request: a status and a body, or the session to stream |
+| `Watch.java` | answers a request for a session's events with its stream, and any other request with 404 |
+| `Budget.java` | keeps the tokens each user's answers used today, and admits a message while they are under the day's budget |
+| `Admit.java` | answers a message 202 when it goes on to the session, and 429 when its user is over the budget |
 | `Dockerfile` | the runner's image: the jar on a Java 21 runtime |
 | `controller/Dockerfile` | the controller's image: Flezha's own, with the plugin packages in `controller/plugins/` |
-| `compose.yaml` | one controller and one runner, in Docker Compose |
+| `compose.yaml` | one controller and one runner, in Docker Compose, with the gateway's HTTP port published on this machine only |
 
 ## Run it
 
@@ -50,6 +61,22 @@ flz operator call anna --namespace agents --text 'Hello'
 ```
 {"text":"Message 1: you said \"Hello\". I am a demo model.","tokens":10}
 ```
+
+## Talk to it over HTTP
+
+With the HTTP plugin's package in `controller/plugins/` (the guide's
+[`custom_plugins.md`](../../../../docs/guides/advanced/custom_plugins.md) builds it), start
+the gateway, enable the plugin on it, and send a message from this machine:
+
+```sh
+flz operator start gateway --id gateway --namespace agents
+flz plugin enable web http_server --operator_id=gateway --namespace agents --hook=on_terminate --Xport=8080 --Xbind=0.0.0.0 --Xchannel=http
+curl -s -d 'Hello from the web' localhost:8080/sessions/anna/messages
+curl -sN localhost:8080/sessions/anna/events
+```
+
+The example runs with authorization off, and the plugin authenticates nobody: it is a
+demonstration, not a setup to expose.
 
 `docker compose down -v` stops both containers and removes the sessions with their volumes.
 
