@@ -2,6 +2,11 @@
 
 Java 21 SDK for authoring Flezha compute engines.
 
+**Support tier:**
+[tier 1](https://github.com/flezha/flezha/blob/main/docs/publishing/maturity.md#sdk-java),
+run by the maintainer in a live deployment, passes the full conformance run in CI and is
+permanently supported.
+
 You write tasklets that handle one message at a time, and operators that
 declare how those tasklets are connected. A controller then owns everything
 around them: placing each operator on a host, persisting per-cell state,
