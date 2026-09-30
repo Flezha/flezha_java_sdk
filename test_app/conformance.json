@@ -37,7 +37,8 @@
     "bounded",
     "shorthand",
     "shorthand_typed_output",
-    "response"
+    "response",
+    "call"
   ],
   "toolchain": "java -version",
   "deferred": [],
@@ -145,6 +146,13 @@
       "call_downstream",
       "call_split",
       "call_turn"
+    ],
+    "operator_call": [
+      "call_pricing",
+      "call_orders",
+      "call_agent",
+      "call_gateway",
+      "call_tool_session"
     ],
     "parts": [
       "part_echo",

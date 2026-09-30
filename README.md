@@ -180,6 +180,30 @@ Each is a declaration the controller must honour, so declare what you need rathe
 than what sounds reassuring: a `correctionWindow` sizes the controller's input-log
 retention, and a tier without keyed sinks is refused at registration.
 
+## Answering and calling
+
+A channel ends in one sink, one `response()` or one `call(...)`. `response()`
+answers the outside caller whose input caused the value. `call(target, Answer.class,
+deadlineMs)` sends each value, after the chain's transforms and key, to another
+operator: `CallTarget.id("pricing")` names an instance, and
+`CallTarget.factory("agent")` an instance of a factory, the one the chain's
+`keyBy` names (`.create(false)` refuses to start it, `.channel("turn")` picks its
+entry channel). The request is written as `sink()` writes it.
+
+The call waits for nothing. Its outcome arrives later as a
+`Response<Req, Ans>` on a new entry channel, `<channel>.response`, which must
+feed a tasklet, the calling one included. A `Response` carries `request()`,
+`answer()` (decoded as `input(Answer.class, ...)` decodes) or `error()` (a
+`FlezhaException`; `call.timeout` once the deadline passes), `ok()`, `target()`
+(the callee's instance id) and `created()` (whether this call started it).
+
+```java
+Stream<String> gateway = c.input(String.class, "in").into(Account.class).named("gateway");
+gateway.keyBy(line -> line.split(":")[0])
+        .call(CallTarget.factory("agent"), String.class, 30_000)
+        .into(Outcome.class);   // Outcome implements Tasklet<Response<String, String>, ?, ?>
+```
+
 ## Modules
 
 | Module | Purpose |

@@ -4,6 +4,7 @@ import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.runtime.operator.ChannelDescriptor;
 import com.flezha.sdk.runtime.operator.ConsumerEdge;
+import com.flezha.sdk.runtime.operator.PluginSink;
 import com.flezha.sdk.runtime.operator.TaskletDescriptor;
 import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.runtime.state.TimerSession;
@@ -259,9 +260,28 @@ final class EmitContext implements Ctx<Object, Object> {
         // channel has one. The plugin-bound terminal is the same path with
         // no consumer edges, which is why there is no second arm for it.
         collectEdgeOutputs(channelId, descriptor, value);
-        if (descriptor.pluginSink().isPresent()) {
-            byte[] bytes = serializeOrThrow(descriptor.pluginSink().get().serializer(), value, descriptor.name());
-            collectPluginOutput(descriptor, bytes, meta, key);
+        if (descriptor.pluginSink().isEmpty()) {
+            return;
+        }
+        PluginSink sink = descriptor.pluginSink().get();
+        if (sink.call().isPresent()) {
+            collectCallOutputs(descriptor, sink, value, meta);
+            return;
+        }
+        collectPluginOutput(descriptor, serializeOrThrow(sink.serializer(), value, descriptor.name()), meta, key);
+    }
+
+    /**
+     * A call end's requests: the value through the call chain's transforms,
+     * each result serialized and keyed by the chain as an edge's would be.
+     * The core stamps them as calls when the activation settles.
+     */
+    private void collectCallOutputs(
+            ChannelDescriptor descriptor, PluginSink sink, Object value, @Nullable Map<String, String> meta) {
+        ConsumerEdge end = sink.call().get();
+        for (Object request : EdgeTransforms.valuesOf(end, value)) {
+            byte[] bytes = serializeOrThrow(sink.serializer(), request, descriptor.name());
+            collectPluginOutput(descriptor, bytes, meta, end.keyOf(request));
         }
     }
 

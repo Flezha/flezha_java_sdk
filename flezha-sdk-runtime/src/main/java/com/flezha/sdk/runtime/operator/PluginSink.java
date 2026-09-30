@@ -1,5 +1,6 @@
 package com.flezha.sdk.runtime.operator;
 
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -8,5 +9,15 @@ import java.util.function.Function;
  * {@link com.flezha.sdk.channel.ChannelKind#INTER_TASKLET}; one with none is
  * the {@link com.flezha.sdk.channel.ChannelKind#PLUGIN_BOUND} terminal, a kind
  * the builder derives from the wiring rather than from which method was called.
+ *
+ * <p>A {@code call(...)} end is one too: {@code call} holds its chain's
+ * transform and key, applied to each value as an edge's are before it is
+ * serialized as a request. Its {@link ConsumerEdge#tasklet()} names none.
  */
-public record PluginSink(Function<Object, byte[]> serializer) {}
+public record PluginSink(Function<Object, byte[]> serializer, Optional<ConsumerEdge> call) {
+
+    /** A sink or a {@code response()} end. */
+    public PluginSink(Function<Object, byte[]> serializer) {
+        this(serializer, Optional.empty());
+    }
+}

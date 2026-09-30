@@ -23,6 +23,8 @@ import javax.annotation.Nonnull;
  *   <li>Per-channel configuration ({@link #named}, {@link #keyed},
  *       {@link #onFull}, {@link #retryMax}, {@link #retryBackoffMs},
  *       {@link #sink}) chains in any order relative to consumer wiring.
+ *   <li>A channel ends in at most one of {@link #sink}, {@link #response} and
+ *       {@link #call}.
  * </ul>
  *
  * <p>Chaining, which is the common case, reads in flow order:
@@ -65,7 +67,7 @@ import javax.annotation.Nonnull;
  * {@code @SafeVarargs} on abstract or default methods, and callers would get
  * unchecked-generic-array warnings).
  */
-public abstract class Stream<T> implements EdgeStream<T> {
+public abstract class Stream<T> implements OutputChain<T> {
 
     /**
      * Override the auto-derived channel name (the producer node's identity)

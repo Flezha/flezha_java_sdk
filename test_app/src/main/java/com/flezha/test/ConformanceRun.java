@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.FlezhaRunner;
+import com.flezha.sdk.channel.CallTarget;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.EdgeStream;
+import com.flezha.sdk.channel.OutputChain;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.Stream;
 import com.flezha.sdk.operator.Operator;
@@ -75,7 +77,7 @@ public final class ConformanceRun {
      * BY NAME, which is what makes the skip checkable.
      */
     private static final List<String> SURFACES =
-            List.of("merge", "branch", "bounded", "shorthand", "shorthand_typed_output", "response");
+            List.of("merge", "branch", "bounded", "shorthand", "shorthand_typed_output", "response", "call");
 
     /** The capacity a row declared per role, read as the tasklet is minted. */
     private static final Map<String, Integer> MAILBOX = new HashMap<>();
@@ -233,7 +235,35 @@ public final class ConformanceRun {
             reshape(s, last);
             return;
         }
+        if (last.startsWith("call")) {
+            call(s, head, splitCall(last));
+            return;
+        }
         terminate(handles, s, last);
+    }
+
+    /**
+     * {@code <x>.call…(<arg>)}: a 500 ms call whose Response channel feeds
+     * the role that produces {@code x}, unless the step leaves it unread.
+     */
+    private static void call(EdgeStream<String> s, String role, String[] call) {
+        if (!(s instanceof OutputChain<String> chain)) {
+            throw new IllegalStateException(
+                    "`call` is a producer-side link on an entry channel, which this SDK's builder does not carry");
+        }
+        CallTarget target = switch (call[0]) {
+            case "call", "call_unread" -> CallTarget.id(call[1]);
+            case "call_factory" -> CallTarget.factory(call[1]);
+            case "call_factory_nocreate" -> CallTarget.factory(call[1]).create(false);
+            case "call_deadline" -> CallTarget.id("pricing");
+            default -> throw new IllegalStateException(
+                    "the fixture spells a link this interpreter does not map: " + call[0]);
+        };
+        long deadlineMs = call[0].equals("call_deadline") ? Long.parseLong(call[1]) : 500;
+        var response = chain.call(target, String.class, deadlineMs);
+        if (!call[0].equals("call_unread")) {
+            wire(response.map(String.class, OperatorCallOperators::render), role);
+        }
     }
 
     private static EdgeStream<String> handle(Map<String, EdgeStream<String>> handles, String name) {

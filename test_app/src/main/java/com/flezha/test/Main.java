@@ -135,6 +135,11 @@ public final class Main {
                 .registerFactory(CallOperators.CallDownstream.class)
                 .registerFactory(CallOperators.CallSplit.class)
                 .registerFactory(CallOperators.CallTurn.class)
+                .registerFactory(OperatorCallOperators.CallPricing.class)
+                .registerFactory(OperatorCallOperators.CallOrders.class)
+                .registerFactory(OperatorCallOperators.CallAgent.class)
+                .registerFactory(OperatorCallOperators.CallGateway.class)
+                .registerFactory(OperatorCallOperators.CallToolSession.class)
                 .registerFactory(PartOperators.PartEcho.class)
                 .registerFactory(PartOperators.PartEchoBounded.class)
                 // The §5 short forms, registered by the classes the author wrote, as

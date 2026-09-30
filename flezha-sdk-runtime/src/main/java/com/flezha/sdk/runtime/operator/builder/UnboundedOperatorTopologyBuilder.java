@@ -2,6 +2,7 @@ package com.flezha.sdk.runtime.operator.builder;
 
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.BeyondWindowPolicy;
+import com.flezha.sdk.channel.CallTarget;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.channel.EdgeStream;
@@ -9,6 +10,7 @@ import com.flezha.sdk.channel.EntryChannel;
 import com.flezha.sdk.channel.Merge;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.PlainPayload;
+import com.flezha.sdk.channel.Response;
 import com.flezha.sdk.channel.RetryPolicy;
 import com.flezha.sdk.channel.RoutedDocument;
 import com.flezha.sdk.channel.Stream;
@@ -18,7 +20,9 @@ import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.core.HostLink;
+import com.flezha.sdk.runtime.operator.ConsumerEdge;
 import com.flezha.sdk.runtime.operator.EdgeYield;
+import com.flezha.sdk.runtime.operator.ResponseEnvelope;
 import com.flezha.sdk.runtime.operator.TaskletModel;
 import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -26,6 +30,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
@@ -162,8 +167,7 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
         return declareEntry(type, name, parser::apply, true);
     }
 
-    private <T> EntryChannel<T> declareEntry(
-            Class<T> type, String name, Function<byte[], Object> parser, boolean parsed) {
+    <T> EntryChannel<T> declareEntry(Class<T> type, String name, Function<byte[], Object> parser, boolean parsed) {
         int id = declareChannel(type, name, ChannelKind.ENTRY);
         ChannelEntry entry = channels.get(id);
         entry.entryParser = parser;
@@ -531,18 +535,38 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
 
     /**
      * Close {@code base} on a terminator link, or open the one-link chain a
-     * bare handle declares. The chain is recorded either way; what closing it
-     * MEANS is the core's answer.
+     * bare handle declares, answering the chain. The chain is recorded either
+     * way; what closing it MEANS is the core's answer.
      */
-    void closeChain(int channel, Integer base, HostLink terminator) {
+    PendingEdge closeChain(int channel, Integer base, HostLink terminator) {
         if (base != null) {
             pending.get(base).links.add(terminator);
-            return;
+            return pending.get(base);
         }
         PendingEdge chain = new PendingEdge();
         chain.channel = channel;
         chain.links.add(terminator);
         pending.add(chain);
+        return chain;
+    }
+
+    /**
+     * Close {@code base} on a call end and declare the Response channel its
+     * outcomes enter on, named after the calling channel as it is named now.
+     * The chain's closures are the end's, as an edge's are the edge's.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    <Q, A> EntryChannel<Response<Q, A>> attachCall(
+            int channelId, Integer base, CallTarget target, long deadlineMs, Class<Q> request, Class<A> answer) {
+        ChannelEntry entry = channels.get(channelId);
+        String response = entry.name + ".response";
+        PendingEdge chain = closeChain(channelId, base, HostLink.call(target, deadlineMs, response));
+        entry.callEnd = new ConsumerEdge(-1, Optional.ofNullable(chain.transform), Optional.ofNullable(chain.key));
+        if (entry.pluginSinkSerializer == null) {
+            entry.pluginSinkSerializer = PlainPayload::encode;
+        }
+        return (EntryChannel)
+                declareEntry(Response.class, response, bytes -> ResponseEnvelope.decode(bytes, request, answer), true);
     }
 
     /** One merge's group id, which ties its sources across their channels. */
@@ -673,6 +697,9 @@ public final class UnboundedOperatorTopologyBuilder implements ChannelBuilder {
          * sink for it, yet its emits leave as the plugin output a sink's do.
          */
         boolean response;
+
+        /** The plugin end is a {@code call(...)}: its chain's closures, applied before each request. */
+        ConsumerEdge callEnd;
 
         public OverflowPolicy overflowPolicy;
         public int retryMaxAttempts = RetryPolicy.DEFAULT.maxAttempts();

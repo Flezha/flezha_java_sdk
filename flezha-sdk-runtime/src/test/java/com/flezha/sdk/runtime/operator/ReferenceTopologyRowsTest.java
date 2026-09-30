@@ -4,7 +4,12 @@ import static com.flezha.sdk.runtime.operator.UnboundedOperatorTopologyBuilderTe
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.FlezhaException;
+import com.flezha.sdk.channel.CallTarget;
 import com.flezha.sdk.channel.ChannelBuilder;
+import com.flezha.sdk.channel.OutputChain;
+import com.flezha.sdk.channel.Response;
+import com.flezha.sdk.channel.Stream;
+import com.flezha.sdk.operator.BoundedOperator;
 import com.flezha.sdk.runtime.RepositoryFixture;
 import com.flezha.sdk.runtime.core.DerivedDeclaration;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
@@ -122,7 +127,36 @@ class ReferenceTopologyRowsTest {
                     plain.named("answer");
                     plain.response();
                     plain.response();
-                }));
+                }),
+                // entry(in); in.into(plain); plain.sink(out); plain.call(pricing)
+                new Row("call_beside_sink", c -> {
+                    var plain = plain(c);
+                    plain.sink("out");
+                    callBack(plain, CallTarget.id("pricing"), 500);
+                }),
+                // entry(in); in.into(plain); plain.named(ask); plain.call_factory_nocreate(agent)
+                new Row(
+                        "call_nocreate_unkeyed",
+                        c -> callBack(
+                                plain(c).named("ask"),
+                                CallTarget.factory("agent").create(false),
+                                500)),
+                // entry(in); in.into(plain); plain.named(ask); plain.call_deadline(0)
+                new Row("call_deadline_zero", c -> callBack(plain(c).named("ask"), CallTarget.id("pricing"), 0)),
+                // entry(in); in.into(plain); plain.named(ask); plain.call_unread(pricing)
+                new Row("call_unread", c -> plain(c).named("ask").call(CallTarget.id("pricing"), String.class, 500)));
+    }
+
+    /** {@code entry(in); in.into(plain)}, the opening every call row shares. */
+    private static Stream<String> plain(ChannelBuilder c) {
+        return c.input(String.class, "in").into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
+    }
+
+    /** A call whose Response channel is wired back into {@code plain}, the role that made it. */
+    private static void callBack(OutputChain<String> chain, CallTarget target, long deadlineMs) {
+        chain.call(target, String.class, deadlineMs)
+                .map(String.class, Response::request)
+                .into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
     }
 
     /** The well-formed rows whose derived lines the fixture's seven-column table carries. */
@@ -156,6 +190,12 @@ class ReferenceTopologyRowsTest {
                             .named("refused")
                             .response();
                 }),
+                // entry(in); in.into(plain); plain.named(ask); plain.call(pricing)
+                new Row("call_back_into_caller", c -> callBack(plain(c).named("ask"), CallTarget.id("pricing"), 500)),
+                // entry(in); in.into(plain); plain.named(ask); plain.key.call_factory(agent)
+                new Row(
+                        "call_factory_by_key",
+                        c -> callBack(plain(c).named("ask").keyBy(value -> value), CallTarget.factory("agent"), 500)),
                 // class.persistent; class.effectively_once; entry(in); in.into(plain); plain.named(answer);
                 // plain.response
                 new Row("eo_unkeyed_response", c -> {
@@ -202,6 +242,28 @@ class ReferenceTopologyRowsTest {
                     .as("%s derived a declaration %s does not pin", row.topology(), FIXTURE)
                     .isEqualTo(pinnedLines(row.topology()));
         }
+    }
+
+    @Test
+    @DisplayName("A call from a single-pass bounded class refuses with the reference name")
+    void aCallFromASinglePassBoundedClassRefuses() throws Exception {
+        // class.bounded; entry(in); in.into(plain); plain.named(ask); plain.call(pricing)
+        BoundedOperator once = new BoundedOperator() {
+            @Override
+            public String factoryId() {
+                return "call_once_bounded";
+            }
+
+            @Override
+            public void channels(ChannelBuilder c) {
+                callBack(plain(c).named("ask"), CallTarget.id("pricing"), 500);
+            }
+        };
+
+        FlezhaException refused = catchConfigException(() -> UnboundedOperatorTopologyBuilder.build(once));
+
+        assertThat(refused).isNotNull();
+        assertThat(refused.issueCodes()).contains(refusalOf("call_once_bounded"));
     }
 
     /** The refusal the fixture's four-column table names for a row. */

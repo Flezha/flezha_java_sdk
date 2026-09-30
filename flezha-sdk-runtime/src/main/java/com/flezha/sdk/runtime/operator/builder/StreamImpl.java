@@ -1,8 +1,11 @@
 package com.flezha.sdk.runtime.operator.builder;
 
-import com.flezha.sdk.channel.EdgeStream;
+import com.flezha.sdk.channel.CallTarget;
+import com.flezha.sdk.channel.EntryChannel;
+import com.flezha.sdk.channel.OutputChain;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.PlainPayload;
+import com.flezha.sdk.channel.Response;
 import com.flezha.sdk.channel.Stream;
 import com.flezha.sdk.runtime.core.HostLink;
 import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.ChannelEntry;
@@ -29,7 +32,7 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
      * Java has no second superclass to spend, so the producer-side handle
      * forwards to the one implementation instead of re-stating it.
      */
-    private final EdgeStreamImpl<T> edge;
+    private final NodeEdge<T> edge;
 
     StreamImpl(UnboundedOperatorTopologyBuilder owner, int node) {
         this(owner, node, null, null);
@@ -69,26 +72,33 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
 
     @Override
     @Nonnull
-    public <U> EdgeStream<U> map(@Nonnull Class<U> type, @Nonnull Function<T, U> mapper) {
+    public <U> OutputChain<U> map(@Nonnull Class<U> type, @Nonnull Function<T, U> mapper) {
         return edge.map(type, mapper);
     }
 
     @Override
     @Nonnull
-    public <U> EdgeStream<U> flatMap(@Nonnull Class<U> type, @Nonnull Function<T, ? extends Iterable<U>> mapper) {
+    public <U> OutputChain<U> flatMap(@Nonnull Class<U> type, @Nonnull Function<T, ? extends Iterable<U>> mapper) {
         return edge.flatMap(type, mapper);
     }
 
     @Override
     @Nonnull
-    public EdgeStream<T> filter(@Nonnull Predicate<T> predicate) {
+    public OutputChain<T> filter(@Nonnull Predicate<T> predicate) {
         return edge.filter(predicate);
     }
 
     @Override
     @Nonnull
-    public EdgeStream<T> keyBy(@Nonnull Function<T, String> key) {
+    public OutputChain<T> keyBy(@Nonnull Function<T, String> key) {
         return edge.keyBy(key);
+    }
+
+    @Override
+    @Nonnull
+    public <A> EntryChannel<Response<T, A>> call(
+            @Nonnull CallTarget target, @Nonnull Class<A> answer, long deadlineMs) {
+        return edge.call(target, answer, deadlineMs);
     }
 
     @Override
