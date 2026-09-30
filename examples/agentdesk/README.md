@@ -31,6 +31,8 @@ the session's answer as it is written, and each user has a daily token budget.
 | `Dockerfile` | the runner's image: the jar on a Java 21 runtime |
 | `controller/Dockerfile` | the controller's image: Flezha's own, with the plugin packages in `controller/plugins/` |
 | `compose.yaml` | one controller and one runner, in Docker Compose, with the gateway's HTTP port published on this machine only |
+| `cluster.yaml` | a second controller with its runner, and a PostgreSQL database both controllers copy their state to; read on top of `compose.yaml` |
+| `k8s/agentdesk.yaml` | the same images on Kubernetes: one pod with the controller and the runner, a volume, and a service |
 
 ## Run it
 
@@ -79,6 +81,14 @@ The example runs with authorization off, and the plugin authenticates nobody: it
 demonstration, not a setup to expose.
 
 `docker compose down -v` stops both containers and removes the sessions with their volumes.
+
+## Run it as a cluster, or on Kubernetes
+
+With `RELEASE_COOKIE` and `DURABILITY_PASSWORD` set in the shell,
+`COMPOSE_FILE=compose.yaml:cluster.yaml docker compose up -d --build --wait` adds a
+second controller; the guide's [`clustering.md`](../../../../docs/guides/advanced/clustering.md)
+walks it. [`kubernetes_deployment.md`](../../../../docs/guides/advanced/kubernetes_deployment.md)
+builds the images and deploys `k8s/agentdesk.yaml` on k3s.
 
 ## Building from a checkout
 

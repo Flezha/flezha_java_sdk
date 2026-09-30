@@ -6,6 +6,7 @@ import com.flezha.sdk.state.Change;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 
@@ -60,7 +61,7 @@ public final class Budget implements Tasklet<Budget.Event, Budget.Spent, Budget.
 
     @Override
     public void run(Event event, Ctx<Spent, Verdict> ctx) throws TaskletException {
-        String today = LocalDate.now(ZoneOffset.UTC).toString();
+        String today = LocalDate.ofInstant(Instant.ofEpochMilli(ctx.now()), ZoneOffset.UTC).toString();
         switch (event) {
             case Sent sent -> ctx.emit(new Verdict(sent.message(), ctx.state().on(today)));
             case Used used -> ctx.change(new Counted(today, used.tokens()));

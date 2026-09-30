@@ -26,6 +26,7 @@ public final class GatewayOperator implements UnboundedOperator {
 
     @Override
     public void channels(ChannelBuilder c) {
+        c.effectivelyOnce();                                 // each request and answer on disk before it runs
         EntryChannel<Request> http = c.input(Request.class, "http");
         http.filter(request -> !request.sends())
                 .into(Watch.class)
