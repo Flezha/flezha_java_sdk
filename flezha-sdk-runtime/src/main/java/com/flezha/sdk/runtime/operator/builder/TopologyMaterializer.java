@@ -2,15 +2,16 @@ package com.flezha.sdk.runtime.operator.builder;
 
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.channel.RetryPolicy;
+import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.runtime.core.DerivedDeclaration;
 import com.flezha.sdk.runtime.operator.ChannelDescriptor;
 import com.flezha.sdk.runtime.operator.ConsumerEdge;
+import com.flezha.sdk.runtime.operator.OperatorTopology;
 import com.flezha.sdk.runtime.operator.PluginSink;
 import com.flezha.sdk.runtime.operator.TaskletDescriptor;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
-import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.ChannelEntry;
-import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.PendingEdge;
-import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.TaskletEntry;
+import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder.ChannelEntry;
+import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder.PendingEdge;
+import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder.TaskletEntry;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,7 +22,7 @@ import java.util.OptionalInt;
 /**
  * Turns the DERIVED declaration the core answered, plus the closures the
  * builder held aside, into the frozen descriptors a
- * {@link UnboundedOperatorTopology} is made of. The channel names, kinds and
+ * {@link OperatorTopology} is made of. The channel names, kinds and
  * consumer edges are the core's answer, never the builder's claim; this class
  * decides nothing and refuses nothing.
  */
@@ -29,8 +30,8 @@ final class TopologyMaterializer {
 
     private TopologyMaterializer() {}
 
-    static UnboundedOperatorTopology materialize(
-            String factoryId,
+    static OperatorTopology materialize(
+            Operator operator,
             List<ChannelEntry> channels,
             List<TaskletEntry> tasklets,
             int[] capacities,
@@ -45,13 +46,14 @@ final class TopologyMaterializer {
         for (int id = 0; id < tasklets.size(); id++) {
             taskletNameToId.put(tasklets.get(id).name, id);
         }
-        return new UnboundedOperatorTopology(
-                factoryId,
+        return new OperatorTopology(
+                operator.factoryId(),
                 descriptors,
                 nameToId,
                 taskletDescriptors(tasklets, descriptors, capacities),
                 taskletNameToId,
-                Boolean.TRUE.equals(declaration.get("effectively_once")),
+                operator.run(),
+                operator.durable(),
                 declaration);
     }
 

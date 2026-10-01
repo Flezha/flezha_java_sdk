@@ -1,7 +1,7 @@
 package com.flezha.examples.pipeline;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 import javax.annotation.Nonnull;
 
 /**
@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
  * distinct feature. It is not. A tasklet's output travels on an ordinary channel, and a channel
  * can be routed to another tasklet as readily as to a sink.
  */
-public final class PipelineOperator implements UnboundedOperator {
+public final class PipelineOperator implements Operator {
 
     @Override
     @Nonnull

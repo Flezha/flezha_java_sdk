@@ -26,7 +26,7 @@ public final class Detect implements Tasklet<String, Void, String> {
         // One worker per subject, so the subject names it. The handle is ignored on purpose: a
         // refused request unread by the end of this invocation logs itself, and this tasklet
         // carries on detecting.
-        ctx.spawnBounded(
+        ctx.spawnSteps(
                 "triage",
                 input.getBytes(StandardCharsets.UTF_8),
                 SpawnOptions.id("triage@" + subject).ifRunning(IfRunning.DELIVER));

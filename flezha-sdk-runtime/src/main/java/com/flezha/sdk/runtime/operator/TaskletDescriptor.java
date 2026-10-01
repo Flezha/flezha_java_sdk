@@ -9,7 +9,7 @@ import java.util.OptionalLong;
 import javax.annotation.Nonnull;
 
 /**
- * Frozen runtime descriptor for one tasklet node inside a {@link UnboundedOperatorTopology}: what
+ * Frozen runtime descriptor for one tasklet node inside a {@link OperatorTopology}: what
  * its class declares ({@link TaskletModel}), plus what the wiring decided about the node, its
  * identity, cell mode, resolved channel ids (cached at registration so the hot path needs zero
  * name lookups), encoded types and mailbox capacity.

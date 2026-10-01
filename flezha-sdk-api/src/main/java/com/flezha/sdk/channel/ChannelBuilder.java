@@ -6,7 +6,7 @@ import javax.annotation.Nonnull;
 /**
  * Producer-first fluent graph builder consumed by
  * {@link com.flezha.sdk.operator.Operator#channels(ChannelBuilder)}, the
- * graph body of both operator kinds.
+ * graph body of every operator.
  *
  * <p>{@code c.input(T.class, "name").into(A.class).into(B.class).sink("plugin")}
  * — {@code .into} wires a consumer and returns that tasklet's <b>output
@@ -133,92 +133,4 @@ public interface ChannelBuilder {
             EdgeStream<T> traffic,
             Function<T, String> keyFn,
             String nodeName);
-
-    /**
-     * Opt this Operator into the <b>effectively-once output tier</b>: each
-     * invocation's state changes, plugin outputs and consumed input offset ship
-     * as ONE {@code cell_effect_record}, which the controller persists as one
-     * WAL record under one fsync. A crash can then never advance the consumed
-     * offset while losing the state or the output it was advanced for.
-     *
-     * <p>Every plugin-bound channel of a tier-enabled Operator MUST be declared
-     * {@code .keyed()} — the tier's replay re-emits outputs, and only a keyed
-     * sink can absorb that as an idempotent upsert. A non-keyed plugin channel
-     * fails registration.
-     */
-    void effectivelyOnce();
-
-    /**
-     * Acknowledge the consumed input offset only at an explicit
-     * {@code ctx.checkpoint()}, rather than after every invocation.
-     *
-     * <p>The interval between checkpoints is the work a crash replays and the
-     * work the controller's input log must retain. In exchange, a Cell whose
-     * state is only coherent at a boundary (a closed window, a completed batch)
-     * never persists a half-built view of it.
-     *
-     * <p>Requires {@link #effectivelyOnce()} — there is no offset to withhold
-     * without the tier — and declaring it alone fails registration with
-     * {@code topology.checkpoint_ack_without_tier}.
-     *
-     * <p>Emits made before a checkpoint are still flushed as they happen —
-     * checkpointing moves the <em>acknowledgement</em>, not the output. To hold
-     * them for the interval too, see {@link #outputsAtCheckpoint(long)}.
-     */
-    void checkpointAck();
-
-    /**
-     * Close the checkpoint interval once {@code inputs} inputs have folded into
-     * it, instead of waiting for an explicit {@code ctx.checkpoint()}.
-     *
-     * <p>An explicit checkpoint still closes the interval early: this is the
-     * ceiling, not the only closer. Implies {@link #checkpointAck()}.
-     */
-    void checkpointEvery(int inputs);
-
-    /**
-     * Hold the interval's outputs with its changes and ship them inside its
-     * checkpoint record, which the controller flushes as one batch after that
-     * record is fsynced — one WAL append per interval instead of one per
-     * invocation.
-     *
-     * <p>The trade is output latency: an emit is not visible downstream until
-     * its interval closes. {@code maxDelayMs} bounds that — the interval closes
-     * that long after the input that opened it even if nothing else arrives, so
-     * a quiet Cell never holds an output indefinitely. It is a parameter
-     * rather than an option because an unbounded hold is not a posture anyone
-     * should be able to declare by omission.
-     *
-     * <p>Replay is exactly the mode's existing contract: an interval that did
-     * not checkpoint re-produces its outputs when it replays, a checkpointed
-     * record re-drives with identical identity, and the keyed-sink dedup the
-     * tier already requires absorbs both. Implies {@link #checkpointAck()}.
-     */
-    void outputsAtCheckpoint(long maxDelayMs);
-
-    /**
-     * Declare that this Operator corrects itself when an input arrives late:
-     * an input whose event time falls behind the Cell's event-time high-water
-     * mark, but by less than {@code windowMs}, triggers the controller to rewind
-     * the Cell to a baseline before that event time and replay the affected
-     * slice in event-time order.
-     *
-     * <p>The window is a promise the controller must be able to keep: it sizes
-     * the input log's hold window and the snapshot age floor, because the past
-     * being repaired has to still exist. That is why the window is declared to
-     * the controller rather than handled purely SDK-side.
-     *
-     * <p>Requires {@link #effectivelyOnce()} (a correction rewinds a consumed
-     * offset), an event-time clock, a written {@code eventTime} (there is no event time to compare
-     * without one), and every channel keyed (a corrected re-emit must overwrite,
-     * not duplicate). Each is checked at registration.
-     */
-    void correctionWindow(long windowMs);
-
-    /**
-     * How to treat an input that arrives beyond the declared
-     * {@link #correctionWindow(long)}. Defaults to
-     * {@link BeyondWindowPolicy#PROCESS_AS_ARRIVAL}.
-     */
-    void beyondWindowPolicy(BeyondWindowPolicy policy);
 }

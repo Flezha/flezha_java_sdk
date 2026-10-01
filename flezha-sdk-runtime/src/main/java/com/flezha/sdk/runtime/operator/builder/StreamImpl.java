@@ -8,7 +8,7 @@ import com.flezha.sdk.channel.PlainPayload;
 import com.flezha.sdk.channel.Response;
 import com.flezha.sdk.channel.Stream;
 import com.flezha.sdk.runtime.core.HostLink;
-import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.ChannelEntry;
+import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder.ChannelEntry;
 import com.flezha.sdk.tasklet.Tasklet;
 import java.util.List;
 import java.util.function.Consumer;
@@ -23,7 +23,7 @@ import javax.annotation.Nullable;
  */
 final class StreamImpl<T> extends Stream<T> implements EdgeSite {
 
-    private final UnboundedOperatorTopologyBuilder owner;
+    private final OperatorTopologyBuilder owner;
     private final int node;
 
     /**
@@ -34,11 +34,11 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
      */
     private final NodeEdge<T> edge;
 
-    StreamImpl(UnboundedOperatorTopologyBuilder owner, int node) {
+    StreamImpl(OperatorTopologyBuilder owner, int node) {
         this(owner, node, null, null);
     }
 
-    StreamImpl(UnboundedOperatorTopologyBuilder owner, int node, Integer pending, Class<?> payloadType) {
+    StreamImpl(OperatorTopologyBuilder owner, int node, Integer pending, Class<?> payloadType) {
         this.owner = owner;
         this.node = node;
         this.edge = new NodeEdge<>(owner, node, pending, payloadType);

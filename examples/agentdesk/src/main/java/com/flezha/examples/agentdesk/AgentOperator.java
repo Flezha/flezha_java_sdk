@@ -1,15 +1,14 @@
 package com.flezha.examples.agentdesk;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.operator.LoopMode;
-import com.flezha.sdk.operator.RollbackMode;
+import com.flezha.sdk.operator.Operator;
+import java.time.Duration;
 
 /**
- * One conversation: a bounded operator that runs one turn per message it is sent, for as long as
+ * One conversation: a steps operator that runs one turn per message it is sent, for as long as
  * the session lasts. Every session is an instance of its own, with its own state.
  */
-public final class AgentOperator implements BoundedOperator {
+public final class AgentOperator implements Operator {
 
     @Override
     public String factoryId() {
@@ -17,13 +16,15 @@ public final class AgentOperator implements BoundedOperator {
     }
 
     @Override
-    public LoopMode loopMode() {
-        return LoopMode.PER_INPUT;                       // one turn per message
+    public Run run() {
+        return new Run.Steps(
+                Each.PER_INPUT,                          // one turn per message
+                OnFailure.KEEP_PROGRESS);                // a failed turn fails alone
     }
 
     @Override
-    public RollbackMode rollbackMode() {
-        return RollbackMode.KEEP_PROGRESS;               // a failed turn fails alone
+    public Durable durable() {
+        return new Durable.Local(Duration.ofSeconds(10)); // an idle session sleeps after 10 s
     }
 
     @Override

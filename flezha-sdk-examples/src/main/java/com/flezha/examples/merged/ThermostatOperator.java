@@ -1,11 +1,11 @@
 package com.flezha.examples.merged;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 import javax.annotation.Nonnull;
 
 /** Two entry channels, one consumer. Either source could equally be another tasklet's output. */
-public final class ThermostatOperator implements UnboundedOperator {
+public final class ThermostatOperator implements Operator {
 
     @Override
     @Nonnull

@@ -18,10 +18,10 @@ import javax.annotation.Nonnull;
  * }</pre>
  *
  * <p>Sources may be entry channels (sealed payloads) or another tasklet's
- * output stream, freely mixed, on an unbounded operator and on a bounded operator
- * operator alike: every message a bounded operator receives carries the channel it
+ * output stream, freely mixed, on a flow operator and on a steps operator
+ * operator alike: every message a steps operator receives carries the channel it
  * arrived on, so the mapping of that source is selected as it is on a
- * stream. On a bounded operator, a merged tasklet fed by an entry channel is a root
+ * stream. On a steps operator, a merged tasklet fed by an entry channel is a root
  * of that channel's chain, and a message on it runs the merged tasklet once,
  * on that message's mapping, in the pass the message starts.
  *
@@ -40,7 +40,7 @@ import javax.annotation.Nonnull;
  * <p>A mapping that throws is contained everywhere it can be: on an
  * inter-tasklet source it is attributed to the producing tasklet
  * (stream) or turned into a terminal chain error the saga compensates
- * (bounded operator). The one unguarded seam is an unbounded operator's entry-channel source, where
+ * (steps operator). The one unguarded seam is a flow operator's entry-channel source, where
  * the mapping runs on the wire-reader path — the same exposure the entry parser
  * there already carries. {@code docs/sdk/multi_input_tasklets.md} tabulates it.
  *

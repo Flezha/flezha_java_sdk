@@ -3,8 +3,8 @@
  *
  * <p>An application is built from two authoring types and started by a runner. A
  * {@link com.flezha.sdk.tasklet.Tasklet} contains the code that handles a single message. A
- * {@link com.flezha.sdk.operator.UnboundedOperator} or
- * {@link com.flezha.sdk.operator.BoundedOperator} declares the graph that connects entry
+ * {@link com.flezha.sdk.operator.Operator} or
+ * {@link com.flezha.sdk.operator.Operator} declares the graph that connects entry
  * channels, tasklets and sinks, and is the unit the cluster schedules, restarts and relocates.
  * {@link com.flezha.sdk.Flezha#createRunner(String)} returns a {@link com.flezha.sdk.FlezhaRunner}
  * builder on which every operator class is declared before the runner is started.

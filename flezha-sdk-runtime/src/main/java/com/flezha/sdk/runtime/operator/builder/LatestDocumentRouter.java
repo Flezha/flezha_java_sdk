@@ -67,7 +67,7 @@ public final class LatestDocumentRouter
      * identifies it, and the version each key has already received.
      *
      * <p>{@code delivered} grows with the keys this member sees, which is the
-     * Cell count it already pays for — not a new unbounded-growth class.
+     * Cell count it already pays for — not a new flow-growth class.
      */
     public static final class RouterState {
         @Nullable

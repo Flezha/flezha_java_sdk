@@ -1,6 +1,6 @@
 package com.flezha.sdk.runtime.operator;
 
-import static com.flezha.sdk.runtime.operator.UnboundedOperatorTopologyBuilderTest.catchConfigException;
+import static com.flezha.sdk.runtime.operator.OperatorTopologyBuilderTest.catchConfigException;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.FlezhaException;
@@ -9,11 +9,10 @@ import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.OutputChain;
 import com.flezha.sdk.channel.Response;
 import com.flezha.sdk.channel.Stream;
-import com.flezha.sdk.operator.BoundedOperator;
+import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.runtime.RepositoryFixture;
 import com.flezha.sdk.runtime.core.DerivedDeclaration;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
-import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +33,7 @@ import org.junit.jupiter.api.Test;
  * <p>The fixture states the verdict and this class states the authoring: each row is written as the
  * fluent calls its {@code steps} column spells, and the expected refusal name and the expected
  * derived lines are read out of the file, so a row it renames or drops fails here rather than
- * passing on a stale literal. {@code UnboundedOperatorTopologyBuilderTest.CoreRefusals} is the other
+ * passing on a stale literal. {@code OperatorTopologyBuilderTest.CoreRefusals} is the other
  * half, pinning the SENTENCES for the shapes this SDK used to judge in its own words; its tasklets
  * and its verdict catcher are reused here rather than declared a second time.
  *
@@ -47,8 +46,20 @@ class ReferenceTopologyRowsTest {
 
     private static final String FIXTURE = "test/fixtures/reference_topologies.txt";
 
-    /** One authored row: the fixture's topology id, and what its {@code steps} column spells. */
-    private record Row(String topology, Consumer<ChannelBuilder> authoring) {}
+    /**
+     * One authored row: the fixture's topology id, the run its {@code class.run} step writes, and
+     * what the rest of its {@code steps} column spells.
+     */
+    private record Row(String topology, Operator.Run run, Consumer<ChannelBuilder> authoring) {
+
+        Row(String topology, Consumer<ChannelBuilder> authoring) {
+            this(topology, Operator.Run.flow(), authoring);
+        }
+
+        OperatorTopology build() {
+            return OperatorTopologyBuilderTest.build(topology, run, authoring);
+        }
+    }
 
     /**
      * The malformed rows authored here, chosen from the reference names no {@code sdk/java} test
@@ -63,67 +74,61 @@ class ReferenceTopologyRowsTest {
                 new Row("dup_key_by", c -> c.input(String.class, "in")
                         .keyBy(value -> value)
                         .keyBy(value -> value)
-                        .into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class)),
+                        .into(OperatorTopologyBuilderTest.SingleTasklet.class)),
                 // entry(in); in.key.map.into(plain)
                 new Row("map_after_key", c -> c.input(String.class, "in")
                         .keyBy(value -> value)
                         .map(String.class, value -> value)
-                        .into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class)),
+                        .into(OperatorTopologyBuilderTest.SingleTasklet.class)),
                 // entry(in); in.into(plain); plain.sink(out); plain.map.into(second)
                 new Row("map_after_sink", c -> {
-                    var plain =
-                            c.input(String.class, "in").into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
+                    var plain = c.input(String.class, "in").into(OperatorTopologyBuilderTest.SingleTasklet.class);
                     plain.sink("out");
-                    plain.map(String.class, value -> value)
-                            .into(UnboundedOperatorTopologyBuilderTest.GraphStage1.class);
+                    plain.map(String.class, value -> value).into(OperatorTopologyBuilderTest.GraphStage1.class);
                 }),
                 // entry(in); in.into(plain); in.map
                 new Row("dangling_chain", c -> {
                     var in = c.input(String.class, "in");
-                    in.into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
+                    in.into(OperatorTopologyBuilderTest.SingleTasklet.class);
                     in.map(String.class, value -> value);
                 }),
                 // entry(in); in.map.into(plain); in.into(plain)
                 new Row("edge_rewired", c -> {
                     var in = c.input(String.class, "in");
-                    in.map(String.class, value -> value).into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
-                    in.into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
+                    in.map(String.class, value -> value).into(OperatorTopologyBuilderTest.SingleTasklet.class);
+                    in.into(OperatorTopologyBuilderTest.SingleTasklet.class);
                 }),
                 // entry(in); in.key.into(routed)
                 new Row("key_on_static", c -> c.input(String.class, "in")
                         .keyBy(value -> value)
-                        .into(UnboundedOperatorTopologyBuilderTest.StaticTasklet.class)),
+                        .into(OperatorTopologyBuilderTest.StaticTasklet.class)),
                 // entry(in); entry(other); in.key.into(dynamic); other.into(dynamic)
                 new Row("unkeyed_dynamic", c -> {
                     var in = c.input(String.class, "in");
                     var other = c.input(String.class, "other");
-                    in.keyBy(value -> value).into(UnboundedOperatorTopologyBuilderTest.DynamicModeOnlyTasklet.class);
-                    other.into(UnboundedOperatorTopologyBuilderTest.DynamicModeOnlyTasklet.class);
+                    in.keyBy(value -> value).into(OperatorTopologyBuilderTest.DynamicModeOnlyTasklet.class);
+                    other.into(OperatorTopologyBuilderTest.DynamicModeOnlyTasklet.class);
                 }),
                 // entry(in); in.into(plain); plain.named(a); plain.sink(b)
                 new Row("named_twice", c -> c.input(String.class, "in")
-                        .into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class)
+                        .into(OperatorTopologyBuilderTest.SingleTasklet.class)
                         .named("a")
                         .sink("b")),
                 // entry(in); in.into(plain); in.into(second); plain.sink(out); second.sink(out)
                 new Row("two_channels_one_sink", c -> {
                     var in = c.input(String.class, "in");
-                    in.into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class)
-                            .sink("out");
-                    in.into(UnboundedOperatorTopologyBuilderTest.GraphStage1.class)
-                            .sink("out");
+                    in.into(OperatorTopologyBuilderTest.SingleTasklet.class).sink("out");
+                    in.into(OperatorTopologyBuilderTest.GraphStage1.class).sink("out");
                 }),
                 // entry(in); in.into(plain); plain.sink(out); plain.response
                 new Row("response_beside_sink", c -> {
-                    var plain =
-                            c.input(String.class, "in").into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
+                    var plain = c.input(String.class, "in").into(OperatorTopologyBuilderTest.SingleTasklet.class);
                     plain.sink("out");
                     plain.response();
                 }),
                 // entry(in); in.into(plain); plain.named(answer); plain.response; plain.response
                 new Row("two_responses", c -> {
-                    var plain =
-                            c.input(String.class, "in").into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
+                    var plain = c.input(String.class, "in").into(OperatorTopologyBuilderTest.SingleTasklet.class);
                     plain.named("answer");
                     plain.response();
                     plain.response();
@@ -149,14 +154,14 @@ class ReferenceTopologyRowsTest {
 
     /** {@code entry(in); in.into(plain)}, the opening every call row shares. */
     private static Stream<String> plain(ChannelBuilder c) {
-        return c.input(String.class, "in").into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
+        return c.input(String.class, "in").into(OperatorTopologyBuilderTest.SingleTasklet.class);
     }
 
     /** A call whose Response channel is wired back into {@code plain}, the role that made it. */
     private static void callBack(OutputChain<String> chain, CallTarget target, long deadlineMs) {
         chain.call(target, String.class, deadlineMs)
                 .map(String.class, Response::request)
-                .into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
+                .into(OperatorTopologyBuilderTest.SingleTasklet.class);
     }
 
     /** The well-formed rows whose derived lines the fixture's seven-column table carries. */
@@ -165,28 +170,27 @@ class ReferenceTopologyRowsTest {
                 // entry(in); in.into(plain); in.into(plain)
                 new Row("fan_in_noop", c -> {
                     var in = c.input(String.class, "in");
-                    in.into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
-                    in.into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
+                    in.into(OperatorTopologyBuilderTest.SingleTasklet.class);
+                    in.into(OperatorTopologyBuilderTest.SingleTasklet.class);
                 }),
                 // entry(in); in.into(plain); plain.named(renamed); plain.sink
                 new Row("named_sink", c -> {
-                    var plain =
-                            c.input(String.class, "in").into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class);
+                    var plain = c.input(String.class, "in").into(OperatorTopologyBuilderTest.SingleTasklet.class);
                     plain.named("renamed");
                     plain.sink();
                 }),
                 // entry(in); in.into(plain); plain.sink(items_output)
                 new Row("sink_names_channel", c -> c.input(String.class, "in")
-                        .into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class)
+                        .into(OperatorTopologyBuilderTest.SingleTasklet.class)
                         .sink("items_output")),
                 // entry(in); in.into(plain); in.into(second); plain.named(accepted); plain.response;
                 // second.named(refused); second.response
                 new Row("two_response_ends", c -> {
                     var in = c.input(String.class, "in");
-                    in.into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class)
+                    in.into(OperatorTopologyBuilderTest.SingleTasklet.class)
                             .named("accepted")
                             .response();
-                    in.into(UnboundedOperatorTopologyBuilderTest.GraphStage1.class)
+                    in.into(OperatorTopologyBuilderTest.GraphStage1.class)
                             .named("refused")
                             .response();
                 }),
@@ -196,15 +200,15 @@ class ReferenceTopologyRowsTest {
                 new Row(
                         "call_factory_by_key",
                         c -> callBack(plain(c).named("ask").keyBy(value -> value), CallTarget.factory("agent"), 500)),
-                // class.persistent; class.effectively_once; entry(in); in.into(plain); plain.named(answer);
-                // plain.response
-                new Row("eo_unkeyed_response", c -> {
-                    c.effectivelyOnce();
-                    c.input(String.class, "in")
-                            .into(UnboundedOperatorTopologyBuilderTest.SingleTasklet.class)
-                            .named("answer")
-                            .response();
-                }));
+                // class.run({"flow":{"exactly":"effectively_once"}}); entry(in); in.into(plain);
+                // plain.named(answer); plain.response
+                new Row(
+                        "eo_unkeyed_response",
+                        new Operator.Run.Flow(new Operator.Exactly.EffectivelyOnce()),
+                        c -> c.input(String.class, "in")
+                                .into(OperatorTopologyBuilderTest.SingleTasklet.class)
+                                .named("answer")
+                                .response()));
     }
 
     @Test
@@ -212,8 +216,7 @@ class ReferenceTopologyRowsTest {
     void aMalformedRowRefusesWithTheReferenceName() throws Exception {
         for (Row row : malformed()) {
             String name = refusalOf(row.topology());
-            FlezhaException refused =
-                    catchConfigException(() -> UnboundedOperatorTopologyBuilder.build(row.topology(), row.authoring()));
+            FlezhaException refused = catchConfigException(row::build);
 
             assertThat(refused)
                     .as("%s is a refusal row of %s and this builder accepted it", row.topology(), FIXTURE)
@@ -232,8 +235,7 @@ class ReferenceTopologyRowsTest {
     @DisplayName("A well-formed row derives to the fixture's bytes")
     void aWellFormedRowDerivesToTheFixturesBytes() throws Exception {
         for (Row row : wellFormed()) {
-            UnboundedOperatorTopology topology =
-                    UnboundedOperatorTopologyBuilder.build(row.topology(), row.authoring());
+            OperatorTopology topology = row.build();
             // The record the builder submitted, answered by the same check it took its
             // verdict from: the derived declaration itself, not a second reading of it.
             DerivedDeclaration derived = HostClassDeclaration.check(topology.declaration());
@@ -245,25 +247,18 @@ class ReferenceTopologyRowsTest {
     }
 
     @Test
-    @DisplayName("A call from a single-pass bounded class refuses with the reference name")
-    void aCallFromASinglePassBoundedClassRefuses() throws Exception {
-        // class.bounded; entry(in); in.into(plain); plain.named(ask); plain.call(pricing)
-        BoundedOperator once = new BoundedOperator() {
-            @Override
-            public String factoryId() {
-                return "call_once_bounded";
-            }
+    @DisplayName("A call from a single-pass steps class refuses with the reference name")
+    void aCallFromASinglePassStepsClassRefuses() throws Exception {
+        // class.run("steps"); entry(in); in.into(plain); plain.named(ask); plain.call(pricing)
+        Row once = new Row(
+                "call_once_steps",
+                Operator.Run.steps(),
+                c -> callBack(plain(c).named("ask"), CallTarget.id("pricing"), 500));
 
-            @Override
-            public void channels(ChannelBuilder c) {
-                callBack(plain(c).named("ask"), CallTarget.id("pricing"), 500);
-            }
-        };
-
-        FlezhaException refused = catchConfigException(() -> UnboundedOperatorTopologyBuilder.build(once));
+        FlezhaException refused = catchConfigException(once::build);
 
         assertThat(refused).isNotNull();
-        assertThat(refused.issueCodes()).contains(refusalOf("call_once_bounded"));
+        assertThat(refused.issueCodes()).contains(refusalOf("call_once_steps"));
     }
 
     /** The refusal the fixture's four-column table names for a row. */

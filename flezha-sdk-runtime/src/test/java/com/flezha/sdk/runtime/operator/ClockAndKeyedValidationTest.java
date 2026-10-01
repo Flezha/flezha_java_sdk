@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.tasklet.Ctx;
@@ -27,30 +27,30 @@ class ClockAndKeyedValidationTest {
 
     @BeforeEach
     void reset() {
-        UnboundedOperatorClassRegistry.reset();
+        OperatorClassRegistry.reset();
     }
 
     @Test
     @DisplayName("The default clock is the wall clock")
     void theDefaultClockIsTheWallClock() {
-        UnboundedOperatorClassRegistry.registerClass(KeyedPluginOperator.class);
-        UnboundedOperatorTopology topology = UnboundedOperatorClassRegistry.getTopology("clock-keyed-plugin");
+        OperatorClassRegistry.registerClass(KeyedPluginOperator.class);
+        OperatorTopology topology = OperatorClassRegistry.getTopology("clock-keyed-plugin");
         assertThat(topology.tasklet(0).clock()).isEqualTo(ClockKind.WALL);
     }
 
     @Test
     @DisplayName("Writing eventTime makes the clock event time")
     void writingEventTimeMakesTheClockEventTime() {
-        UnboundedOperatorClassRegistry.registerClass(ExtractorOperator.class);
-        UnboundedOperatorTopology topology = UnboundedOperatorClassRegistry.getTopology("clock-extractor");
+        OperatorClassRegistry.registerClass(ExtractorOperator.class);
+        OperatorTopology topology = OperatorClassRegistry.getTopology("clock-extractor");
         assertThat(topology.tasklet(0).clock()).isEqualTo(ClockKind.EVENT_TIME);
     }
 
     @Test
     @DisplayName("Two clocks are refused: eventTime written and logicalClock declared")
     void twoClocksAreRefused() {
-        FlezhaException refused = Refused.by(
-                "topology.two_clocks", () -> UnboundedOperatorClassRegistry.registerClass(TwoClocksOperator.class));
+        FlezhaException refused =
+                Refused.by("topology.two_clocks", () -> OperatorClassRegistry.registerClass(TwoClocksOperator.class));
         assertThat(Refused.details(refused, "topology.two_clocks")).containsEntry("tasklet", "two_clocks");
     }
 
@@ -58,8 +58,7 @@ class ClockAndKeyedValidationTest {
     @DisplayName("A logical clock without state is refused as topology.unservable_clock")
     void aLogicalClockWithoutStateIsRefused() {
         Refused.by(
-                "topology.unservable_clock",
-                () -> UnboundedOperatorClassRegistry.registerClass(UnservableClockOperator.class));
+                "topology.unservable_clock", () -> OperatorClassRegistry.registerClass(UnservableClockOperator.class));
     }
 
     @Test
@@ -67,14 +66,14 @@ class ClockAndKeyedValidationTest {
     void keyedChannelWithoutPluginWireIsRefused() {
         Refused.by(
                 "topology.keyed_channel_without_plugin_wire",
-                () -> UnboundedOperatorClassRegistry.registerClass(KeyedNoPluginOperator.class));
+                () -> OperatorClassRegistry.registerClass(KeyedNoPluginOperator.class));
     }
 
     @Test
     @DisplayName("a keyed plugin-bound channel registers and is marked keyed on the descriptor")
     void keyedPluginChannelRegisters() {
-        UnboundedOperatorClassRegistry.registerClass(KeyedPluginOperator.class);
-        UnboundedOperatorTopology topology = UnboundedOperatorClassRegistry.getTopology("clock-keyed-plugin");
+        OperatorClassRegistry.registerClass(KeyedPluginOperator.class);
+        OperatorTopology topology = OperatorClassRegistry.getTopology("clock-keyed-plugin");
         assertThat(topology).isNotNull();
         ChannelDescriptor out = topology.channel(topology.lookupChannelId("out"));
         assertThat(out.keyed()).isTrue();
@@ -83,8 +82,7 @@ class ClockAndKeyedValidationTest {
     @Test
     @DisplayName("a constructor that throws is reported as the author's error, not as a missing constructor")
     void throwingConstructorIsReportedAsTheAuthorsError() {
-        Throwable thrown =
-                catchThrowable(() -> UnboundedOperatorClassRegistry.registerClass(ThrowingConstructorOperator.class));
+        Throwable thrown = catchThrowable(() -> OperatorClassRegistry.registerClass(ThrowingConstructorOperator.class));
 
         assertThat(thrown).hasMessageNotContaining("no-arg constructor");
         assertThat(Arrays.asList(thrown, thrown.getCause()))
@@ -95,7 +93,7 @@ class ClockAndKeyedValidationTest {
 
     // --- fixtures -----------------------------------------------------------
 
-    public static final class ThrowingConstructorOperator implements UnboundedOperator {
+    public static final class ThrowingConstructorOperator implements Operator {
         public ThrowingConstructorOperator() {
             throw new IllegalStateException(AUTHORS_REFUSAL);
         }
@@ -109,7 +107,7 @@ class ClockAndKeyedValidationTest {
         public void channels(ChannelBuilder c) {}
     }
 
-    public static final class TwoClocksOperator implements UnboundedOperator {
+    public static final class TwoClocksOperator implements Operator {
         @Override
         public String factoryId() {
             return "clock-two-clocks";
@@ -121,7 +119,7 @@ class ClockAndKeyedValidationTest {
         }
     }
 
-    public static final class ExtractorOperator implements UnboundedOperator {
+    public static final class ExtractorOperator implements Operator {
         @Override
         public String factoryId() {
             return "clock-extractor";
@@ -133,7 +131,7 @@ class ClockAndKeyedValidationTest {
         }
     }
 
-    public static final class UnservableClockOperator implements UnboundedOperator {
+    public static final class UnservableClockOperator implements Operator {
         @Override
         public String factoryId() {
             return "clock-unservable";
@@ -145,7 +143,7 @@ class ClockAndKeyedValidationTest {
         }
     }
 
-    public static final class KeyedNoPluginOperator implements UnboundedOperator {
+    public static final class KeyedNoPluginOperator implements Operator {
         @Override
         public String factoryId() {
             return "clock-keyed-no-plugin";
@@ -158,7 +156,7 @@ class ClockAndKeyedValidationTest {
         }
     }
 
-    public static final class KeyedPluginOperator implements UnboundedOperator {
+    public static final class KeyedPluginOperator implements Operator {
         @Override
         public String factoryId() {
             return "clock-keyed-plugin";

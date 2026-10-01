@@ -1,6 +1,6 @@
 package com.flezha.test;
 
-import com.flezha.sdk.authoring.UnboundedOperator;
+import com.flezha.sdk.authoring.Operator;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.tasklet.Ctx;
@@ -17,10 +17,9 @@ import java.util.List;
  * live beside the interpreter because a role IS a tasklet declaration, and
  * one written elsewhere would be read as a fixture.
  *
- * <p>Every role but {@code nochange} keeps a state its Change applies to,
- * which is what makes the class persistent in this SDK: Java reads persistence
- * off the state its tasklets declare rather than off a class flag, so a row's
- * {@code class.persistent} step is what the palette already says.
+ * <p>Every role but {@code nochange} keeps a state its Change applies to, so
+ * a row's class has something to keep wherever its {@code class.durable} step
+ * says the work is kept.
  */
 final class Palette {
 
@@ -106,10 +105,10 @@ final class Palette {
         }
     }
 
-    /** {@code shorthand(plain, out, -).topology}: a short form that also implements an operator interface. */
-    @UnboundedOperator(id = "plain", sink = "out")
+    /** {@code shorthand(plain, out, -).topology}: a short form that also implements the operator interface. */
+    @Operator(id = "plain", sink = "out")
     public static final class ShortFormWithTopology
-            implements Tasklet<String, Void, String>, com.flezha.sdk.operator.UnboundedOperator {
+            implements Tasklet<String, Void, String>, com.flezha.sdk.operator.Operator {
 
         @Override
         public String factoryId() {
@@ -126,7 +125,7 @@ final class Palette {
     }
 
     /** {@code shorthand(plain, out, -).noout}: a short form with a sink and no output. */
-    @UnboundedOperator(id = "plain", sink = "out")
+    @Operator(id = "plain", sink = "out")
     public static final class SinkWithoutOutput implements Tasklet<String, Void, Void> {
 
         @Override

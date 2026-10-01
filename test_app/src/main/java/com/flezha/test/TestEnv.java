@@ -1,5 +1,7 @@
 package com.flezha.test;
 
+import com.flezha.sdk.operator.Operator;
+import java.time.Duration;
 import java.util.Optional;
 
 /** Environment knobs the fixtures read, parsed the way the Rust test app parses them. */
@@ -23,5 +25,16 @@ final class TestEnv {
         } catch (NumberFormatException e) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * Where a sleeping fixture keeps its work: locally, sleeping after the class default unless the
+     * drill or the bench driving it shortens the interval through
+     * {@code FLEZHA_FIXTURE_SLEEP_AFTER_MS}.
+     */
+    static Operator.Durable fixtureDurable() {
+        return new Operator.Durable.Local(optLong("FLEZHA_FIXTURE_SLEEP_AFTER_MS")
+                .map(Duration::ofMillis)
+                .orElse(Operator.DEFAULT_SLEEP_AFTER));
     }
 }

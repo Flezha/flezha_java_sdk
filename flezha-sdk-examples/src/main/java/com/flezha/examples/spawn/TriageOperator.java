@@ -1,16 +1,21 @@
 package com.flezha.examples.spawn;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.BoundedOperator;
+import com.flezha.sdk.operator.Operator;
 import javax.annotation.Nonnull;
 
 /** The worker: one per subject, torn down when its single pass completes. */
-public final class TriageOperator implements BoundedOperator {
+public final class TriageOperator implements Operator {
 
     @Override
     @Nonnull
     public String factoryId() {
         return "triage";
+    }
+
+    @Override
+    public Run run() {
+        return Run.steps();
     }
 
     /** The spawn payload, the alert that asked for this worker, seeds the one pass. */

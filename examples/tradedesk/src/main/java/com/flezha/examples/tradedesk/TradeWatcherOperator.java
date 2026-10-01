@@ -3,7 +3,7 @@ package com.flezha.examples.tradedesk;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.flezha.examples.tradedesk.TrackPrices.Trade;
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 import java.util.List;
 import javax.annotation.Nonnull;
 
@@ -11,12 +11,12 @@ import javax.annotation.Nonnull;
  * The desk's stream: trades in, each price compared with its symbol's recent average, and an order
  * started when a price jumps far enough above it.
  *
- * <p>An unbounded operator runs for as long as the desk does. The exchange sends other messages
+ * <p>A flow operator runs for as long as the desk does. The exchange sends other messages
  * beside its trades and delivers several trades in one message, so the wiring keeps the trade
  * messages, splits each into its trades before anything else sees them, drops what the desk does
  * not follow, and routes the rest to a cell per symbol.
  */
-public final class TradeWatcherOperator implements UnboundedOperator {
+public final class TradeWatcherOperator implements Operator {
 
     /**
      * One message from the exchange: {@code channel} says what it is, and a trade message carries

@@ -78,7 +78,7 @@ already-published result when an input arrives after its interval closed. Rather
 than discarding the message or misattributing it, the runtime replays the
 affected cell with the message in its correct position and re-emits.
 
-**[`bounded/`](src/main/java/com/flezha/examples/bounded)** covers ordered
+**[`steps/`](src/main/java/com/flezha/examples/steps)** covers ordered
 steps that must not be re-executed as a unit after a partial failure: reserve,
 charge, dispatch. Completed steps are journaled, a crash resumes at the next
 step, and an exhausted retry ladder unwinds what was already done.
@@ -88,8 +88,8 @@ that holds its conversation in durable state and resumes mid-thread after a
 restart, waking when a message arrives. This is the shape to copy for
 anything intended to run for weeks.
 
-**[`spawn/`](src/main/java/com/flezha/examples/spawn)** shows an unbounded tasklet
-requesting a bounded worker from the controller, so a detector can delegate
+**[`spawn/`](src/main/java/com/flezha/examples/spawn)** shows a flow tasklet
+requesting a steps worker from the controller, so a detector can delegate
 substantial work without becoming a dispatcher itself.
 
 ## Looking things up

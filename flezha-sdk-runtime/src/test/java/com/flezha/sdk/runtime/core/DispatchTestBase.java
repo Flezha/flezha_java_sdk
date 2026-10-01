@@ -3,10 +3,8 @@ package com.flezha.sdk.runtime.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.operator.UnboundedOperator;
-import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
+import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.Ctx;
@@ -52,8 +50,8 @@ abstract class DispatchTestBase {
         TRAVERSALS.set(0);
         TIMER_EVENTS.clear();
         REFUSE.set(false);
-        UnboundedOperatorClassRegistry.reset();
-        BoundedOperatorClassRegistry.reset();
+        OperatorClassRegistry.reset();
+        OperatorClassRegistry.reset();
         dispatcher = new ActivationDispatcher();
     }
 
@@ -102,11 +100,11 @@ abstract class DispatchTestBase {
     // ==================================================================
 
     /**
-     * An UnboundedOperator fixture: an id and a wiring, which is all any of these
+     * An Operator fixture: an id and a wiring, which is all any of these
      * vary. The class stays real (the registry instantiates it by name) and
      * declares only what it is.
      */
-    public abstract static class Op implements UnboundedOperator {
+    public abstract static class Op implements Operator {
         private final String factoryId;
         private final Consumer<ChannelBuilder> wiring;
 
@@ -505,11 +503,15 @@ abstract class DispatchTestBase {
 
     public static final class CheckpointOperator extends Op {
         public CheckpointOperator() {
-            super("ckpt_op", c -> {
-                c.effectivelyOnce();
-                c.checkpointAck();
-                c.input(String.class, "in").into(CkptTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
-            });
+            super("ckpt_op", c -> c.input(String.class, "in")
+                    .into(CkptTask.class)
+                    .keyed()
+                    .sink(s -> s.getBytes(StandardCharsets.UTF_8)));
+        }
+
+        @Override
+        public Run run() {
+            return new Run.Flow(new Exactly.EffectivelyOnce().withAck(new Ack.Checkpoint()));
         }
     }
 
@@ -559,21 +561,26 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class CompletingUnboundedOperator extends Op {
-        public CompletingUnboundedOperator() {
-            super("completing_unbounded", c -> c.input(String.class, "in").into(CompletingTask.class));
+    public static final class CompletingOperator extends Op {
+        public CompletingOperator() {
+            super("completing_flow", c -> c.input(String.class, "in").into(CompletingTask.class));
         }
     }
 
-    public static final class CompletingBounded implements BoundedOperator {
+    public static final class CompletingSteps implements Operator {
         @Override
         public String factoryId() {
-            return "completing_bounded";
+            return "completing_steps";
         }
 
         @Override
-        public boolean persistenceEnabled() {
-            return false;
+        public Run run() {
+            return Run.steps();
+        }
+
+        @Override
+        public Durable durable() {
+            return new Durable.Memory();
         }
 
         @Override
@@ -583,38 +590,48 @@ abstract class DispatchTestBase {
     }
 
     /**
-     * A structured bounded operator whose producing channel `bounded_fan` has TWO consumers,
+     * A structured steps operator whose producing channel `steps_fan` has TWO consumers,
      * one of them behind a map — the shape the fan-in diamond's root has, and
      * the one a per-consumer producer-side emit multiplies.
      */
-    public static final class FanOutBounded implements BoundedOperator {
+    public static final class FanOutSteps implements Operator {
         @Override
         public String factoryId() {
-            return "fanout_bounded";
+            return "fanout_steps";
         }
 
         @Override
-        public boolean persistenceEnabled() {
-            return false;
+        public Run run() {
+            return Run.steps();
+        }
+
+        @Override
+        public Durable durable() {
+            return new Durable.Memory();
         }
 
         @Override
         public void channels(ChannelBuilder c) {
-            var fan = c.input(String.class, "seed").into(MidTask.class).named("bounded_fan");
+            var fan = c.input(String.class, "seed").into(MidTask.class).named("steps_fan");
             fan.map(String.class, s -> "mapped:" + s).into(KeyRecorder.class);
-            fan.into(KeyRecorder.class, "bounded_plain_leaf");
+            fan.into(KeyRecorder.class, "steps_plain_leaf");
         }
     }
 
-    public static final class SagaBounded implements BoundedOperator {
+    public static final class SagaSteps implements Operator {
         @Override
         public String factoryId() {
-            return "saga_bounded";
+            return "saga_steps";
         }
 
         @Override
-        public boolean persistenceEnabled() {
-            return false;
+        public Run run() {
+            return Run.steps();
+        }
+
+        @Override
+        public Durable durable() {
+            return new Durable.Memory();
         }
 
         @Override

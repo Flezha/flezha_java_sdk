@@ -78,7 +78,7 @@ public interface Tasklet<Input, State, Output> {
 
     /**
      * The tasklet's name and scalar settings, read at registration. Every tasklet class carries
-     * it, except a short form ({@code @UnboundedOperator} / {@code @BoundedOperator}), whose
+     * it, except a short form ({@code @Operator} / {@code @Operator}), whose
      * tasklet takes the operator's {@code id} as its name.
      */
     @Retention(RetentionPolicy.RUNTIME)
@@ -174,7 +174,7 @@ public interface Tasklet<Input, State, Output> {
     }
 
     /**
-     * Undoes a reversible side effect of {@link #run} (bounded operators only). The bounded driver
+     * Undoes a reversible side effect of {@link #run} (steps operators only). The steps driver
      * calls it only while rolling back an abnormal termination, once per cell that ran, in reverse
      * completion order, with that cell's own outputs and its context. It must be idempotent: a
      * crash mid-rollback may call it again, and after one {@code completedOutput} can be empty.

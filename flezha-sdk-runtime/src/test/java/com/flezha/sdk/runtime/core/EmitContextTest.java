@@ -2,7 +2,7 @@ package com.flezha.sdk.runtime.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.runtime.state.TimerOp;
 import com.flezha.sdk.state.TimerKind;
@@ -24,7 +24,7 @@ class EmitContextTest extends DispatchTestBase {
     @Test
     @DisplayName("an input applies its Change, ships decodable change bytes, and stages the plugin output")
     void workAppliesChangesAndCollectsOutputs() {
-        UnboundedOperatorClassRegistry.registerClass(CounterOperator.class);
+        OperatorClassRegistry.registerClass(CounterOperator.class);
         ItemEffect effect =
                 soleEffect(work("counter_op", 0, Optional.empty(), 7, input(0, "x", 1_000, OptionalLong.of(9), false)));
 
@@ -50,7 +50,7 @@ class EmitContextTest extends DispatchTestBase {
     @Test
     @DisplayName("the sink names the channel the plugin output is addressed by")
     void sinkNamesTheChannel() {
-        UnboundedOperatorClassRegistry.registerClass(SinkNamesChannelOperator.class);
+        OperatorClassRegistry.registerClass(SinkNamesChannelOperator.class);
         ItemEffect effect = soleEffect(work("sink_names_channel", 0, Optional.empty(), 5, input(0, "v", 1_000)));
 
         assertThat(effect.outputs()).hasSize(1);
@@ -62,7 +62,7 @@ class EmitContextTest extends DispatchTestBase {
     @Test
     @DisplayName("a keyed plugin emit carries flz.cell / flz.seq / flz.key and the schema key")
     void keyedEmitCarriesIdentityStamps() {
-        UnboundedOperatorClassRegistry.registerClass(KeyedEmitOperator.class);
+        OperatorClassRegistry.registerClass(KeyedEmitOperator.class);
         ItemEffect effect = soleEffect(work("keyed_op", 0, Optional.empty(), 5, input(0, "v", 1_000)));
 
         assertThat(effect.outputs()).hasSize(1);
@@ -79,7 +79,7 @@ class EmitContextTest extends DispatchTestBase {
     @Test
     @DisplayName("a key-less emit in a keyed Cell carries that Cell's own key, stamped like emitKeyed")
     void keyLessEmitInAKeyedCellCarriesTheCellKey() {
-        UnboundedOperatorClassRegistry.registerClass(KeyedEmitOperator.class);
+        OperatorClassRegistry.registerClass(KeyedEmitOperator.class);
         ItemEffect effect = soleEffect(work("keyed_op", 0, Optional.of("BTC/USD"), 5, input(0, "plain:v", 1_000)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.Ok.class);
@@ -95,7 +95,7 @@ class EmitContextTest extends DispatchTestBase {
     @Test
     @DisplayName("a key-less emit on a keyed channel is refused where the Cell has no key")
     void keyLessEmitOnAKeyedChannelIsRefusedWithoutAnCellKey() {
-        UnboundedOperatorClassRegistry.registerClass(KeyedEmitOperator.class);
+        OperatorClassRegistry.registerClass(KeyedEmitOperator.class);
         ItemEffect effect = soleEffect(work("keyed_op", 0, Optional.empty(), 5, input(0, "plain:v", 1_000)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
@@ -107,7 +107,7 @@ class EmitContextTest extends DispatchTestBase {
     @Test
     @DisplayName("emitKeyed on a non-keyed channel is refused, cell key or not")
     void keyedEmitOnANonKeyedChannelIsRefused() {
-        UnboundedOperatorClassRegistry.registerClass(CounterOperator.class);
+        OperatorClassRegistry.registerClass(CounterOperator.class);
         ItemEffect effect = soleEffect(work("counter_op", 0, Optional.of("BTC/USD"), 7, input(0, "key:x", 1_000)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
@@ -119,7 +119,7 @@ class EmitContextTest extends DispatchTestBase {
     @Test
     @DisplayName("registrations ride the effect; a firing's removal leads its ops; now() equals firedAt")
     void timerOpsRideTheEffect() {
-        UnboundedOperatorClassRegistry.registerClass(TimerOperator.class);
+        OperatorClassRegistry.registerClass(TimerOperator.class);
         ItemEffect armed = soleEffect(work("timer_op", 0, Optional.empty(), 0, input(0, "1000", 1_000)));
         assertThat(armed.timers())
                 .containsExactly(
@@ -139,7 +139,7 @@ class EmitContextTest extends DispatchTestBase {
     @Test
     @DisplayName("an emit from a tasklet that owns no output channel is refused naming the tasklet")
     void anEmitWithNoOutputChannelIsRefused() {
-        UnboundedOperatorClassRegistry.registerClass(LeafEmitOperator.class);
+        OperatorClassRegistry.registerClass(LeafEmitOperator.class);
         ItemEffect effect = soleEffect(work("leaf_emit_op", 0, Optional.empty(), 0, input(0, "x", 1)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
@@ -150,7 +150,7 @@ class EmitContextTest extends DispatchTestBase {
     @Test
     @DisplayName("an event-time timer under a wall clock is refused inside the invocation")
     void eventTimeTimerWithoutEventTimeClockIsRefused() {
-        UnboundedOperatorClassRegistry.registerClass(WallTimerOperator.class);
+        OperatorClassRegistry.registerClass(WallTimerOperator.class);
         ItemEffect effect = soleEffect(work("wall_timer_op", 0, Optional.empty(), 0, input(0, "x", 1)));
         assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
         assertThat(((Verdict.RetryableError) effect.verdict()).message())
@@ -160,7 +160,7 @@ class EmitContextTest extends DispatchTestBase {
     @Test
     @DisplayName("ctx.checkpoint() marks the effect; tier outputs carry no host-side identity stamps")
     void checkpointFlagAndTierOutputs() {
-        UnboundedOperatorClassRegistry.registerClass(CheckpointOperator.class);
+        OperatorClassRegistry.registerClass(CheckpointOperator.class);
         ItemEffect open = soleEffect(work("ckpt_op", 0, Optional.empty(), 0, input(0, "accumulate", 1)));
         assertThat(open.checkpoint()).isFalse();
         assertThat(open.outputs()).hasSize(1);
@@ -174,13 +174,13 @@ class EmitContextTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("an unbounded tasklet's complete rides its effect the same way, for the core to refuse")
-    void anUnboundedTaskletsCompleteRidesItsEffect() {
-        UnboundedOperatorClassRegistry.registerClass(CompletingUnboundedOperator.class);
-        ItemEffect effect = soleEffect(work("completing_unbounded", 0, Optional.empty(), 0, input(0, "x", 1)));
+    @DisplayName("a flow tasklet's complete rides its effect the same way, for the core to end the instance")
+    void aFlowTaskletsCompleteRidesItsEffect() {
+        OperatorClassRegistry.registerClass(CompletingOperator.class);
+        ItemEffect effect = soleEffect(work("completing_flow", 0, Optional.empty(), 0, input(0, "x", 1)));
 
         assertThat(effect.verdict())
-                .as("the host does not judge the operator kind; the core's stream fold refuses the request")
+                .as("the host does not judge the run; the core ends the flow instance once its Cells are idle")
                 .isInstanceOf(Verdict.Ok.class);
         assertThat(effect.complete())
                 .hasValueSatisfying(result ->

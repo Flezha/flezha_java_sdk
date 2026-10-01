@@ -39,7 +39,7 @@ class SpawnHandleTest {
         SpawnRequests.install(core);
 
         SpawnResult result =
-                new StubCtx(false, 42).spawnBounded("worker", PAYLOAD).await();
+                new StubCtx(false, 42).spawnSteps("worker", PAYLOAD).await();
 
         assertThat(result).isEqualTo(new SpawnResult("worker-k7m2qzxw4pd3fn2a", SpawnOutcome.SPAWNED));
         assertThat(core.requests).containsExactly("42/worker//p/deliver/false");
@@ -52,9 +52,9 @@ class SpawnHandleTest {
         SpawnRequests.install(core);
         Ctx<Void, Object> ctx = new StubCtx(false, 42);
 
-        assertThat(ctx.spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1")).await())
+        assertThat(ctx.spawnSteps("worker", PAYLOAD, SpawnOptions.id("w1")).await())
                 .isEqualTo(new SpawnResult("w1", SpawnOutcome.DELIVERED));
-        ctx.spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1").ifRunning(IfRunning.ERROR));
+        ctx.spawnSteps("worker", PAYLOAD, SpawnOptions.id("w1").ifRunning(IfRunning.ERROR));
 
         assertThat(core.requests).containsExactly("42/worker/w1/p/deliver/false", "42/worker/w1/p/error/false");
     }
@@ -67,8 +67,8 @@ class SpawnHandleTest {
         SpawnRequests.install(core);
         Ctx<Void, Object> ctx = new StubCtx(false, 42);
 
-        ctx.spawnBounded("worker", "p");
-        ctx.spawnBounded("worker", new Ticket("AAPL", 10), SpawnOptions.id("w1"));
+        ctx.spawnSteps("worker", "p");
+        ctx.spawnSteps("worker", new Ticket("AAPL", 10), SpawnOptions.id("w1"));
 
         assertThat(core.requests)
                 .containsExactly(
@@ -94,7 +94,7 @@ class SpawnHandleTest {
         SpawnRequests.install(core);
 
         SpawnHandle handle = new StubCtx(false, 42)
-                .spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1").ifRunning(IfRunning.ERROR));
+                .spawnSteps("worker", PAYLOAD, SpawnOptions.id("w1").ifRunning(IfRunning.ERROR));
 
         assertThatThrownBy(handle::await).isSameAs(core.refusal);
     }
@@ -105,7 +105,7 @@ class SpawnHandleTest {
         core.refusal = FlezhaException.of("quota.exceeded", Map.of("kind", "max_operators", "current", 3, "limit", 3));
         SpawnRequests.install(core);
 
-        SpawnHandle handle = new StubCtx(false, 42).spawnBounded("worker", PAYLOAD);
+        SpawnHandle handle = new StubCtx(false, 42).spawnSteps("worker", PAYLOAD);
 
         assertThatThrownBy(handle::tryResult).isInstanceOfSatisfying(FlezhaException.class, e -> {
             assertThat(e.code()).isEqualTo("quota.exceeded");
@@ -118,9 +118,9 @@ class SpawnHandleTest {
     void eachFailureIsTheOneExceptionToldApartByItsCode() {
         SpawnRequests.install(core);
         for (String code : List.of(
-                "operator.factory_unknown", "operator.factory_not_bounded", "spawn.timeout", "spawn.unavailable")) {
+                "operator.factory_unknown", "operator.factory_not_steps", "spawn.timeout", "spawn.unavailable")) {
             core.refusal = FlezhaException.of(code, Map.of());
-            assertThatThrownBy(new StubCtx(false, 42).spawnBounded("worker", PAYLOAD)::await)
+            assertThatThrownBy(new StubCtx(false, 42).spawnSteps("worker", PAYLOAD)::await)
                     .isInstanceOfSatisfying(
                             FlezhaException.class, e -> assertThat(e.code()).isEqualTo(code));
         }
@@ -130,7 +130,7 @@ class SpawnHandleTest {
     @DisplayName("tryResult answers pending without waiting until the answer arrives")
     void tryResultAnswersPendingUntilTheAnswerArrives() throws Exception {
         SpawnRequests.install(core);
-        SpawnHandle handle = new StubCtx(false, 42).spawnBounded("worker", PAYLOAD);
+        SpawnHandle handle = new StubCtx(false, 42).spawnSteps("worker", PAYLOAD);
 
         assertThat(handle.tryResult()).isEmpty();
 
@@ -144,7 +144,7 @@ class SpawnHandleTest {
     void awaitLeavesTheDeadlineToTheCoreAndEveryReadAsksTheCore() throws Exception {
         core.answer = "{\"id\":\"w1\",\"outcome\":\"spawned\"}";
         SpawnRequests.install(core);
-        SpawnHandle handle = new StubCtx(false, 42).spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1"));
+        SpawnHandle handle = new StubCtx(false, 42).spawnSteps("worker", PAYLOAD, SpawnOptions.id("w1"));
 
         assertThat(handle.await()).isEqualTo(handle.await());
         assertThat(handle.tryResult()).contains(new SpawnResult("w1", SpawnOutcome.SPAWNED));
@@ -159,12 +159,12 @@ class SpawnHandleTest {
         Ctx<Void, Object> replaying = new StubCtx(true, 42);
 
         core.answer = "{\"id\":\"\",\"outcome\":\"skipped_on_replay\"}";
-        assertThat(replaying.spawnBounded("worker", PAYLOAD).await())
+        assertThat(replaying.spawnSteps("worker", PAYLOAD).await())
                 .isEqualTo(new SpawnResult("", SpawnOutcome.SKIPPED_ON_REPLAY));
 
         core.answer = "{\"id\":\"w1\",\"outcome\":\"skipped_on_replay\"}";
         assertThat(replaying
-                        .spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1"))
+                        .spawnSteps("worker", PAYLOAD, SpawnOptions.id("w1"))
                         .await())
                 .isEqualTo(new SpawnResult("w1", SpawnOutcome.SKIPPED_ON_REPLAY));
 
@@ -176,10 +176,10 @@ class SpawnHandleTest {
     void withoutAControlPlaneEveryReadAnswersUnavailable() {
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         SpawnHandle handle = capturingStderr(
-                stderr, () -> new StubCtx(false, 42).spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1")));
+                stderr, () -> new StubCtx(false, 42).spawnSteps("worker", PAYLOAD, SpawnOptions.id("w1")));
 
         assertThat(stderr.toString(StandardCharsets.UTF_8))
-                .startsWith("[flezha] spawnBounded(factory `worker`, id `w1`) failed: spawn.unavailable: ")
+                .startsWith("[flezha] spawnSteps(factory `worker`, id `w1`) failed: spawn.unavailable: ")
                 .endsWith(System.lineSeparator())
                 .hasLineCount(1);
         assertThatThrownBy(handle::tryResult).isInstanceOfSatisfying(FlezhaException.class, e -> assertThat(e.code())
@@ -194,9 +194,9 @@ class SpawnHandleTest {
     void withoutAControlPlaneAReplayedSpawnAnswersSkipped() throws Exception {
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         Ctx<Void, Object> replaying = new StubCtx(true, 42);
-        SpawnHandle unnamed = capturingStderr(stderr, () -> replaying.spawnBounded("worker", PAYLOAD));
+        SpawnHandle unnamed = capturingStderr(stderr, () -> replaying.spawnSteps("worker", PAYLOAD));
         SpawnHandle named =
-                capturingStderr(stderr, () -> replaying.spawnBounded("worker", PAYLOAD, SpawnOptions.id("w1")));
+                capturingStderr(stderr, () -> replaying.spawnSteps("worker", PAYLOAD, SpawnOptions.id("w1")));
 
         assertThat(stderr.toString(StandardCharsets.UTF_8)).isEmpty();
         assertThat(unnamed.tryResult()).contains(new SpawnResult("", SpawnOutcome.SKIPPED_ON_REPLAY));
@@ -209,7 +209,7 @@ class SpawnHandleTest {
         core.answer = "{\"id\":\"w1\",\"outcome\":\"hatched\"}";
         SpawnRequests.install(core);
 
-        assertThatThrownBy(new StubCtx(false, 42).spawnBounded("worker", PAYLOAD)::await)
+        assertThatThrownBy(new StubCtx(false, 42).spawnSteps("worker", PAYLOAD)::await)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("hatched");
     }
@@ -273,7 +273,7 @@ class SpawnHandleTest {
         }
     }
 
-    /** Only the members the defaults of {@code spawnBounded} and {@code complete} read. */
+    /** Only the members the defaults of {@code spawnSteps} and {@code complete} read. */
     private record StubCtx(boolean replay, long token, List<String> completed) implements Ctx<Void, Object> {
         StubCtx(boolean replay, long token) {
             this(replay, token, new CopyOnWriteArrayList<>());

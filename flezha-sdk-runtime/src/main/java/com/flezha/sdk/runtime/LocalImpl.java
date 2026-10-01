@@ -11,7 +11,7 @@ import com.flezha.sdk.runtime.core.ActivationDispatcher;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.core.Output;
 import com.flezha.sdk.runtime.core.OutputTarget;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -53,7 +53,7 @@ public final class LocalImpl implements LocalRunHandle {
     /** Entry point invoked by reflection from {@code LocalOperator.start}. */
     @Nonnull
     public static LocalRunHandle start(@Nonnull Class<?> type) {
-        String factoryId = UnboundedOperatorClassRegistry.registerClass(type);
+        String factoryId = OperatorClassRegistry.registerClass(type);
         long core = FlzCore.newContext();
         try {
             FlzCore.declareClass(core, HostClassDeclaration.forFactory(factoryId));

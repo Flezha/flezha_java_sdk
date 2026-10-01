@@ -9,11 +9,11 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 
 /**
- * The ONE implementation behind a {@code FlezhaRunner}'s two declared factory
- * sets (stream + bounded operator). Instance-scoped: each runner carries its own
- * cores, so a later runner starts with an empty declared set (generation 2
- * must re-define its types); the runtime-side class registries reached via
- * {@link RuntimeBridge} stay process-global and overwrite on insert.
+ * A {@code FlezhaRunner}'s declared factory set. Instance-scoped: each runner
+ * carries its own, so a later runner starts with an empty declared set
+ * (generation 2 must re-define its types); the runtime-side class registry
+ * reached via {@link RuntimeBridge} stays process-global and overwrites on
+ * insert.
  *
  * <p><b>Internal.</b> Not part of the SDK's public API; user code never calls
  * this.
@@ -24,27 +24,19 @@ public final class RegistryCore {
     private final Object lock = new Object();
     private final Map<String, Class<?>> entries = new LinkedHashMap<>();
     private final String runtimeRegistryFqn;
-    private final String kindLabel;
 
     /**
      * @param runtimeRegistryFqn the runtime-side class registry reached via
      *     {@link RuntimeBridge} ({@code registerClass(Class)} /
      *     {@code unregisterClass(String)} / {@code reset()})
-     * @param kindLabel {@code "operator"} / {@code "bounded"} — used in error
-     *     messages
      */
-    public RegistryCore(String runtimeRegistryFqn, String kindLabel) {
+    public RegistryCore(String runtimeRegistryFqn) {
         this.runtimeRegistryFqn = runtimeRegistryFqn;
-        this.kindLabel = kindLabel;
     }
 
     /**
      * Register a class: validate via the runtime side (which returns the
      * controller-facing factory id), then record it here.
-     *
-     * <p>A factory id already held by the OTHER kind is refused by the runtime
-     * registries themselves, which see both kinds' process-global entries; this
-     * core owns only its own runner's set.
      *
      * @return the controller-facing factory id.
      * @throws IllegalArgumentException on a null class.
@@ -52,18 +44,17 @@ public final class RegistryCore {
      */
     public String register(Class<?> cls) {
         if (cls == null) {
-            throw new IllegalArgumentException(kindLabel + "Class must not be null");
+            throw new IllegalArgumentException("operator class must not be null");
         }
         synchronized (lock) {
             // Delegate to the runtime side (which validates the authoring and
             // returns the controller-facing factory id) before we record it here.
-            String factoryId = (String) RuntimeBridge.invoke(
-                    runtimeRegistryFqn,
-                    "registerClass",
-                    new Class<?>[] {Class.class},
-                    "Failed to register " + kindLabel + " '" + cls.getName() + "'",
-                    cls);
-            if (entries.containsKey(factoryId)) {
+            String factoryId = registerInRuntime(cls);
+            Class<?> held = entries.get(factoryId);
+            if (held != null) {
+                // The runtime registry overwrites on insert: give the id back to the class this
+                // runner already holds under it.
+                registerInRuntime(held);
                 throw FlezhaException.of("topology.duplicate_factory_id", Map.of("factory_id", factoryId));
             }
             entries.put(factoryId, cls);
@@ -71,12 +62,21 @@ public final class RegistryCore {
         }
     }
 
+    private String registerInRuntime(Class<?> cls) {
+        return (String) RuntimeBridge.invoke(
+                runtimeRegistryFqn,
+                "registerClass",
+                new Class<?>[] {Class.class},
+                "Failed to register operator '" + cls.getName() + "'",
+                cls);
+    }
+
     private void unregisterInRuntime(String factoryId) {
         RuntimeBridge.invoke(
                 runtimeRegistryFqn,
                 "unregisterClass",
                 new Class<?>[] {String.class},
-                "Failed to remove " + kindLabel + " factory '" + factoryId + "'",
+                "Failed to remove operator factory '" + factoryId + "'",
                 factoryId);
     }
 

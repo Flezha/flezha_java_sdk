@@ -3,7 +3,7 @@ package com.flezha.sdk.runtime.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.channel.CallTarget;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
 import com.flezha.sdk.tasklet.Tasklet;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -45,7 +45,7 @@ class CallDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("each request the call chain makes leaves as a plugin output keyed by the chain")
     void eachRequestLeavesAsAPluginOutputKeyedByTheChain() {
-        UnboundedOperatorClassRegistry.registerClass(CallOp.class);
+        OperatorClassRegistry.registerClass(CallOp.class);
         ItemEffect effect = soleEffect(work("call_op", 0, Optional.empty(), 1, input(0, "s1:hi", 1_000)));
 
         assertThat(effect.outputs()).hasSize(2);
@@ -62,7 +62,7 @@ class CallDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("a value the call chain filters out makes no request")
     void aValueTheCallChainFiltersOutMakesNoRequest() {
-        UnboundedOperatorClassRegistry.registerClass(CallOp.class);
+        OperatorClassRegistry.registerClass(CallOp.class);
         ItemEffect effect = soleEffect(work("call_op", 0, Optional.empty(), 1, input(0, "drop:x", 1_000)));
 
         assertThat(effect.outputs()).isEmpty();
@@ -71,7 +71,7 @@ class CallDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("an outcome on the Response channel reaches the tasklet as a decoded Response")
     void anOutcomeReachesTheTaskletDecoded() {
-        UnboundedOperatorClassRegistry.registerClass(CallOp.class);
+        OperatorClassRegistry.registerClass(CallOp.class);
         String envelope =
                 "{\"call\":\"c\",\"target\":\"s1\",\"created\":true," + "\"request\":\"czE6aGk=\",\"value\":\"b2s=\"}";
         ItemEffect effect = soleEffect(work("call_op", 0, Optional.empty(), 1, input(2, envelope, 1_000)));

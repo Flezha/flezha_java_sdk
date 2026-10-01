@@ -3,7 +3,7 @@ package com.flezha.sdk.tasklet;
 import javax.annotation.Nonnull;
 
 /**
- * What {@link Ctx#spawnBounded} does when the requested instance id is
+ * What {@link Ctx#spawnSteps} does when the requested instance id is
  * already running.
  */
 public enum IfRunning {
@@ -18,7 +18,7 @@ public enum IfRunning {
         this.wire = wire;
     }
 
-    /** The policy as the controller reads it off {@code SpawnBoundedRequest}. */
+    /** The policy as the controller reads it off {@code SpawnStepsRequest}. */
     @Nonnull
     public String wire() {
         return wire;

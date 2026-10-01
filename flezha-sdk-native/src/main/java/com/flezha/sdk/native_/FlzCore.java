@@ -141,7 +141,7 @@ public final class FlzCore {
     public static native void abandon(long ctx, long token);
 
     /**
-     * The ABI form of {@code ctx.spawnBounded}: request a bounded instance
+     * The ABI form of {@code ctx.spawnSteps}: request a steps instance
      * in the runner's own namespace from the polled activation {@code token},
      * returning the handle number at once. An empty {@code id} asks the
      * controller to generate one; {@code ifRunning} is the wire string

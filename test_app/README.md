@@ -7,13 +7,13 @@ factory ids it registers, the transports it supports and how it is launched are
 declared in `conformance.json` beside this file — see
 `docs/sdk/conformance.md`.
 
-The app declares its UnboundedOperator classes via
+The app declares its Operator classes via
 `Flezha.createRunner(ns).registerFactory(...)` — the integration-matrix core
 being:
 
-- `do_nothing` — `DoNothingUnboundedOperator` + `DoNothingTasklet`
-- `store_input` — `StoreInputUnboundedOperator` + `StoreInputTasklet`
-- `compare_filter` — `CompareFilterUnboundedOperator` + `CompareFilterTasklet`
+- `do_nothing` — `DoNothingOperator` + `DoNothingTasklet`
+- `store_input` — `StoreInputOperator` + `StoreInputTasklet`
+- `compare_filter` — `CompareFilterOperator` + `CompareFilterTasklet`
 
 The factory id list matches `test/apps/rust_runner/`'s `do_nothing` /
 `store_input` / `compare_filter` set; the `operator-message-handlers`
@@ -21,10 +21,10 @@ factories are absent from both apps until that capability ships.
 
 Every tasklet is a class implementing `Tasklet<Input, State, Output>` and carrying
 `@Tasklet.Spec(name = ...)`; nothing is generated. It also carries the §5 short forms, tasklet
-classes annotated `@UnboundedOperator` / `@BoundedOperator` that are whole operators:
-`SugarDoNothing`, `SugarStore`, `SugarNamedInput`, the sinkless `SugarStateOnly`, the bounded
-short forms `SugarBounded` and the `per_input` `SugarBoundedPerInput`; and the 2-tasklet
-`SugarEntry` → `SugarDownstream` reference operator, wired by `SugarStaticCellUnboundedOperator`.
+classes annotated `@Operator` that are whole operators:
+`SugarDoNothing`, `SugarStore`, `SugarNamedInput`, the sinkless `SugarStateOnly`, the steps
+short forms `SugarSteps` and the `per_input` `SugarStepsPerInput`; and the 2-tasklet
+`SugarEntry` → `SugarDownstream` reference operator, wired by `SugarStaticCellOperator`.
 `Main` registers each short form by its class with `registerFactory`, as it registers every
 other operator; `SugarTwinTest` asserts they register under their ids and process input as the
 equivalent hand-written operators do. See `docs/sdk/authoring_contract.md`.

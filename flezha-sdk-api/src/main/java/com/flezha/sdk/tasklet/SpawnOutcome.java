@@ -1,6 +1,6 @@
 package com.flezha.sdk.tasklet;
 
-/** A {@link Ctx#spawnBounded} request that reached an instance. */
+/** A {@link Ctx#spawnSteps} request that reached an instance. */
 public enum SpawnOutcome {
     /** A fresh instance started with the payload as its first input. */
     SPAWNED,

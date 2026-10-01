@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.flezha.sdk.channel.CallTarget;
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.channel.Response;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorTopologyBuilderTest.SingleTasklet;
-import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
+import com.flezha.sdk.runtime.operator.OperatorTopologyBuilderTest.SingleTasklet;
+import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,14 +22,13 @@ class CallEndTest {
     @Test
     @DisplayName("a call closes its chain with the call link and declares <channel>.response as an entry")
     void aCallClosesItsChainAndDeclaresTheResponseChannel() {
-        UnboundedOperatorTopology topology =
-                UnboundedOperatorTopologyBuilder.build("calls", c -> c.input(String.class, "in")
-                        .into(SingleTasklet.class)
-                        .named("ask")
-                        .keyBy(value -> value)
-                        .call(CallTarget.factory("agent").create(false).channel("turn"), String.class, 60_000)
-                        .map(String.class, Response::request)
-                        .into(SingleTasklet.class));
+        OperatorTopology topology = OperatorTopologyBuilder.build("calls", c -> c.input(String.class, "in")
+                .into(SingleTasklet.class)
+                .named("ask")
+                .keyBy(value -> value)
+                .call(CallTarget.factory("agent").create(false).channel("turn"), String.class, 60_000)
+                .map(String.class, Response::request)
+                .into(SingleTasklet.class));
 
         Map<String, Object> call = new LinkedHashMap<>();
         call.put("link", "call");
@@ -56,12 +55,11 @@ class CallEndTest {
     @Test
     @DisplayName("a call to a named instance records its target, create true and no channel")
     void aCallToANamedInstanceRecordsItsTarget() {
-        UnboundedOperatorTopology topology =
-                UnboundedOperatorTopologyBuilder.build("calls_pricing", c -> c.input(String.class, "in")
-                        .into(SingleTasklet.class)
-                        .call(CallTarget.id("pricing"), String.class, 500)
-                        .map(String.class, Response::request)
-                        .into(SingleTasklet.class));
+        OperatorTopology topology = OperatorTopologyBuilder.build("calls_pricing", c -> c.input(String.class, "in")
+                .into(SingleTasklet.class)
+                .call(CallTarget.id("pricing"), String.class, 500)
+                .map(String.class, Response::request)
+                .into(SingleTasklet.class));
 
         Map<String, Object> call = new LinkedHashMap<>();
         call.put("link", "call");
@@ -76,7 +74,7 @@ class CallEndTest {
 
     /** Every chain declared on one channel, as the record spells it. */
     @SuppressWarnings("unchecked")
-    private static List<List<Object>> chains(UnboundedOperatorTopology t, int channel) {
+    private static List<List<Object>> chains(OperatorTopology t, int channel) {
         var channels = (List<Map<String, Object>>) t.declaration().get("channels");
         return (List<List<Object>>) channels.get(channel).get("chains");
     }

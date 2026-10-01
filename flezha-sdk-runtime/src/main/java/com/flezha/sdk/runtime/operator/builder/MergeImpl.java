@@ -19,7 +19,7 @@ final class MergeImpl<I> implements Merge<I> {
     /** One declared merge source: the channel and the chain ending in its mapping. */
     private record MergeSourceEntry(int channelId, int chain) {}
 
-    private final UnboundedOperatorTopologyBuilder owner;
+    private final OperatorTopologyBuilder owner;
     private final Class<I> mergedType;
     private final List<MergeSourceEntry> sources = new ArrayList<>();
     /**
@@ -32,7 +32,7 @@ final class MergeImpl<I> implements Merge<I> {
     /** How many times {@code keyBy} was declared; a second is one link more. */
     private int keyDeclarations;
 
-    MergeImpl(UnboundedOperatorTopologyBuilder owner, Class<I> mergedType) {
+    MergeImpl(OperatorTopologyBuilder owner, Class<I> mergedType) {
         this.owner = owner;
         this.mergedType = mergedType;
     }

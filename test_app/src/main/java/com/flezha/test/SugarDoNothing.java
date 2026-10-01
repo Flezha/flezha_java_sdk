@@ -1,6 +1,6 @@
 package com.flezha.test;
 
-import com.flezha.sdk.authoring.UnboundedOperator;
+import com.flezha.sdk.authoring.Operator;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
  * Single-tasklet stateless short-form twin of {@link DoNothingTasklet}: the annotation makes this
  * tasklet a whole operator, and {@code Main} registers this class.
  */
-@UnboundedOperator(id = "sugar_do_nothing", sink = "sugar_do_nothing_echo")
+@Operator(id = "sugar_do_nothing", sink = "sugar_do_nothing_echo")
 public class SugarDoNothing implements Tasklet<String, Void, byte[]> {
 
     @Override

@@ -1,12 +1,11 @@
 package com.flezha.examples.agent;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.operator.LoopMode;
+import com.flezha.sdk.operator.Operator;
 import javax.annotation.Nonnull;
 
 /** Wakes on each message. */
-public final class ChatOperator implements BoundedOperator {
+public final class ChatOperator implements Operator {
 
     @Override
     @Nonnull
@@ -16,9 +15,8 @@ public final class ChatOperator implements BoundedOperator {
 
     /** One iteration per inbound message. */
     @Override
-    @Nonnull
-    public LoopMode loopMode() {
-        return LoopMode.PER_INPUT;
+    public Run run() {
+        return Run.steps(Each.PER_INPUT);
     }
 
     @Override

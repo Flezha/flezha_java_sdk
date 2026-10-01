@@ -96,7 +96,7 @@ public final class FlezhaImpl implements RunnerHandle {
             throw FlezhaException.of(
                     "runtime.operator_type_in_use", java.util.Map.of("factory_id", factoryId, "live_instances", live));
         }
-        com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry.unregisterClass(factoryId);
+        com.flezha.sdk.runtime.operator.OperatorClassRegistry.unregisterClass(factoryId);
     }
 
     @Override

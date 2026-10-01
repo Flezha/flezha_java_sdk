@@ -3,8 +3,8 @@ package com.flezha.sdk.runtime.core;
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.runtime.operator.ChannelDescriptor;
 import com.flezha.sdk.runtime.operator.ConsumerEdge;
+import com.flezha.sdk.runtime.operator.OperatorTopology;
 import com.flezha.sdk.runtime.operator.TaskletDescriptor;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
 import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
  */
 final class CellRouting {
 
-    private final UnboundedOperatorTopology topology;
+    private final OperatorTopology topology;
 
     /** Per-Tasklet routing instances — {@code cellsFor} / {@code eventTime} only. */
     @SuppressWarnings("rawtypes")
@@ -36,22 +36,21 @@ final class CellRouting {
     private final KryoCodec edgeCodec;
 
     /** Whether this class's producers release their values untransformed. */
-    private final boolean structuredBounded;
+    private final boolean structuredSteps;
 
     @SuppressWarnings("rawtypes")
-    CellRouting(
-            UnboundedOperatorTopology topology, List<Tasklet> routers, KryoCodec edgeCodec, boolean structuredBounded) {
+    CellRouting(OperatorTopology topology, List<Tasklet> routers, KryoCodec edgeCodec, boolean structuredSteps) {
         this.topology = topology;
         this.routers = routers;
         this.edgeCodec = edgeCodec;
-        this.structuredBounded = structuredBounded;
+        this.structuredSteps = structuredSteps;
     }
 
     /**
      * Decode an input payload and keep only the values that route to this
      * Cell, applying the consumer edge's transform chain when — and only
      * when — the payload reached here untransformed: an entry payload, whose
-     * producer is the wire, or a bounded stage's released value. An unbounded
+     * producer is the wire, or a steps stage's released value. A flow
      * producer evaluated the edge when its activation completed, so applying
      * it again would compose the chain with itself.
      */
@@ -71,7 +70,7 @@ final class CellRouting {
         if (edge == null) {
             return List.of(base);
         }
-        return channel.kind() == ChannelKind.ENTRY || structuredBounded
+        return channel.kind() == ChannelKind.ENTRY || structuredSteps
                 ? EdgeTransforms.valuesOf(edge, base)
                 : List.of(base);
     }

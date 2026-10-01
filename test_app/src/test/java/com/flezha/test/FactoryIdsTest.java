@@ -3,8 +3,7 @@ package com.flezha.test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.flezha.sdk.Flezha;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
-import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
 import java.util.HashSet;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,11 +28,11 @@ class FactoryIdsTest {
             "bench_echo",
             "bench_keyed",
             "bench_keyed_nopersist",
-            "bench_loop_bounded",
+            "bench_loop_steps",
             "bounded_mailbox_drop_nothing",
             "bounded_mailbox_drop_newest",
             "bounded_mailbox_drop_oldest",
-            "branch_bounded",
+            "branch_steps",
             "call_agent",
             "call_downstream",
             "call_echo",
@@ -44,39 +43,39 @@ class FactoryIdsTest {
             "call_tool_session",
             "call_turn",
             "candle",
-            "chat_loop_bounded",
-            "chat_rewind_bounded",
+            "chat_loop_steps",
+            "chat_rewind_steps",
             "checkpoint_batched_store",
             "checkpoint_store",
             "coalescing_counter",
-            "commit_block_bounded",
+            "commit_block_steps",
             "compare_filter",
-            "diamond_bounded",
+            "diamond_steps",
             "do_nothing",
             "dynamic_cell",
-            "echo_bounded",
-            "event_timer_bounded",
-            "failed_stage_bounded",
-            "failing_turn_all_or_nothing_bounded",
-            "failing_turn_loop_bounded",
+            "echo_steps",
+            "event_timer_steps",
+            "failed_stage_steps",
+            "failing_turn_undo_all_steps",
+            "failing_turn_loop_steps",
             "cell_stress",
             "hybrid_channel",
-            "keyed_block_bounded",
-            "keyed_loop_bounded",
-            "keyed_saga_bounded",
+            "keyed_block_steps",
+            "keyed_loop_steps",
+            "keyed_saga_steps",
             "merged_input",
             "mixed_operator",
             "optout_commit_block",
-            "outbox_block_bounded",
+            "outbox_block_steps",
             "part_echo",
-            "part_echo_bounded",
+            "part_echo_steps",
             "partition_relay",
             "persistence_off_counter",
             "poison_probe",
-            "reply_block_loop_bounded",
+            "reply_block_loop_steps",
             "resume_probe",
-            "retry_bounded",
-            "saga_block_bounded",
+            "retry_steps",
+            "saga_block_steps",
             "schema_evolution_v1",
             "schema_evolution_v2",
             "session_timeout",
@@ -85,31 +84,31 @@ class FactoryIdsTest {
             "spawn_once_requester",
             "spawn_requester",
             "stateful_counter",
-            "stateless_loop_bounded",
+            "stateless_loop_steps",
             "static_cell",
-            "static_cell_bounded",
+            "static_cell_steps",
             "store_input",
             "sugar_do_nothing",
             "sugar_named_input",
             "sugar_state_only",
             "sugar_static_cell",
             "sugar_store_input",
-            "sugar_bounded",
-            "sugar_bounded_per_input",
-            "sync_durable_bounded",
+            "sugar_steps",
+            "sugar_steps_per_input",
+            "sync_durable_steps",
             "tier_chain",
-            "tier_commit_block_bounded",
+            "tier_commit_block_steps",
             "tier_store",
-            "timer_loop_bounded",
+            "timer_loop_steps",
             "transform_chain",
-            "typed_once_bounded",
-            "undo_outbox_bounded",
+            "typed_once_steps",
+            "undo_outbox_steps",
             "wedge_probe");
 
     @BeforeEach
     void reset() {
-        UnboundedOperatorClassRegistry.reset();
-        BoundedOperatorClassRegistry.reset();
+        OperatorClassRegistry.reset();
+        OperatorClassRegistry.reset();
     }
 
     @Test
@@ -117,8 +116,8 @@ class FactoryIdsTest {
     void sameIds() {
         Main.define(Flezha.createRunner("factory_ids_ns"));
 
-        Set<String> live = new HashSet<>(UnboundedOperatorClassRegistry.factoryIds());
-        live.addAll(BoundedOperatorClassRegistry.factoryIds());
+        Set<String> live = new HashSet<>(OperatorClassRegistry.factoryIds());
+        live.addAll(OperatorClassRegistry.factoryIds());
         assertEquals(RUST_FACTORY_IDS, live);
     }
 }

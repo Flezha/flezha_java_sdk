@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
  * {@link Activation} into one {@link ActivationResult} by running user code —
  * no native calls, which is what makes the whole typed layer unit-testable
  * without the core. The impurities are the api-side {@code SpawnRequests}
- * static, reached through {@code Ctx}'s default {@code spawnBounded}, and the
+ * static, reached through {@code Ctx}'s default {@code spawnSteps}, and the
  * {@link Parts} the runtime hands in, which {@code ctx.part} reaches.
  *
  * <p>The core guarantees per-Cell exclusivity — it never hands out a second

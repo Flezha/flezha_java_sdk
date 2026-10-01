@@ -1,13 +1,13 @@
 package com.flezha.test;
 
-import com.flezha.sdk.authoring.UnboundedOperator;
+import com.flezha.sdk.authoring.Operator;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.nio.charset.StandardCharsets;
 
 /** The short form naming its entry channel {@code prices} rather than taking the default. */
-@UnboundedOperator(id = "sugar_named_input", sink = "sugar_named_input_sink", input = "prices")
+@Operator(id = "sugar_named_input", sink = "sugar_named_input_sink", input = "prices")
 public class SugarNamedInput implements Tasklet<String, Void, byte[]> {
 
     @Override

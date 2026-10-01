@@ -3,19 +3,18 @@ package com.flezha.sdk.runtime.core;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.native_.FlzCore;
-import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
+import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.OperatorTopology;
 import com.flezha.sdk.runtime.operator.TaskletModel;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
-import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.ChannelEntry;
-import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.ClassFacts;
-import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.PendingEdge;
-import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder.TaskletEntry;
+import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder.ChannelEntry;
+import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder.PendingEdge;
+import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder.TaskletEntry;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nonnull;
 
@@ -58,16 +57,13 @@ public final class HostClassDeclaration {
     private HostClassDeclaration() {}
 
     /**
-     * Resolve {@code factoryId} in the class registries and encode the record
-     * its class was built from, of either kind. Written once at build time, so
-     * the bytes the core judged are the bytes it registers.
+     * Resolve {@code factoryId} in the class registry and encode the record
+     * its class was built from. Written once at build time, so the bytes the
+     * core judged are the bytes it registers.
      */
     @Nonnull
     public static byte[] forFactory(@Nonnull String factoryId) {
-        UnboundedOperatorTopology topology = UnboundedOperatorClassRegistry.getTopology(factoryId);
-        if (topology == null) {
-            topology = BoundedOperatorClassRegistry.getTopology(factoryId);
-        }
+        OperatorTopology topology = OperatorClassRegistry.getTopology(factoryId);
         if (topology == null) {
             throw new IllegalStateException("factory `" + factoryId + "` is not registered");
         }
@@ -75,45 +71,25 @@ public final class HostClassDeclaration {
     }
 
     /**
-     * The record the builder writes, which an unbounded class submits as is: the
-     * class facts as declared, one entry per channel and tasklet in id order,
-     * and per channel the chains its handles were given. Consumers, channel
-     * kinds, sink names and the acknowledgement granularity are NOT here —
-     * they are the core's answer.
+     * The record a class submits: its settings tree as declared, one entry per
+     * channel and tasklet in id order, and per channel the chains its handles
+     * were given. Consumers, channel kinds, sink names and the acknowledgement
+     * granularity are NOT here — they are the core's answer.
      */
     @Nonnull
-    public static Map<String, Object> forUnbounded(
+    public static Map<String, Object> forClass(
             @Nonnull String factoryId,
-            @Nonnull ClassFacts facts,
+            @Nonnull Operator settings,
             @Nonnull List<ChannelEntry> channels,
             @Nonnull List<TaskletEntry> tasklets,
             @Nonnull int[] capacities) {
         Map<String, Object> decl = base(factoryId);
-        if (facts.persistent()) {
-            decl.put("persistent", true);
+        if (!settings.description().isEmpty()) {
+            decl.put("description", settings.description());
         }
-        if (facts.sleepWhenIdle()) {
-            decl.put("sleep_when_idle", true);
-        }
-        if (facts.effectivelyOnce()) {
-            decl.put("effectively_once", true);
-        }
-        // Every checkpoint knob rides raw; the core derives the granularity
-        // from them, which is the rule six per-SDK helpers each carried.
-        if (facts.checkpointAck()) {
-            decl.put("checkpoint_ack", true);
-        }
-        if (facts.checkpointEvery() != null) {
-            decl.put("checkpoint_every", facts.checkpointEvery());
-        }
-        if (facts.checkpointMaxDelayMs() != null) {
-            decl.put("checkpoint_outputs", "at_checkpoint");
-            decl.put("checkpoint_max_delay_ms", facts.checkpointMaxDelayMs());
-        }
-        if (facts.correctionWindowMs() != null) {
-            decl.put("correction_window_ms", facts.correctionWindowMs());
-            decl.put("beyond_window_policy", facts.beyondWindowPolicy().wireName());
-        }
+        settings.maxDuration().ifPresent(d -> decl.put("max_duration_ms", d.toMillis()));
+        decl.put("run", runJson(settings.run()));
+        decl.put("durable", durableJson(settings.durable()));
         long compactAfterBytes = tasklets.stream()
                 .mapToLong(p -> p.model.compactAfterBytes())
                 .min()
@@ -143,38 +119,59 @@ public final class HostClassDeclaration {
         }
     }
 
-    /**
-     * The record a bounded class submits: the {@link #forUnbounded} record its
-     * {@code channels} told the builder, every tier, checkpoint and correction
-     * key included, plus the class's own durability and the {@code bounded}
-     * block. The core judges a record carrying that block on a bounded operator's
-     * settings and refuses an unbounded-only one by its own name.
-     */
-    @Nonnull
-    public static Map<String, Object> forBounded(
-            @Nonnull Map<String, Object> builderRecord, @Nonnull BoundedOperator probe) {
-        Map<String, Object> decl = new LinkedHashMap<>(builderRecord);
-        if (probe.syncDurability()) {
-            decl.put("sync_durability", true);
-        }
+    /** {@code run} as the tree's JSON: {@code {"flow":{"exactly":...}}} or {@code {"steps":{...}}}. */
+    private static Map<String, Object> runJson(Operator.Run run) {
+        return switch (run) {
+            case Operator.Run.Flow flow -> Map.of("flow", Map.of("exactly", exactlyJson(flow.exactly())));
+            case Operator.Run.Steps steps -> Map.of(
+                    "steps",
+                    Map.of(
+                            "each", steps.each().name().toLowerCase(Locale.ROOT),
+                            "on_failure", steps.onFailure().name().toLowerCase(Locale.ROOT)));
+        };
+    }
 
-        Map<String, Object> bounded = new LinkedHashMap<>();
-        bounded.put(
-                "loop_mode",
-                switch (probe.loopMode()) {
-                    case ONCE -> "once";
-                    case PER_INPUT -> "per_input";
-                    case CHAINED -> "chained";
-                });
-        bounded.put(
-                "rollback_mode",
-                switch (probe.rollbackMode()) {
-                    case ALL_OR_NOTHING -> "all_or_nothing";
-                    case KEEP_PROGRESS -> "keep_progress";
-                });
-        probe.maxDuration().ifPresent(d -> bounded.put("max_duration_ms", d.toMillis()));
-        decl.put("bounded", bounded);
-        return decl;
+    private static Object exactlyJson(Operator.Exactly exactly) {
+        if (!(exactly instanceof Operator.Exactly.EffectivelyOnce tier)) {
+            return "at_least_once";
+        }
+        Map<String, Object> members = new LinkedHashMap<>();
+        members.put("ack", ackJson(tier.ack()));
+        tier.correctionMs().ifPresent(ms -> members.put("correction_ms", ms));
+        members.put("beyond_window", tier.beyondWindow().name().toLowerCase(Locale.ROOT));
+        return Map.of("effectively_once", members);
+    }
+
+    private static Object ackJson(Operator.Ack ack) {
+        if (!(ack instanceof Operator.Ack.Checkpoint checkpoint)) {
+            return "per_input";
+        }
+        Map<String, Object> members = new LinkedHashMap<>();
+        checkpoint.every().ifPresent(n -> members.put("every", n));
+        checkpoint.maxDelayMs().ifPresent(ms -> members.put("max_delay_ms", ms));
+        members.put("outputs", checkpoint.outputs().name().toLowerCase(Locale.ROOT));
+        return Map.of("checkpoint", members);
+    }
+
+    /**
+     * {@code durable} as the tree's JSON: {@code false}, or the level with its {@code sleep_after};
+     * the run's default leaves {@code sleep_after} out.
+     */
+    private static Object durableJson(Operator.Durable durable) {
+        return switch (durable) {
+            case Operator.Durable.Memory ignored -> false;
+            case Operator.Durable.Local local -> level("local", local.sleepAfter());
+            case Operator.Durable.Remote remote -> level("remote", remote.sleepAfter());
+        };
+    }
+
+    private static Object level(String name, Operator.Durable.SleepAfter sleepAfter) {
+        return switch (sleepAfter) {
+            case Operator.Durable.SleepAfter.RunDefault ignored -> name;
+            case Operator.Durable.SleepAfter.Never ignored -> Map.of(name, Map.of("sleep_after", false));
+            case Operator.Durable.SleepAfter.After after -> Map.of(
+                    name, Map.of("sleep_after", after.interval().toMillis()));
+        };
     }
 
     private static Map<String, Object> base(String factoryId) {

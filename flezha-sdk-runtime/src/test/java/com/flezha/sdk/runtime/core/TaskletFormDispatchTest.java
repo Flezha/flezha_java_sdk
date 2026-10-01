@@ -2,8 +2,8 @@ package com.flezha.sdk.runtime.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
 import com.flezha.sdk.runtime.operator.TaskletDescriptor;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -21,7 +21,7 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("One run emits any number of values through the context; A Java tasklet that emits nothing")
     void oneRunEmitsAnyNumberOfValuesThroughTheContext() {
-        UnboundedOperatorClassRegistry.registerClass(EmitManyOperator.class);
+        OperatorClassRegistry.registerClass(EmitManyOperator.class);
 
         ItemEffect two = soleEffect(work("emit_many", 0, Optional.empty(), 0, input(0, "two", 1)));
         ItemEffect none = soleEffect(work("emit_many", 0, Optional.empty(), 1, input(0, "none", 2)));
@@ -35,13 +35,12 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("A Void state keeps nothing, and a Void output declares no output channel")
     void aVoidStateKeepsNothing() {
-        UnboundedOperatorClassRegistry.registerClass(StaticOperator.class);
+        OperatorClassRegistry.registerClass(StaticOperator.class);
         ItemEffect effect = soleEffect(work("static_op", 0, Optional.of("a"), 0, input(0, "a:1", 1)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.Ok.class);
         assertThat(effect.changes()).isEmpty();
-        TaskletDescriptor desc =
-                UnboundedOperatorClassRegistry.getTopology("static_op").tasklet(0);
+        TaskletDescriptor desc = OperatorClassRegistry.getTopology("static_op").tasklet(0);
         assertThat(desc.model().stateless()).isTrue();
         assertThat(desc.outputChannelId()).isEqualTo(OptionalInt.empty());
     }
@@ -49,7 +48,7 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("a Void-state tasklet that records a change fails its input, recording nothing")
     void aVoidStateChangeIsRefused() {
-        UnboundedOperatorClassRegistry.registerClass(VoidChangeOperator.class);
+        OperatorClassRegistry.registerClass(VoidChangeOperator.class);
         ItemEffect effect = soleEffect(work("void_change", 0, Optional.empty(), 0, input(0, "x", 1)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
@@ -59,7 +58,7 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("A change is applied and recorded")
     void aChangeIsAppliedAndRecorded() {
-        UnboundedOperatorClassRegistry.registerClass(CounterOperator.class);
+        OperatorClassRegistry.registerClass(CounterOperator.class);
         ItemEffect effect = soleEffect(work("counter_op", 0, Optional.empty(), 0, input(0, "a", 1)));
 
         assertThat(effect.changes()).hasSize(1);
@@ -69,7 +68,7 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("A restart folds the log through applyTo, in seq order, back to the state before it")
     void aRestartFoldsTheLogThroughApplyTo() {
-        UnboundedOperatorClassRegistry.registerClass(CounterOperator.class);
+        OperatorClassRegistry.registerClass(CounterOperator.class);
         List<byte[]> log = new java.util.ArrayList<>();
         for (int seq = 0; seq < 3; seq++) {
             log.addAll(soleEffect(work("counter_op", 0, Optional.empty(), seq, input(0, "a", seq)))
@@ -94,15 +93,13 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("Static-mode Tasklet creates one cell per key, each with its own instance")
     void staticModeTaskletCreatesOneCellPerKey() {
-        UnboundedOperatorClassRegistry.registerClass(StaticOperator.class);
-        TaskletDescriptor desc =
-                UnboundedOperatorClassRegistry.getTopology("static_op").tasklet(0);
+        OperatorClassRegistry.registerClass(StaticOperator.class);
+        TaskletDescriptor desc = OperatorClassRegistry.getTopology("static_op").tasklet(0);
         assertThat(desc.cellKeys()).containsExactly("a", "b");
         @SuppressWarnings("unchecked")
-        Map<String, Object> declared = ((List<Map<String, Object>>)
-                        UnboundedOperatorClassRegistry.getTopology("static_op")
-                                .declaration()
-                                .get("tasklets"))
+        Map<String, Object> declared = ((List<Map<String, Object>>) OperatorClassRegistry.getTopology("static_op")
+                        .declaration()
+                        .get("tasklets"))
                 .get(0);
         assertThat(declared).containsEntry("cell_mode", "static").containsEntry("cell_keys", List.of("a", "b"));
 
@@ -116,9 +113,8 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("Logical clock re-arms on restore: ctx.now() serves the seq the core hands the invocation")
     void logicalClockReArmsOnRestore() {
-        UnboundedOperatorClassRegistry.registerClass(LogicalOperator.class);
-        TaskletDescriptor desc =
-                UnboundedOperatorClassRegistry.getTopology("logical_op").tasklet(0);
+        OperatorClassRegistry.registerClass(LogicalOperator.class);
+        TaskletDescriptor desc = OperatorClassRegistry.getTopology("logical_op").tasklet(0);
         assertThat(desc.clock().wireName()).isEqualTo("logical");
 
         outcome(command(

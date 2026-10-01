@@ -24,10 +24,9 @@
 # covered when its title, reduced to lower-case letters and digits, appears
 # inside the same reduction of a test's `@DisplayName`, its method name, or its
 # class name — the three spellings `java-sdk-testing` itself names. Reduction
-# means punctuation, case and word breaks do not matter, so `checkpointAck
-# without the tier is refused` covers "checkpointAck() without the tier is
-# refused". The scenario must appear in full: a test that names half of one has
-# not named it.
+# means punctuation, case and word breaks do not matter, so `retryMax zero
+# is refused` covers "retryMax(0) is refused". The scenario must appear in
+# full: a test that names half of one has not named it.
 #
 # THE BASELINE, scripts/java-spec-coverage-baseline.txt, lists the scenarios
 # that had no such test when the gate landed. They are the debt, written down

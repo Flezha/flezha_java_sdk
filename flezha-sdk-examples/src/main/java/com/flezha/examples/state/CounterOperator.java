@@ -1,7 +1,7 @@
 package com.flezha.examples.state;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 import javax.annotation.Nonnull;
 
 /**
@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
  * <p>No key is declared, so every message is routed to a single cell and there is one count for
  * the whole operator. The {@code keyed} example covers partitioning into one cell per key.
  */
-public final class CounterOperator implements UnboundedOperator {
+public final class CounterOperator implements Operator {
 
     @Override
     @Nonnull

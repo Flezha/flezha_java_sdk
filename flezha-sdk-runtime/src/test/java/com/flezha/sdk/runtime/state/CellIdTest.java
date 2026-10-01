@@ -14,9 +14,9 @@ class CellIdTest {
     @Test
     @DisplayName("encodedBytes matches the controller framing: [rc_len][rc][sh_len][sh][pk_len:u16 BE][pk]")
     void encodedBytesMatchesControllerFraming() {
-        byte[] id = new CellId("MarketUnboundedOperator", "OhlcTasklet", "M1").encodedBytes();
+        byte[] id = new CellId("MarketFlowOperatorClass", "OhlcTasklet", "M1").encodedBytes();
         assertThat(id[0]).isEqualTo((byte) 23);
-        assertThat(new String(id, 1, 23, StandardCharsets.UTF_8)).isEqualTo("MarketUnboundedOperator");
+        assertThat(new String(id, 1, 23, StandardCharsets.UTF_8)).isEqualTo("MarketFlowOperatorClass");
         assertThat(id[24]).isEqualTo((byte) 11);
         assertThat(new String(id, 25, 11, StandardCharsets.UTF_8)).isEqualTo("OhlcTasklet");
         ByteBuffer pk = ByteBuffer.wrap(id, 36, 4).order(ByteOrder.BIG_ENDIAN);

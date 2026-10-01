@@ -12,14 +12,12 @@ import com.flezha.sdk.channel.OutputChain;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.Stream;
 import com.flezha.sdk.operator.Operator;
-import com.flezha.sdk.operator.UnboundedOperator;
-import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.runtime.core.DerivedDeclaration;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.operator.ChannelDescriptor;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
-import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
+import com.flezha.sdk.runtime.operator.OperatorTopology;
+import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder;
+import com.flezha.sdk.tasklet.Tasklet;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -61,10 +59,10 @@ import java.util.function.Consumer;
  * producer-side links ({@code named}, {@code sink}, {@code keyed},
  * {@code branch}) live on {@link Stream} and an entry channel's handle is an
  * {@link EdgeStream}, so a row applying one to an entry channel has no Java
- * spelling; and an unbounded class has no {@code syncDurability} knob at all — it
- * is a bounded declaration here, which is why only
- * {@code HostClassDeclaration.forBounded} writes the key. The fixture's
- * {@code needs} column names both.
+ * spelling; and a settings tree with a setting under the wrong parent is a
+ * type error here, proven by the compile-fail fixtures under
+ * {@code flezha-sdk-api/src/test/resources/compile_fail/} instead
+ * ({@link #COMPILE_FAIL}). The fixture's {@code needs} column names both.
  */
 public final class ConformanceRun {
 
@@ -77,7 +75,10 @@ public final class ConformanceRun {
      * BY NAME, which is what makes the skip checkable.
      */
     private static final List<String> SURFACES =
-            List.of("merge", "branch", "bounded", "shorthand", "shorthand_typed_output", "response", "call");
+            List.of("merge", "branch", "steps", "shorthand", "shorthand_typed_output", "response", "call");
+
+    /** Where the compile-fail fixtures live, relative to the repository root. */
+    private static final String COMPILE_FAIL = "sdk/java/flezha-sdk-api/src/test/resources/compile_fail/";
 
     /** The capacity a row declared per role, read as the tasklet is minted. */
     private static final Map<String, Integer> MAILBOX = new HashMap<>();
@@ -90,18 +91,15 @@ public final class ConformanceRun {
     /** A row of the four-column refusal table. */
     private record Row(String topology, String steps, String needs) {
 
-        /** Whether the row declares a bounded class, which only the bounded kind can write. */
-        boolean bounded() {
-            return declares("class.bounded");
-        }
-
-        boolean declares(String classStep) {
+        /** The JSON a {@code class.<setting>(<tree>)} step writes, or {@code null} when none does. */
+        String classSetting(String setting) {
             for (String step : steps.split(";")) {
-                if (step.trim().equals(classStep)) {
-                    return true;
+                String trimmed = step.trim();
+                if (trimmed.startsWith("class." + setting + "(")) {
+                    return trimmed.substring(trimmed.indexOf('(') + 1, trimmed.lastIndexOf(')'));
                 }
             }
-            return false;
+            return null;
         }
     }
 
@@ -154,8 +152,8 @@ public final class ConformanceRun {
     // -----------------------------------------------------------------------
     // The interpreter.
 
-    /** The class a row declares, of either kind: the steps are read at {@code channels()} time. */
-    private abstract static class RowOperator implements Operator {
+    /** The class a row declares: the row's graph under the settings tree its class steps wrote. */
+    public static final class RowOperator implements Operator {
 
         @Override
         public String factoryId() {
@@ -163,34 +161,20 @@ public final class ConformanceRun {
         }
 
         @Override
+        public Run run() {
+            String tree = current.classSetting("run");
+            return tree == null ? Run.flow() : SettingsTreeJson.run(tree);
+        }
+
+        @Override
+        public Durable durable() {
+            String tree = current.classSetting("durable");
+            return tree == null ? Durable.local() : SettingsTreeJson.durable(tree);
+        }
+
+        @Override
         public void channels(ChannelBuilder c) {
             interpret(c, current.steps());
-        }
-    }
-
-    /** The class a row declares on the unbounded kind; its two class switches are the row's. */
-    public static final class RowUnboundedOperator extends RowOperator implements UnboundedOperator {
-        @Override
-        public boolean persistenceEnabled() {
-            return current.declares("class.persistent");
-        }
-
-        @Override
-        public boolean sleepWhenIdle() {
-            return current.declares("class.sleep_when_idle");
-        }
-    }
-
-    /** The class a {@code class.bounded} row declares: the same steps, on the bounded kind. */
-    public static final class RowBoundedOperator extends RowOperator implements BoundedOperator {
-        @Override
-        public boolean persistenceEnabled() {
-            return current.declares("class.persistent");
-        }
-
-        @Override
-        public boolean sleepWhenIdle() {
-            return current.declares("class.sleep_when_idle") || persistenceEnabled();
         }
     }
 
@@ -214,13 +198,13 @@ public final class ConformanceRun {
         }
     }
 
-    /** {@code <handle>.<link>…} — a chain, a channel knob, or a class flag. */
+    /** {@code <handle>.<link>…} — a chain, a channel knob, or a class setting. */
     private static void dotted(ChannelBuilder c, Map<String, EdgeStream<String>> handles, String step) {
         int dot = step.indexOf('.');
         String head = step.substring(0, dot);
         String rest = step.substring(dot + 1);
         if (head.equals("class")) {
-            classFlag(c, rest);
+            // Read by RowOperator's run() and durable().
             return;
         }
         List<String> links = new ArrayList<>(List.of(rest.split("\\.")));
@@ -355,28 +339,6 @@ public final class ConformanceRun {
         producer.branch(arms);
     }
 
-    /**
-     * {@code class.<flag>[(<value>)]} — the facts the class declares on the
-     * builder. {@code persistent} and {@code sleep_when_idle} are the row
-     * classes' switches; {@code bounded} is the kind of the class the row is
-     * declared on, {@link RowBoundedOperator}; {@code sync_durability} is a
-     * declaration an unbounded class does not carry, and every row needing it is
-     * skipped before it reaches here.
-     */
-    private static void classFlag(ChannelBuilder c, String rest) {
-        String[] call = splitCall(rest);
-        switch (call[0]) {
-            case "persistent", "sleep_when_idle", "bounded" -> {}
-            case "effectively_once" -> c.effectivelyOnce();
-            case "checkpoint_ack" -> c.checkpointAck();
-            case "checkpoint_every" -> c.checkpointEvery(Integer.parseInt(call[1]));
-            case "correction_window" -> c.correctionWindow(Long.parseLong(call[1]));
-            case "outputs_at_checkpoint" -> c.outputsAtCheckpoint(Long.parseLong(call[1]));
-            default -> throw new IllegalStateException(
-                    "the fixture spells a class flag this interpreter does not map: " + call[0]);
-        }
-    }
-
     private static OverflowPolicy overflow(String policy) {
         return switch (policy) {
             case "drop_nothing" -> OverflowPolicy.DROP_NOTHING;
@@ -440,28 +402,47 @@ public final class ConformanceRun {
      * The two twins the fixture cites rather than re-spells: this app's own
      * fixtures, which is what the seven-column table states.
      */
-    private static UnboundedOperatorTopology cited(String topology) {
+    private static OperatorTopology cited(String topology) {
         return switch (topology) {
-            case "hybrid_channel" -> UnboundedOperatorTopologyBuilder.build(new HybridChannelUnboundedOperator());
-            case "commit_block_chain" -> UnboundedOperatorTopologyBuilder.build(new TierCommitBlockBoundedOperator());
+            case "hybrid_channel" -> OperatorTopologyBuilder.build(new HybridChannelOperator());
+            case "commit_block_chain" -> OperatorTopologyBuilder.build(new TierCommitBlockOperator());
             default -> throw new IllegalStateException(
                     "the fixture cites a topology this app does not declare: " + topology);
         };
     }
 
-    private static UnboundedOperatorTopology topologyOf(Row row) {
+    private static OperatorTopology topologyOf(Row row) {
         if (row.steps().equals("cited above")) {
             return cited(row.topology());
         }
         load(row);
-        return UnboundedOperatorTopologyBuilder.build(
-                row.bounded() ? new RowBoundedOperator() : new RowUnboundedOperator());
+        return OperatorTopologyBuilder.build(new RowOperator());
+    }
+
+    /**
+     * A settings tree with a setting under the wrong parent is a type error in this SDK: the row
+     * is answered by the refusal it would earn elsewhere and the compile-fail fixture that pins it
+     * here, whose text carries that name. {@code null} for every other row.
+     */
+    private static String[] typedRefusal(Row row) {
+        if (!row.needs().equals("untyped_tree")) {
+            return null;
+        }
+        String name = row.topology().equals("kind_literal") ? "topology.invalid_setting" : "topology.unknown_field";
+        return new String[] {name, COMPILE_FAIL + row.topology() + ".java"};
     }
 
     /** One row's verdict, in the report's shape. */
     private static ObjectNode judge(ObjectMapper json, Row row) {
         ObjectNode entry = json.createObjectNode();
         entry.put("topology", row.topology());
+        String[] typed = typedRefusal(row);
+        if (typed != null) {
+            entry.put("outcome", "cited");
+            entry.putArray("names").add(typed[0]);
+            entry.put("citation", typed[1]);
+            return entry;
+        }
         if (!row.needs().equals("-") && !SURFACES.contains(row.needs())) {
             entry.put("outcome", "skipped");
             entry.put("needs", row.needs());
@@ -472,7 +453,7 @@ public final class ConformanceRun {
             return judgeShorthand(json, entry, shorthand);
         }
         try {
-            UnboundedOperatorTopology topology = topologyOf(row);
+            OperatorTopology topology = topologyOf(row);
             entry.put("outcome", "accepted");
             entry.set("derived", derived(json, topology));
         } catch (FlezhaException refusal) {
@@ -486,7 +467,7 @@ public final class ConformanceRun {
     /**
      * A {@code shorthand(<id>|-, <sink>|-, <input>|-)} step. {@code -} is a field the row leaves
      * unwritten; {@code .noout} marks a body declaring no output, and {@code .topology} a class that
-     * also implements an operator interface.
+     * also implements the operator interface.
      */
     private record Shorthand(boolean hasSink, boolean noout, boolean topology) {
 
@@ -551,8 +532,8 @@ public final class ConformanceRun {
      */
     private static void drive(FlezhaRunner runner, List<Shorthand> declarations) {
         if (declarations.size() > 1) {
-            runner.registerFactory(ShorthandDupUnbounded.class);
-            runner.registerFactory(ShorthandDupBounded.class);
+            runner.registerFactory(ShorthandDupFlow.class);
+            runner.registerFactory(ShorthandDupSteps.class);
         } else {
             runner.registerFactory(declarations.get(0).declared());
         }
@@ -562,7 +543,7 @@ public final class ConformanceRun {
      * The derived declaration, in the columns the fixture's seven-column table
      * states: what the core answered, as the topology materialised it.
      */
-    private static ArrayNode derived(ObjectMapper json, UnboundedOperatorTopology topology) {
+    private static ArrayNode derived(ObjectMapper json, OperatorTopology topology) {
         ArrayNode channels = json.createArrayNode();
         DerivedDeclaration answer = HostClassDeclaration.check(topology.declaration());
         for (int index = 0; index < topology.channels().size(); index++) {
@@ -628,6 +609,11 @@ public final class ConformanceRun {
                 .findFirst()
                 .orElseThrow(() -> new IOException(FIXTURE + " has no row `" + topology + "`"));
 
+        String[] typed = typedRefusal(row);
+        if (typed != null) {
+            System.err.println(topology + ": " + typed[0] + " is a compile error here; pinned by " + typed[1]);
+            System.exit(1);
+        }
         if (!row.needs().equals("-") && !SURFACES.contains(row.needs())) {
             System.err.println(topology + ": this SDK's builder carries no `" + row.needs()
                     + "`, so the row is skipped and nothing is registered");
@@ -650,7 +636,7 @@ public final class ConformanceRun {
         }
         load(row);
         try {
-            runner.registerFactory(row.bounded() ? RowBoundedOperator.class : RowUnboundedOperator.class);
+            runner.registerFactory(RowOperator.class);
         } catch (FlezhaException refusal) {
             System.err.println(
                     topology + ": " + refusal.getMessage() + "; issues: " + String.join(", ", refusal.issueCodes()));

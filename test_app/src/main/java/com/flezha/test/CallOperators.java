@@ -1,9 +1,8 @@
 package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.operator.LoopMode;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -13,14 +12,14 @@ import java.util.Optional;
 /**
  * The {@code call_response} fixtures, the Java mirror of the Rust test app's: operators an outside
  * caller calls and whose graph answers it through {@code response()} — from the first tasklet, from
- * a downstream one, from whichever of two filtered paths the input took, and from a durable bounded
+ * a downstream one, from whichever of two filtered paths the input took, and from a durable steps
  * turn.
  */
 public final class CallOperators {
 
     private CallOperators() {}
 
-    public static final class CallEcho implements UnboundedOperator {
+    public static final class CallEcho implements Operator {
         @Override
         public String factoryId() {
             return "call_echo";
@@ -32,7 +31,7 @@ public final class CallOperators {
         }
     }
 
-    public static final class CallDownstream implements UnboundedOperator {
+    public static final class CallDownstream implements Operator {
         @Override
         public String factoryId() {
             return "call_downstream";
@@ -45,7 +44,7 @@ public final class CallOperators {
     }
 
     /** An input starting {@code no} takes the refused path, every other the accepted one. */
-    public static final class CallSplit implements UnboundedOperator {
+    public static final class CallSplit implements Operator {
         @Override
         public String factoryId() {
             return "call_split";
@@ -59,15 +58,20 @@ public final class CallOperators {
         }
     }
 
-    public static final class CallTurn implements BoundedOperator {
+    public static final class CallTurn implements Operator {
         @Override
         public String factoryId() {
             return "call_turn";
         }
 
         @Override
-        public LoopMode loopMode() {
-            return LoopMode.PER_INPUT;
+        public Run run() {
+            return Run.steps(Each.PER_INPUT);
+        }
+
+        @Override
+        public Durable durable() {
+            return TestEnv.fixtureDurable();
         }
 
         @Override

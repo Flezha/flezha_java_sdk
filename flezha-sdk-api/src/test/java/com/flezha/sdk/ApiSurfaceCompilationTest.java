@@ -35,11 +35,8 @@ class ApiSurfaceCompilationTest {
     @ParameterizedTest(name = "{0} does not resolve")
     @ValueSource(
             strings = {
-                "com.flezha.sdk.UnboundedOperatorHandler",
                 "com.flezha.sdk.FactoryRegistry",
                 "com.flezha.sdk.RunnerBuilder",
-                "com.flezha.sdk.operator.UnboundedOperatorRegistry",
-                "com.flezha.sdk.operator.BoundedOperatorRegistry",
             })
     void deletedTypesDoNotResolve(String type) {
         Compilation result = compile(usesImport(type));
@@ -51,40 +48,63 @@ class ApiSurfaceCompilationTest {
     }
 
     @Test
-    @DisplayName("the bounded kind is not in a package of its own: com.flezha.sdk.bounded does not resolve")
-    void theBoundedKindIsNotInAPackageOfItsOwn() {
-        for (String type : List.of(
-                "com.flezha.sdk.bounded.BoundedOperator",
-                "com.flezha.sdk.bounded.BoundedOperatorConfigurationException",
-                "com.flezha.sdk.bounded.LoopMode",
-                "com.flezha.sdk.bounded.RollbackMode")) {
-            assertDoesNotCompile(usesImport(type));
-        }
-    }
-
-    @Test
-    @DisplayName("both kinds and the base share one package, the bounded supporting types with them")
-    void bothKindsAndTheBaseShareOnePackage() {
+    @DisplayName("the one base and its settings tree resolve from one package")
+    void theOneBaseAndItsTreeShareOnePackage() {
         assertThat(
                         compiles(
                                 """
                         package nowhere;
-                        import com.flezha.sdk.operator.LoopMode;
                         import com.flezha.sdk.operator.Operator;
-                        import com.flezha.sdk.operator.RollbackMode;
-                        import com.flezha.sdk.operator.UnboundedOperator;
-                        import com.flezha.sdk.operator.BoundedOperator;
+                        import java.time.Duration;
                         public final class UsesLegacyApi {
-                            // Both kinds are the base, so one return type holds either.
-                            Operator eitherKind(UnboundedOperator s, BoundedOperator w, boolean b) {
-                                return b ? s : w;
-                            }
-
-                            LoopMode loop;
-                            RollbackMode rollback;
+                            Operator.Run steps = new Operator.Run.Steps(
+                                    Operator.Each.CHAINED, Operator.OnFailure.KEEP_PROGRESS);
+                            Operator.Run flow = new Operator.Run.Flow(new Operator.Exactly.EffectivelyOnce()
+                                    .withAck(new Operator.Ack.Checkpoint().withEvery(500))
+                                    .withCorrectionMs(60_000));
+                            Operator.Durable durable = new Operator.Durable.Local(Duration.ofMinutes(10));
                         }
                         """))
-                .as("the base, both kinds and the bounded supporting types resolve from one package")
+                .as("the base and every node of the tree resolve from com.flezha.sdk.operator")
+                .isTrue();
+    }
+
+    /** The misplaced-setting rows of {@code test/fixtures/reference_topologies.txt}, one fixture each. */
+    @ParameterizedTest(name = "{0} does not compile")
+    @ValueSource(
+            strings = {
+                "each_under_flow",
+                "ack_under_at_least_once",
+                "ack_under_steps",
+                "correction_under_steps",
+                "exactly_under_steps",
+                "sleep_after_in_memory",
+                "kind_literal",
+            })
+    void aSettingUnderTheWrongParentDoesNotCompile(String row) throws IOException {
+        String source = Files.readString(Path.of("src/test/resources/compile_fail", row + ".java"));
+        String refusal = row.equals("kind_literal") ? "topology.invalid_setting" : "topology.unknown_field";
+
+        assertThat(source)
+                .as("the fixture names the refusal the row earns elsewhere")
+                .startsWith("// " + refusal + ":");
+        assertThat(compile(source).ok()).as("the fixture:\n" + source).isFalse();
+    }
+
+    @Test
+    @DisplayName("the compile-fail fixtures' class compiles with its settings in their place")
+    void theFixtureClassCompilesWithItsSettingsInPlace() {
+        assertThat(
+                        compiles(
+                                operatorWith(
+                                        "",
+                                        """
+                @Override public Run run() {
+                    return new Run.Flow(new Exactly.EffectivelyOnce().withAck(new Ack.Checkpoint()).withCorrectionMs(5_000));
+                }
+                @Override public Durable durable() { return new Durable.Local(java.time.Duration.ofSeconds(1)); }
+                """)))
+                .as("the control: only the misplaced setting decides a fixture's outcome")
                 .isTrue();
     }
 
@@ -106,37 +126,37 @@ class ApiSurfaceCompilationTest {
     void callingRemovedEgressMethodsFails() {
         // Control first: without it a classpath that resolved nothing would
         // make every refusal below vacuously true.
-        assertThat(compiles(usesUnbounded("s.sink(\"x\");")))
+        assertThat(compiles(usesStream("s.sink(\"x\");")))
                 .as("the replacement spelling must compile — otherwise the refusals prove nothing")
                 .isTrue();
 
-        assertDoesNotCompile(usesUnbounded("s.output(\"x\");"));
-        assertDoesNotCompile(usesUnbounded("s.output(\"x\", v -> v.getBytes());"));
-        assertDoesNotCompile(usesUnbounded("s.alsoOutput(\"x\");"));
-        assertDoesNotCompile(usesUnbounded("s.alsoOutput(\"x\", v -> v.getBytes());"));
+        assertDoesNotCompile(usesStream("s.output(\"x\");"));
+        assertDoesNotCompile(usesStream("s.output(\"x\", v -> v.getBytes());"));
+        assertDoesNotCompile(usesStream("s.alsoOutput(\"x\");"));
+        assertDoesNotCompile(usesStream("s.alsoOutput(\"x\", v -> v.getBytes());"));
     }
 
     @Test
     @DisplayName("The retry knobs are gone from the interface")
     void theRetryKnobsAreGoneFromTheInterface() {
-        assertThat(compiles(boundedWith("c.input(String.class, \"in\").retryMax(2).retryBackoffMs(20);", "")))
+        assertThat(compiles(operatorWith("c.input(String.class, \"in\").retryMax(2).retryBackoffMs(20);", "")))
                 .as("the edge's retry declaration must compile, or the refusals prove nothing")
                 .isTrue();
 
-        assertDoesNotCompile(boundedWith("", "@Override public int retryAttempts() { return 1; }"));
-        assertDoesNotCompile(boundedWith("", "@Override public java.time.Duration retryBackoff() { return null; }"));
-        assertDoesNotCompile(boundedWith("", "@Override public int barrierRetryAttempts() { return 1; }"));
+        assertDoesNotCompile(operatorWith("", "@Override public int retryAttempts() { return 1; }"));
+        assertDoesNotCompile(operatorWith("", "@Override public java.time.Duration retryBackoff() { return null; }"));
+        assertDoesNotCompile(operatorWith("", "@Override public int barrierRetryAttempts() { return 1; }"));
     }
 
     @Test
-    @DisplayName("a bounded graph written in a body named tasklets does not compile: channels is abstract on the base")
-    void aBoundedBodyNamedTaskletsDoesNotCompile() {
+    @DisplayName("a graph written in a body named tasklets does not compile: channels is abstract on the base")
+    void aBodyNamedTaskletsDoesNotCompile() {
         assertDoesNotCompile(
                 """
                 package nowhere;
                 import com.flezha.sdk.channel.ChannelBuilder;
-                import com.flezha.sdk.operator.BoundedOperator;
-                public final class UsesLegacyApi implements BoundedOperator {
+                import com.flezha.sdk.operator.Operator;
+                public final class UsesLegacyApi implements Operator {
                     @Override public String factoryId() { return "legacy"; }
                     public void tasklets(ChannelBuilder c) {}
                 }
@@ -159,17 +179,17 @@ class ApiSurfaceCompilationTest {
             }
         }
         assertThat(found)
-                .as("a bounded operator is a graph committed stage by stage")
+                .as("an operator that runs in steps is a graph committed stage by stage")
                 .isEmpty();
     }
 
-    /** A bounded class whose graph body is {@code graph} and whose remaining members are {@code members}. */
-    private static String boundedWith(String graph, String members) {
+    /** An operator class whose graph body is {@code graph} and whose remaining members are {@code members}. */
+    private static String operatorWith(String graph, String members) {
         return """
                 package nowhere;
                 import com.flezha.sdk.channel.ChannelBuilder;
-                import com.flezha.sdk.operator.BoundedOperator;
-                public final class UsesLegacyApi implements BoundedOperator {
+                import com.flezha.sdk.operator.Operator;
+                public final class UsesLegacyApi implements Operator {
                     @Override public String factoryId() { return "legacy"; }
                     @Override public void channels(ChannelBuilder c) { %s }
                     %s
@@ -189,7 +209,7 @@ class ApiSurfaceCompilationTest {
     }
 
     /** One `Stream<String>` in scope, `body` the only thing under test. */
-    private static String usesUnbounded(String body) {
+    private static String usesStream(String body) {
         return """
                 package nowhere;
                 import com.flezha.sdk.channel.Stream;

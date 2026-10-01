@@ -1,7 +1,7 @@
 package com.flezha.examples.echo;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 import javax.annotation.Nonnull;
 
 /**
@@ -12,7 +12,7 @@ import javax.annotation.Nonnull;
  * relocates when a host is withdrawn, and scales across several hosts. A tasklet is one stage
  * inside that graph.
  */
-public final class EchoOperator implements UnboundedOperator {
+public final class EchoOperator implements Operator {
 
     /**
      * The operator's stable identity, durable in the same way the tasklet's name is. The

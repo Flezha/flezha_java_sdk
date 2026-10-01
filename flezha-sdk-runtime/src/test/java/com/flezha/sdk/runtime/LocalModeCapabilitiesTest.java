@@ -9,7 +9,7 @@ import com.flezha.sdk.LocalOperator;
 import com.flezha.sdk.SinkOutput;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.OverflowPolicy;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.Ctx;
@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
  * passes end to end are not two different graphs.
  *
  * <p>The other ten capabilities in the vocabulary are the controller's: persistence,
- * effectively-once, correction, partitioning, bounded operators, liveness, restarts. Local mode refuses them
+ * effectively-once, correction, partitioning, steps operators, liveness, restarts. Local mode refuses them
  * by name rather than approximating them.
  *
  * <p>What each test can assert is what a run with no controller can see. A durable write reaches a
@@ -83,8 +83,7 @@ class LocalModeCapabilitiesTest {
         // the released value.
         declares("keyed_channels", "partition_relay");
 
-        List<SinkOutput> released =
-                release(PartitionRelayUnboundedOperator.class, "in", "input", List.of("a:1", "b:1", "a:2"));
+        List<SinkOutput> released = release(PartitionRelayOperator.class, "in", "input", List.of("a:1", "b:1", "a:2"));
 
         assertThat(payloads(released)).containsExactlyInAnyOrder("a:1", "b:1", "a:2");
         assertThat(payloadsOfKey(released, "a")).containsExactly("a:1", "a:2");
@@ -105,7 +104,7 @@ class LocalModeCapabilitiesTest {
         declares("dynamic_cell", "dynamic_cell");
 
         List<SinkOutput> released =
-                release(DynamicCellUnboundedOperator.class, "input", "kafka", List.of("a:1", "b:1", "drop", "a:2"));
+                release(DynamicCellOperator.class, "input", "kafka", List.of("a:1", "b:1", "drop", "a:2"));
 
         assertThat(payloads(released))
                 .as("the filter dropped `drop` before it was keyed, and every other value reached its Cell")
@@ -126,8 +125,8 @@ class LocalModeCapabilitiesTest {
         declares("retry_ladder", "bounded_mailbox_drop_nothing");
 
         List<String> inputs = IntStream.range(0, 24).mapToObj(at -> "n" + at).toList();
-        List<SinkOutput> released = release(
-                BoundedMailboxDropNothingUnboundedOperator.class, "drop_nothing_input", "drop_nothing_echo", inputs);
+        List<SinkOutput> released =
+                release(BoundedMailboxDropNothingOperator.class, "drop_nothing_input", "drop_nothing_echo", inputs);
 
         assertThat(payloads(released))
                 .as("the mailbox holds 4 and 24 were fed: under `drop_nothing` the feed waits, in order")
@@ -139,7 +138,7 @@ class LocalModeCapabilitiesTest {
     void aDeclaredTimerFiresLocallyWithItsScheduledTime() {
         declares("cell_timers", "session_timeout");
 
-        List<SinkOutput> released = release(SessionTimeoutUnboundedOperator.class, "input", "kafka", List.of("open"));
+        List<SinkOutput> released = release(SessionTimeoutOperator.class, "input", "kafka", List.of("open"));
 
         assertThat(payloads(released))
                 .as("the timer fired exactly once, carrying the timestamp it was scheduled for")
@@ -155,8 +154,8 @@ class LocalModeCapabilitiesTest {
         // instead of running the graph.
         declares("effectively_once", "tier_store");
 
-        FlezhaException refused = Refused.by(
-                "runtime.local_needs_controller", () -> LocalOperator.start(TierStoreUnboundedOperator.class));
+        FlezhaException refused =
+                Refused.by("runtime.local_needs_controller", () -> LocalOperator.start(TierStoreOperator.class));
         assertThat(refused.details()).containsEntry("capability", "effectively_once");
     }
 
@@ -165,7 +164,7 @@ class LocalModeCapabilitiesTest {
     void aLocalRunDropsEveryPart() {
         declares("parts", "part_echo");
 
-        List<SinkOutput> released = release(PartEchoUnboundedOperator.class, "in", "answer", List.of("3"));
+        List<SinkOutput> released = release(PartEchoOperator.class, "in", "answer", List.of("3"));
 
         assertThat(payloads(released)).containsExactly("done:3");
     }
@@ -174,7 +173,7 @@ class LocalModeCapabilitiesTest {
     @DisplayName("parts: the core refuses a part whose channel ends in no sink")
     void aPartWithNoSinkIsRefused() {
         PART_REFUSALS.clear();
-        for (Class<?> operator : List.of(PartToTaskletUnboundedOperator.class, PartToResponseUnboundedOperator.class)) {
+        for (Class<?> operator : List.of(PartToTaskletOperator.class, PartToResponseOperator.class)) {
             try (LocalOperator run = LocalOperator.start(operator)) {
                 run.feed("input", "x");
                 run.runUntilIdle(BUDGET);
@@ -251,7 +250,7 @@ class LocalModeCapabilitiesTest {
     }
 
     /** The test app's {@code SugarDoNothing} short form. */
-    @com.flezha.sdk.authoring.UnboundedOperator(id = "sugar_do_nothing", sink = "sugar_do_nothing_echo")
+    @com.flezha.sdk.authoring.Operator(id = "sugar_do_nothing", sink = "sugar_do_nothing_echo")
     public static final class SugarDoNothing extends EchoTasklet {}
 
     /** Releases the input under the key it resolves to, on the class's keyed sink. */
@@ -263,7 +262,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class PartitionRelayUnboundedOperator implements UnboundedOperator {
+    public static final class PartitionRelayOperator implements Operator {
         @Override
         public String factoryId() {
             return "partition_relay";
@@ -284,7 +283,7 @@ class LocalModeCapabilitiesTest {
     @Tasklet.Spec(name = "dynamic_cell_tasklet")
     public static final class DynamicCellTasklet extends EchoTasklet {}
 
-    public static final class DynamicCellUnboundedOperator implements UnboundedOperator {
+    public static final class DynamicCellOperator implements Operator {
         @Override
         public String factoryId() {
             return "dynamic_cell";
@@ -304,7 +303,7 @@ class LocalModeCapabilitiesTest {
     @Tasklet.Spec(name = "drop_nothing_test_tasklet", capacity = 4)
     public static final class DropNothingTasklet extends EchoTasklet {}
 
-    public static final class BoundedMailboxDropNothingUnboundedOperator implements UnboundedOperator {
+    public static final class BoundedMailboxDropNothingOperator implements Operator {
         @Override
         public String factoryId() {
             return "bounded_mailbox_drop_nothing";
@@ -337,7 +336,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class SessionTimeoutUnboundedOperator implements UnboundedOperator {
+    public static final class SessionTimeoutOperator implements Operator {
         @Override
         public String factoryId() {
             return "session_timeout";
@@ -361,7 +360,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class PartEchoUnboundedOperator implements UnboundedOperator {
+    public static final class PartEchoOperator implements Operator {
         @Override
         public String factoryId() {
             return "part_echo";
@@ -398,7 +397,7 @@ class LocalModeCapabilitiesTest {
         public void run(String input, Ctx<Void, String> ctx) {}
     }
 
-    public static final class PartToTaskletUnboundedOperator implements UnboundedOperator {
+    public static final class PartToTaskletOperator implements Operator {
         @Override
         public String factoryId() {
             return "part_to_tasklet";
@@ -410,7 +409,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class PartToResponseUnboundedOperator implements UnboundedOperator {
+    public static final class PartToResponseOperator implements Operator {
         @Override
         public String factoryId() {
             return "part_to_response";
@@ -448,15 +447,19 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class TierStoreUnboundedOperator implements UnboundedOperator {
+    public static final class TierStoreOperator implements Operator {
         @Override
         public String factoryId() {
             return "tier_store";
         }
 
         @Override
+        public Run run() {
+            return new Run.Flow(new Exactly.EffectivelyOnce());
+        }
+
+        @Override
         public void channels(ChannelBuilder c) {
-            c.effectivelyOnce();
             c.input(String.class, "input")
                     .onFull(OverflowPolicy.DROP_NOTHING)
                     .into(TierStoreTasklet.class)

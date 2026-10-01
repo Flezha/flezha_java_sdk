@@ -10,8 +10,8 @@ import java.util.function.Function;
 import javax.annotation.Nonnull;
 
 /**
- * Frozen runtime descriptor for one channel inside a {@link UnboundedOperatorTopology}.
- * Indexed by interned channel id (the position in {@link UnboundedOperatorTopology#channels}).
+ * Frozen runtime descriptor for one channel inside a {@link OperatorTopology}.
+ * Indexed by interned channel id (the position in {@link OperatorTopology#channels}).
  */
 public final class ChannelDescriptor {
 
@@ -84,7 +84,7 @@ public final class ChannelDescriptor {
 
     /**
      * The consuming tasklet ids, mappings stripped — what the graph-shape
-     * walk and the bounded operator DAG builder need.
+     * walk and the steps operator DAG builder need.
      */
     @Nonnull
     public List<Integer> consumerIds() {

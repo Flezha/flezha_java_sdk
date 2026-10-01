@@ -9,8 +9,8 @@ import javax.annotation.Nullable;
 /**
  * What an operator start takes, which is what {@code flz operator start}
  * takes: the factory that serves it, and optionally its id, the values it is
- * seeded with and the start options. The kind is the factory's, announced by
- * its runner.
+ * seeded with and the start options. How it runs is the class's, announced
+ * by its runner.
  *
  * <p>Instances are immutable; each setter answers a new spec, so a spec is
  * safe to keep and reuse.
@@ -31,7 +31,7 @@ public final class OperatorSpec {
     }
 
     /**
-     * An operator of {@code factoryId}, of the kind its runner announced,
+     * An operator of {@code factoryId}, running as its class declares,
      * under an id the controller generates unless {@link #id} names one.
      */
     @Nonnull

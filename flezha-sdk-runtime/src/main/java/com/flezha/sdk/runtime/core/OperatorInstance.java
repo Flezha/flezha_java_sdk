@@ -2,11 +2,10 @@ package com.flezha.sdk.runtime.core;
 
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.internal.RuntimeBridge;
-import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
 import com.flezha.sdk.runtime.operator.ChannelDescriptor;
+import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.OperatorTopology;
 import com.flezha.sdk.runtime.operator.TaskletDescriptor;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
 import com.flezha.sdk.runtime.state.CellId;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.runtime.state.PendingTimers;
@@ -40,7 +39,7 @@ public final class OperatorInstance {
     private final String operatorId;
     private final String factoryId;
 
-    final UnboundedOperatorTopology topology;
+    final OperatorTopology topology;
 
     /** Per-Tasklet routing instances — {@code cellsFor} / {@code eventTime} only. */
     @SuppressWarnings("rawtypes")
@@ -58,8 +57,8 @@ public final class OperatorInstance {
      */
     final KryoCodec edgeCodec = new KryoCodec(List.of(), false);
 
-    /** A bounded class, whose stages the core folds into the driver's collect sink instead of routing them. */
-    final boolean bounded;
+    /** A class that runs in steps, whose stages the core folds into the driver's collect sink instead of routing them. */
+    final boolean steps;
 
     private final CellRouting routing;
 
@@ -67,27 +66,23 @@ public final class OperatorInstance {
 
     private record CellAddress(int tasklet, String cellKey) {}
 
-    private OperatorInstance(String operatorId, String factoryId, UnboundedOperatorTopology topology, boolean bounded) {
+    private OperatorInstance(String operatorId, String factoryId, OperatorTopology topology) {
         this.operatorId = operatorId;
         this.factoryId = factoryId;
         this.topology = topology;
-        this.bounded = bounded;
+        this.steps = topology.steps();
         for (TaskletDescriptor desc : topology.tasklets()) {
             routers.add(instantiate(desc));
             codecs.add(desc.codec());
             timerPolicies.add(TimerPolicy.of(desc.model().maxTimersPerCell(), desc.name(), desc.clock()));
         }
-        this.routing = new CellRouting(topology, routers, edgeCodec, bounded);
+        this.routing = new CellRouting(topology, routers, edgeCodec, steps);
     }
 
     static OperatorInstance materialize(String operatorId, String factoryId) {
-        UnboundedOperatorTopology topology = UnboundedOperatorClassRegistry.getTopology(factoryId);
+        OperatorTopology topology = OperatorClassRegistry.getTopology(factoryId);
         if (topology != null) {
-            return new OperatorInstance(operatorId, factoryId, topology, false);
-        }
-        topology = BoundedOperatorClassRegistry.getTopology(factoryId);
-        if (topology != null) {
-            return new OperatorInstance(operatorId, factoryId, topology, true);
+            return new OperatorInstance(operatorId, factoryId, topology);
         }
         throw new IllegalStateException("unknown factory `" + factoryId + "` for operator `" + operatorId + "`");
     }

@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The tasklets of {@code failing_turn_loop_bounded}, mirroring the Rust test
+ * The tasklets of {@code failing_turn_loop_steps}, mirroring the Rust test
  * app's {@code Note} / {@code Answer}: {@code note} records each message and
  * its undo moves the latest one to {@code undone}; {@code answer} replies
  * {@code re:<message>}, and fails on {@code boom} always, on {@code boom-once}
@@ -82,7 +82,7 @@ public final class FailingTurnSteps {
         @Override
         public void run(String input, Ctx<Healed, String> ctx) throws TaskletException {
             boolean fails = "boom".equals(input)
-                    || ("boom-once".equals(input) && !BoundedE2eGate.released())
+                    || ("boom-once".equals(input) && !StepsE2eGate.released())
                     || ("boom-until-healed".equals(input) && !ctx.state().healed);
             if (fails) {
                 throw new TaskletException("answer refused " + input);

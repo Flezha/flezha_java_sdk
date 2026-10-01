@@ -6,10 +6,10 @@ import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.EntryChannel;
 import com.flezha.sdk.channel.RoutedDocument;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.operator.builder.LatestDocumentRouter;
-import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
+import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -43,7 +43,7 @@ class RouteLatestExpansionTest {
     }
 
     /** The canonical shape: a document stream, a traffic stream, a keyed consumer. */
-    static final class RoutedOperator implements UnboundedOperator {
+    static final class RoutedOperator implements Operator {
         @Override
         public String factoryId() {
             return "route_latest_expansion";
@@ -62,7 +62,7 @@ class RouteLatestExpansionTest {
     @Test
     @DisplayName("the block expands to one single-cell node fed by both streams")
     void expandsToOneSingleCellNode() {
-        UnboundedOperatorTopology topology = UnboundedOperatorTopologyBuilder.build(new RoutedOperator());
+        OperatorTopology topology = OperatorTopologyBuilder.build(new RoutedOperator());
 
         int routerId = topology.taskletNameToId().get(LatestDocumentRouter.NODE_NAME);
         TaskletDescriptor router = topology.tasklets().get(routerId);
@@ -97,7 +97,7 @@ class RouteLatestExpansionTest {
         // The router retains the document in journaled state but is generic over
         // its type, so only the wiring can name it. Without this registration the
         // first snapshot of a router holding a typed document fails to serialize.
-        UnboundedOperatorTopology topology = UnboundedOperatorTopologyBuilder.build(new RoutedOperator());
+        OperatorTopology topology = OperatorTopologyBuilder.build(new RoutedOperator());
         int routerId = topology.taskletNameToId().get(LatestDocumentRouter.NODE_NAME);
         assertThat(topology.tasklets().get(routerId).kryoTypes())
                 .containsAll(new LatestDocumentRouter().kryoTypes())
@@ -105,7 +105,7 @@ class RouteLatestExpansionTest {
     }
 
     /** Two unnamed routers over one traffic stream: one node, one traffic edge. */
-    static final class TwoUnnamedRoutersOperator implements UnboundedOperator {
+    static final class TwoUnnamedRoutersOperator implements Operator {
         @Override
         public String factoryId() {
             return "route_latest_twice";
@@ -122,7 +122,7 @@ class RouteLatestExpansionTest {
     }
 
     /** The same pair, named: two independent routers. */
-    static final class TwoNamedRoutersOperator implements UnboundedOperator {
+    static final class TwoNamedRoutersOperator implements Operator {
         @Override
         public String factoryId() {
             return "route_latest_twice_named";
@@ -148,19 +148,18 @@ class RouteLatestExpansionTest {
         // one node — they would share one retained document and one delivered
         // map, so each document stream would overwrite the other's.
         FlezhaException refused = Refused.by(
-                "topology.edge_already_wired",
-                () -> UnboundedOperatorTopologyBuilder.build(new TwoUnnamedRoutersOperator()));
+                "topology.edge_already_wired", () -> OperatorTopologyBuilder.build(new TwoUnnamedRoutersOperator()));
         assertThat(Refused.details(refused, "topology.edge_already_wired"))
                 .containsEntry("channel", "trades")
                 .containsEntry("tasklet", LatestDocumentRouter.NODE_NAME);
 
-        UnboundedOperatorTopology topology = UnboundedOperatorTopologyBuilder.build(new TwoNamedRoutersOperator());
+        OperatorTopology topology = OperatorTopologyBuilder.build(new TwoNamedRoutersOperator());
         assertThat(topology.taskletNameToId()).containsKeys("primary", "secondary");
         assertThat(topology.taskletNameToId()).doesNotContainKey(LatestDocumentRouter.NODE_NAME);
     }
 
     /** One channel as both streams: the document stream is the traffic stream. */
-    static final class SelfRoutedOperator implements UnboundedOperator {
+    static final class SelfRoutedOperator implements Operator {
         @Override
         public String factoryId() {
             return "route_latest_self";
@@ -179,8 +178,7 @@ class RouteLatestExpansionTest {
         // fails when: the router would retain traffic items as documents and
         // deliver them back to their own keys.
         FlezhaException refused = Refused.by(
-                "topology.duplicate_merge_source",
-                () -> UnboundedOperatorTopologyBuilder.build(new SelfRoutedOperator()));
+                "topology.duplicate_merge_source", () -> OperatorTopologyBuilder.build(new SelfRoutedOperator()));
         assertThat(Refused.details(refused, "topology.duplicate_merge_source")).containsEntry("channel", "trades");
     }
 }

@@ -8,7 +8,7 @@ import javax.annotation.Nonnull;
 
 /**
  * Wire identity of a Cell. Combines the operator-instance id (= controller's
- * {@code operator_id}), the Tasklet's name within the UnboundedOperator, and the cell
+ * {@code operator_id}), the Tasklet's name within the Operator, and the cell
  * key (empty string for single-cell mode).
  *
  * <p>The controller keys each per-Cell WAL by this identity and echoes it

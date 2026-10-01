@@ -4,10 +4,8 @@ import com.flezha.sdk.channel.CallTarget;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.Response;
 import com.flezha.sdk.channel.Stream;
-import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.operator.LoopMode;
-import com.flezha.sdk.operator.RollbackMode;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -57,7 +55,7 @@ public final class OperatorCallOperators {
         }
     }
 
-    public static final class CallPricing implements UnboundedOperator {
+    public static final class CallPricing implements Operator {
         @Override
         public String factoryId() {
             return "call_pricing";
@@ -69,7 +67,7 @@ public final class OperatorCallOperators {
         }
     }
 
-    public static final class CallOrders implements UnboundedOperator {
+    public static final class CallOrders implements Operator {
         @Override
         public String factoryId() {
             return "call_orders";
@@ -87,25 +85,20 @@ public final class OperatorCallOperators {
     }
 
     /** A durable keep-progress session answering {@code answer:<turn>}. */
-    public static final class CallAgent implements BoundedOperator {
+    public static final class CallAgent implements Operator {
         @Override
         public String factoryId() {
             return "call_agent";
         }
 
         @Override
-        public LoopMode loopMode() {
-            return LoopMode.PER_INPUT;
+        public Run run() {
+            return new Run.Steps(Each.PER_INPUT, OnFailure.KEEP_PROGRESS);
         }
 
         @Override
-        public RollbackMode rollbackMode() {
-            return RollbackMode.KEEP_PROGRESS;
-        }
-
-        @Override
-        public boolean selfTerminating() {
-            return false;
+        public Durable durable() {
+            return TestEnv.fixtureDurable();
         }
 
         @Override
@@ -123,15 +116,19 @@ public final class OperatorCallOperators {
      * Calls {@code call_agent} by the session key of each {@code <session>:<text>} turn; a
      * {@code resume:<session>:<text>} turn reaches only a session already running.
      */
-    public static final class CallGateway implements UnboundedOperator {
+    public static final class CallGateway implements Operator {
         @Override
         public String factoryId() {
             return "call_gateway";
         }
 
         @Override
+        public Run run() {
+            return new Run.Flow(new Exactly.EffectivelyOnce());
+        }
+
+        @Override
         public void channels(ChannelBuilder c) {
-            c.effectivelyOnce();
             Stream<String> account = c.input(String.class, "in")
                     .map(Turn.class, Turn::of)
                     .into(GatewayAccount.class)
@@ -157,20 +154,20 @@ public final class OperatorCallOperators {
     }
 
     /** A durable session calling {@code pricing} from a turn and reading the outcome as its next. */
-    public static final class CallToolSession implements BoundedOperator {
+    public static final class CallToolSession implements Operator {
         @Override
         public String factoryId() {
             return "call_tool_session";
         }
 
         @Override
-        public LoopMode loopMode() {
-            return LoopMode.PER_INPUT;
+        public Run run() {
+            return Run.steps(Each.PER_INPUT);
         }
 
         @Override
-        public boolean selfTerminating() {
-            return false;
+        public Durable durable() {
+            return TestEnv.fixtureDurable();
         }
 
         @Override

@@ -10,12 +10,12 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * The async result of a {@link Ctx#spawnBounded} request, returned before the controller
+ * The async result of a {@link Ctx#spawnSteps} request, returned before the controller
  * answers. {@link #await} waits for the answer; {@link #tryResult} never waits.
  *
  * <p>A request that reached no instance throws {@link FlezhaException} from the read, with the
  * controller's code ({@code operator.already_running}, {@code operator.factory_unknown},
- * {@code operator.factory_not_bounded}, or any other refusal's own) or the core's
+ * {@code operator.factory_not_steps}, or any other refusal's own) or the core's
  * ({@code spawn.timeout}, {@code spawn.unavailable}).
  *
  * <p>Read it inside the invocation that made it. Every read asks the core, which answers a resolved

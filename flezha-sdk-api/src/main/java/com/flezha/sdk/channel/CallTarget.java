@@ -28,7 +28,7 @@ public record CallTarget(@Nullable String target, @Nullable String factory, bool
 
     /**
      * An instance of {@code factory}: after a {@code keyBy}, the one whose id is the request's key,
-     * started with the request when no instance holds it; without one, a new bounded instance per
+     * started with the request when no instance holds it; without one, a new steps instance per
      * call.
      */
     @Nonnull

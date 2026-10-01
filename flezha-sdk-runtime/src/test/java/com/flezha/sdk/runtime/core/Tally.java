@@ -1,6 +1,6 @@
 package com.flezha.sdk.runtime.core;
 
-import com.flezha.sdk.authoring.UnboundedOperator;
+import com.flezha.sdk.authoring.Operator;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -11,7 +11,7 @@ import java.util.List;
  * A short form recording two nested change records per input, which is what gives a restore fold
  * a journal of discovered types to read back.
  */
-@UnboundedOperator(id = "tally_op")
+@Operator(id = "tally_op")
 public class Tally implements Tasklet<String, Tally.TallyState, Void> {
 
     public static class TallyState {

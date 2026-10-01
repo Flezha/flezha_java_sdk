@@ -4,10 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.operator.LoopMode;
-import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
+import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -47,7 +45,7 @@ class PartDispatchTest extends DispatchTestBase {
     @DisplayName(
             "each item's parts carry the activation's token, the item's index and the sink's encoding, before run returns")
     void partsCarryTheTokenAndTheItemIndex() {
-        UnboundedOperatorClassRegistry.registerClass(PartOperator.class);
+        OperatorClassRegistry.registerClass(PartOperator.class);
         ActivationOutcome out = outcome(work("part_op", 0, Optional.empty(), 0, input(0, "2", 1), input(0, "1", 2)));
 
         assertThat(RECORDED)
@@ -64,17 +62,17 @@ class PartDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("a timer handler sends a part under its own item")
     void aTimerHandlerSendsAPart() {
-        UnboundedOperatorClassRegistry.registerClass(PartOperator.class);
+        OperatorClassRegistry.registerClass(PartOperator.class);
         soleEffect(work("part_op", 0, Optional.empty(), 0, new WorkItem.Timer(TimerKind.PROCESSING_TIME, 5)));
 
         assertThat(RECORDED).containsExactly("part 1/0/<fired 5>");
     }
 
     @Test
-    @DisplayName("a per_input bounded stage sends its parts as an unbounded tasklet does")
-    void aBoundedStageSendsParts() {
-        BoundedOperatorClassRegistry.registerClass(PartBounded.class);
-        ItemEffect effect = soleEffect(work("part_bounded", 0, Optional.empty(), 0, input(0, "2", 1)));
+    @DisplayName("a per_input steps stage sends its parts as a flow tasklet does")
+    void aStepsStageSendsParts() {
+        OperatorClassRegistry.registerClass(PartSteps.class);
+        ItemEffect effect = soleEffect(work("part_steps", 0, Optional.empty(), 0, input(0, "2", 1)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.Ok.class);
         assertThat(RECORDED).containsExactly("part 1/0/<1>", "part 1/0/<2>", "returned 2");
@@ -83,7 +81,7 @@ class PartDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("a refused part fails the invocation as any raise does")
     void aRefusedPartFailsTheInvocation() {
-        UnboundedOperatorClassRegistry.registerClass(PartOperator.class);
+        OperatorClassRegistry.registerClass(PartOperator.class);
         REFUSING.set(true);
         ItemEffect effect = soleEffect(work("part_op", 0, Optional.empty(), 0, input(0, "1", 1)));
 
@@ -102,20 +100,20 @@ class PartDispatchTest extends DispatchTestBase {
     }
 
     /** {@code PER_INPUT}, as a session turn is. */
-    public static final class PartBounded implements BoundedOperator {
+    public static final class PartSteps implements Operator {
         @Override
         public String factoryId() {
-            return "part_bounded";
+            return "part_steps";
         }
 
         @Override
-        public LoopMode loopMode() {
-            return LoopMode.PER_INPUT;
+        public Run run() {
+            return Run.steps(Each.PER_INPUT);
         }
 
         @Override
-        public boolean persistenceEnabled() {
-            return false;
+        public Durable durable() {
+            return new Durable.Memory();
         }
 
         @Override

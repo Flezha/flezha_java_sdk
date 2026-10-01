@@ -20,7 +20,7 @@ final class NodeEdge<T> extends EdgeStreamImpl<T> implements OutputChain<T> {
 
     private final int node;
 
-    NodeEdge(UnboundedOperatorTopologyBuilder owner, int node, Integer pending, Class<?> payloadType) {
+    NodeEdge(OperatorTopologyBuilder owner, int node, Integer pending, Class<?> payloadType) {
         super(
                 owner,
                 pending,

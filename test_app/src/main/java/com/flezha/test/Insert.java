@@ -3,7 +3,7 @@ package com.flezha.test;
 import com.flezha.sdk.state.Change;
 
 /**
- * Idempotent SET-style Change recorded by the durable structured bounded operator
+ * Idempotent SET-style Change recorded by the durable structured steps operator
  * operators in the crash-resume e2e (§7c.3): inserts {@code key} into the
  * Cell's set. Re-applying the same key on a resume re-run is a no-op, so
  * Model A idempotent re-run over restored state is safe. Mirrors the Rust test

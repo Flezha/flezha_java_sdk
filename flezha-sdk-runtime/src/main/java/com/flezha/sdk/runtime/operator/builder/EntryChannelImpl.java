@@ -9,8 +9,7 @@ final class EntryChannelImpl<T> extends EdgeStreamImpl<T> implements EntryChanne
     private final int channelId;
     private final String name;
 
-    EntryChannelImpl(
-            UnboundedOperatorTopologyBuilder owner, int channelId, String name, Integer pending, Class<?> payloadType) {
+    EntryChannelImpl(OperatorTopologyBuilder owner, int channelId, String name, Integer pending, Class<?> payloadType) {
         super(owner, pending, payloadType);
         this.channelId = channelId;
         this.name = name;

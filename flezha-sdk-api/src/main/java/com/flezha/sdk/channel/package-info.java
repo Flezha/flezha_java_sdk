@@ -1,8 +1,8 @@
 /**
- * Channel and unbounded declarations: the graph connecting entry points, tasklets and sinks.
+ * Channel declarations: the graph connecting entry points, tasklets and sinks.
  *
  * <p>These types are declared inside an operator's {@code channels(ChannelBuilder)} method, the
- * one graph body both operator kinds write, and are never constructed directly.
+ * one graph body every operator writes, and are never constructed directly.
  * {@link com.flezha.sdk.channel.ChannelBuilder} is the entry point, and every call returns the next
  * handle in the chain, so a complete graph is expressed as one fluent expression. The declaration
  * is read once at registration and validated as a whole; a malformed graph is refused there rather
@@ -20,7 +20,7 @@
  * and test feeds; unlabelled, a channel takes the producing tasklet's name. {@code into} wires a
  * further tasklet as a consumer, which is how multi-stage graphs are expressed. {@code sink}
  * attaches a plugin, {@code keyed} declares that emits carry a natural key supplied through
- * {@code emitKeyed}. A durable bounded operator journals the handoff at every stage boundary of
+ * {@code emitKeyed}. A durable operator that runs in steps journals the handoff at every stage boundary of
  * its graph; the payload codec it uses there is derived by the runtime and is declared nowhere.
  *
  * <p>{@link com.flezha.sdk.channel.EdgeStream} carries the transforms applied on the wiring itself:
@@ -34,11 +34,9 @@
  * channels each supply a mapping into one sum type consumed by a single tasklet.
  * {@link com.flezha.sdk.channel.RoutedDocument} supports operator-wide document delivery, in which
  * every key observed on a traffic channel receives each distinct document exactly once, on that
- * key's own next traffic item. {@link com.flezha.sdk.channel.RetryPolicy},
- * {@link com.flezha.sdk.channel.OverflowPolicy} and
- * {@link com.flezha.sdk.channel.BeyondWindowPolicy} declare, respectively, the retry ladder before
- * a payload is parked, the behaviour of a full mailbox, and the treatment of a message arriving
- * outside the correction window.
+ * key's own next traffic item. {@link com.flezha.sdk.channel.RetryPolicy} and
+ * {@link com.flezha.sdk.channel.OverflowPolicy} declare, respectively, the retry ladder before a
+ * payload is parked and the behaviour of a full mailbox.
  */
 @javax.annotation.ParametersAreNonnullByDefault
 package com.flezha.sdk.channel;

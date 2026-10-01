@@ -1,11 +1,11 @@
 package com.flezha.examples.spawn;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 import javax.annotation.Nonnull;
 
 /** One instance, running forever over the event stream. */
-public final class AlertDetectorOperator implements UnboundedOperator {
+public final class AlertDetectorOperator implements Operator {
 
     @Override
     @Nonnull

@@ -20,13 +20,13 @@ import javax.annotation.Nonnull;
 abstract class EdgeStreamImpl<T> implements EdgeStream<T>, EdgeSite {
 
     /** The builder this handle was declared on. */
-    final UnboundedOperatorTopologyBuilder owner;
+    final OperatorTopologyBuilder owner;
     /** The chain declared on this handle, {@code null} for a bare one. */
     final Integer pending;
     /** The payload type after this handle's transforms. */
     final Class<?> payloadType;
 
-    EdgeStreamImpl(UnboundedOperatorTopologyBuilder owner, Integer pending, Class<?> payloadType) {
+    EdgeStreamImpl(OperatorTopologyBuilder owner, Integer pending, Class<?> payloadType) {
         this.owner = owner;
         this.pending = pending;
         this.payloadType = payloadType;

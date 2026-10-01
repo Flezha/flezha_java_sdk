@@ -4,9 +4,7 @@ import com.flezha.sdk.admin.Admin;
 import com.flezha.sdk.internal.RegistryCore;
 import com.flezha.sdk.internal.RunnerHandle;
 import com.flezha.sdk.internal.RuntimeBridge;
-import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.operator.UnboundedOperator;
-import java.util.ArrayList;
+import com.flezha.sdk.operator.Operator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -45,15 +43,11 @@ public final class FlezhaRunner implements AutoCloseable {
     private final String namespace;
 
     /**
-     * This runner's declared factory sets — per-runner (a later runner starts
+     * This runner's declared factory set — per-runner (a later runner starts
      * empty; generation 2 must re-define its types). The runtime-side class
-     * registries stay process-global behind these.
+     * registry stays process-global behind it.
      */
-    private final RegistryCore stream =
-            new RegistryCore("com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry", "operator");
-
-    private final RegistryCore bounded =
-            new RegistryCore("com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry", "bounded");
+    private final RegistryCore factories = new RegistryCore("com.flezha.sdk.runtime.operator.OperatorClassRegistry");
 
     private final AtomicReference<RunnerHandle> handle = new AtomicReference<>();
 
@@ -80,30 +74,23 @@ public final class FlezhaRunner implements AutoCloseable {
 
     /**
      * Declare an operator class the runtime can spawn instances of later (via the controller's
-     * {@code AddOperator}), of either kind: the kind is read from the interface the class
-     * implements, never named by the call. Calls the class's {@code channels(...)} once and
-     * records the topology in the class registry of its kind.
+     * {@code AddOperator}). Calls the class's {@code channels(...)} and reads its settings once,
+     * and records the topology in the class registry.
      * Legal before and after {@link #start()}. Invalid authoring is reported here, at the declaring
      * call site, as a {@link FlezhaException} whose code names the refusal.
      *
      * <p>A short form is registered by the tasklet class the author wrote, annotated
-     * {@link com.flezha.sdk.authoring.UnboundedOperator @UnboundedOperator} or
-     * {@link com.flezha.sdk.authoring.BoundedOperator @BoundedOperator}: the call reads the
-     * annotation and declares the one-tasklet operator it describes. Nothing is generated.
-     *
-     * <p>Unbounded and bounded operators share one factory-id namespace per runner, so a second class under
-     * an id this runner already holds is refused whichever kind either one is.
+     * {@link com.flezha.sdk.authoring.Operator @Operator}: the call reads the annotation and
+     * declares the one-tasklet operator it describes. Nothing is generated.
      *
      * @throws FlezhaException on a duplicate factory id ({@code topology.duplicate_factory_id}), when
-     *     the class implements both kind interfaces or carries both annotations
-     *     ({@code topology.ambiguous_operator_kind}), when it is neither an operator nor a short form
-     *     ({@code topology.unknown_operator_kind}), when its authoring is refused, and on a closed
-     *     runner ({@code runtime.runner_closed}).
+     *     the class is neither an operator nor a short form ({@code topology.no_operator_exported}),
+     *     when its authoring is refused, and on a closed runner ({@code runtime.runner_closed}).
      */
     @Nonnull
     public FlezhaRunner registerFactory(Class<?> operatorClass) {
         open();
-        coreOf(operatorClass, "registerFactory()").register(operatorClass);
+        checked(operatorClass, "registerFactory()").register(operatorClass);
         syncFactoriesIfStarted();
         return this;
     }
@@ -116,35 +103,28 @@ public final class FlezhaRunner implements AutoCloseable {
      * @throws FlezhaException {@code runtime.class_not_registered} if the class's factory id is not
      *     currently defined on this runner, {@code runtime.operator_type_in_use} if the runner is
      *     started and live operator instances of the factory exist (the type stays defined),
-     *     {@code runtime.runner_closed} on a closed runner, and the kind refusals
-     *     {@link #registerFactory} names.
+     *     {@code runtime.runner_closed} on a closed runner, and
+     *     {@code topology.no_operator_exported} as {@link #registerFactory} names it.
      */
     @Nonnull
     public FlezhaRunner unregisterFactory(Class<?> operatorClass) {
         open();
-        return remove(coreOf(operatorClass, "unregisterFactory()"), operatorClass);
+        return remove(checked(operatorClass, "unregisterFactory()"), operatorClass);
     }
 
     /**
-     * The registry of the kind a class declares, read from the interface it implements or, for a
-     * short form, from its annotation. A class of both kinds, or of neither, is refused by the
-     * contract's name for it ({@code docs/sdk/authoring_contract.md} §5.1).
+     * The registry, for a class that is an operator or a short form; anything else is refused by
+     * the contract's name for it ({@code docs/sdk/authoring_contract.md} §5.1).
      */
-    private RegistryCore coreOf(Class<?> declared, String what) {
+    private RegistryCore checked(Class<?> declared, String what) {
         if (declared == null) {
             throw new IllegalArgumentException(what + ": the operator class must not be null");
         }
-        boolean isUnbounded = UnboundedOperator.class.isAssignableFrom(declared)
-                || declared.isAnnotationPresent(com.flezha.sdk.authoring.UnboundedOperator.class);
-        boolean isBounded = BoundedOperator.class.isAssignableFrom(declared)
-                || declared.isAnnotationPresent(com.flezha.sdk.authoring.BoundedOperator.class);
-        if (isUnbounded && isBounded) {
-            throw FlezhaException.of("topology.ambiguous_operator_kind", Map.of("module", declared.getName()));
+        if (!Operator.class.isAssignableFrom(declared)
+                && !declared.isAnnotationPresent(com.flezha.sdk.authoring.Operator.class)) {
+            throw FlezhaException.of("topology.no_operator_exported", Map.of("module", declared.getName()));
         }
-        if (!isUnbounded && !isBounded) {
-            throw FlezhaException.of("topology.unknown_operator_kind", Map.of("module", declared.getName()));
-        }
-        return isBounded ? bounded : stream;
+        return factories;
     }
 
     /**
@@ -316,11 +296,9 @@ public final class FlezhaRunner implements AutoCloseable {
         }
     }
 
-    /** This runner's full current factory set: stream first, then bounded operator. */
+    /** This runner's full current factory set. */
     private List<String> declaredFactoryIds() {
-        List<String> ids = new ArrayList<>(stream.factoryIds());
-        ids.addAll(bounded.factoryIds());
-        return ids;
+        return factories.factoryIds();
     }
 
     /**

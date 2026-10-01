@@ -8,13 +8,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.native_.FlzCore;
-import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.operator.LoopMode;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.RepositoryFixture;
-import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -42,36 +39,32 @@ class HostClassDeclarationTest {
 
     @AfterEach
     void reset() {
-        UnboundedOperatorClassRegistry.reset();
-        BoundedOperatorClassRegistry.reset();
+        OperatorClassRegistry.reset();
     }
 
     @Test
-    @DisplayName("an unbounded declaration emits channels and tasklets in id order with tier facts")
-    void unboundedDeclaration() throws Exception {
-        UnboundedOperatorClassRegistry.registerClass(TierOperator.class);
+    @DisplayName("a flow declaration emits its settings tree, then channels and tasklets in id order")
+    void flowDeclaration() throws Exception {
+        OperatorClassRegistry.registerClass(TierOperator.class);
         JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_tier_op"));
 
         assertThat(decl.get("factory_id").asText()).isEqualTo("decl_tier_op");
         assertThat(decl.get("sdk_lang").asInt()).isEqualTo(2);
         assertThat(decl.get("change_format_id").asInt()).isEqualTo(4);
-        assertThat(decl.get("effectively_once").asBoolean()).isTrue();
-        assertThat(decl.get("checkpoint_ack").asBoolean())
-                .as("the RAW flag the author set; the core derives the granularity from it")
-                .isTrue();
-        assertThat(decl.has("ack_granularity"))
-                .as("the granularity is the core's answer, never the builder's claim")
-                .isFalse();
-        assertThat(decl.has("checkpoint_every"))
-                .as("a bare checkpointAck() declares no interval options")
-                .isFalse();
-        assertThat(decl.has("checkpoint_outputs")).isFalse();
-        assertThat(decl.has("checkpoint_max_delay_ms")).isFalse();
-        assertThat(decl.has("correction_window_ms")).isFalse();
-        assertThat(decl.get("persistent").asBoolean())
-                .as("the tier IS durable state, so the class journals a Change")
-                .isTrue();
-        assertThat(decl.has("bounded")).isFalse();
+        assertThat(decl.get("run"))
+                .as("the tree as the author wrote it; the core derives the granularity from it")
+                .isEqualTo(
+                        JSON.readTree(
+                                """
+                        {"flow": {"exactly": {"effectively_once": {
+                            "ack": {"checkpoint": {"outputs": "as_produced"}},
+                            "beyond_window": "process_as_arrival"}}}}
+                        """));
+        assertThat(decl.get("durable"))
+                .as("kept locally, sleeping as the run does, when the class says nothing")
+                .isEqualTo(JSON.readTree("\"local\""));
+        assertThat(decl.has("description")).isFalse();
+        assertThat(decl.has("max_duration_ms")).isFalse();
 
         JsonNode channels = decl.get("channels");
         assertThat(channels).hasSize(2);
@@ -113,7 +106,7 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("each Tasklet declares its own schema version, never the class maximum")
     void perTaskletSchemaVersions() throws Exception {
-        UnboundedOperatorClassRegistry.registerClass(MixedVersionOperator.class);
+        OperatorClassRegistry.registerClass(MixedVersionOperator.class);
         JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_mixed_version_op"));
 
         assertThat(decl.has("schema_version"))
@@ -139,88 +132,72 @@ class HostClassDeclarationTest {
     }
 
     @Test
-    @DisplayName("a bounded declaration carries its tasklets with the bounded block")
-    void boundedDeclaration() throws Exception {
-        BoundedOperatorClassRegistry.registerClass(DeclBounded.class);
-        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_bounded"));
+    @DisplayName("a steps declaration carries its run, its wall-clock stop and its tasklets")
+    void stepsDeclaration() throws Exception {
+        OperatorClassRegistry.registerClass(DeclSteps.class);
+        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_steps"));
 
-        assertThat(decl.get("factory_id").asText()).isEqualTo("decl_bounded");
-        assertThat(decl.get("channels")).isNotEmpty();
-        assertThat(decl.get("tasklets")).hasSize(1);
+        assertThat(decl.get("factory_id").asText()).isEqualTo("decl_steps");
         assertThat(decl.get("tasklets").get(0).get("name").asText()).isEqualTo("v1_task");
-        assertThat(decl.get("persistent").asBoolean()).isTrue();
-
-        JsonNode bounded = decl.get("bounded");
-        assertThat(bounded.get("loop_mode").asText()).isEqualTo("once");
-        assertThat(bounded.get("rollback_mode").asText()).isEqualTo("all_or_nothing");
-        assertThat(bounded.get("max_duration_ms").asLong()).isEqualTo(30_000);
-        assertThat(bounded.fieldNames())
-                .toIterable()
-                .as("retry is the edge's, carried on each channel")
-                .doesNotContain("retry_attempts", "retry_backoff_ms", "barrier_retry_attempts");
-        assertThat(decl.has("sync_durability"))
-                .as("asynchronous remote durability is the cost-free default")
-                .isFalse();
+        assertThat(decl.get("run"))
+                .isEqualTo(JSON.readTree("{\"steps\": {\"each\": \"once\", \"on_failure\": \"undo_all\"}}"));
+        assertThat(decl.get("max_duration_ms").asLong()).isEqualTo(30_000);
+        assertThat(decl.get("durable")).isEqualTo(JSON.readTree("\"local\""));
     }
 
     @Test
-    @DisplayName("an unbounded operator's opt-out is read from the class, not its Tasklets")
-    void anUnboundedOptsOutByItsSwitch() throws Exception {
-        UnboundedOperatorClassRegistry.registerClass(PersistenceOffOperator.class);
-        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_persistence_off_op"));
+    @DisplayName(
+            "Default-on with no override: a class that says nothing is kept locally and leaves its sleep to its run")
+    void defaultOnWithNoOverride() throws Exception {
+        OperatorClassRegistry.registerClass(MixedVersionOperator.class);
+        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_mixed_version_op"));
 
-        assertThat(decl.path("persistent").asBoolean())
-                .as("persistenceEnabled() false opts out even over a tasklet that journals a Change")
-                .isFalse();
-        assertThat(decl.path("sleep_when_idle").asBoolean()).isFalse();
+        assertThat(decl.get("durable")).isEqualTo(JSON.readTree("\"local\""));
+        assertThat(decl.get("run")).isEqualTo(JSON.readTree("{\"flow\": {\"exactly\": \"at_least_once\"}}"));
     }
 
     @Test
-    @DisplayName("sleeping is a class setting of both kinds, on for a durable bounded by default")
-    void sleepWhenIdleIsDeclaredForBothKinds() throws Exception {
-        UnboundedOperatorClassRegistry.registerClass(SleepingOperator.class);
-        BoundedOperatorClassRegistry.registerClass(DeclBounded.class);
-        BoundedOperatorClassRegistry.registerClass(OptedOutBounded.class);
-
-        assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_sleeping_op"))
-                        .path("sleep_when_idle")
-                        .asBoolean())
-                .isTrue();
-        assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_bounded"))
-                        .path("sleep_when_idle")
-                        .asBoolean())
-                .as("a bounded sleeps whenever it persists")
-                .isTrue();
-        JsonNode optedOut = JSON.readTree(HostClassDeclaration.forFactory("decl_opted_out_bounded"));
-        assertThat(optedOut.path("persistent").asBoolean()).isFalse();
-        assertThat(optedOut.path("sleep_when_idle").asBoolean()).isFalse();
+    @DisplayName("Code-declared opt-out is honored")
+    void aFlowOperatorsOptOutIsReadFromTheClassNotItsTasklets() throws Exception {
+        // DeclTask keeps a state; the class's own durable() still decides.
+        OperatorClassRegistry.registerClass(InMemoryOperator.class);
+        assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_in_memory_op"))
+                        .get("durable"))
+                .isEqualTo(JSON.readTree("false"));
     }
 
     @Test
-    @DisplayName("sleeping without persistence is refused by name, for either kind")
-    void sleepingWithoutPersistenceIsRefused() {
+    @DisplayName("durable spells each level: false, local and remote, with or without sleeping")
+    void durableSpellsEachLevel() throws Exception {
+        OperatorClassRegistry.registerClass(InMemoryOperator.class);
+        OperatorClassRegistry.registerClass(QuickSleeperOperator.class);
+        OperatorClassRegistry.registerClass(RemoteSteps.class);
+
+        assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_in_memory_op"))
+                        .get("durable"))
+                .isEqualTo(JSON.readTree("false"));
+        assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_quick_sleeper_op"))
+                        .get("durable"))
+                .isEqualTo(JSON.readTree("{\"local\": {\"sleep_after\": 600000}}"));
+        assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_remote_steps"))
+                        .get("durable"))
+                .as("a remote class that never sleeps")
+                .isEqualTo(JSON.readTree("{\"remote\": {\"sleep_after\": false}}"));
+    }
+
+    @Test
+    @DisplayName("the effectively-once tier in memory is refused by name: the guarantee needs a disk")
+    void theTierInMemoryIsRefused() {
         Refused.by(
-                "topology.sleep_without_persistence",
-                () -> UnboundedOperatorClassRegistry.registerClass(SleeplessUnboundedOperator.class));
-        Refused.by(
-                "topology.sleep_without_persistence",
-                () -> BoundedOperatorClassRegistry.registerClass(SleeplessBounded.class));
-    }
-
-    @Test
-    @DisplayName("a bounded class declaring synchronous durability ships the flag")
-    void syncDurabilityDeclaration() throws Exception {
-        BoundedOperatorClassRegistry.registerClass(SyncDurableBounded.class);
-
-        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_sync_bounded"));
-        assertThat(decl.get("sync_durability").asBoolean()).isTrue();
+                "topology.effectively_once_without_persistence",
+                () -> OperatorClassRegistry.registerClass(TierInMemoryOperator.class));
     }
 
     @Test
     @DisplayName("a declared hook needs no second declaration: a written compensate is compensable")
     void aWrittenCompensateIsDeclared() throws Exception {
-        BoundedOperatorClassRegistry.registerClass(FullyDeclaredBounded.class);
-        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_full_bounded"));
+        OperatorClassRegistry.registerClass(FullyDeclaredSteps.class);
+        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_full_steps"));
 
         assertThat(decl.get("tasklets").get(0).path("compensate_overridden").asBoolean())
                 .as("the rollback plans only from compensable tasklets")
@@ -230,26 +207,69 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("the builder can spell every key the shared fixture pins")
     void everyPinnedDeclarationKeyHasAJavaSpelling() throws Exception {
-        UnboundedOperatorClassRegistry.registerClass(FullyDeclaredOperator.class);
-        UnboundedOperatorClassRegistry.registerClass(FullyDeclaredDynamicOperator.class);
-        BoundedOperatorClassRegistry.registerClass(FullyDeclaredBounded.class);
+        OperatorClassRegistry.registerClass(FullyDeclaredOperator.class);
+        OperatorClassRegistry.registerClass(FullyDeclaredDynamicOperator.class);
 
-        JsonNode stream = JSON.readTree(HostClassDeclaration.forFactory("decl_full_op"));
+        JsonNode flow = JSON.readTree(HostClassDeclaration.forFactory("decl_full_op"));
         JsonNode dynamic = JSON.readTree(HostClassDeclaration.forFactory("decl_full_dynamic_op"));
-        JsonNode bounded = JSON.readTree(HostClassDeclaration.forFactory("decl_full_bounded"));
 
         // A key may live on any node of its section: the entry channel has no
         // `producer`, the plugin-bound one has the `keyed` flag.
-        assertEverySpellingExists("class", List.of(stream), Set.of("sync_durability", "bounded"));
-        assertEverySpellingExists("channel", nodes(stream.get("channels")), Set.of());
+        assertEverySpellingExists("class", List.of(flow), Set.of());
+        assertEverySpellingExists("channel", nodes(flow.get("channels")), Set.of());
         // Cell mode splits the tasklet keys: a static tasklet declares its
         // key set, a dynamic one its TTL and cap. Both modes together are the
         // section.
-        List<JsonNode> tasklets = new ArrayList<>(nodes(stream.get("tasklets")));
+        List<JsonNode> tasklets = new ArrayList<>(nodes(flow.get("tasklets")));
         tasklets.addAll(nodes(dynamic.get("tasklets")));
         assertEverySpellingExists("tasklet", tasklets, Set.of());
-        assertEverySpellingExists("bounded", List.of(bounded.get("bounded")), Set.of());
-        assertThat(bounded.has("sync_durability")).isTrue();
+    }
+
+    @Test
+    @DisplayName("forFactory resolves the registry and refuses an unknown id")
+    void forFactoryResolvesTheRegistry() {
+        OperatorClassRegistry.registerClass(TierOperator.class);
+        OperatorClassRegistry.registerClass(DeclSteps.class);
+        assertThat(HostClassDeclaration.forFactory("decl_tier_op")).isNotEmpty();
+        assertThat(HostClassDeclaration.forFactory("decl_steps")).isNotEmpty();
+        assertThatThrownBy(() -> HostClassDeclaration.forFactory("missing"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("missing");
+    }
+
+    @Test
+    @DisplayName("the checkpoint members ride the tree only when declared")
+    void checkpointMembers() throws Exception {
+        OperatorClassRegistry.registerClass(BatchedOutputsOperator.class);
+        JsonNode ack = JSON.readTree(HostClassDeclaration.forFactory("decl_batched_op"))
+                .at("/run/flow/exactly/effectively_once/ack");
+
+        assertThat(ack)
+                .isEqualTo(JSON.readTree(
+                        "{\"checkpoint\": {\"every\": 500, \"max_delay_ms\": 50, \"outputs\": \"at_checkpoint\"}}"));
+    }
+
+    @Test
+    @DisplayName("A durable chained loop whose terminal task releases nothing is refused")
+    void chainedLoopTerminalWithoutHandoffIsRefusedByTheCore() {
+        // The refusal is the core's, raised where every host reaches it —
+        // declareClass — and is not restated in this SDK, exactly as the
+        // branching-chained-loop refusal already is. Only an inter-tasklet
+        // channel carries a journal codec, so a terminal whose only wiring is a
+        // plugin sink ships an empty handoff and the crash-resumed loop reads
+        // that as convergence.
+        OperatorClassRegistry.registerClass(ChainedTerminalIntoSinkSteps.class);
+        byte[] declaration = HostClassDeclaration.forFactory("decl_chained_sink");
+
+        long ctx = FlzCore.newContext();
+        try {
+            FlezhaException refused = Refused.by(
+                    "topology.chained_loop_terminal_without_handoff", () -> FlzCore.declareClass(ctx, declaration));
+            assertThat(Refused.details(refused, "topology.chained_loop_terminal_without_handoff"))
+                    .containsEntry("tasklet", "decl_chained_sink_task");
+        } finally {
+            FlzCore.contextFree(ctx);
+        }
     }
 
     private static List<JsonNode> nodes(JsonNode array) {
@@ -261,8 +281,7 @@ class HostClassDeclarationTest {
     /**
      * Every key the fixture pins for {@code section} that no node of that
      * section carries, minus the ones this declaration legitimately omits (a
-     * static tasklet has no {@code idle_ttl_ms}, an unbounded class no
-     * {@code sync_durability}). A key with no Java spelling at all shows up
+     * static tasklet has no {@code idle_ttl_ms}). A key with no Java spelling at all shows up
      * here and nowhere else.
      */
     private static void assertEverySpellingExists(
@@ -293,26 +312,36 @@ class HostClassDeclarationTest {
                 .collect(Collectors.toCollection(java.util.ArrayList::new));
     }
 
-    /** Declares every unbounded-side option the Java surface has a spelling for. */
-    public static final class FullyDeclaredOperator implements UnboundedOperator {
+    /** Declares every flow-side option the Java surface has a spelling for. */
+    public static final class FullyDeclaredOperator implements Operator {
         @Override
         public String factoryId() {
             return "decl_full_op";
         }
 
         @Override
-        public boolean sleepWhenIdle() {
-            return true;
+        public String description() {
+            return "every key the fixture pins";
+        }
+
+        @Override
+        public Optional<Duration> maxDuration() {
+            return Optional.of(Duration.ofMinutes(5));
+        }
+
+        @Override
+        public Run run() {
+            return new Run.Flow(new Exactly.EffectivelyOnce()
+                    .withAck(new Ack.Checkpoint()
+                            .withEvery(500)
+                            .withMaxDelayMs(50)
+                            .withOutputs(Outputs.AT_CHECKPOINT))
+                    .withCorrectionMs(600_000)
+                    .withBeyondWindow(BeyondWindow.DROP));
         }
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.effectivelyOnce();
-            c.checkpointAck();
-            c.checkpointEvery(500);
-            c.outputsAtCheckpoint(50);
-            c.correctionWindow(600_000);
-            c.beyondWindowPolicy(com.flezha.sdk.channel.BeyondWindowPolicy.DROP);
             c.input(String.class, "in")
                     .onFull(com.flezha.sdk.channel.OverflowPolicy.DROP_NOTHING)
                     .retryMax(3)
@@ -324,7 +353,7 @@ class HostClassDeclarationTest {
     }
 
     /** The dynamic half of the tasklet surface: a lazy Cell with a TTL and a cap. */
-    public static final class FullyDeclaredDynamicOperator implements UnboundedOperator {
+    public static final class FullyDeclaredDynamicOperator implements Operator {
         @Override
         public String factoryId() {
             return "decl_full_dynamic_op";
@@ -369,7 +398,7 @@ class HostClassDeclarationTest {
             return List.of("a");
         }
 
-        // `correctionWindow` needs an event-time clock: a correction rewinds to a
+        // A correction window needs an event-time clock: a correction rewinds to a
         // baseline before the late input's event time.
         @Override
         public long eventTime(String input) {
@@ -393,21 +422,16 @@ class HostClassDeclarationTest {
         }
     }
 
-    /** Declares every bounded-side option the Java surface has a spelling for. */
-    public static final class FullyDeclaredBounded implements BoundedOperator {
+    /** A steps class whose tasklet writes its compensate. */
+    public static final class FullyDeclaredSteps implements Operator {
         @Override
         public String factoryId() {
-            return "decl_full_bounded";
+            return "decl_full_steps";
         }
 
         @Override
-        public boolean syncDurability() {
-            return true;
-        }
-
-        @Override
-        public Optional<Duration> maxDuration() {
-            return Optional.of(Duration.ofSeconds(30));
+        public Run run() {
+            return new Run.Steps(Each.PER_INPUT, OnFailure.KEEP_PROGRESS);
         }
 
         @Override
@@ -416,73 +440,16 @@ class HostClassDeclarationTest {
         }
     }
 
-    @Test
-    @DisplayName("forFactory resolves both registries and refuses an unknown id")
-    void forFactoryResolvesRegistries() {
-        UnboundedOperatorClassRegistry.registerClass(TierOperator.class);
-        BoundedOperatorClassRegistry.registerClass(DeclBounded.class);
-        assertThat(HostClassDeclaration.forFactory("decl_tier_op")).isNotEmpty();
-        assertThat(HostClassDeclaration.forFactory("decl_bounded")).isNotEmpty();
-        assertThatThrownBy(() -> HostClassDeclaration.forFactory("missing"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("missing");
-    }
-
-    @Test
-    @DisplayName("the checkpoint interval options ride the declaration only when declared")
-    void checkpointIntervalOptions() throws Exception {
-        UnboundedOperatorClassRegistry.registerClass(BatchedOutputsOperator.class);
-        JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_batched_op"));
-
-        assertThat(decl.has("checkpoint_ack"))
-                .as("each option writes its OWN raw flag; the core implies the granularity")
-                .isFalse();
-        assertThat(decl.get("checkpoint_every").asInt()).isEqualTo(500);
-        assertThat(decl.get("checkpoint_outputs").asText()).isEqualTo("at_checkpoint");
-        assertThat(decl.get("checkpoint_max_delay_ms").asLong()).isEqualTo(50L);
-    }
-
-    @Test
-    @DisplayName("an interval option without the tier is refused, naming the missing tier")
-    void checkpointOptionsWithoutTier() {
-        Refused.by(
-                "topology.checkpoint_ack_without_tier",
-                () -> UnboundedOperatorClassRegistry.registerClass(NoTierBatchedOperator.class));
-    }
-
-    @Test
-    @DisplayName("A durable chained loop whose terminal task releases nothing is refused")
-    void chainedLoopTerminalWithoutHandoffIsRefusedByTheCore() {
-        // The refusal is the core's, raised where every host reaches it —
-        // declareClass — and is not restated in this SDK, exactly as the
-        // branching-chained-loop refusal already is. Only an inter-tasklet
-        // channel carries a journal codec, so a terminal whose only wiring is a
-        // plugin sink ships an empty handoff and the crash-resumed loop reads
-        // that as convergence.
-        BoundedOperatorClassRegistry.registerClass(ChainedTerminalIntoSinkBounded.class);
-        byte[] declaration = HostClassDeclaration.forFactory("decl_chained_sink");
-
-        long ctx = FlzCore.newContext();
-        try {
-            FlezhaException refused = Refused.by(
-                    "topology.chained_loop_terminal_without_handoff", () -> FlzCore.declareClass(ctx, declaration));
-            assertThat(Refused.details(refused, "topology.chained_loop_terminal_without_handoff"))
-                    .containsEntry("tasklet", "decl_chained_sink_task");
-        } finally {
-            FlzCore.contextFree(ctx);
-        }
-    }
-
     /** A durable CHAINED loop whose terminal task's only output is a plugin sink. */
-    public static final class ChainedTerminalIntoSinkBounded implements BoundedOperator {
+    public static final class ChainedTerminalIntoSinkSteps implements Operator {
         @Override
         public String factoryId() {
             return "decl_chained_sink";
         }
 
         @Override
-        public LoopMode loopMode() {
-            return LoopMode.CHAINED;
+        public Run run() {
+            return Run.steps(Each.CHAINED);
         }
 
         @Override
@@ -500,58 +467,36 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class BatchedOutputsOperator implements UnboundedOperator {
+    public static final class BatchedOutputsOperator implements Operator {
         @Override
         public String factoryId() {
             return "decl_batched_op";
         }
 
         @Override
-        public void channels(ChannelBuilder c) {
-            c.effectivelyOnce();
-            c.checkpointEvery(500);
-            c.outputsAtCheckpoint(50);
-            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
-        }
-    }
-
-    public static final class NoTierBatchedOperator implements UnboundedOperator {
-        @Override
-        public String factoryId() {
-            return "decl_no_tier_batched_op";
+        public Run run() {
+            return new Run.Flow(new Exactly.EffectivelyOnce()
+                    .withAck(new Ack.Checkpoint()
+                            .withEvery(500)
+                            .withMaxDelayMs(50)
+                            .withOutputs(Outputs.AT_CHECKPOINT)));
         }
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.outputsAtCheckpoint(50);
             c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
-    public static final class TierOperator implements UnboundedOperator {
+    public static final class TierOperator implements Operator {
         @Override
         public String factoryId() {
             return "decl_tier_op";
         }
 
         @Override
-        public void channels(ChannelBuilder c) {
-            c.effectivelyOnce();
-            c.checkpointAck();
-            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
-        }
-    }
-
-    /** A tier-less class whose tasklet journals a Change, opted out by its switch. */
-    public static final class PersistenceOffOperator implements UnboundedOperator {
-        @Override
-        public String factoryId() {
-            return "decl_persistence_off_op";
-        }
-
-        @Override
-        public boolean persistenceEnabled() {
-            return false;
+        public Run run() {
+            return new Run.Flow(new Exactly.EffectivelyOnce().withAck(new Ack.Checkpoint()));
         }
 
         @Override
@@ -560,15 +505,20 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class SleepingOperator implements UnboundedOperator {
+    public static final class TierInMemoryOperator implements Operator {
         @Override
         public String factoryId() {
-            return "decl_sleeping_op";
+            return "decl_tier_in_memory_op";
         }
 
         @Override
-        public boolean sleepWhenIdle() {
-            return true;
+        public Run run() {
+            return new Run.Flow(new Exactly.EffectivelyOnce());
+        }
+
+        @Override
+        public Durable durable() {
+            return new Durable.Memory();
         }
 
         @Override
@@ -577,30 +527,65 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class SleeplessUnboundedOperator implements UnboundedOperator {
+    /** A class whose tasklet journals a Change, kept in memory by its setting. */
+    public static final class InMemoryOperator implements Operator {
         @Override
         public String factoryId() {
-            return "decl_sleepless_op";
+            return "decl_in_memory_op";
         }
 
         @Override
-        public boolean persistenceEnabled() {
-            return false;
-        }
-
-        @Override
-        public boolean sleepWhenIdle() {
-            return true;
+        public Durable durable() {
+            return new Durable.Memory();
         }
 
         @Override
         public void channels(ChannelBuilder c) {
             c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    public static final class QuickSleeperOperator implements Operator {
+        @Override
+        public String factoryId() {
+            return "decl_quick_sleeper_op";
+        }
+
+        @Override
+        public Durable durable() {
+            return new Durable.Local(Duration.ofMinutes(10));
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    public static final class RemoteSteps implements Operator {
+        @Override
+        public String factoryId() {
+            return "decl_remote_steps";
+        }
+
+        @Override
+        public Run run() {
+            return Run.steps();
+        }
+
+        @Override
+        public Durable durable() {
+            return new Durable.Remote(new Durable.SleepAfter.Never());
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "in").into(VersionOneTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
     /** Two tasklets in one class, each at its own schema version. */
-    public static final class MixedVersionOperator implements UnboundedOperator {
+    public static final class MixedVersionOperator implements Operator {
         @Override
         public String factoryId() {
             return "decl_mixed_version_op";
@@ -634,27 +619,7 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class SyncDurableBounded implements BoundedOperator {
-        @Override
-        public String factoryId() {
-            return "decl_sync_bounded";
-        }
-
-        @Override
-        public boolean syncDurability() {
-            return true;
-        }
-
-        @Override
-        public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(VersionOneTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
-        }
-    }
-
-    /**
-     * The tier fixtures' tasklet. It declares a state because
-     * {@code effectivelyOnce()} requires one: the tier IS durable state.
-     */
+    /** The tier fixtures' tasklet. It declares a state, because the tier IS durable state. */
     @Tasklet.Spec(name = "decl_task")
     public static final class DeclTask implements Tasklet<String, DeclTask.Kept, String> {
         public static final class Kept {}
@@ -677,59 +642,15 @@ class HostClassDeclarationTest {
         public void compensate(List<String> completedOutput, Ctx<Void, String> ctx) {}
     }
 
-    public static final class DeclBounded implements BoundedOperator {
+    public static final class DeclSteps implements Operator {
         @Override
         public String factoryId() {
-            return "decl_bounded";
+            return "decl_steps";
         }
 
         @Override
-        public Optional<Duration> maxDuration() {
-            return Optional.of(Duration.ofSeconds(30));
-        }
-
-        @Override
-        public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(VersionOneTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
-        }
-    }
-
-    public static final class OptedOutBounded implements BoundedOperator {
-        @Override
-        public String factoryId() {
-            return "decl_opted_out_bounded";
-        }
-
-        @Override
-        public boolean persistenceEnabled() {
-            return false;
-        }
-
-        @Override
-        public Optional<Duration> maxDuration() {
-            return Optional.of(Duration.ofSeconds(30));
-        }
-
-        @Override
-        public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(VersionOneTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
-        }
-    }
-
-    public static final class SleeplessBounded implements BoundedOperator {
-        @Override
-        public String factoryId() {
-            return "decl_sleepless_bounded";
-        }
-
-        @Override
-        public boolean persistenceEnabled() {
-            return false;
-        }
-
-        @Override
-        public boolean sleepWhenIdle() {
-            return true;
+        public Run run() {
+            return Run.steps();
         }
 
         @Override

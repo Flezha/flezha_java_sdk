@@ -17,7 +17,7 @@
  * cell's state through {@code state()} and {@code change(...)}, supplies output through
  * {@code emit} and {@code emitKeyed}, the tasklet's clock
  * through {@code now()}, a replay-stable identifier through {@code stableId()}, checkpoint control,
- * timer registration, and the bounded spawn request described below.
+ * timer registration, and the steps spawn request described below.
  *
  * <p>Recovery re-executes user code. A tasklet must therefore be a deterministic function of its
  * declared inputs: reading {@code System.currentTimeMillis()} or generating a random identifier
@@ -28,7 +28,7 @@
  * <p>{@link com.flezha.sdk.tasklet.SpawnRequests}, {@link com.flezha.sdk.tasklet.SpawnOptions},
  * {@link com.flezha.sdk.tasklet.IfRunning}, {@link com.flezha.sdk.tasklet.SpawnHandle},
  * {@link com.flezha.sdk.tasklet.SpawnResult} and {@link com.flezha.sdk.tasklet.SpawnOutcome}
- * cover tasklet-requested bounded operator spawning, in which a tasklet asks the controller for a
+ * cover tasklet-requested steps operator spawning, in which a tasklet asks the controller for a
  * worker instance rather than dispatching one itself. Without an id the controller generates one
  * and starts a new instance; with one, the request is resolved controller-side, so concurrent
  * requests against that id converge on a single instance.

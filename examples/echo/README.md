@@ -55,6 +55,6 @@ above is all you need.
 
 [`docs/guides/runner_deployment.md`](../../../../docs/guides/runner_deployment.md)
 walks through what each of the three parts is and why the split is the way it
-is. The other worked examples, covering state, keys, timers, bounded operators and the
+is. The other worked examples, covering state, keys, timers, steps operators and the
 rest, stay inside the SDK's own build at
 [`sdk/java/flezha-sdk-examples/`](../../flezha-sdk-examples/README.md).

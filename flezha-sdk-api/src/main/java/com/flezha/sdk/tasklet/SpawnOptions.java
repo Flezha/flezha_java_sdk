@@ -3,7 +3,7 @@ package com.flezha.sdk.tasklet;
 import javax.annotation.Nonnull;
 
 /**
- * The instance a {@link Ctx#spawnBounded(String, Object, SpawnOptions)} request names. Built
+ * The instance a {@link Ctx#spawnSteps(String, Object, SpawnOptions)} request names. Built
  * only from an id, so a policy for a running instance cannot be written for a spawn that has none:
  * without an id the controller generates one and always starts a new instance.
  *

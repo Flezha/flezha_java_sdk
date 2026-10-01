@@ -11,7 +11,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  * Starts a runner: a process that connects to the controller and serves your operators.
  *
  * <p>Declare every operator you want served before calling {@code run()}. One runner can serve
- * several, and {@code registerFactory(...)} is the same call for the bounded kind.
+ * several, and {@code registerFactory(...)} is the same call for the steps run.
  */
 public final class Main {
 

@@ -1,9 +1,8 @@
 package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.BoundedOperator;
-import com.flezha.sdk.operator.LoopMode;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -22,8 +21,8 @@ public final class PartOperators {
 
     private PartOperators() {}
 
-    /** The unbounded operator. */
-    public static final class PartEcho implements UnboundedOperator {
+    /** The flow operator. */
+    public static final class PartEcho implements Operator {
         @Override
         public String factoryId() {
             return "part_echo";
@@ -35,16 +34,21 @@ public final class PartOperators {
         }
     }
 
-    /** The same per message, as the stage of a {@code PER_INPUT} bounded operator. */
-    public static final class PartEchoBounded implements BoundedOperator {
+    /** The same per message, as the stage of a {@code PER_INPUT} steps operator. */
+    public static final class PartEchoSteps implements Operator {
         @Override
         public String factoryId() {
-            return "part_echo_bounded";
+            return "part_echo_steps";
         }
 
         @Override
-        public LoopMode loopMode() {
-            return LoopMode.PER_INPUT;
+        public Run run() {
+            return Run.steps(Each.PER_INPUT);
+        }
+
+        @Override
+        public Durable durable() {
+            return TestEnv.fixtureDurable();
         }
 
         @Override
@@ -54,7 +58,7 @@ public final class PartOperators {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").retryBackoffMs(25).into(BoundedEcho.class).sink("answer");
+            c.input(String.class, "in").retryBackoffMs(25).into(StepsEcho.class).sink("answer");
         }
     }
 
@@ -70,7 +74,7 @@ public final class PartOperators {
     }
 
     @Tasklet.Spec(name = "part_echo_turn")
-    public static final class BoundedEcho extends NoStateStep {
+    public static final class StepsEcho extends NoStateStep {
         @Override
         public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             partsThenAnswer(input, ctx);

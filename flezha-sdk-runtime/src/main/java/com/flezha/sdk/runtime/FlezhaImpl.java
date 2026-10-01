@@ -5,12 +5,11 @@ import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.Logger;
 import com.flezha.sdk.internal.RunnerHandle;
 import com.flezha.sdk.native_.FlzCore;
-import com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry;
 import com.flezha.sdk.runtime.config.FlezhaEnv;
 import com.flezha.sdk.runtime.core.ActivationDispatcher;
 import com.flezha.sdk.runtime.core.CoreSpawnRequester;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
 import com.flezha.sdk.tasklet.SpawnRequests;
 import java.util.List;
 import java.util.Map;
@@ -132,9 +131,7 @@ public final class FlezhaImpl implements RunnerHandle {
             throw FlezhaException.of(
                     "runtime.operator_type_in_use", Map.of("factory_id", factoryId, "live_instances", live));
         }
-        if (UnboundedOperatorClassRegistry.unregisterClass(factoryId) == null) {
-            BoundedOperatorClassRegistry.unregisterClass(factoryId);
-        }
+        OperatorClassRegistry.unregisterClass(factoryId);
         declared.remove(factoryId);
     }
 
@@ -155,9 +152,8 @@ public final class FlezhaImpl implements RunnerHandle {
             if (declared.contains(factoryId)) {
                 continue;
             }
-            if (UnboundedOperatorClassRegistry.getTopology(factoryId) == null
-                    && BoundedOperatorClassRegistry.getTopology(factoryId) == null) {
-                LOG.warn("syncFactories: `{}` is not in the class registries; skipping", factoryId);
+            if (OperatorClassRegistry.getTopology(factoryId) == null) {
+                LOG.warn("syncFactories: `{}` is not in the class registry; skipping", factoryId);
                 continue;
             }
             try {

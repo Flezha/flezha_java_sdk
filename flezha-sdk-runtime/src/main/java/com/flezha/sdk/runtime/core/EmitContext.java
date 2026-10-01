@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -271,6 +272,13 @@ final class EmitContext implements Ctx<Object, Object> {
         collectPluginOutput(descriptor, serializeOrThrow(sink.serializer(), value, descriptor.name()), meta, key);
     }
 
+    private static OptionalInt handoffProducer(ChannelDescriptor descriptor) {
+        return descriptor.kind() == ChannelKind.INTER_TASKLET
+                        && descriptor.pluginSink().isEmpty()
+                ? descriptor.producer()
+                : OptionalInt.empty();
+    }
+
     /**
      * A call end's requests: the value through the call chain's transforms,
      * each result serialized and keyed by the chain as an edge's would be.
@@ -296,37 +304,37 @@ final class EmitContext implements Ctx<Object, Object> {
 
     /**
      * Producer-side edge evaluation: transform chain, edge key, consumer
-     * event time. That is the UNBOUNDED shape — the core routes each output
+     * event time. That is the flow shape — the core routes each output
      * on {@code (edge, key)} and reads the consumer.
      *
-     * <p>A bounded stage is held, not routed: the core keeps every output
+     * <p>A steps stage is held, not routed: the core keeps every output
      * as ONE released value on the instance's pass sheet and addresses each
      * consumer itself when the stage commits. One output per consumer would
      * therefore multiply the stage's released batch (and every downstream
      * node's work) by the channel's consumer count. So a structured
-     * bounded operator releases the value once, untransformed and unkeyed; each
+     * steps operator releases the value once, untransformed and unkeyed; each
      * consumer applies its own edge on delivery in
      * {@link CellRouting#valuesForCell}, which is the seam a live run and a
      * journal re-seed both cross.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void collectEdgeOutputs(int channelId, ChannelDescriptor descriptor, Object value) {
-        // A channel with no consumer releases nothing: on a bounded operator that
-        // is a plugin-bound terminal, and seeding the next stage from it
-        // would hand the driver a terminal output.
-        if (descriptor.consumers().isEmpty()) {
-            return;
-        }
-        if (instance.bounded) {
-            outputs.add(new Output(
-                    // The consumer the fold discards; naming the channel's
-                    // first keeps the target a well-formed Edge.
-                    new OutputTarget.Edge(
-                            channelId, descriptor.consumers().get(0).tasklet()),
-                    Optional.empty(),
-                    OptionalLong.empty(),
-                    List.of(),
-                    instance.edgeCodec.serialize(value)));
+        if (instance.steps) {
+            // The consumer the fold discards: the channel's first keeps the target a
+            // well-formed Edge, and an inter-tasklet terminal names its producer, its
+            // value the pass's handoff (a chained loop's carry). A plugin-bound
+            // terminal releases nothing here.
+            OptionalInt consumer = descriptor.consumers().isEmpty()
+                    ? handoffProducer(descriptor)
+                    : OptionalInt.of(descriptor.consumers().get(0).tasklet());
+            if (consumer.isPresent()) {
+                outputs.add(new Output(
+                        new OutputTarget.Edge(channelId, consumer.getAsInt()),
+                        Optional.empty(),
+                        OptionalLong.empty(),
+                        List.of(),
+                        instance.edgeCodec.serialize(value)));
+            }
             return;
         }
         for (ConsumerEdge edge : descriptor.consumers()) {
@@ -352,7 +360,7 @@ final class EmitContext implements Ctx<Object, Object> {
     /**
      * A plugin output. A keyed channel of a class that records no effects
      * carries the identity stamps; under the tier, and for a durable
-     * bounded operator, the controller derives them from the effect record at flush
+     * steps operator, the controller derives them from the effect record at flush
      * time, so none ride here.
      */
     private void collectPluginOutput(

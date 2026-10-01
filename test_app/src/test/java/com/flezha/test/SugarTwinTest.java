@@ -3,11 +3,10 @@ package com.flezha.test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.flezha.sdk.operator.UnboundedOperator;
 import com.flezha.sdk.runtime.operator.TaskletModel;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorClassRegistry;
-import com.flezha.sdk.runtime.operator.UnboundedOperatorTopology;
-import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
+import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
+import com.flezha.sdk.runtime.operator.OperatorTopology;
+import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder;
 import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.testing.TaskletTestHarness;
 import java.nio.charset.StandardCharsets;
@@ -18,7 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Asserts the {@code @UnboundedOperator} / {@code @BoundedOperator} short forms register under their
+ * Asserts the {@code @Operator} short forms register under their
  * ids and process input as the equivalent hand-written operators do, and that the 2-tasklet
  * reference operator matches the cross-SDK authoring contract (see
  * {@code docs/sdk/authoring_contract.md} §6).
@@ -27,13 +26,12 @@ class SugarTwinTest {
 
     @BeforeEach
     void reset() {
-        UnboundedOperatorClassRegistry.reset();
-        com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry.reset();
+        OperatorClassRegistry.reset();
     }
 
     /** The topology the short form on {@code cls} declares, as registration builds it. */
-    private static UnboundedOperatorTopology shortForm(Class<?> cls) {
-        return UnboundedOperatorTopologyBuilder.build(UnboundedOperatorClassRegistry.probe(cls, UnboundedOperator.class));
+    private static OperatorTopology shortForm(Class<?> cls) {
+        return OperatorTopologyBuilder.build(OperatorClassRegistry.probe(cls));
     }
 
     @Test
@@ -73,7 +71,7 @@ class SugarTwinTest {
         var tasklet = new SugarEntry();
         assertThat(tasklet.cellsFor("apple")).containsExactly("a");
         assertThat(tasklet.cellsFor("zebra")).containsExactly("d");
-        var topology = UnboundedOperatorTopologyBuilder.build(new SugarStaticCellUnboundedOperator());
+        var topology = OperatorTopologyBuilder.build(new SugarStaticCellOperator());
         var entry = topology.tasklet(topology.taskletNameToId().get("macro_static_entry_tasklet"));
         assertThat(entry.cellsForOverridden())
                 .as("the class writes cellsFor, which is what declares it")
@@ -94,15 +92,15 @@ class SugarTwinTest {
     @Test
     void shortFormsRegisterOnlyWhenTheAuthorRegistersThem() {
         var runner = com.flezha.sdk.Flezha.createRunner("sugar_twin_ns");
-        assertThat(UnboundedOperatorClassRegistry.factoryIds()).isEmpty();
+        assertThat(OperatorClassRegistry.factoryIds()).isEmpty();
 
         runner.registerFactory(SugarDoNothing.class)
                 .registerFactory(SugarStore.class)
                 .registerFactory(SugarNamedInput.class)
                 .registerFactory(SugarStateOnly.class)
-                .registerFactory(SugarStaticCellUnboundedOperator.class);
+                .registerFactory(SugarStaticCellOperator.class);
 
-        assertThat(UnboundedOperatorClassRegistry.factoryIds())
+        assertThat(OperatorClassRegistry.factoryIds())
                 .contains(
                         "sugar_do_nothing",
                         "sugar_store_input",
@@ -111,15 +109,14 @@ class SugarTwinTest {
                         "sugar_static_cell");
 
         runner.unregisterFactory(SugarStateOnly.class);
-        assertThat(UnboundedOperatorClassRegistry.factoryIds()).doesNotContain("sugar_state_only");
+        assertThat(OperatorClassRegistry.factoryIds()).doesNotContain("sugar_state_only");
     }
 
-    /** fails when: the bounded short form stops declaring a bounded operator. */
+    /** fails when: the steps short form stops declaring a steps operator. */
     @Test
-    void theBoundedShortFormRegistersAsABounded() {
-        com.flezha.sdk.Flezha.createRunner("sugar_twin_bounded_ns").registerFactory(SugarBounded.class);
-        assertThat(com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry.factoryIds())
-                .contains("sugar_bounded");
+    void theStepsShortFormRegistersAsSteps() {
+        com.flezha.sdk.Flezha.createRunner("sugar_twin_steps_ns").registerFactory(SugarSteps.class);
+        assertThat(OperatorClassRegistry.getTopology("sugar_steps").steps()).isTrue();
     }
 
     /**
@@ -155,22 +152,23 @@ class SugarTwinTest {
     }
 
     /**
-     * fails when: the two kinds stop sharing one factory-id namespace, so a bounded operator could be
-     * placed under an id an unbounded operator already answers. The refusal is the real registries' — this is
-     * the module where both are on the classpath.
+     * fails when: a steps operator can be placed under an id a flow operator already answers, or the
+     * refused class takes the id over in the runtime registry. This is the module where the runner
+     * and the real registry are both on the classpath.
      */
     @Test
-    void aBoundedUnderAnUnboundedFactoryIdIsRefused() {
-        var runner = com.flezha.sdk.Flezha.createRunner("sugar_twin_dup_ns").registerFactory(ShorthandDupUnbounded.class);
+    void aStepsClassUnderAFlowFactoryIdIsRefused() {
+        var runner = com.flezha.sdk.Flezha.createRunner("sugar_twin_dup_ns").registerFactory(ShorthandDupFlow.class);
 
-        assertThatThrownBy(() -> runner.registerFactory(ShorthandDupBounded.class))
+        assertThatThrownBy(() -> runner.registerFactory(ShorthandDupSteps.class))
                 .isInstanceOfSatisfying(com.flezha.sdk.FlezhaException.class, e -> {
                     assertThat(e.code()).isEqualTo("topology.duplicate_factory_id");
                     assertThat(e.details()).containsEntry("factory_id", "plain");
                 });
 
-        assertThat(com.flezha.sdk.runtime.bounded.BoundedOperatorClassRegistry.factoryIds())
-                .doesNotContain("plain");
+        assertThat(OperatorClassRegistry.getTopology("plain").steps())
+                .as("the flow class keeps the id")
+                .isFalse();
     }
 
     /**

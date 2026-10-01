@@ -1,13 +1,13 @@
 package com.flezha.examples.tradedesk;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.BoundedOperator;
+import com.flezha.sdk.operator.Operator;
 import javax.annotation.Nonnull;
 
 /**
- * The desk's bounded operator: one instance per order, which runs its steps once and then ends.
+ * The desk's steps operator: one instance per order, which runs its steps once and then ends.
  *
- * <p>A bounded operator declares its steps the way an unbounded operator declares its graph, on the same
+ * <p>A steps operator declares its steps the way a flow operator declares its graph, on the same
  * builder, and the controller schedules, restarts and relocates it in the same way. What differs
  * is the lifecycle: each step's output is written down as it commits, so an instance that is
  * interrupted resumes at the step it reached rather than from the beginning, and the instance ends
@@ -18,7 +18,7 @@ import javax.annotation.Nonnull;
  * methods: the order is cancelled, then the money is released. A step with no {@code compensate}
  * is skipped, which is why the desk's book is left alone.
  */
-public final class OrderExecutorOperator implements BoundedOperator {
+public final class OrderExecutorOperator implements Operator {
 
     /**
      * The order an instance is started with. The entry channel declares this type, so the first
@@ -35,6 +35,11 @@ public final class OrderExecutorOperator implements BoundedOperator {
     @Nonnull
     public String factoryId() {
         return "order_executor";
+    }
+
+    @Override
+    public Run run() {
+        return Run.steps();
     }
 
     /**

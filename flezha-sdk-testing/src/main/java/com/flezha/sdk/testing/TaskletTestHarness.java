@@ -425,7 +425,7 @@ public final class TaskletTestHarness<Input, State, Output> {
         @Override
         public void checkpoint() {}
 
-        /** No-op: the harness drives one Tasklet directly, with no bounded instance to end. */
+        /** No-op: the harness drives one Tasklet directly, with no steps instance to end. */
         @Override
         public void complete(@Nonnull byte[] result) {}
 

@@ -41,8 +41,8 @@ public final class LocalOperator implements AutoCloseable {
     }
 
     /**
-     * Register {@code type}'s declared graph and start it locally. {@code type} is an unbounded
-     * operator class, or a tasklet class carrying the {@code @UnboundedOperator} short form.
+     * Register {@code type}'s declared graph and start it locally. {@code type} is an
+     * operator class, or a tasklet class carrying the {@code @Operator} short form.
      *
      * @throws RuntimeException naming the capability when the declaration
      *     needs a controller

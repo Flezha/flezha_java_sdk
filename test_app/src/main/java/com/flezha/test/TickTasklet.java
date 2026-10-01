@@ -5,7 +5,7 @@ import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.util.List;
 
-/** Tasklet backing {@link CoalescingCounterUnboundedOperator}: folds one {@link TickInput}. */
+/** Tasklet backing {@link CoalescingCounterOperator}: folds one {@link TickInput}. */
 @Tasklet.Spec(name = "tick_tasklet")
 public final class TickTasklet implements Tasklet<TickInput, TickTasklet.State, Void> {
 

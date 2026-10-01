@@ -9,13 +9,13 @@ import com.flezha.sdk.channel.CallTarget;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.EntryChannel;
 import com.flezha.sdk.channel.Stream;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 
 /**
- * The HTTP side of the desk: an unbounded operator that carries the HTTP plugin, answers every
+ * The HTTP side of the desk: a flow operator that carries the HTTP plugin, answers every
  * request, and calls the session a message is for.
  */
-public final class GatewayOperator implements UnboundedOperator {
+public final class GatewayOperator implements Operator {
 
     static final long DEADLINE_MS = 60_000;
 
@@ -25,8 +25,12 @@ public final class GatewayOperator implements UnboundedOperator {
     }
 
     @Override
+    public Run run() {
+        return new Run.Flow(new Exactly.EffectivelyOnce());
+    }
+
+    @Override
     public void channels(ChannelBuilder c) {
-        c.effectivelyOnce();                                 // each request and answer on disk before it runs
         EntryChannel<Request> http = c.input(Request.class, "http");
         http.filter(request -> !request.sends())
                 .into(Watch.class)

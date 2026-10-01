@@ -1,7 +1,7 @@
 package com.flezha.examples.keyed;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 import java.util.List;
 import javax.annotation.Nonnull;
 
@@ -12,7 +12,7 @@ import javax.annotation.Nonnull;
  * cost no cell, no mailbox and no dispatch hop. Reshaping a value there is cheap; parsing a
  * megabyte there is not, so keep them small.
  */
-public final class CandleOperator implements UnboundedOperator {
+public final class CandleOperator implements Operator {
 
     private static final List<String> TIMEFRAMES = List.of("1m", "5m", "1h", "1d");
 

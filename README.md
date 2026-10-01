@@ -77,9 +77,9 @@ relocates when a host is withdrawn, and scales across several hosts.
 package com.example.echo;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 
-public final class EchoOperator implements UnboundedOperator {
+public final class EchoOperator implements Operator {
 
     /** Also durable. Renaming it makes the cluster forget what was running. */
     @Override
@@ -129,7 +129,40 @@ public final class Main {
 the runner to be closed explicitly.
 
 Declare every operator on the builder before the runner starts. One runner can
-serve several, and `registerFactory(...)` is the same call for the bounded kind.
+serve several, and `registerFactory(...)` is the same call whichever way a class
+runs.
+
+## Settings
+
+One `Operator` base carries the settings tree. Each "one of" is a sealed
+interface and each nested setting a member of its parent only, so a setting
+under the wrong parent does not compile:
+
+```java
+@Override
+public Run run() {
+    return new Run.Steps(Each.PER_INPUT, OnFailure.KEEP_PROGRESS);
+}
+
+@Override
+public Durable durable() {
+    return new Durable.Local(Duration.ofMinutes(10));   // sleep after ten idle minutes
+}
+```
+
+| Setting | Values | Default |
+|---|---|---|
+| `run()` | `Run.Flow(exactly)` or `Run.Steps(each, onFailure)` | a flow, at least once |
+| `exactly` (flow) | `Exactly.AtLeastOnce()` or `Exactly.EffectivelyOnce(ack, correctionMs, beyondWindow)` | at least once |
+| `ack` (effectively once) | `Ack.PerInput()` or `Ack.Checkpoint(every, maxDelayMs, outputs)` | per input |
+| `each` (steps) | `ONCE`, `PER_INPUT`, `CHAINED` | `ONCE` |
+| `onFailure` (steps) | `UNDO_ALL`, `KEEP_PROGRESS` | `UNDO_ALL` |
+| `durable()` | `Durable.Memory()`, `Durable.Local(sleepAfter)`, `Durable.Remote(sleepAfter)` | local; a flow never sleeps, a steps class after six hours |
+| `maxDuration()` | a wall-clock stop for either run | none |
+| `description()` | shown by `flz operator info` | empty |
+
+The short form, `@Operator` on a tasklet class, takes the same tree as nested
+annotations: `@Operator(id = "chat", run = @Run(steps = @Steps(each = Each.PER_INPUT)))`.
 
 Anything Flezha refuses throws one unchecked type, `com.flezha.sdk.FlezhaException`:
 a registration, a refused connect, an administration call, a spawn read, and a
@@ -170,19 +203,19 @@ controller are refused at startup with the responsible declaration named.
 | Capability | Declare | Gives you |
 |---|---|---|
 | Durable state | a state class, and `Change` records applied with `ctx.change(...)` | State survives restart, rebuilt from a change log. |
-| Effectively-once output | `c.effectivelyOnce()` + `.keyed()` channels | State, output and consumed offset become durable in ONE record. A crash cannot advance the offset while losing the output. |
-| Checkpointed intervals | `c.checkpointAck()` + `ctx.checkpoint()` | The offset is withheld until the state is coherent, so a half-built window is never persisted. |
-| Late-input correction | `c.correctionWindow(ms)` | A late input rewinds the Cell and replays the slice in event-time order, repairing the earlier result. |
+| Effectively-once output | `Exactly.EffectivelyOnce` in `run()` + `.keyed()` channels | State, output and consumed offset become durable in ONE record. A crash cannot advance the offset while losing the output. |
+| Checkpointed intervals | `Ack.Checkpoint` in `run()` + `ctx.checkpoint()` | The offset is withheld until the state is coherent, so a half-built window is never persisted. |
+| Late-input correction | `correctionMs` on `Exactly.EffectivelyOnce` | A late input rewinds the Cell and replays the slice in event-time order, repairing the earlier result. |
 | Dead-letter queue | `.retryMax(n)` on the channel | A poison payload is retried, then parked durably, never silently dropped. |
 | Edge transforms | `.map(T.class, f)` / `.filter(p)` / `.flatMap(T.class, f)` on the wiring | Reshape, drop or fan out values without a Tasklet, with no cell, no mailbox and no dispatch hop. |
 | Dynamic cell mode | `.keyBy(f)` on the wiring | One Cell per key the stream actually carries, created on first sight, and visible where the graph is declared. |
 | Operator-wide document | `c.routeLatest(Doc.class, documents, traffic, keyFn)` | Every key seen on the traffic stream receives each distinct document exactly once, on that key's own next traffic item, the one delivery a keyed tasklet cannot get from a broadcast. One tick of latency per key is the price of only ever emitting keys this member owns. |
-| Bounded operator transaction | `implements BoundedOperator` + `channels(...)` | A graph committed stage by stage: a committed stage is not re-run on resume, which continues at the stage it reached. Failure unwinds through each tasklet's `compensate`, declared by writing it. |
-| Durable loop / suspension | `loopMode()` + `ctx.timerAfter(d)` | One durable iteration per message; parks when idle, holding its journal, and wakes at its earliest pending timer. |
-| Cell retry | `.retryMax(n)` / `.retryBackoffMs(ms)` on the edge that feeds the tasklet | In a bounded operator, only the failing cell re-runs; a failed attempt's output is dropped, not double-emitted. |
+| Steps operator transaction | `Run.Steps` in `run()` + `channels(...)` | A graph committed stage by stage: a committed stage is not re-run on resume, which continues at the stage it reached. Failure unwinds through each tasklet's `compensate`, declared by writing it. |
+| Durable loop / suspension | `Each.PER_INPUT` + `ctx.timerAfter(d)` | One durable iteration per message; parks when idle, holding its journal, and wakes at its earliest pending timer. |
+| Cell retry | `.retryMax(n)` / `.retryBackoffMs(ms)` on the edge that feeds the tasklet | In a steps operator, only the failing cell re-runs; a failed attempt's output is dropped, not double-emitted. |
 
 Each is a declaration the controller must honour, so declare what you need rather
-than what sounds reassuring: a `correctionWindow` sizes the controller's input-log
+than what sounds reassuring: a correction window sizes the controller's input-log
 retention, and a tier without keyed sinks is refused at registration.
 
 ## Answering and calling
@@ -213,8 +246,8 @@ gateway.keyBy(line -> line.split(":")[0])
 
 | Module | Purpose |
 |---|---|
-| `flezha-sdk-api` | Public API: `Flezha`, `UnboundedOperator`, `BoundedOperator`, `Tasklet` and `@Tasklet.Spec`, `Ctx`, `Change`, `StableId`, channel builders, the short-form annotations. No native dependency. |
-| `flezha-sdk-runtime` | Control plane, data plane, framing, worker pool, reconnect, state persistence, bounded class registration. |
+| `flezha-sdk-api` | Public API: `Flezha`, `Operator` and its settings tree, `Tasklet` and `@Tasklet.Spec`, `Ctx`, `Change`, `StableId`, channel builders, the `@Operator` short form. No native dependency. |
+| `flezha-sdk-runtime` | Control plane, data plane, framing, worker pool, reconnect, state persistence, steps class registration. |
 | `flezha-sdk-native` | JNI bindings + bundled per-OS `libflz_core_ffi`. |
 | `flezha-sdk-testing` | `TaskletTestHarness`, added with `<scope>test</scope>`. |
 | `flezha-sdk-examples` | Worked examples. Compiled by the build, so they cannot rot. |
@@ -253,7 +286,6 @@ FLEZHA_E2E_RUNTIME=java mix test --include system   # from repo root: the shared
 | `FLEZHA_WORKER_POOL_SIZE` | `availableProcessors()` | Shared runner draining every Cell mailbox. |
 | `FLEZHA_LOG_LEVEL` | `warn` | `debug`, `info`, `warn` or `error` for the default logger. Unset, blank and unrecognised all mean `warn`. |
 | `FLEZHA_NATIVE_LIB_DIR` | `$TMPDIR` | Where `libflz_core_ffi` is extracted. Set it on containers where `/tmp` is `noexec`. |
-| `FLEZHA_PARK_IDLE_MS` | `600000` | How long an instance of a class that sleeps (`sleepWhenIdle()`) stays idle before it sleeps. |
 
 ## Diagnostics
 

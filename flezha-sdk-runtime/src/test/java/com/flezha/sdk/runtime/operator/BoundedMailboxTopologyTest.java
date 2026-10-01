@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.OverflowPolicy;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.runtime.Refused;
-import com.flezha.sdk.runtime.operator.builder.UnboundedOperatorTopologyBuilder;
+import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,13 +24,13 @@ class BoundedMailboxTopologyTest {
 
     @BeforeEach
     void reset() {
-        UnboundedOperatorClassRegistry.reset();
+        OperatorClassRegistry.reset();
     }
 
     @Test
     @DisplayName("default policy: DROP_NOTHING on entry and inter-tasklet channels alike")
     void defaultPoliciesByKind() {
-        UnboundedOperatorTopology topology = UnboundedOperatorTopologyBuilder.build(new TwoStageUnboundedOperator());
+        OperatorTopology topology = OperatorTopologyBuilder.build(new TwoStageOperator());
         // Channel index 0 is the entry channel "input"; index 1 is the
         // inter-tasklet channel "mid".
         assertThat(topology.channels().get(0).overflowPolicy()).isEqualTo(OverflowPolicy.DROP_NOTHING);
@@ -40,23 +40,21 @@ class BoundedMailboxTopologyTest {
     @Test
     @DisplayName("onFull(DROP_OLDEST) overrides the per-kind default on an inter-tasklet channel")
     void onFullOverridesDefault() {
-        UnboundedOperatorTopology topology =
-                UnboundedOperatorTopologyBuilder.build(new InterTaskletDropOldestUnboundedOperator());
+        OperatorTopology topology = OperatorTopologyBuilder.build(new InterTaskletDropOldestOperator());
         assertThat(topology.channels().get(1).overflowPolicy()).isEqualTo(OverflowPolicy.DROP_OLDEST);
     }
 
     @Test
     @DisplayName("onFull(DROP_NEWEST) on an entry channel overrides the default: shedding is declared")
     void onFullOnEntryChannelOverrides() {
-        UnboundedOperatorTopology topology =
-                UnboundedOperatorTopologyBuilder.build(new EntryDropNewestUnboundedOperator());
+        OperatorTopology topology = OperatorTopologyBuilder.build(new EntryDropNewestOperator());
         assertThat(topology.channels().get(0).overflowPolicy()).isEqualTo(OverflowPolicy.DROP_NEWEST);
     }
 
     @Test
     @DisplayName("a written Tasklet.mailboxCapacity() flows into the descriptor")
     void taskletOverrideHonored() {
-        UnboundedOperatorTopology topology = UnboundedOperatorTopologyBuilder.build(new BigMailboxUnboundedOperator());
+        OperatorTopology topology = OperatorTopologyBuilder.build(new BigMailboxOperator());
         int taskletId = topology.taskletNameToId().get("big_mailbox_tasklet");
         assertThat(topology.tasklets().get(taskletId).mailboxCapacity()).isEqualTo(8192);
     }
@@ -64,7 +62,7 @@ class BoundedMailboxTopologyTest {
     @Test
     @DisplayName("default mailbox capacity is 1024 when no override and no env var present")
     void defaultMailboxCapacity() {
-        UnboundedOperatorTopology topology = UnboundedOperatorTopologyBuilder.build(new TwoStageUnboundedOperator());
+        OperatorTopology topology = OperatorTopologyBuilder.build(new TwoStageOperator());
         for (TaskletDescriptor desc : topology.tasklets()) {
             assertThat(desc.mailboxCapacity()).isEqualTo(1024);
         }
@@ -74,8 +72,7 @@ class BoundedMailboxTopologyTest {
     @DisplayName("capacity = 0 fails registration, named by the core")
     void zeroCapacityRejected() {
         FlezhaException refused = Refused.by(
-                "topology.mailbox_capacity_zero",
-                () -> UnboundedOperatorTopologyBuilder.build(new ZeroCapacityUnboundedOperator()));
+                "topology.mailbox_capacity_zero", () -> OperatorTopologyBuilder.build(new ZeroCapacityOperator()));
         assertThat(Refused.details(refused, "topology.mailbox_capacity_zero"))
                 .containsEntry("tasklet", "zero_capacity_tasklet");
     }
@@ -84,8 +81,7 @@ class BoundedMailboxTopologyTest {
     @DisplayName("mailboxCapacity above MAX is rejected, named by the core with the value")
     void tooLargeRejected() {
         FlezhaException refused = Refused.by(
-                "topology.mailbox_capacity_too_large",
-                () -> UnboundedOperatorTopologyBuilder.build(new HugeCapacityUnboundedOperator()));
+                "topology.mailbox_capacity_too_large", () -> OperatorTopologyBuilder.build(new HugeCapacityOperator()));
         assertThat(Refused.details(refused, "topology.mailbox_capacity_too_large"))
                 .containsEntry("tasklet", "huge_capacity_tasklet")
                 .containsEntry("value", 9999999);
@@ -107,7 +103,7 @@ class BoundedMailboxTopologyTest {
         public void run(Integer input, Ctx<Void, Void> ctx) {}
     }
 
-    public static final class TwoStageUnboundedOperator implements UnboundedOperator {
+    public static final class TwoStageOperator implements Operator {
         @Override
         public String factoryId() {
             return "two_stage";
@@ -120,7 +116,7 @@ class BoundedMailboxTopologyTest {
         }
     }
 
-    public static final class InterTaskletDropOldestUnboundedOperator implements UnboundedOperator {
+    public static final class InterTaskletDropOldestOperator implements Operator {
         @Override
         public String factoryId() {
             return "interprocedure_drop_oldest";
@@ -144,7 +140,7 @@ class BoundedMailboxTopologyTest {
     void droppingPolicyUnderTheTierIsRefused() {
         FlezhaException refused = Refused.by(
                 "topology.dropping_policy_under_effectively_once",
-                () -> UnboundedOperatorTopologyBuilder.build(new TierShedsUnboundedOperator()));
+                () -> OperatorTopologyBuilder.build(new TierShedsOperator()));
         assertThat(Refused.details(refused, "topology.dropping_policy_under_effectively_once"))
                 .containsEntry("channel", "input")
                 .containsEntry("policy", "drop_newest");
@@ -153,20 +149,23 @@ class BoundedMailboxTopologyTest {
     @Test
     @DisplayName("shedding stays available to a class that declares neither the tier nor a correction")
     void droppingPolicyOffTheTierStillBuilds() {
-        UnboundedOperatorTopology topology =
-                UnboundedOperatorTopologyBuilder.build(new EntryDropNewestUnboundedOperator());
+        OperatorTopology topology = OperatorTopologyBuilder.build(new EntryDropNewestOperator());
         assertThat(topology.channels().get(0).overflowPolicy()).isEqualTo(OverflowPolicy.DROP_NEWEST);
     }
 
-    public static final class TierShedsUnboundedOperator implements UnboundedOperator {
+    public static final class TierShedsOperator implements Operator {
         @Override
         public String factoryId() {
             return "tier_sheds";
         }
 
         @Override
+        public Run run() {
+            return new Run.Flow(new Exactly.EffectivelyOnce());
+        }
+
+        @Override
         public void channels(ChannelBuilder c) {
-            c.effectivelyOnce();
             c.input(String.class, "input")
                     .onFull(OverflowPolicy.DROP_NEWEST)
                     .into(A.class)
@@ -175,7 +174,7 @@ class BoundedMailboxTopologyTest {
         }
     }
 
-    public static final class EntryDropNewestUnboundedOperator implements UnboundedOperator {
+    public static final class EntryDropNewestOperator implements Operator {
         @Override
         public String factoryId() {
             return "entry_drop_newest";
@@ -198,7 +197,7 @@ class BoundedMailboxTopologyTest {
         public void run(String input, Ctx<Void, Integer> ctx) {}
     }
 
-    public static final class BigMailboxUnboundedOperator implements UnboundedOperator {
+    public static final class BigMailboxOperator implements Operator {
         @Override
         public String factoryId() {
             return "big_mailbox";
@@ -216,7 +215,7 @@ class BoundedMailboxTopologyTest {
         public void run(String input, Ctx<Void, Integer> ctx) {}
     }
 
-    public static final class ZeroCapacityUnboundedOperator implements UnboundedOperator {
+    public static final class ZeroCapacityOperator implements Operator {
         @Override
         public String factoryId() {
             return "zero_cap";
@@ -235,7 +234,7 @@ class BoundedMailboxTopologyTest {
         public void run(String input, Ctx<Void, Integer> ctx) {}
     }
 
-    public static final class HugeCapacityUnboundedOperator implements UnboundedOperator {
+    public static final class HugeCapacityOperator implements Operator {
         @Override
         public String factoryId() {
             return "huge_cap";

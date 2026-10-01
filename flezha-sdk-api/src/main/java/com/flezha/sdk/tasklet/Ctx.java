@@ -10,7 +10,7 @@ import javax.annotation.Nonnull;
 /**
  * One invocation's context, passed to {@link Tasklet#run}, {@link Tasklet#onTimer} and
  * {@link Tasklet#compensate}: the cell's state and its changes, emits, the clock, a replay-stable
- * identifier, timers and bounded spawns.
+ * identifier, timers and steps spawns.
  *
  * <pre>{@code
  * @Override
@@ -100,22 +100,22 @@ public interface Ctx<State, Output> {
      * window, a completed batch). The interval you leave open is the work a
      * crash replays and the work the controller's input log retains.
      *
-     * <p>A no-op unless the Operator declared {@code checkpointAck()}.
+     * <p>A no-op unless the operator acknowledges at a checkpoint
+     * ({@link com.flezha.sdk.operator.Operator.Ack.Checkpoint}).
      */
     void checkpoint();
 
     /**
-     * End the bounded operator this tasklet runs in, with {@code result}. The call does not stop the
-     * iteration: its remaining tasklets still run and commit, and the instance then ends with
-     * status {@code ok} and this result instead of waiting for its next input, re-seeding a chained
-     * loop or parking. In a {@code ONCE} bounded operator it is the result the single pass ends with.
+     * End the operator this tasklet runs in, with {@code result}. The call does not stop the
+     * invocation's remaining work. In an operator that runs in steps, the iteration's remaining
+     * tasklets still run and commit, and the instance then ends with status {@code ok} and this
+     * result instead of waiting for its next input, re-seeding a chained loop or parking; in a
+     * {@code ONCE} run it is the result the single pass ends with. In a flow operator the instance
+     * runs the work its cells already hold to its outputs, then ends {@code completed}.
      *
      * <p>A later call in the same invocation replaces an earlier one. When several cells call it
      * in one iteration, the instance ends once, with the result of the tasklet latest in the
      * chain and, within it, of the greatest cell key.
-     *
-     * <p>An unbounded operator never completes: an unbounded tasklet calling this fails its input with a
-     * non-retryable {@code runtime.complete_outside_bounded} error.
      */
     void complete(byte[] result);
 
@@ -128,7 +128,7 @@ public interface Ctx<State, Output> {
     }
 
     /**
-     * Ask the controller for a new bounded instance of {@code factoryId}, under an id it
+     * Ask the controller for a new steps instance of {@code factoryId}, under an id it
      * generates, with {@code payload} as the instance's first input. The payload is encoded as a
      * sink with no encoder encodes a value ({@link PlainPayload}): a {@code byte[]} as it is, a
      * {@code String} as UTF-8, anything else as JSON, which the instance's entry channel decodes.
@@ -142,7 +142,7 @@ public interface Ctx<State, Output> {
      * spawn reissued after a lost or timed-out answer starts a second instance, and a replayed
      * invocation answers an empty id, because the generated one existed only in the live run's
      * answer. A caller who needs at most one instance, or the id on replay, passes its own id
-     * through {@link #spawnBounded(String, Object, SpawnOptions)}.
+     * through {@link #spawnSteps(String, Object, SpawnOptions)}.
      *
      * <p>Spawning is a side effect of <b>live</b> processing. Replayed input (a crash-resume or a
      * late-input correction re-running this invocation) issues no request and answers
@@ -153,7 +153,7 @@ public interface Ctx<State, Output> {
      * live run never had.
      */
     @Nonnull
-    default SpawnHandle spawnBounded(String factoryId, Object payload) {
+    default SpawnHandle spawnSteps(String factoryId, Object payload) {
         return SpawnRequests.request(
                 activationToken(),
                 factoryId,
@@ -165,7 +165,7 @@ public interface Ctx<State, Output> {
     }
 
     /**
-     * Ask the controller for the bounded instance {@code options} names: start {@code factoryId}
+     * Ask the controller for the steps instance {@code options} names: start {@code factoryId}
      * under that id if it is free, otherwise apply its {@link IfRunning} policy
      * ({@link IfRunning#DELIVER}, the default, feeds the running instance; {@link IfRunning#ERROR}
      * reports {@code operator.already_running}). {@code payload} is the instance's first input
@@ -174,10 +174,10 @@ public interface Ctx<State, Output> {
      * <p>Concurrent requests for one id resolve controller-side: exactly one spawns and every other
      * payload is delivered to it. A replayed invocation answers
      * {@link SpawnOutcome#SKIPPED_ON_REPLAY} with that id. The handle, the failures and the replay
-     * rule are those of {@link #spawnBounded(String, Object)}.
+     * rule are those of {@link #spawnSteps(String, Object)}.
      */
     @Nonnull
-    default SpawnHandle spawnBounded(String factoryId, Object payload, SpawnOptions options) {
+    default SpawnHandle spawnSteps(String factoryId, Object payload, SpawnOptions options) {
         return SpawnRequests.request(
                 activationToken(),
                 factoryId,
@@ -191,7 +191,7 @@ public interface Ctx<State, Output> {
     /**
      * Whether this invocation is re-running already-processed input. Runtime
      * detail: the dispatcher overrides it, and it is what makes
-     * {@link #spawnBounded} a live-processing-only side effect.
+     * {@link #spawnSteps} a live-processing-only side effect.
      */
     default boolean replaying() {
         return false;
@@ -249,7 +249,7 @@ public interface Ctx<State, Output> {
      * <p>The anchor is {@code ctx.now()}, the tasklet's clock, not an ambient
      * read, which is what makes a replayed invocation register the same absolute
      * timestamp the live one did. Under an event-time clock the
-     * anchor is therefore the input's event time: an unbounded operator that is caught up
+     * anchor is therefore the input's event time: a flow operator that is caught up
      * schedules the same instant a wall clock would, and one replaying history
      * schedules a past instant, which fires at once.
      */

@@ -1,11 +1,11 @@
 package com.flezha.examples.local;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.UnboundedOperator;
+import com.flezha.sdk.operator.Operator;
 import javax.annotation.Nonnull;
 
 /** Splits lines into words, then counts each word in its own cell. */
-public final class WordCountOperator implements UnboundedOperator {
+public final class WordCountOperator implements Operator {
 
     @Override
     @Nonnull

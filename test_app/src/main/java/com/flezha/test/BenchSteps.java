@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Step classes for the {@code mix bench.bounded} Java fixtures — the mirror of
+ * Step classes for the {@code mix bench.steps} Java fixtures — the mirror of
  * the Rust test app's {@code BenchS0..BenchS15} and {@code BenchTurn}. Each
  * chain position needs a distinct {@link Tasklet}
  * class, so the durable pass-through steps are enumerated; every one is the
@@ -88,7 +88,7 @@ public final class BenchSteps {
     public static final class S15 extends DurableStep {}
 
     /**
-     * The loop's durable first step: bounded state, input passed on. With
+     * The loop's durable first step: steps state, input passed on. With
      * {@code FLEZHA_BENCH_WAKE_AFTER_MS} set each turn arms a timer that far out, whose
      * firing sends the bench's wake marker, {@code wake:<fired_at>}.
      */
