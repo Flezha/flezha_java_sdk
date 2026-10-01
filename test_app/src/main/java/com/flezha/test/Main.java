@@ -89,6 +89,7 @@ public final class Main {
                 .registerFactory(SessionTimeoutOperator.class)
                 .registerFactory(MixedOperator.class)
                 .registerFactory(TierStoreOperator.class)
+                .registerFactory(RemoteTierStoreOperator.class)
                 .registerFactory(TierChainOperator.class)
                 .registerFactory(BenchEchoOperator.class)
                 .registerFactory(BenchKeyedOperator.class)
