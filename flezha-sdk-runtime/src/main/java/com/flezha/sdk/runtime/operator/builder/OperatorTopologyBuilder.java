@@ -84,6 +84,8 @@ public final class OperatorTopologyBuilder implements ChannelBuilder {
     private final List<FlezhaException> errors = new ArrayList<>();
     /** Ties the sources of one merge together across the channels they sit on. */
     private int mergeGroups;
+    /** The operator classes this graph embeds, and the flow classes being inlined. */
+    final OperatorEmbedding embedding = new OperatorEmbedding(this);
 
     /** Set at build time: every mutating path refuses afterwards. */
     private boolean frozen;
@@ -128,6 +130,9 @@ public final class OperatorTopologyBuilder implements ChannelBuilder {
     @Nonnull
     public <T> EntryChannel<T> input(@Nonnull Class<T> type, @Nonnull String name) {
         checkMutable();
+        if (embedding.inlining()) {
+            return embedding.entry(type, name);
+        }
         boolean parsed = type != byte[].class && type != String.class;
         return declareEntry(type, name, bytes -> PlainPayload.decode(bytes, type), parsed);
     }
@@ -137,6 +142,9 @@ public final class OperatorTopologyBuilder implements ChannelBuilder {
     public <T> EntryChannel<T> input(
             @Nonnull Class<T> type, @Nonnull String name, @Nonnull Function<byte[], T> parser) {
         checkMutable();
+        if (embedding.inlining()) {
+            return embedding.entry(type, name);
+        }
         return declareEntry(type, name, parser::apply, true);
     }
 
@@ -286,6 +294,11 @@ public final class OperatorTopologyBuilder implements ChannelBuilder {
         return tasklets.get(taskletId);
     }
 
+    /** How many nodes are registered so far: the id the next one takes. */
+    int taskletCount() {
+        return tasklets.size();
+    }
+
     private int declareChannel(Class<?> payloadType, String name, ChannelKind kind) {
         int id = channels.size();
         ChannelEntry entry = new ChannelEntry();
@@ -307,7 +320,7 @@ public final class OperatorTopologyBuilder implements ChannelBuilder {
      */
     int registerNode(Class<? extends Tasklet<?, ?, ?>> taskletClass, String nodeName) {
         TaskletModel model = TaskletModel.read(taskletClass, instantiate(taskletClass));
-        String identity = nodeName != null ? nodeName : model.name();
+        String identity = embedding.prefixed(nodeName != null ? nodeName : model.name());
         Integer existing = resolveIdentity(identity, taskletClass, nodeName != null);
         if (existing != null) {
             return existing;
@@ -360,7 +373,7 @@ public final class OperatorTopologyBuilder implements ChannelBuilder {
     }
 
     /** Record one refusal; a class mentioned twice reports it once. */
-    private void refuse(FlezhaException error) {
+    void refuse(FlezhaException error) {
         boolean known = errors.stream()
                 .anyMatch(e -> e.code().equals(error.code()) && e.details().equals(error.details()));
         if (!known) {
@@ -547,6 +560,10 @@ public final class OperatorTopologyBuilder implements ChannelBuilder {
      */
     private void refuseTypeMismatch(
             ChannelEntry channel, TaskletEntry tasklet, Class<?> deliveredTypeOverride, Class<?> chainType) {
+        if (tasklet.embeds != null) {
+            // The embedded class's entry reads the value it is written in.
+            return;
+        }
         Class<?> declared = deliveredTypeOverride != null ? deliveredTypeOverride : chainType;
         Class<?> deliveredType = declared != null ? declared : channel.payloadType;
         // A placeholder's types are not the author's: its construction is already refused.
@@ -580,13 +597,14 @@ public final class OperatorTopologyBuilder implements ChannelBuilder {
         if (tasklet.outputChannelId != null) {
             return tasklet.outputChannelId;
         }
-        int id = declareChannel(tasklet.model.outputType(), tasklet.name, ChannelKind.INTER_TASKLET);
+        Class<?> payloadType = tasklet.embeddedOutput != null ? tasklet.embeddedOutput : tasklet.model.outputType();
+        int id = declareChannel(payloadType, tasklet.name, ChannelKind.INTER_TASKLET);
         channels.get(id).producer = taskletId;
         tasklet.outputChannelId = id;
         return id;
     }
 
-    private static String describe(Class<?> c) {
+    static String describe(Class<?> c) {
         return c == byte[].class ? "byte[]" : c.getName();
     }
 
@@ -657,5 +675,17 @@ public final class OperatorTopologyBuilder implements ChannelBuilder {
         List<Class<?>> kryoTypes;
 
         Integer outputChannelId;
+
+        /** The factory id of the steps class this node runs one stepped instance of per edge key. */
+        public String embeds;
+
+        /** The embedded class's entry channel the edge feeds, when it declares several. */
+        public String input;
+
+        /** The most stepped instances a keyed edge into the embedded class keeps at once. */
+        public Integer maxCells;
+
+        /** The embedded class's exit output type, which the node's output channel carries. */
+        Class<?> embeddedOutput;
     }
 }

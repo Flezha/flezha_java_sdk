@@ -131,4 +131,99 @@ final class Palette {
         @Override
         public void run(String input, Ctx<Void, Void> ctx) {}
     }
+
+    /** The operator class a class role is bound to, its factory id the role. */
+    static Class<? extends com.flezha.sdk.operator.Operator> innerClass(String role) {
+        return switch (role) {
+            case "inner_session" -> InnerSession.class;
+            case "inner_loop" -> InnerLoop.class;
+            case "inner_cleanup" -> InnerCleanup.class;
+            case "inner_two_entries" -> InnerTwoEntries.class;
+            case "inner_two_exits" -> InnerTwoExits.class;
+            default -> throw new IllegalStateException("the fixture names a class role that is not one: " + role);
+        };
+    }
+
+    public static final class InnerSession implements com.flezha.sdk.operator.Operator {
+        @Override
+        public String factoryId() {
+            return "inner_session";
+        }
+
+        @Override
+        public Run run() {
+            return Run.steps(Each.PER_INPUT);
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "turns").into(Plain.class);
+        }
+    }
+
+    public static final class InnerLoop implements com.flezha.sdk.operator.Operator {
+        @Override
+        public String factoryId() {
+            return "inner_loop";
+        }
+
+        @Override
+        public Run run() {
+            return Run.steps(Each.CHAINED);
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "turns").into(Plain.class).named("carry");
+        }
+    }
+
+    public static final class InnerCleanup implements com.flezha.sdk.operator.Operator {
+        @Override
+        public String factoryId() {
+            return "inner_cleanup";
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "raw").into(Plain.class).into(Second.class);
+        }
+    }
+
+    public static final class InnerTwoEntries implements com.flezha.sdk.operator.Operator {
+        @Override
+        public String factoryId() {
+            return "inner_two_entries";
+        }
+
+        @Override
+        public Run run() {
+            return Run.steps(Each.PER_INPUT);
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "a").into(Plain.class);
+            c.input(String.class, "b").into(Second.class);
+        }
+    }
+
+    public static final class InnerTwoExits implements com.flezha.sdk.operator.Operator {
+        @Override
+        public String factoryId() {
+            return "inner_two_exits";
+        }
+
+        @Override
+        public Run run() {
+            return Run.steps(Each.PER_INPUT);
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            var turns = c.input(String.class, "turns");
+            turns.into(Plain.class);
+            turns.into(Second.class);
+        }
+    }
 }

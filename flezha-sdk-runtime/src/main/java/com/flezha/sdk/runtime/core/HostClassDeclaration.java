@@ -71,6 +71,33 @@ public final class HostClassDeclaration {
     }
 
     /**
+     * Register {@code factoryId}'s class with the core, never announced as a
+     * factory of its own: the core judges an embedding against the class it
+     * names, and an embedding class is judged when it is built, before any
+     * runner context exists.
+     */
+    public static void declareEmbedded(@Nonnull String factoryId) {
+        long ctx = FlzCore.newContext();
+        try {
+            FlzCore.declareClass(ctx, forEmbedded(factoryId));
+        } finally {
+            FlzCore.contextFree(ctx);
+        }
+    }
+
+    /** {@link #forFactory} for a class declared only to be embedded by another. */
+    @Nonnull
+    public static byte[] forEmbedded(@Nonnull String factoryId) {
+        OperatorTopology topology = OperatorClassRegistry.getTopology(factoryId);
+        if (topology == null) {
+            throw new IllegalStateException("factory `" + factoryId + "` is not registered");
+        }
+        Map<String, Object> record = new LinkedHashMap<>(topology.declaration());
+        record.put("embedded", true);
+        return encode(record);
+    }
+
+    /**
      * The record a class submits: its settings tree as declared, one entry per
      * channel and tasklet in id order, and per channel the chains its handles
      * were given. Consumers, channel kinds, sink names and the acknowledgement
@@ -232,7 +259,11 @@ public final class HostClassDeclaration {
             if (desc.dynamic) {
                 p.put("cell_mode", "dynamic");
                 model.cellIdleTtl().ifPresent(ttl -> p.put("idle_ttl_ms", ttl.toMillis()));
-                model.maxCells().ifPresent(cap -> p.put("max_cells", cap));
+                if (desc.maxCells != null) {
+                    p.put("max_cells", desc.maxCells);
+                } else {
+                    model.maxCells().ifPresent(cap -> p.put("max_cells", cap));
+                }
             } else if (!model.cellKeys().isEmpty()) {
                 p.put("cell_mode", "static");
                 p.put("cell_keys", model.cellKeys());
@@ -255,6 +286,12 @@ public final class HostClassDeclaration {
             // they never declared.
             p.put("schema_version", model.schemaVersion());
             p.put("min_readable_schema_version", model.minReadableSchemaVersion());
+            if (desc.embeds != null) {
+                p.put("operator", desc.embeds);
+                if (desc.input != null) {
+                    p.put("input", desc.input);
+                }
+            }
             out.add(p);
         }
         return out;

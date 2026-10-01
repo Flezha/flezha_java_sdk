@@ -23,6 +23,7 @@ public final class TaskletDescriptor {
     private final OptionalInt outputChannelId;
     private final List<Class<?>> kryoTypes;
     private final int mailboxCapacity;
+    private final boolean embeds;
 
     public TaskletDescriptor(
             @Nonnull String name,
@@ -31,7 +32,8 @@ public final class TaskletDescriptor {
             @Nonnull OptionalInt inputChannelId,
             @Nonnull OptionalInt outputChannelId,
             @Nonnull List<Class<?>> kryoTypes,
-            int mailboxCapacity) {
+            int mailboxCapacity,
+            boolean embeds) {
         this.name = name;
         this.model = model;
         this.dynamic = dynamic;
@@ -39,6 +41,7 @@ public final class TaskletDescriptor {
         this.outputChannelId = outputChannelId;
         this.kryoTypes = List.copyOf(kryoTypes);
         this.mailboxCapacity = mailboxCapacity;
+        this.embeds = embeds;
     }
 
     /** The node's identity: the tasklet's name, or the explicit node name given at wiring time. */
@@ -115,5 +118,13 @@ public final class TaskletDescriptor {
     /** Resolved per-cell mailbox capacity (the declared one, then the env var, then the default). */
     public int mailboxCapacity() {
         return mailboxCapacity;
+    }
+
+    /**
+     * Whether the node embeds a steps class: a value on an edge into it is written as the
+     * class's entry reads it, {@link com.flezha.sdk.channel.PlainPayload}, not in the class codec.
+     */
+    public boolean embeds() {
+        return embeds;
     }
 }

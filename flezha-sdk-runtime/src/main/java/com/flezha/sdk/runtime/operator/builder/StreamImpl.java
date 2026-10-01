@@ -1,12 +1,14 @@
 package com.flezha.sdk.runtime.operator.builder;
 
 import com.flezha.sdk.channel.CallTarget;
+import com.flezha.sdk.channel.Embedding;
 import com.flezha.sdk.channel.EntryChannel;
 import com.flezha.sdk.channel.OutputChain;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.PlainPayload;
 import com.flezha.sdk.channel.Response;
 import com.flezha.sdk.channel.Stream;
+import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.runtime.core.HostLink;
 import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder.ChannelEntry;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -68,6 +70,13 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
     @Nonnull
     public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<T, ?, O>> taskletClass, @Nonnull String nodeName) {
         return edge.into(taskletClass, nodeName);
+    }
+
+    @Override
+    @Nonnull
+    public <O> Stream<O> into(
+            @Nonnull Class<? extends Operator> operator, @Nonnull Class<O> output, @Nonnull Embedding embedding) {
+        return edge.into(operator, output, embedding);
     }
 
     @Override

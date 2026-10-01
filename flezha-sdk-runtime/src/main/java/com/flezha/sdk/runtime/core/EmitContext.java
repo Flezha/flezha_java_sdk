@@ -2,6 +2,7 @@ package com.flezha.sdk.runtime.core;
 
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelKind;
+import com.flezha.sdk.channel.PlainPayload;
 import com.flezha.sdk.runtime.operator.ChannelDescriptor;
 import com.flezha.sdk.runtime.operator.ConsumerEdge;
 import com.flezha.sdk.runtime.operator.PluginSink;
@@ -352,7 +353,9 @@ final class EmitContext implements Ctx<Object, Object> {
                         Optional.ofNullable(edge.keyOf(v)),
                         eventTime,
                         List.of(),
-                        instance.edgeCodec.serialize(v)));
+                        consumer != null && consumer.embeds()
+                                ? PlainPayload.encode(v)
+                                : instance.edgeCodec.serialize(v)));
             }
         }
     }

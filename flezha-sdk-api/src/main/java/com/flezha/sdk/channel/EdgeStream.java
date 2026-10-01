@@ -1,5 +1,6 @@
 package com.flezha.sdk.channel;
 
+import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.tasklet.Tasklet;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -66,6 +67,24 @@ public interface EdgeStream<T> {
      */
     @Nonnull
     <O> Stream<O> into(Class<? extends Tasklet<T, ?, O>> tasklet, String nodeName);
+
+    /**
+     * Wire this stream into an operator class. A class that runs in steps becomes a node, named
+     * by its factory id, that runs one stepped instance of it per key of this edge (one on an
+     * unkeyed edge) with its own state and journal; the handle answered carries its exit tasklet's
+     * output, of type {@code output}. A class that runs in flow is inlined: its graph joins this
+     * one, fed by this edge, its nodes named {@code <factoryId>.<node>}, and the handle answered
+     * is its exit node's. A steps class inside a steps class fails registration with
+     * {@code topology.nested_steps}.
+     */
+    @Nonnull
+    default <O> Stream<O> into(Class<? extends Operator> operator, Class<O> output) {
+        return into(operator, output, Embedding.of());
+    }
+
+    /** {@link #into(Class, Class)} with the embedding's options. */
+    @Nonnull
+    <O> Stream<O> into(Class<? extends Operator> operator, Class<O> output, Embedding embedding);
 
     /** Reshape every value on the way to the next consumer. */
     @Nonnull
