@@ -78,8 +78,6 @@ public final class Main {
                 .registerFactory(CoalescingCounterOperator.class)
                 .registerFactory(PersistenceOffOperator.class)
                 .registerFactory(SleepingCounterOperator.class)
-                .registerFactory(InnerOperators.Gateway.class)
-                .registerFactory(InnerOperators.LoopGateway.class)
                 .registerFactory(HybridChannelOperator.class)
                 .registerFactory(MergedInputOperator.class)
                 .registerFactory(TransformChainOperator.class)

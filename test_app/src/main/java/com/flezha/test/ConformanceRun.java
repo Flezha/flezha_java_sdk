@@ -280,8 +280,6 @@ public final class ConformanceRun {
         String[] call = splitCall(link);
         switch (call[0]) {
             case "into" -> handles.put(call[1], wire(s, call[1]));
-            // The result is the class's exit, addressed by the class's role.
-            case "into_class" -> handles.put(call[1], s.into(Palette.innerClass(call[1]), String.class));
             case "retry_max" -> s.retryMax(Integer.parseInt(call[1]));
             case "on_full" -> s.onFull(overflow(call[1]));
             // Read by taskletClass() as the tasklet was minted.

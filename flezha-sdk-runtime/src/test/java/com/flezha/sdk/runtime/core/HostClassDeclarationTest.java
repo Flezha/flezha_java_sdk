@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.channel.Embedding;
 import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.runtime.Refused;
@@ -16,7 +15,6 @@ import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
-import com.flezha.sdk.tasklet.TaskletException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -211,23 +209,19 @@ class HostClassDeclarationTest {
     void everyPinnedDeclarationKeyHasAJavaSpelling() throws Exception {
         OperatorClassRegistry.registerClass(FullyDeclaredOperator.class);
         OperatorClassRegistry.registerClass(FullyDeclaredDynamicOperator.class);
-        OperatorClassRegistry.registerClass(FullyDeclaredEmbedding.class);
 
         JsonNode flow = JSON.readTree(HostClassDeclaration.forFactory("decl_full_op"));
         JsonNode dynamic = JSON.readTree(HostClassDeclaration.forFactory("decl_full_dynamic_op"));
-        JsonNode embedding = JSON.readTree(HostClassDeclaration.forFactory("decl_full_embedding"));
-        JsonNode embedded = JSON.readTree(HostClassDeclaration.forEmbedded("decl_full_embedded"));
 
         // A key may live on any node of its section: the entry channel has no
         // `producer`, the plugin-bound one has the `keyed` flag.
-        assertEverySpellingExists("class", List.of(flow, embedded), Set.of());
+        assertEverySpellingExists("class", List.of(flow), Set.of());
         assertEverySpellingExists("channel", nodes(flow.get("channels")), Set.of());
         // Cell mode splits the tasklet keys: a static tasklet declares its
         // key set, a dynamic one its TTL and cap. Both modes together are the
         // section.
         List<JsonNode> tasklets = new ArrayList<>(nodes(flow.get("tasklets")));
         tasklets.addAll(nodes(dynamic.get("tasklets")));
-        tasklets.addAll(nodes(embedding.get("tasklets")));
         assertEverySpellingExists("tasklet", tasklets, Set.of());
     }
 
@@ -316,50 +310,6 @@ class HostClassDeclarationTest {
                 .filter(line -> line.startsWith(prefix))
                 .map(line -> line.substring(prefix.length()))
                 .collect(Collectors.toCollection(java.util.ArrayList::new));
-    }
-
-    /** A steps class embedded by name on an edge. */
-    public static final class FullyDeclaredEmbedded implements Operator {
-        @Override
-        public String factoryId() {
-            return "decl_full_embedded";
-        }
-
-        @Override
-        public Run run() {
-            return Run.steps(Each.PER_INPUT);
-        }
-
-        @Override
-        public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(EmbeddedTurn.class).named("answer");
-        }
-    }
-
-    @Tasklet.Spec(name = "decl_embedded_turn")
-    public static final class EmbeddedTurn implements Tasklet<String, Void, String> {
-        @Override
-        public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
-            ctx.emit(input);
-        }
-    }
-
-    public static final class FullyDeclaredEmbedding implements Operator {
-        @Override
-        public String factoryId() {
-            return "decl_full_embedding";
-        }
-
-        @Override
-        public void channels(ChannelBuilder c) {
-            c.input(String.class, "in")
-                    .into(
-                            FullyDeclaredEmbedded.class,
-                            String.class,
-                            Embedding.of().input("in"))
-                    .into(EmbeddedTurn.class, "reply")
-                    .sink("out");
-        }
     }
 
     /** Declares every flow-side option the Java surface has a spelling for. */

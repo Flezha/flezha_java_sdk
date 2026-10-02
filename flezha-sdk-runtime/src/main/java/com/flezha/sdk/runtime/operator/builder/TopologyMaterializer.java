@@ -117,8 +117,7 @@ final class TopologyMaterializer {
                     inputChannel(channels, i),
                     entry.outputChannelId == null ? OptionalInt.empty() : OptionalInt.of(entry.outputChannelId),
                     entry.kryoTypes,
-                    capacities[i],
-                    entry.embeds != null));
+                    capacities[i]));
         }
         return descriptors;
     }

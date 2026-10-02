@@ -1,10 +1,8 @@
 package com.flezha.sdk.runtime.operator.builder;
 
 import com.flezha.sdk.channel.EdgeStream;
-import com.flezha.sdk.channel.Embedding;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.Stream;
-import com.flezha.sdk.operator.Operator;
 import com.flezha.sdk.runtime.operator.EdgeYield;
 import com.flezha.sdk.tasklet.Tasklet;
 import java.util.ArrayList;
@@ -94,14 +92,6 @@ abstract class EdgeStreamImpl<T> implements EdgeStream<T>, EdgeSite {
     @Nonnull
     public <O> Stream<O> into(@Nonnull Class<? extends Tasklet<T, ?, O>> taskletClass, @Nonnull String nodeName) {
         return wireInto(taskletClass, nodeName);
-    }
-
-    @Override
-    @Nonnull
-    public <O> Stream<O> into(
-            @Nonnull Class<? extends Operator> operator, @Nonnull Class<O> output, @Nonnull Embedding embedding) {
-        owner.checkMutable();
-        return owner.embedding.wire(siteChannelId(), pending, payloadType, operator, output, embedding);
     }
 
     <O> Stream<O> wireInto(Class<? extends Tasklet<T, ?, O>> taskletClass, String nodeName) {
