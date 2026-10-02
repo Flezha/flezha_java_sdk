@@ -39,7 +39,7 @@ public final class OrderExecutorOperator implements Operator {
 
     @Override
     public Run run() {
-        return Run.steps();
+        return new Run.Steps(Each.ONCE, OnFailure.UNDO_ALL);
     }
 
     /**
