@@ -4,6 +4,8 @@ import com.flezha.sdk.Flezha;
 import com.flezha.sdk.FlezhaRunner;
 import com.flezha.sdk.admin.Admin;
 import com.flezha.sdk.admin.OperatorSpec;
+import com.flezha.sdk.admin.PluginSpec;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -28,13 +30,11 @@ public final class Main {
         // Admin admin = runner.admin();
         // admin.startOperator(OperatorSpec.of("echo").id("my_echo"));
         //
-        // ObjectNode sink = JsonNodeFactory.instance.objectNode();
-        // sink.put("id", "writer");
-        // sink.put("provider", "operator_file_sink");
-        // sink.put("operator_id", "my_echo");
-        // sink.putObject("opts").put("path", "echo-out.txt");
-        // sink.putArray("hooks").addArray().add("on_output").addObject();
-        // admin.enablePlugin("writer", sink);
+        // ObjectNode opts = JsonNodeFactory.instance.objectNode().put("path", "echo-out.txt");
+        // admin.enablePlugin("writer", PluginSpec.of("operator_file_sink").opts(opts));
+        // ArrayNode hooks = JsonNodeFactory.instance.arrayNode();
+        // hooks.addArray().add("on_output").addObject();
+        // admin.bindPlugin("writer", "my_echo", hooks, null);
         //
         // admin.send("my_echo", "hello world", "in");
         //

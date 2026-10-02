@@ -5,11 +5,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.internal.RunnerHandle;
 import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Administering the namespace this runner's connection proved, from ordinary
@@ -67,16 +69,46 @@ public final class Admin {
         return call("Operator.send", operatorId, message, channel);
     }
 
-    /** Enable a plugin, built from the fields {@code flz plugin enable} takes. */
+    /** Enable the plugin {@code name} in this namespace, as {@code spec} describes it. */
     @Nonnull
-    public JsonNode enablePlugin(String pluginId, JsonNode fields) {
-        return call("PluginManager.enable", pluginId, fields);
+    public JsonNode enablePlugin(String name, PluginSpec spec) {
+        return call("PluginManager.enable", name, spec.fields());
     }
 
-    /** Disable a plugin, or every partitioned instance of it. */
+    /** Bind the operator {@code operatorId} to the enabled plugin {@code name}, with no hooks. */
     @Nonnull
-    public JsonNode disablePlugin(String pluginId) {
-        return call("PluginManager.disable", pluginId);
+    public JsonNode bindPlugin(String name, String operatorId) {
+        return bindPlugin(name, operatorId, null, null);
+    }
+
+    /**
+     * Bind the operator {@code operatorId} to the enabled plugin {@code name}.
+     *
+     * @param hooks names or {@code [name, opts]} pairs, or null for none
+     * @param channel the channel the plugin feeds or reads, or null for none
+     */
+    @Nonnull
+    public JsonNode bindPlugin(String name, String operatorId, @Nullable JsonNode hooks, @Nullable String channel) {
+        ObjectNode fields = operatorFields(operatorId);
+        if (hooks != null) {
+            fields.set("hooks", hooks);
+        }
+        if (channel != null) {
+            fields.put("channel", channel);
+        }
+        return call("PluginManager.bind", name, fields);
+    }
+
+    /** Unbind the operator {@code operatorId} from the plugin {@code name}, which stays enabled. */
+    @Nonnull
+    public JsonNode unbindPlugin(String name, String operatorId) {
+        return call("PluginManager.unbind", name, operatorFields(operatorId));
+    }
+
+    /** Disable the plugin {@code name}, stopping it wherever it runs. */
+    @Nonnull
+    public JsonNode disablePlugin(String name) {
+        return call("PluginManager.disable", name, JsonNodeFactory.instance.objectNode());
     }
 
     /** The operator ids running in this namespace. */
@@ -85,7 +117,7 @@ public final class Admin {
         return call("Operator.list_operators");
     }
 
-    /** The plugins enabled on the controller node answering this call. */
+    /** The plugins enabled in this namespace: name, provider, single, bound operators. */
     @Nonnull
     public JsonNode listPlugins() {
         return call("PluginManager.list");
@@ -118,5 +150,9 @@ public final class Admin {
         } catch (JsonProcessingException e) {
             throw FlezhaException.of("admin.unreadable_answer", Map.of("verb", verb), e);
         }
+    }
+
+    private static ObjectNode operatorFields(String operatorId) {
+        return JsonNodeFactory.instance.objectNode().put("operator_id", operatorId);
     }
 }

@@ -3,6 +3,8 @@ package com.flezha.sdk.admin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.runtime.FlezhaImpl;
 import java.util.List;
@@ -40,6 +42,41 @@ class AdminTest {
                 .isEqualTo(new StartResult("my_echo", StartOutcome.ALREADY_RUNNING));
         assertThat(FlezhaImpl.ADMIN_CALLS)
                 .containsExactly(List.of("Operator.start", "[{\"factory_id\":\"echo\",\"id\":\"my_echo\"}]"));
+    }
+
+    @Test
+    @DisplayName("a plugin is enabled by name, and bound and unbound by operator")
+    void aPluginIsEnabledByNameAndBoundAndUnboundByOperator() {
+        JsonNodeFactory json = JsonNodeFactory.instance;
+        ArrayNode hooks = json.arrayNode();
+        hooks.addArray().add("on_output").addObject();
+
+        admin.enablePlugin(
+                "writer",
+                PluginSpec.of("operator_file_sink").opts(json.objectNode().put("path", "out.txt")));
+        admin.enablePlugin("feed", PluginSpec.of("operator_websocket").single().bind("my_echo", hooks));
+        admin.bindPlugin("writer", "my_echo");
+        admin.bindPlugin("writer", "my_other", json.arrayNode().add("on_output"), "in");
+        admin.unbindPlugin("writer", "my_echo");
+        admin.disablePlugin("writer");
+        admin.listPlugins();
+
+        assertThat(FlezhaImpl.ADMIN_CALLS)
+                .containsExactly(
+                        List.of(
+                                "PluginManager.enable",
+                                "[\"writer\",{\"provider\":\"operator_file_sink\",\"opts\":{\"path\":\"out.txt\"}}]"),
+                        List.of(
+                                "PluginManager.enable",
+                                "[\"feed\",{\"provider\":\"operator_websocket\",\"opts\":{},\"single\":true,"
+                                        + "\"operator_id\":\"my_echo\",\"hooks\":[[\"on_output\",{}]]}]"),
+                        List.of("PluginManager.bind", "[\"writer\",{\"operator_id\":\"my_echo\"}]"),
+                        List.of(
+                                "PluginManager.bind",
+                                "[\"writer\",{\"operator_id\":\"my_other\",\"hooks\":[\"on_output\"],\"channel\":\"in\"}]"),
+                        List.of("PluginManager.unbind", "[\"writer\",{\"operator_id\":\"my_echo\"}]"),
+                        List.of("PluginManager.disable", "[\"writer\",{}]"),
+                        List.of("PluginManager.list", "[]"));
     }
 
     @Test
