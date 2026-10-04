@@ -37,6 +37,12 @@ public final class FlezhaImpl implements RunnerHandle {
     /** Every {@code (verb, args)} an administration call carried, in call order. */
     public static final List<List<String>> ADMIN_CALLS = new ArrayList<>();
 
+    /** Every {@code (operator, channel, message, msgId, key, local)} a send carried, in call order. */
+    public static final List<List<Object>> SENDS = new ArrayList<>();
+
+    /** What {@link #send} answers. */
+    public static volatile String SEND_ANSWER = "null";
+
     /** What {@link #adminCall(String, String)} answers. */
     public static volatile String ADMIN_ANSWER = "null";
 
@@ -80,8 +86,8 @@ public final class FlezhaImpl implements RunnerHandle {
 
     @Override
     @Nonnull
-    public Map<String, ?> operators() {
-        return Map.of();
+    public List<String> operators() {
+        return List.of();
     }
 
     @Override
@@ -111,6 +117,14 @@ public final class FlezhaImpl implements RunnerHandle {
     public String adminCall(String verb, String args) {
         ADMIN_CALLS.add(List.of(verb, args));
         return ADMIN_ANSWER;
+    }
+
+    @Override
+    @Nonnull
+    public String send(String operator, String channel, byte[] message, String msgId, String key, boolean local) {
+        SENDS.add(java.util.Arrays.asList(
+                operator, channel, new String(message, java.nio.charset.StandardCharsets.UTF_8), msgId, key, local));
+        return SEND_ANSWER;
     }
 
     @Override

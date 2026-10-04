@@ -1,4 +1,4 @@
-package com.flezha.sdk.admin;
+package com.flezha.sdk.control;
 
 /** What an operator start did. */
 public enum StartOutcome {

@@ -2,7 +2,6 @@ package com.flezha.sdk.runtime.core;
 
 import com.flezha.sdk.Flezha;
 import com.flezha.sdk.Logger;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 
@@ -39,12 +38,6 @@ public final class ActivationDispatcher {
 
     public ActivationDispatcher(@Nonnull Parts parts) {
         this.parts = parts;
-    }
-
-    /** Live operator instances keyed by operator id — the {@code operators()} view. */
-    @Nonnull
-    public Map<String, OperatorInstance> instances() {
-        return instances;
     }
 
     /** How many live instances belong to {@code factoryId}. */

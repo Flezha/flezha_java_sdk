@@ -1,4 +1,4 @@
-package com.flezha.sdk.admin;
+package com.flezha.sdk.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;

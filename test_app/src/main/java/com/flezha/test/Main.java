@@ -1,9 +1,15 @@
 package com.flezha.test;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.sdk.ConsoleLogger;
 import com.flezha.sdk.Flezha;
+import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.FlezhaRunner;
 import com.flezha.sdk.LogLevel;
+import com.flezha.sdk.SendOpts;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * Mirror of {@code test/apps/rust_runner/src/main.rs}. Accepts the
@@ -43,7 +49,40 @@ public final class Main {
             runner.run();
             return;
         }
+        String localSends = System.getenv("FLEZHA_LOCAL_SEND_SCRIPT");
+        if (localSends != null && !localSends.isEmpty()) {
+            startLocalSends(runner, localSends);
+        }
         define(runner).run();
+    }
+
+    /**
+     * The local-send drill: a JSON array of {@code {operator, channel,
+     * message, when}} sends this app's own code makes with {@code local},
+     * each once the file {@code when} names exists, printing
+     * {@code local_send <operator> ok} or {@code local_send <operator> err <code>}.
+     */
+    private static void startLocalSends(FlezhaRunner runner, String script) throws Exception {
+        JsonNode sends = new ObjectMapper().readTree(script);
+        Thread drill = new Thread(() -> {
+            for (JsonNode send : sends) {
+                String operator = send.path("operator").asText();
+                try {
+                    while (!Files.exists(Path.of(send.path("when").asText()))) {
+                        Thread.sleep(50);
+                    }
+                    runner.send(operator, send.path("message").asText(), send.path("channel").asText(),
+                            SendOpts.of().local());
+                    System.out.println("local_send " + operator + " ok");
+                } catch (FlezhaException e) {
+                    System.out.println("local_send " + operator + " err " + e.code());
+                } catch (InterruptedException e) {
+                    return;
+                }
+            }
+        }, "local-send-drill");
+        drill.setDaemon(true);
+        drill.start();
     }
 
     /**

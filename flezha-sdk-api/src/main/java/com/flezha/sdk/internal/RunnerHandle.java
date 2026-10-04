@@ -1,8 +1,8 @@
 package com.flezha.sdk.internal;
 
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * SPI the runtime's {@code FlezhaImpl} implements and the public
@@ -19,9 +19,9 @@ public interface RunnerHandle {
     @Nonnull
     String runnerId();
 
-    /** Snapshot of currently-spawned Operator instances keyed by {@code operator_id}. */
+    /** The ids of the operator instances bound on this runner, read from the core. */
     @Nonnull
-    Map<String, ?> operators();
+    List<String> operators();
 
     /** Block until the runner shuts down. */
     void awaitTermination() throws InterruptedException;
@@ -53,4 +53,19 @@ public interface RunnerHandle {
      */
     @Nonnull
     String adminCall(String verb, String args);
+
+    /**
+     * Send {@code message} to the entry channel {@code channel} of
+     * {@code operator}, through the controller or with {@code local} in
+     * process. Answers the controller's verdict as JSON, or {@code null} as
+     * JSON for a local send. A null {@code msgId} or {@code key} is none.
+     */
+    @Nonnull
+    String send(
+            String operator,
+            String channel,
+            byte[] message,
+            @Nullable String msgId,
+            @Nullable String key,
+            boolean local);
 }

@@ -3,6 +3,7 @@ package com.flezha.sdk.runtime;
 import com.flezha.sdk.Flezha;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.Logger;
+import com.flezha.sdk.control.Control;
 import com.flezha.sdk.internal.RunnerHandle;
 import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.runtime.config.FlezhaEnv;
@@ -11,6 +12,7 @@ import com.flezha.sdk.runtime.core.CoreSpawnRequester;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
 import com.flezha.sdk.tasklet.SpawnRequests;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,6 +21,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Runtime implementation of the internal {@link RunnerHandle} SPI the public
@@ -120,8 +123,10 @@ public final class FlezhaImpl implements RunnerHandle {
 
     @Override
     @Nonnull
-    public Map<String, ?> operators() {
-        return dispatcher.instances();
+    public List<String> operators() {
+        List<String> ids = new ArrayList<>();
+        Control.read("operators", FlzCore.operators(core)).forEach(id -> ids.add(id.asText()));
+        return ids;
     }
 
     @Override
@@ -139,6 +144,19 @@ public final class FlezhaImpl implements RunnerHandle {
     @Nonnull
     public String adminCall(String verb, String args) {
         return FlzCore.adminCall(core, verb, args);
+    }
+
+    @Override
+    @Nonnull
+    public String send(
+            String operator,
+            String channel,
+            byte[] message,
+            @Nullable String msgId,
+            @Nullable String key,
+            boolean local) {
+        return FlzCore.sendMessage(
+                core, operator, channel, message, msgId == null ? "" : msgId, key == null ? "" : key, local);
     }
 
     /**

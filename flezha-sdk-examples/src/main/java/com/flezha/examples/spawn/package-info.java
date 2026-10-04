@@ -28,7 +28,8 @@
  * <p>With authorization on, the default in a release, the namespace's {@code runner@<namespace>}
  * principal needs the {@code spawner} role, or every spawn is refused:
  * {@code flz role bind runner@<namespace> spawner <namespace>}. The role also lets this runner's
- * {@code admin()} start and send to operators in its namespace, and nothing else.
+ * {@code control()} start operators and its {@code send} reach operators in its namespace,
+ * and nothing else.
  *
  * <p>{@link com.flezha.examples.spawn.Main} declares both operators on one runner, since the
  * requesting flow operator and the steps operator it requests are ordinary declarations with

@@ -1,16 +1,19 @@
 package com.flezha.sdk;
 
-import com.flezha.sdk.admin.Admin;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.flezha.sdk.control.Control;
 import com.flezha.sdk.internal.RegistryCore;
 import com.flezha.sdk.internal.RunnerHandle;
 import com.flezha.sdk.internal.RuntimeBridge;
 import com.flezha.sdk.operator.Operator;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * This JVM's runner: create → declare ({@link #registerFactory} /
@@ -221,8 +224,8 @@ public final class FlezhaRunner implements AutoCloseable {
     }
 
     /**
-     * Administer this namespace from ordinary application code: start, stop
-     * and feed operators, enable and disable plugins, read what is running.
+     * Administer this namespace from ordinary application code: start and
+     * stop operators, enable and disable plugins, read what is running.
      *
      * <p>The controller judges every call as the identity this connection
      * proved, so no credential is held here and nothing expires. A user
@@ -233,18 +236,49 @@ public final class FlezhaRunner implements AutoCloseable {
      * @throws FlezhaException {@code runtime.runner_not_started} on a never-started runner.
      */
     @Nonnull
-    public Admin admin() {
-        return new Admin(started());
+    public Control control() {
+        return new Control(started());
     }
 
     /**
-     * Returns a snapshot of currently-spawned Operator instances keyed by
-     * what the wire calls {@code operator_id}.
+     * Send {@code message} to the entry channel {@code channel} of
+     * {@code operatorId} through the controller, under the same role check as
+     * {@link #control()}, and answer its verdict:
+     * {@code {"to": <operator>, "verdict": "delivered" | "absorbed" | "suspended"}}.
      *
      * @throws FlezhaException {@code runtime.runner_not_started} on a never-started runner.
      */
     @Nonnull
-    public Map<String, ?> getOperators() {
+    public JsonNode send(String operatorId, String message, String channel) {
+        return send(operatorId, message, channel, SendOpts.of());
+    }
+
+    /**
+     * {@link #send(String, String, String)} with a message id or a partition
+     * key, or locally: in process to an operator bound on this runner,
+     * answering {@code null}. See {@link SendOpts#local()} for what a local
+     * send gives up.
+     *
+     * @throws FlezhaException {@code usage.options_conflict} for a local send
+     *     with an id or a key; {@code runtime.operator_not_local} for a local
+     *     send to an operator this runner does not hold.
+     */
+    @Nullable
+    public JsonNode send(String operatorId, String message, String channel, SendOpts opts) {
+        String answer = started()
+                .send(operatorId, channel, message.getBytes(StandardCharsets.UTF_8), opts.msgId, opts.key, opts.local);
+        JsonNode verdict = Control.read("Operator.send", answer);
+        return verdict.isNull() ? null : verdict;
+    }
+
+    /**
+     * The ids of the operator instances bound on this runner now, a partition
+     * member by its member id, read without the controller.
+     *
+     * @throws FlezhaException {@code runtime.runner_not_started} on a never-started runner.
+     */
+    @Nonnull
+    public List<String> getOperators() {
         return started().operators();
     }
 

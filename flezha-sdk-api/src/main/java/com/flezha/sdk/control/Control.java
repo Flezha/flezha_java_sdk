@@ -1,4 +1,4 @@
-package com.flezha.sdk.admin;
+package com.flezha.sdk.control;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -25,17 +25,20 @@ import javax.annotation.Nullable;
  *
  * <pre>{@code flz role bind runner@team-orders app team-orders}</pre>
  *
+ * <p>Sending to an operator is not here: it is
+ * {@link com.flezha.sdk.FlezhaRunner#send(String, String, String, com.flezha.sdk.SendOpts)}.
+ *
  * <p>Every method here is one line over a single native entry point, because
  * the verb travels as data. Adding a verb costs a method and no JNI. A refused call throws
  * {@link FlezhaException} with the code the controller answered, such as {@code quota.exceeded}.
  */
-public final class Admin {
+public final class Control {
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final RunnerHandle handle;
 
-    public Admin(RunnerHandle handle) {
+    public Control(RunnerHandle handle) {
         this.handle = handle;
     }
 
@@ -50,7 +53,7 @@ public final class Admin {
             String outcome = answer.required("outcome").asText().toUpperCase(Locale.ROOT);
             return new StartResult(answer.required("id").asText(), StartOutcome.valueOf(outcome));
         } catch (IllegalArgumentException e) {
-            throw FlezhaException.of("admin.unreadable_answer", Map.of("verb", "Operator.start"), e);
+            throw FlezhaException.of("control.unreadable_answer", Map.of("verb", "Operator.start"), e);
         }
     }
 
@@ -58,15 +61,6 @@ public final class Admin {
     @Nonnull
     public JsonNode stopOperator(String operatorId) {
         return call("Operator.stop", operatorId);
-    }
-
-    /**
-     * Inject a message into an operator's input stream and block for the
-     * delivery verdict. {@code channel} may be empty for none.
-     */
-    @Nonnull
-    public JsonNode send(String operatorId, String message, String channel) {
-        return call("Operator.send", operatorId, message, channel);
     }
 
     /** Enable the plugin {@code name} in this namespace, as {@code spec} describes it. */
@@ -144,11 +138,16 @@ public final class Admin {
         for (Object arg : args) {
             array.add(arg instanceof JsonNode node ? node : JsonNodeFactory.instance.textNode(String.valueOf(arg)));
         }
-        String answer = handle.adminCall(verb, array.toString());
+        return read(verb, handle.adminCall(verb, array.toString()));
+    }
+
+    /** The controller's JSON answer to {@code verb}, refused when it does not read. */
+    @Nonnull
+    public static JsonNode read(String verb, String answer) {
         try {
             return JSON.readTree(answer);
         } catch (JsonProcessingException e) {
-            throw FlezhaException.of("admin.unreadable_answer", Map.of("verb", verb), e);
+            throw FlezhaException.of("control.unreadable_answer", Map.of("verb", verb), e);
         }
     }
 

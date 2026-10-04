@@ -195,6 +195,19 @@ public final class FlzCore {
     public static native String adminCall(long ctx, String verb, String args);
 
     /**
+     * Send {@code message} to the entry channel {@code channel} of
+     * {@code operator}: through the controller, answering its verdict as JSON,
+     * or with {@code local} in process to an operator bound on this runner,
+     * answering {@code null}. An empty {@code msgId} or {@code key} is none.
+     * Blocks for the answer, or while a local consumer's mailbox is full.
+     */
+    public static native String sendMessage(
+            long ctx, String operator, String channel, byte[] message, String msgId, String key, boolean local);
+
+    /** The ids of the operator instances bound on this runner, as a JSON array. */
+    public static native String operators(long ctx);
+
+    /**
      * The core's monotonic clock in nanoseconds since an arbitrary process
      * origin: the one clock every host's {@code ctx} reads. Context-free.
      */

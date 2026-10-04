@@ -1,4 +1,4 @@
-package com.flezha.sdk.admin;
+package com.flezha.sdk.control;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -13,9 +13,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /** The start call's request and answer, over the runtime double's administration call. */
-class AdminTest {
+class ControlTest {
 
-    private final Admin admin = new Admin(FlezhaImpl.start("admin_test", List::of, () -> {}));
+    private final Control control = new Control(FlezhaImpl.start("control_test", List::of, () -> {}));
 
     @AfterEach
     void reset() {
@@ -28,7 +28,7 @@ class AdminTest {
     void aStartWithoutAnIdAnswersTheGeneratedId() {
         FlezhaImpl.ADMIN_ANSWER = "{\"id\":\"echo-k7m2qzxw4pd3fn2a\",\"outcome\":\"started\"}";
 
-        assertThat(admin.startOperator(OperatorSpec.of("echo")))
+        assertThat(control.startOperator(OperatorSpec.of("echo")))
                 .isEqualTo(new StartResult("echo-k7m2qzxw4pd3fn2a", StartOutcome.STARTED));
         assertThat(FlezhaImpl.ADMIN_CALLS).containsExactly(List.of("Operator.start", "[{\"factory_id\":\"echo\"}]"));
     }
@@ -38,7 +38,7 @@ class AdminTest {
     void aStartWithAnIdAnswersAlreadyRunning() {
         FlezhaImpl.ADMIN_ANSWER = "{\"id\":\"my_echo\",\"outcome\":\"already_running\"}";
 
-        assertThat(admin.startOperator(OperatorSpec.of("echo").id("my_echo")))
+        assertThat(control.startOperator(OperatorSpec.of("echo").id("my_echo")))
                 .isEqualTo(new StartResult("my_echo", StartOutcome.ALREADY_RUNNING));
         assertThat(FlezhaImpl.ADMIN_CALLS)
                 .containsExactly(List.of("Operator.start", "[{\"factory_id\":\"echo\",\"id\":\"my_echo\"}]"));
@@ -51,15 +51,16 @@ class AdminTest {
         ArrayNode hooks = json.arrayNode();
         hooks.addArray().add("on_output").addObject();
 
-        admin.enablePlugin(
+        control.enablePlugin(
                 "writer",
                 PluginSpec.of("operator_file_sink").opts(json.objectNode().put("path", "out.txt")));
-        admin.enablePlugin("feed", PluginSpec.of("operator_websocket").single().bind("my_echo", hooks));
-        admin.bindPlugin("writer", "my_echo");
-        admin.bindPlugin("writer", "my_other", json.arrayNode().add("on_output"), "in");
-        admin.unbindPlugin("writer", "my_echo");
-        admin.disablePlugin("writer");
-        admin.listPlugins();
+        control.enablePlugin(
+                "feed", PluginSpec.of("operator_websocket").single().bind("my_echo", hooks));
+        control.bindPlugin("writer", "my_echo");
+        control.bindPlugin("writer", "my_other", json.arrayNode().add("on_output"), "in");
+        control.unbindPlugin("writer", "my_echo");
+        control.disablePlugin("writer");
+        control.listPlugins();
 
         assertThat(FlezhaImpl.ADMIN_CALLS)
                 .containsExactly(
@@ -83,15 +84,15 @@ class AdminTest {
     @DisplayName("a start answer of another shape is refused naming it")
     void aStartAnswerOfAnotherShapeIsRefused() {
         FlezhaImpl.ADMIN_ANSWER = "{\"id\":\"my_echo\",\"outcome\":\"duplicate\"}";
-        assertThatThrownBy(() -> admin.startOperator(OperatorSpec.of("echo").id("my_echo")))
+        assertThatThrownBy(() -> control.startOperator(OperatorSpec.of("echo").id("my_echo")))
                 .isInstanceOfSatisfying(FlezhaException.class, e -> {
-                    assertThat(e.code()).isEqualTo("admin.unreadable_answer");
+                    assertThat(e.code()).isEqualTo("control.unreadable_answer");
                     assertThat(e.details()).containsEntry("verb", "Operator.start");
                 });
 
         FlezhaImpl.ADMIN_ANSWER = "{\"outcome\":\"started\"}";
-        assertThatThrownBy(() -> admin.startOperator(OperatorSpec.of("echo")))
+        assertThatThrownBy(() -> control.startOperator(OperatorSpec.of("echo")))
                 .isInstanceOfSatisfying(
-                        FlezhaException.class, e -> assertThat(e.code()).isEqualTo("admin.unreadable_answer"));
+                        FlezhaException.class, e -> assertThat(e.code()).isEqualTo("control.unreadable_answer"));
     }
 }
