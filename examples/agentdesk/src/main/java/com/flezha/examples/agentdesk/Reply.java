@@ -36,6 +36,7 @@ public final class Reply implements Tasklet<String, Reply.Conversation, Reply.An
 
     @Override
     public void run(String message, Ctx<Conversation, Answer> ctx) throws TaskletException {
+        // Each piece streams out as it is made; then the whole answer.
         ctx.emit(DemoModel.answer(ctx.state().messages, message, ctx::part));
         ctx.change(new Said(message));
     }

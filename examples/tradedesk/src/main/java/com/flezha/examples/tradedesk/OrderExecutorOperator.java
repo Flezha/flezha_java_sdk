@@ -39,7 +39,9 @@ public final class OrderExecutorOperator implements Operator {
 
     @Override
     public Run run() {
-        return new Run.Steps(Each.ONCE, OnFailure.UNDO_ALL);
+        return new Run.Steps(
+                Each.ONCE,                               // one instance per order; each step runs once
+                OnFailure.UNDO_ALL);                     // a failed step undoes the finished ones
     }
 
     /**
@@ -61,7 +63,7 @@ public final class OrderExecutorOperator implements Operator {
      */
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
-        c.input(OrderTicket.class, "order")
+        c.input(OrderTicket.class, "order")                                // the order to carry out
                 .into(ReserveFunds.class)                                  // step one
                 .into(PlaceOrder.class)                                    // step two, once step one is done
                 .branch(

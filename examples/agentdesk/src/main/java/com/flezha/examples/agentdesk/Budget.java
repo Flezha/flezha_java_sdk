@@ -63,7 +63,9 @@ public final class Budget implements Tasklet<Budget.Event, Budget.Spent, Budget.
     public void run(Event event, Ctx<Spent, Verdict> ctx) throws TaskletException {
         String today = LocalDate.ofInstant(Instant.ofEpochMilli(ctx.now()), ZoneOffset.UTC).toString();
         switch (event) {
+            // A message to admit: hand on its verdict.
             case Sent sent -> ctx.emit(new Verdict(sent.message(), ctx.state().on(today)));
+            // The tokens an answer used: count them.
             case Used used -> ctx.change(new Counted(today, used.tokens()));
         }
     }

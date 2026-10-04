@@ -12,6 +12,7 @@ public final class Deliver implements Tasklet<Answer, Void, Answer> {
 
     @Override
     public void run(Answer answer, Ctx<Void, Answer> ctx) throws TaskletException {
+        // The whole answer, to whoever called.
         ctx.emit(answer);
     }
 

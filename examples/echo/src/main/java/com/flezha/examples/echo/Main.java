@@ -21,8 +21,8 @@ public final class Main {
         // run() is start() followed by awaitTermination(). Splitting them keeps the handle,
         // which is the only way to reach admin(), and still blocks until shutdown.
         FlezhaRunner runner = Flezha.createRunner(args.length > 0 ? args[0] : "default")
-                .registerFactory(EchoOperator.class)
-                .start();
+                .registerFactory(EchoOperator.class)     // the operators this runner serves
+                .start();                                // connects to the controller
 
         // Everything `flz operator` and `flz plugin` do is also a method here. Uncomment to
         // drive this namespace from the application instead of from a terminal:

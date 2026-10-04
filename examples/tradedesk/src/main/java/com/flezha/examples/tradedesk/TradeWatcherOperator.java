@@ -56,13 +56,13 @@ public final class TradeWatcherOperator implements Operator {
      */
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
-        c.input(TradeMessage.class, "trades")
+        c.input(TradeMessage.class, "trades")                        // JSON from the exchange
                 .filter(message -> "trade".equals(message.channel())) // trade messages only
                 .flatMap(Trade.class, TradeMessage::data)            // a message into its trades
                 .filter(trade -> "market".equals(trade.ord_type()))  // market orders only
                 .keyBy(Trade::symbol)                                // one cell per symbol
                 .into(TrackPrices.class)
-                .into(BuyAboveAverage.class)
-                .sink("signals");
+                .into(BuyAboveAverage.class)                         // fed by the tasklet above
+                .sink("signals");                                    // out to the file plugin
     }
 }

@@ -22,7 +22,7 @@ public final class EchoOperator implements Operator {
     @Override
     @Nonnull
     public String factoryId() {
-        return "echo";
+        return "echo";                       // the name `flz operator start` takes
     }
 
     /**
@@ -37,6 +37,8 @@ public final class EchoOperator implements Operator {
      */
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
-        c.input(String.class, "in").into(Echo.class).sink("out");
+        c.input(String.class, "in")          // messages arrive on the entry channel "in"
+                .into(Echo.class)            // each one runs through the echo tasklet
+                .sink("out");                // the result leaves on "out", for a plugin to pick up
     }
 }

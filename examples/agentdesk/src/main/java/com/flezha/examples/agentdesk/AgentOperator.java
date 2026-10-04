@@ -29,12 +29,12 @@ public final class AgentOperator implements Operator {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "turn")
+        c.input(String.class, "turn")                    // entry 1: `flz operator call`
                 .into(Reply.class)
-                .sink("answer")                          // to whoever listens
+                .sink("answer")                          // to whoever listens; the chain goes on
                 .into(Deliver.class)
                 .response();                             // to whoever called
-        c.input(Message.class, "message")                // from the gateway
+        c.input(Message.class, "message")                // entry 2: the gateway, into the same Reply
                 .map(String.class, Message::text)
                 .into(Reply.class);
     }
