@@ -14,8 +14,8 @@ import javax.annotation.Nullable;
  * answers. {@link #await} waits for the answer; {@link #tryResult} never waits.
  *
  * <p>A request that reached no instance throws {@link FlezhaException} from the read, with the
- * controller's code ({@code operator.already_running}, {@code operator.factory_unknown},
- * {@code operator.factory_not_steps}, or any other refusal's own) or the core's
+ * controller's code ({@code relay.already_running}, {@code relay.factory_unknown},
+ * {@code relay.factory_not_steps}, or any other refusal's own) or the core's
  * ({@code spawn.timeout}, {@code spawn.unavailable}).
  *
  * <p>Read it inside the invocation that made it. Every read asks the core, which answers a resolved

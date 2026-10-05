@@ -60,7 +60,7 @@ public final class KryoCodec {
      * than one per part, so a call costs one thread-local lookup.
      *
      * <p>The unbounded growth is what the discarded {@code Output(bos)} had: a
-     * 4 KB window flushing into a flow operator that accepted any size. {@code Input}
+     * 4 KB window flushing into a flow relay that accepted any size. {@code Input}
      * starts uninitialized; every decode sets its buffer before reading.
      */
     private static final class Locals {

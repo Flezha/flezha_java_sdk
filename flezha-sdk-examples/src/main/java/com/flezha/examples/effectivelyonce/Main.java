@@ -3,7 +3,7 @@ package com.flezha.examples.effectivelyonce;
 import com.flezha.sdk.Flezha;
 
 /**
- * Starts a runner: the process that connects to a controller and serves the operators declared on
+ * Starts a runner: the process that connects to a controller and serves the relays declared on
  * it. {@code run()} connects and blocks until shutdown; {@code start()} returns to the caller and
  * leaves the runner to be closed explicitly.
  */
@@ -11,7 +11,7 @@ public final class Main {
 
     public static void main(String[] args) throws Exception {
         Flezha.createRunner(args.length > 0 ? args[0] : "my_app")
-                .registerFactory(RollupOperator.class)
+                .registerFactory(RollupRelay.class)
                 .run();
     }
 

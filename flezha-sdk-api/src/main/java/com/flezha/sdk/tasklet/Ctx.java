@@ -16,7 +16,7 @@ import javax.annotation.Nonnull;
  * @Override
  * public void run(Order order, Ctx<Cart, String> ctx) throws TaskletException {
  *     ctx.change(new ItemAdded(order.item(), ctx.now()));   // ctx.now(), never System.currentTimeMillis()
- *     ctx.emit("added " + order.item());                    // where this goes is the operator's business
+ *     ctx.emit("added " + order.item());                    // where this goes is the relay's business
  * }
  * }</pre>
  *
@@ -26,7 +26,7 @@ import javax.annotation.Nonnull;
  *   <li>{@link #state()} reads the cell's state and {@link #change} is the one recorded way to
  *       mutate it: the change is applied and written to the cell's log, from which the state is
  *       rebuilt after a restart.
- *   <li>{@link #emit} sends a value onward. The destination is declared by the operator, not here,
+ *   <li>{@link #emit} sends a value onward. The destination is declared by the relay, not here,
  *       so a graph can be rewired without touching the tasklet.
  *   <li>{@link #now()} is the invocation's time, computed once by the runtime from the tasklet's
  *       clock and served identically on a replay.
@@ -100,17 +100,17 @@ public interface Ctx<State, Output> {
      * window, a completed batch). The interval you leave open is the work a
      * crash replays and the work the controller's input log retains.
      *
-     * <p>A no-op unless the operator acknowledges at a checkpoint
-     * ({@link com.flezha.sdk.operator.Operator.Ack.Checkpoint}).
+     * <p>A no-op unless the relay acknowledges at a checkpoint
+     * ({@link com.flezha.sdk.relay.Relay.Ack.Checkpoint}).
      */
     void checkpoint();
 
     /**
-     * End the operator this tasklet runs in, with {@code result}. The call does not stop the
-     * invocation's remaining work. In an operator that runs in steps, the iteration's remaining
+     * End the relay this tasklet runs in, with {@code result}. The call does not stop the
+     * invocation's remaining work. In a relay that runs in steps, the iteration's remaining
      * tasklets still run and commit, and the instance then ends with status {@code ok} and this
      * result instead of waiting for its next input, re-seeding a chained loop or parking; in a
-     * {@code ONCE} run it is the result the single pass ends with. In a flow operator the instance
+     * {@code ONCE} run it is the result the single pass ends with. In a flow relay the instance
      * runs the work its cells already hold to its outputs, then ends {@code completed}.
      *
      * <p>A later call in the same invocation replaces an earlier one. When several cells call it
@@ -168,7 +168,7 @@ public interface Ctx<State, Output> {
      * Ask the controller for the steps instance {@code options} names: start {@code factoryId}
      * under that id if it is free, otherwise apply its {@link IfRunning} policy
      * ({@link IfRunning#DELIVER}, the default, feeds the running instance; {@link IfRunning#ERROR}
-     * reports {@code operator.already_running}). {@code payload} is the instance's first input
+     * reports {@code relay.already_running}). {@code payload} is the instance's first input
      * on a spawn, one more input on a delivery.
      *
      * <p>Concurrent requests for one id resolve controller-side: exactly one spawns and every other
@@ -249,7 +249,7 @@ public interface Ctx<State, Output> {
      * <p>The anchor is {@code ctx.now()}, the tasklet's clock, not an ambient
      * read, which is what makes a replayed invocation register the same absolute
      * timestamp the live one did. Under an event-time clock the
-     * anchor is therefore the input's event time: a flow operator that is caught up
+     * anchor is therefore the input's event time: a flow relay that is caught up
      * schedules the same instant a wall clock would, and one replaying history
      * schedules a past instant, which fires at once.
      */
@@ -294,7 +294,7 @@ public interface Ctx<State, Output> {
 
     /**
      * Emit a typed value on this Tasklet's declared output channel. The channel
-     * id was resolved once, when the operator's wiring was registered, so this
+     * id was resolved once, when the relay's wiring was registered, so this
      * call performs no name lookups.
      *
      * <p>Inter-tasklet channels: the value is passed by reference to consumer
@@ -315,7 +315,7 @@ public interface Ctx<State, Output> {
 
     /**
      * Send a part: a preview of the output this invocation is producing, which leaves the runner
-     * now rather than when the invocation returns. A listener attached to the operator receives
+     * now rather than when the invocation returns. A listener attached to the relay receives
      * it; a sink never does, and nothing about the part is durable or replayed.
      *
      * <p>The part previews this tasklet's own output channel, and {@code value} is encoded exactly

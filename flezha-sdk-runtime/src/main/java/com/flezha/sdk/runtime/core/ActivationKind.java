@@ -54,7 +54,7 @@ public sealed interface ActivationKind {
             implements ActivationKind {}
 
     /**
-     * Discriminant 7: saga compensation for one steps operator Cell. The recorded
+     * Discriminant 7: saga compensation for one steps relay Cell. The recorded
      * forward outputs cross; the host runs {@code compensate}.
      */
     record CompensateRun(@Nonnull List<byte[]> outputs) implements ActivationKind {}

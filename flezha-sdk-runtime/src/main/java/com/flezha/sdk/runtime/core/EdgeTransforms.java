@@ -1,7 +1,7 @@
 package com.flezha.sdk.runtime.core;
 
-import com.flezha.sdk.runtime.operator.ConsumerEdge;
-import com.flezha.sdk.runtime.operator.EdgeYield;
+import com.flezha.sdk.runtime.relay.ConsumerEdge;
+import com.flezha.sdk.runtime.relay.EdgeYield;
 import java.util.List;
 
 /**

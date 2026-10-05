@@ -2,7 +2,7 @@ package com.flezha.sdk.runtime.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
+import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
@@ -20,7 +20,7 @@ class StateExchangeTest extends DispatchTestBase {
     @Test
     @DisplayName("a RestoreFold body tagged with an older version goes to the migration, not the codec")
     void restoreFoldMigratesTaggedBodies() {
-        OperatorClassRegistry.registerClass(MigratingCounterOperator.class);
+        RelayClassRegistry.registerClass(MigratingCounterRelay.class);
         ActivationDispatcher dispatcher = new ActivationDispatcher();
 
         ActivationOutcome restored = dispatcher
@@ -47,7 +47,7 @@ class StateExchangeTest extends DispatchTestBase {
     @Test
     @DisplayName("a Tasklet declaring no migration refuses an older body rather than decoding it")
     void restoreFoldWithoutAMigrationRefuses() {
-        OperatorClassRegistry.registerClass(CounterOperator.class);
+        RelayClassRegistry.registerClass(CounterRelay.class);
         ActivationDispatcher dispatcher = new ActivationDispatcher();
 
         ActivationOutcome outcome = dispatcher
@@ -72,7 +72,7 @@ class StateExchangeTest extends DispatchTestBase {
     @Test
     @DisplayName("RestoreFold rebuilds snapshot + changes; SnapshotRequest and LiveStateRead read the result")
     void restoreSnapshotAndLiveRead() {
-        OperatorClassRegistry.registerClass(CounterOperator.class);
+        RelayClassRegistry.registerClass(CounterRelay.class);
         ItemEffect first = soleEffect(work("counter_op", 0, Optional.empty(), 0, input(0, "a", 1)));
         soleEffect(work("counter_op", 0, Optional.empty(), 1, input(0, "b", 2)));
 
@@ -109,7 +109,7 @@ class StateExchangeTest extends DispatchTestBase {
     @Test
     @DisplayName("Nested change records are discovered: a restore fold decodes them and rebuilds the state")
     void nestedChangeRecordsAreDiscovered() {
-        OperatorClassRegistry.registerClass(Tally.class);
+        RelayClassRegistry.registerClass(Tally.class);
         ItemEffect ran = soleEffect(work("tally_op", 0, Optional.empty(), 0, input(0, "a", 1)));
         assertThat(ran.changes()).as("Seen then Counted").hasSize(2);
 
@@ -137,7 +137,7 @@ class StateExchangeTest extends DispatchTestBase {
     @Test
     @DisplayName("ApplyState replaces the state from its JSON form; MigrationSerialize reads it back")
     void applyStateRoundTrips() {
-        OperatorClassRegistry.registerClass(CounterOperator.class);
+        RelayClassRegistry.registerClass(CounterRelay.class);
         ActivationOutcome applied = outcome(command(
                 "counter_op",
                 0,
@@ -156,7 +156,7 @@ class StateExchangeTest extends DispatchTestBase {
     @Test
     @DisplayName("a Void state serializes as an empty object and reads back")
     void voidStateShipsAsEmptyObject() {
-        OperatorClassRegistry.registerClass(StatelessStateOperator.class);
+        RelayClassRegistry.registerClass(StatelessStateRelay.class);
 
         ActivationOutcome migrated =
                 outcome(command("stateless_state_op", 0, Optional.empty(), new ActivationKind.MigrationSerialize()));

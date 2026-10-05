@@ -2,7 +2,7 @@ package com.flezha.examples.local;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.flezha.sdk.LocalOperator;
+import com.flezha.sdk.LocalRelay;
 import java.time.Duration;
 
 /**
@@ -16,7 +16,7 @@ import java.time.Duration;
 public final class Main {
 
     public static void main(String[] args) {
-        try (LocalOperator run = LocalOperator.start(WordCountOperator.class)) {
+        try (LocalRelay run = LocalRelay.start(WordCountRelay.class)) {
             run.onSink("totals", out -> System.out.println("totals <- " + new String(out.payload(), UTF_8)));
             run.feed("lines", "the quick brown fox");
             run.feed("lines", "the lazy dog");

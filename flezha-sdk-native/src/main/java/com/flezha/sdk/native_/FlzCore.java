@@ -63,7 +63,7 @@ public final class FlzCore {
      * tasklets. Throws, naming the capability, when the declaration needs a
      * controller.
      */
-    public static native void localStart(long ctx, String factoryId, String operatorId);
+    public static native void localStart(long ctx, String factoryId, String relayId);
 
     /** Queue the sink named {@code channel} for {@link #localNextOutput}. */
     public static native void localOnSink(long ctx, String channel);
@@ -184,7 +184,7 @@ public final class FlzCore {
     /**
      * Administer the namespace this connection proved: one entry for the whole
      * surface, because the verb is data. {@code verb} names a function of the
-     * controller's published consumer surface ({@code "Operator.start"}) and
+     * controller's published consumer surface ({@code "Relay.start"}) and
      * {@code args} is a JSON array of that call's arguments other than the
      * namespace, which the controller fills from the connection. Returns the
      * published function's own answer as JSON; throws on refusal, no control
@@ -196,16 +196,16 @@ public final class FlzCore {
 
     /**
      * Send {@code message} to the entry channel {@code channel} of
-     * {@code operator}: through the controller, answering its verdict as JSON,
-     * or with {@code local} in process to an operator bound on this runner,
+     * {@code relay}: through the controller, answering its verdict as JSON,
+     * or with {@code local} in process to a relay bound on this runner,
      * answering {@code null}. An empty {@code msgId} or {@code key} is none.
      * Blocks for the answer, or while a local consumer's mailbox is full.
      */
     public static native String sendMessage(
-            long ctx, String operator, String channel, byte[] message, String msgId, String key, boolean local);
+            long ctx, String relay, String channel, byte[] message, String msgId, String key, boolean local);
 
-    /** The ids of the operator instances bound on this runner, as a JSON array. */
-    public static native String operators(long ctx);
+    /** The ids of the relay instances bound on this runner, as a JSON array. */
+    public static native String relays(long ctx);
 
     /**
      * The core's monotonic clock in nanoseconds since an arbitrary process

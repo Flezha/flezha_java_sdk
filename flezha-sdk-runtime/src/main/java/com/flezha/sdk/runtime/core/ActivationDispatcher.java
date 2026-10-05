@@ -28,7 +28,7 @@ public final class ActivationDispatcher {
         void send(long token, int item, @Nonnull byte[] payload);
     }
 
-    private final ConcurrentHashMap<String, OperatorInstance> instances = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, RelayInstance> instances = new ConcurrentHashMap<>();
     private final Parts parts;
 
     /** A dispatcher with no core behind it: every part is dropped, as a run with no stream drops it. */
@@ -50,21 +50,21 @@ public final class ActivationDispatcher {
     @Nonnull
     public ActivationResult dispatch(@Nonnull Activation activation) {
         try {
-            // Keyed by operator id, but the FACTORY the activation names is what
-            // decides which class runs: an operator id rebound to a different
+            // Keyed by relay id, but the FACTORY the activation names is what
+            // decides which class runs: a relay id rebound to a different
             // factory — a deploy putting the next version of a class behind the
             // same id — must not keep running the class we materialized first.
-            OperatorInstance instance = instances.compute(
-                    activation.target().operator(),
+            RelayInstance instance = instances.compute(
+                    activation.target().relay(),
                     (id, existing) -> existing != null && existing.factoryId().equals(activation.factory())
                             ? existing
-                            : OperatorInstance.materialize(id, activation.factory()));
+                            : RelayInstance.materialize(id, activation.factory()));
             return new ActivationResult(activation.token(), instance.dispatch(activation, parts));
         } catch (Throwable t) {
             String message = t.getMessage() == null ? t.toString() : t.getMessage();
             LOG.error(
                     "activation dispatch failed for `{}`: {}",
-                    activation.target().operator(),
+                    activation.target().relay(),
                     message);
             return new ActivationResult(activation.token(), new ActivationOutcome.Failed(new WorkError(message, true)));
         }

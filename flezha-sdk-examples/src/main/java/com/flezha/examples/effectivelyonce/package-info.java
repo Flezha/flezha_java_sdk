@@ -15,7 +15,7 @@
  * interval rather than leaving a partially constructed window on disk. The tasklet here closes an
  * interval every hundred ticks.
  *
- * <p>{@link com.flezha.examples.effectivelyonce.RollupOperator} declares both in its run:
+ * <p>{@link com.flezha.examples.effectivelyonce.RollupRelay} declares both in its run:
  * {@code Exactly.EffectivelyOnce} with {@code Ack.Checkpoint}. The first makes state, output and consumed
  * offset durable together in a single record, so a crash cannot advance the offset while losing the
  * output. The second is what withholds the offset until the tasklet declares the state coherent.

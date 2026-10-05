@@ -2,9 +2,9 @@ package com.flezha.examples;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.flezha.examples.merged.ThermostatOperator;
-import com.flezha.sdk.runtime.operator.OperatorTopology;
-import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder;
+import com.flezha.examples.merged.ThermostatRelay;
+import com.flezha.sdk.runtime.relay.RelayTopology;
+import com.flezha.sdk.runtime.relay.builder.RelayTopologyBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +14,7 @@ class MergedInputTest {
     @Test
     @DisplayName("both sources reach the one detector")
     void mergedTopologyRegisters() {
-        OperatorTopology topology = OperatorTopologyBuilder.build(new ThermostatOperator());
+        RelayTopology topology = RelayTopologyBuilder.build(new ThermostatRelay());
 
         assertThat(topology.tasklets()).hasSize(1);
         int detector = topology.taskletNameToId().get("detector");

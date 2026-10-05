@@ -8,10 +8,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.native_.FlzCore;
-import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.relay.Relay;
 import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.RepositoryFixture;
-import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
+import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The {@code HostClassDecl} JSON builder — the successor of the retired
- * {@code AddOperatorResponse}-metadata declarations: what the poll core is
+ * {@code AddRelayResponse}-metadata declarations: what the poll core is
  * told about a registered class, with ids equal to declaration order.
  */
 class HostClassDeclarationTest {
@@ -39,13 +39,13 @@ class HostClassDeclarationTest {
 
     @AfterEach
     void reset() {
-        OperatorClassRegistry.reset();
+        RelayClassRegistry.reset();
     }
 
     @Test
     @DisplayName("a flow declaration emits its settings tree, then channels and tasklets in id order")
     void flowDeclaration() throws Exception {
-        OperatorClassRegistry.registerClass(TierOperator.class);
+        RelayClassRegistry.registerClass(TierRelay.class);
         JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_tier_op"));
 
         assertThat(decl.get("factory_id").asText()).isEqualTo("decl_tier_op");
@@ -106,7 +106,7 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("each Tasklet declares its own schema version, never the class maximum")
     void perTaskletSchemaVersions() throws Exception {
-        OperatorClassRegistry.registerClass(MixedVersionOperator.class);
+        RelayClassRegistry.registerClass(MixedVersionRelay.class);
         JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_mixed_version_op"));
 
         assertThat(decl.has("schema_version"))
@@ -134,7 +134,7 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("a steps declaration carries its run, its wall-clock stop and its tasklets")
     void stepsDeclaration() throws Exception {
-        OperatorClassRegistry.registerClass(DeclSteps.class);
+        RelayClassRegistry.registerClass(DeclSteps.class);
         JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_steps"));
 
         assertThat(decl.get("factory_id").asText()).isEqualTo("decl_steps");
@@ -149,7 +149,7 @@ class HostClassDeclarationTest {
     @DisplayName(
             "Default-on with no override: a class that says nothing is kept locally and leaves its sleep to its run")
     void defaultOnWithNoOverride() throws Exception {
-        OperatorClassRegistry.registerClass(MixedVersionOperator.class);
+        RelayClassRegistry.registerClass(MixedVersionRelay.class);
         JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_mixed_version_op"));
 
         assertThat(decl.get("durable")).isEqualTo(JSON.readTree("\"local\""));
@@ -158,9 +158,9 @@ class HostClassDeclarationTest {
 
     @Test
     @DisplayName("Code-declared opt-out is honored")
-    void aFlowOperatorsOptOutIsReadFromTheClassNotItsTasklets() throws Exception {
+    void aFlowRelaysOptOutIsReadFromTheClassNotItsTasklets() throws Exception {
         // DeclTask keeps a state; the class's own durable() still decides.
-        OperatorClassRegistry.registerClass(InMemoryOperator.class);
+        RelayClassRegistry.registerClass(InMemoryRelay.class);
         assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_in_memory_op"))
                         .get("durable"))
                 .isEqualTo(JSON.readTree("false"));
@@ -169,9 +169,9 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("durable spells each level: false, local and remote, with or without sleeping")
     void durableSpellsEachLevel() throws Exception {
-        OperatorClassRegistry.registerClass(InMemoryOperator.class);
-        OperatorClassRegistry.registerClass(QuickSleeperOperator.class);
-        OperatorClassRegistry.registerClass(RemoteSteps.class);
+        RelayClassRegistry.registerClass(InMemoryRelay.class);
+        RelayClassRegistry.registerClass(QuickSleeperRelay.class);
+        RelayClassRegistry.registerClass(RemoteSteps.class);
 
         assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_in_memory_op"))
                         .get("durable"))
@@ -190,13 +190,13 @@ class HostClassDeclarationTest {
     void theTierInMemoryIsRefused() {
         Refused.by(
                 "topology.effectively_once_without_persistence",
-                () -> OperatorClassRegistry.registerClass(TierInMemoryOperator.class));
+                () -> RelayClassRegistry.registerClass(TierInMemoryRelay.class));
     }
 
     @Test
     @DisplayName("a declared hook needs no second declaration: a written compensate is compensable")
     void aWrittenCompensateIsDeclared() throws Exception {
-        OperatorClassRegistry.registerClass(FullyDeclaredSteps.class);
+        RelayClassRegistry.registerClass(FullyDeclaredSteps.class);
         JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_full_steps"));
 
         assertThat(decl.get("tasklets").get(0).path("compensate_overridden").asBoolean())
@@ -207,8 +207,8 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("the builder can spell every key the shared fixture pins")
     void everyPinnedDeclarationKeyHasAJavaSpelling() throws Exception {
-        OperatorClassRegistry.registerClass(FullyDeclaredOperator.class);
-        OperatorClassRegistry.registerClass(FullyDeclaredDynamicOperator.class);
+        RelayClassRegistry.registerClass(FullyDeclaredRelay.class);
+        RelayClassRegistry.registerClass(FullyDeclaredDynamicRelay.class);
 
         JsonNode flow = JSON.readTree(HostClassDeclaration.forFactory("decl_full_op"));
         JsonNode dynamic = JSON.readTree(HostClassDeclaration.forFactory("decl_full_dynamic_op"));
@@ -228,8 +228,8 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("forFactory resolves the registry and refuses an unknown id")
     void forFactoryResolvesTheRegistry() {
-        OperatorClassRegistry.registerClass(TierOperator.class);
-        OperatorClassRegistry.registerClass(DeclSteps.class);
+        RelayClassRegistry.registerClass(TierRelay.class);
+        RelayClassRegistry.registerClass(DeclSteps.class);
         assertThat(HostClassDeclaration.forFactory("decl_tier_op")).isNotEmpty();
         assertThat(HostClassDeclaration.forFactory("decl_steps")).isNotEmpty();
         assertThatThrownBy(() -> HostClassDeclaration.forFactory("missing"))
@@ -240,7 +240,7 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("the checkpoint members ride the tree only when declared")
     void checkpointMembers() throws Exception {
-        OperatorClassRegistry.registerClass(BatchedOutputsOperator.class);
+        RelayClassRegistry.registerClass(BatchedOutputsRelay.class);
         JsonNode ack = JSON.readTree(HostClassDeclaration.forFactory("decl_batched_op"))
                 .at("/run/flow/exactly/effectively_once/ack");
 
@@ -258,7 +258,7 @@ class HostClassDeclarationTest {
         // channel carries a journal codec, so a terminal whose only wiring is a
         // plugin sink ships an empty handoff and the crash-resumed loop reads
         // that as convergence.
-        OperatorClassRegistry.registerClass(ChainedTerminalIntoSinkSteps.class);
+        RelayClassRegistry.registerClass(ChainedTerminalIntoSinkSteps.class);
         byte[] declaration = HostClassDeclaration.forFactory("decl_chained_sink");
 
         long ctx = FlzCore.newContext();
@@ -313,7 +313,7 @@ class HostClassDeclarationTest {
     }
 
     /** Declares every flow-side option the Java surface has a spelling for. */
-    public static final class FullyDeclaredOperator implements Operator {
+    public static final class FullyDeclaredRelay implements Relay {
         @Override
         public String factoryId() {
             return "decl_full_op";
@@ -353,7 +353,7 @@ class HostClassDeclarationTest {
     }
 
     /** The dynamic half of the tasklet surface: a lazy Cell with a TTL and a cap. */
-    public static final class FullyDeclaredDynamicOperator implements Operator {
+    public static final class FullyDeclaredDynamicRelay implements Relay {
         @Override
         public String factoryId() {
             return "decl_full_dynamic_op";
@@ -423,7 +423,7 @@ class HostClassDeclarationTest {
     }
 
     /** A steps class whose tasklet writes its compensate. */
-    public static final class FullyDeclaredSteps implements Operator {
+    public static final class FullyDeclaredSteps implements Relay {
         @Override
         public String factoryId() {
             return "decl_full_steps";
@@ -441,7 +441,7 @@ class HostClassDeclarationTest {
     }
 
     /** A durable CHAINED loop whose terminal task's only output is a plugin sink. */
-    public static final class ChainedTerminalIntoSinkSteps implements Operator {
+    public static final class ChainedTerminalIntoSinkSteps implements Relay {
         @Override
         public String factoryId() {
             return "decl_chained_sink";
@@ -467,7 +467,7 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class BatchedOutputsOperator implements Operator {
+    public static final class BatchedOutputsRelay implements Relay {
         @Override
         public String factoryId() {
             return "decl_batched_op";
@@ -488,7 +488,7 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class TierOperator implements Operator {
+    public static final class TierRelay implements Relay {
         @Override
         public String factoryId() {
             return "decl_tier_op";
@@ -505,7 +505,7 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class TierInMemoryOperator implements Operator {
+    public static final class TierInMemoryRelay implements Relay {
         @Override
         public String factoryId() {
             return "decl_tier_in_memory_op";
@@ -528,7 +528,7 @@ class HostClassDeclarationTest {
     }
 
     /** A class whose tasklet journals a Change, kept in memory by its setting. */
-    public static final class InMemoryOperator implements Operator {
+    public static final class InMemoryRelay implements Relay {
         @Override
         public String factoryId() {
             return "decl_in_memory_op";
@@ -545,7 +545,7 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class QuickSleeperOperator implements Operator {
+    public static final class QuickSleeperRelay implements Relay {
         @Override
         public String factoryId() {
             return "decl_quick_sleeper_op";
@@ -562,7 +562,7 @@ class HostClassDeclarationTest {
         }
     }
 
-    public static final class RemoteSteps implements Operator {
+    public static final class RemoteSteps implements Relay {
         @Override
         public String factoryId() {
             return "decl_remote_steps";
@@ -585,7 +585,7 @@ class HostClassDeclarationTest {
     }
 
     /** Two tasklets in one class, each at its own schema version. */
-    public static final class MixedVersionOperator implements Operator {
+    public static final class MixedVersionRelay implements Relay {
         @Override
         public String factoryId() {
             return "decl_mixed_version_op";
@@ -642,7 +642,7 @@ class HostClassDeclarationTest {
         public void compensate(List<String> completedOutput, Ctx<Void, String> ctx) {}
     }
 
-    public static final class DeclSteps implements Operator {
+    public static final class DeclSteps implements Relay {
         @Override
         public String factoryId() {
             return "decl_steps";

@@ -28,7 +28,7 @@ public interface OutputChain<T> extends EdgeStream<T> {
     OutputChain<T> keyBy(Function<T, String> key);
 
     /**
-     * End this chain in a call to another operator: every value that reaches it, after this
+     * End this chain in a call to another relay: every value that reaches it, after this
      * chain's transforms and key, is one request, serialized as {@link Stream#sink()} serializes
      * it. The call waits for nothing: its outcome arrives later as a {@link Response} on the entry
      * channel this answers, named {@code <this channel>.response}, which must feed a tasklet (the

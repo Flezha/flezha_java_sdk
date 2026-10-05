@@ -11,7 +11,7 @@ import com.flezha.sdk.runtime.core.ActivationDispatcher;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.core.Output;
 import com.flezha.sdk.runtime.core.OutputTarget;
-import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
+import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -22,7 +22,7 @@ import javax.annotation.Nonnull;
 
 /**
  * Runtime implementation of {@link LocalRunHandle}, resolved by reflection
- * from the public {@code LocalOperator}. The local twin of
+ * from the public {@code LocalRelay}. The local twin of
  * {@link FlezhaImpl}: it declares the class exactly as a deployed runner
  * does and brings the same {@link PollHost} threads, and differs in one call
  * — {@code localStart} instead of {@code start}, so nothing dials a
@@ -50,10 +50,10 @@ public final class LocalImpl implements LocalRunHandle {
         this.outputs.setDaemon(true);
     }
 
-    /** Entry point invoked by reflection from {@code LocalOperator.start}. */
+    /** Entry point invoked by reflection from {@code LocalRelay.start}. */
     @Nonnull
     public static LocalRunHandle start(@Nonnull Class<?> type) {
-        String factoryId = OperatorClassRegistry.registerClass(type);
+        String factoryId = RelayClassRegistry.registerClass(type);
         long core = FlzCore.newContext();
         try {
             FlzCore.declareClass(core, HostClassDeclaration.forFactory(factoryId));

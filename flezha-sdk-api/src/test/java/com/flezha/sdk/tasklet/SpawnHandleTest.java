@@ -90,7 +90,7 @@ class SpawnHandleTest {
     @Test
     @DisplayName("the error policy comes back as already running, carrying the controller's code")
     void theErrorPolicyComesBackAsAlreadyRunning() {
-        core.refusal = FlezhaException.of("operator.already_running", Map.of("operator", "w1"));
+        core.refusal = FlezhaException.of("relay.already_running", Map.of("relay", "w1"));
         SpawnRequests.install(core);
 
         SpawnHandle handle = new StubCtx(false, 42)
@@ -102,7 +102,7 @@ class SpawnHandleTest {
     @Test
     @DisplayName("a refusal does not fault the call; a read reports it with the controller's code")
     void aRefusalIsReportedOnlyByARead() {
-        core.refusal = FlezhaException.of("quota.exceeded", Map.of("kind", "max_operators", "current", 3, "limit", 3));
+        core.refusal = FlezhaException.of("quota.exceeded", Map.of("kind", "max_relays", "current", 3, "limit", 3));
         SpawnRequests.install(core);
 
         SpawnHandle handle = new StubCtx(false, 42).spawnSteps("worker", PAYLOAD);
@@ -117,8 +117,8 @@ class SpawnHandleTest {
     @DisplayName("each failure is the one exception, told apart by its code")
     void eachFailureIsTheOneExceptionToldApartByItsCode() {
         SpawnRequests.install(core);
-        for (String code : List.of(
-                "operator.factory_unknown", "operator.factory_not_steps", "spawn.timeout", "spawn.unavailable")) {
+        for (String code :
+                List.of("relay.factory_unknown", "relay.factory_not_steps", "spawn.timeout", "spawn.unavailable")) {
             core.refusal = FlezhaException.of(code, Map.of());
             assertThatThrownBy(new StubCtx(false, 42).spawnSteps("worker", PAYLOAD)::await)
                     .isInstanceOfSatisfying(

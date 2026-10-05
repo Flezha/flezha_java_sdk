@@ -85,7 +85,7 @@ public final class ActivationCodec {
     // ------------------------------------------------------------------
 
     private static void encodeCellRef(Postcard.Writer w, CellRef ref) {
-        w.string(ref.operator()).varint(Integer.toUnsignedLong(ref.tasklet()));
+        w.string(ref.relay()).varint(Integer.toUnsignedLong(ref.tasklet()));
         w.optional(ref.cellKey(), Postcard.Writer::string);
     }
 

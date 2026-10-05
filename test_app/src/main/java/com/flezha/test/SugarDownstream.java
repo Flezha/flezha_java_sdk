@@ -5,7 +5,7 @@ import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.nio.charset.StandardCharsets;
 
-/** Downstream tasklet of the 2-tasklet reference operator; it keeps no state. */
+/** Downstream tasklet of the 2-tasklet reference relay; it keeps no state. */
 @Tasklet.Spec(name = "macro_static_downstream_tasklet")
 public class SugarDownstream implements Tasklet<String, Void, byte[]> {
 

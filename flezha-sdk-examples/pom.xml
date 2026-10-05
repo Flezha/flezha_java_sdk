@@ -13,7 +13,7 @@
     <artifactId>flezha-sdk-examples</artifactId>
     <name>Flezha SDK Examples</name>
     <description>
-        Worked examples for every operator shape the SDK supports. Part of the
+        Worked examples for every relay shape the SDK supports. Part of the
         reactor on purpose: an example that stops compiling against the SDK is a
         broken example, and the build says so.
     </description>

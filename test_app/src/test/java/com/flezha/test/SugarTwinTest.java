@@ -3,10 +3,10 @@ package com.flezha.test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.flezha.sdk.runtime.operator.TaskletModel;
-import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
-import com.flezha.sdk.runtime.operator.OperatorTopology;
-import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder;
+import com.flezha.sdk.runtime.relay.TaskletModel;
+import com.flezha.sdk.runtime.relay.RelayClassRegistry;
+import com.flezha.sdk.runtime.relay.RelayTopology;
+import com.flezha.sdk.runtime.relay.builder.RelayTopologyBuilder;
 import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.testing.TaskletTestHarness;
 import java.nio.charset.StandardCharsets;
@@ -17,21 +17,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Asserts the {@code @Operator} short forms register under their
- * ids and process input as the equivalent hand-written operators do, and that the 2-tasklet
- * reference operator matches the cross-SDK authoring contract (see
+ * Asserts the {@code @Relay} short forms register under their
+ * ids and process input as the equivalent hand-written relays do, and that the 2-tasklet
+ * reference relay matches the cross-SDK authoring contract (see
  * {@code docs/sdk/authoring_contract.md} §6).
  */
 class SugarTwinTest {
 
     @BeforeEach
     void reset() {
-        OperatorClassRegistry.reset();
+        RelayClassRegistry.reset();
     }
 
     /** The topology the short form on {@code cls} declares, as registration builds it. */
-    private static OperatorTopology shortForm(Class<?> cls) {
-        return OperatorTopologyBuilder.build(OperatorClassRegistry.probe(cls));
+    private static RelayTopology shortForm(Class<?> cls) {
+        return RelayTopologyBuilder.build(RelayClassRegistry.probe(cls));
     }
 
     @Test
@@ -71,7 +71,7 @@ class SugarTwinTest {
         var tasklet = new SugarEntry();
         assertThat(tasklet.cellsFor("apple")).containsExactly("a");
         assertThat(tasklet.cellsFor("zebra")).containsExactly("d");
-        var topology = OperatorTopologyBuilder.build(new SugarStaticCellOperator());
+        var topology = RelayTopologyBuilder.build(new SugarStaticCellRelay());
         var entry = topology.tasklet(topology.taskletNameToId().get("macro_static_entry_tasklet"));
         assertThat(entry.cellsForOverridden())
                 .as("the class writes cellsFor, which is what declares it")
@@ -92,15 +92,15 @@ class SugarTwinTest {
     @Test
     void shortFormsRegisterOnlyWhenTheAuthorRegistersThem() {
         var runner = com.flezha.sdk.Flezha.createRunner("sugar_twin_ns");
-        assertThat(OperatorClassRegistry.factoryIds()).isEmpty();
+        assertThat(RelayClassRegistry.factoryIds()).isEmpty();
 
         runner.registerFactory(SugarDoNothing.class)
                 .registerFactory(SugarStore.class)
                 .registerFactory(SugarNamedInput.class)
                 .registerFactory(SugarStateOnly.class)
-                .registerFactory(SugarStaticCellOperator.class);
+                .registerFactory(SugarStaticCellRelay.class);
 
-        assertThat(OperatorClassRegistry.factoryIds())
+        assertThat(RelayClassRegistry.factoryIds())
                 .contains(
                         "sugar_do_nothing",
                         "sugar_store_input",
@@ -109,14 +109,14 @@ class SugarTwinTest {
                         "sugar_static_cell");
 
         runner.unregisterFactory(SugarStateOnly.class);
-        assertThat(OperatorClassRegistry.factoryIds()).doesNotContain("sugar_state_only");
+        assertThat(RelayClassRegistry.factoryIds()).doesNotContain("sugar_state_only");
     }
 
-    /** fails when: the steps short form stops declaring a steps operator. */
+    /** fails when: the steps short form stops declaring a steps relay. */
     @Test
     void theStepsShortFormRegistersAsSteps() {
         com.flezha.sdk.Flezha.createRunner("sugar_twin_steps_ns").registerFactory(SugarSteps.class);
-        assertThat(OperatorClassRegistry.getTopology("sugar_steps").steps()).isTrue();
+        assertThat(RelayClassRegistry.getTopology("sugar_steps").steps()).isTrue();
     }
 
     /**
@@ -152,7 +152,7 @@ class SugarTwinTest {
     }
 
     /**
-     * fails when: a steps operator can be placed under an id a flow operator already answers, or the
+     * fails when: a steps relay can be placed under an id a flow relay already answers, or the
      * refused class takes the id over in the runtime registry. This is the module where the runner
      * and the real registry are both on the classpath.
      */
@@ -166,14 +166,14 @@ class SugarTwinTest {
                     assertThat(e.details()).containsEntry("factory_id", "plain");
                 });
 
-        assertThat(OperatorClassRegistry.getTopology("plain").steps())
+        assertThat(RelayClassRegistry.getTopology("plain").steps())
                 .as("the flow class keeps the id")
                 .isFalse();
     }
 
     /**
      * fails when: the shorthand stops naming its entry channel {@code input} — the address §6's
-     * conformance table and every operator in the tree ships under.
+     * conformance table and every relay in the tree ships under.
      */
     @Test
     void theShorthandKeepsTheDefaultEntryChannelName() {
@@ -181,11 +181,11 @@ class SugarTwinTest {
     }
 
     /**
-     * Cross-SDK conformance: the reference operator's type mapping matches the contract table (and
-     * the Rust expansion of the same operator).
+     * Cross-SDK conformance: the reference relay's type mapping matches the contract table (and
+     * the Rust expansion of the same relay).
      */
     @Test
-    void referenceOperatorMatchesContract() {
+    void referenceRelayMatchesContract() {
         var entry = TaskletModel.read(SugarEntry.class, null);
         assertThat(entry.inputType()).isEqualTo(String.class);
         assertThat(entry.outputType()).isEqualTo(String.class);

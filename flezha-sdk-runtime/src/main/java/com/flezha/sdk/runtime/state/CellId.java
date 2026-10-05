@@ -7,8 +7,8 @@ import java.util.Optional;
 import javax.annotation.Nonnull;
 
 /**
- * Wire identity of a Cell. Combines the operator-instance id (= controller's
- * {@code operator_id}), the Tasklet's name within the Operator, and the cell
+ * Wire identity of a Cell. Combines the relay-instance id (= controller's
+ * {@code relay_id}), the Tasklet's name within the Relay, and the cell
  * key (empty string for single-cell mode).
  *
  * <p>The controller keys each per-Cell WAL by this identity and echoes it
@@ -32,7 +32,7 @@ public record CellId(String instanceId, String taskletName, String cellKey) {
      * Structured binary identity consumed by the controller's
      * {@code decode_cell_id}:
      * {@code [rc_len:u8][rc][sh_len:u8][sh][pk_len:u16 BE][pk]}, where
-     * {@code rc} = operator-instance id, {@code sh} = tasklet name, {@code pk} =
+     * {@code rc} = relay-instance id, {@code sh} = tasklet name, {@code pk} =
      * cell key (all UTF-8). Mirrors the Rust SDK's
      * {@code encode_cell_identity}.
      */
@@ -42,7 +42,7 @@ public record CellId(String instanceId, String taskletName, String cellKey) {
         byte[] sh = taskletName.getBytes(StandardCharsets.UTF_8);
         byte[] pk = cellKey.getBytes(StandardCharsets.UTF_8);
         if (rc.length > 255 || sh.length > 255) {
-            throw new IllegalArgumentException("operator_class / tasklet_id must be <= 255 bytes");
+            throw new IllegalArgumentException("relay_class / tasklet_id must be <= 255 bytes");
         }
         if (pk.length > 0xFFFF) {
             throw new IllegalArgumentException("cell_key must be <= 65535 bytes");

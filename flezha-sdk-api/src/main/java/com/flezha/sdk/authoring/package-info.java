@@ -1,11 +1,11 @@
 /**
- * The short form: a whole single-tasklet operator declared on the tasklet class itself.
+ * The short form: a whole single-tasklet relay declared on the tasklet class itself.
  *
- * <p>{@link com.flezha.sdk.authoring.Operator} goes on a class that implements
+ * <p>{@link com.flezha.sdk.authoring.Relay} goes on a class that implements
  * {@link com.flezha.sdk.tasklet.Tasklet}. It is read when the class is registered,
- * {@code runner.registerFactory(Echo.class)}, which declares an operator wiring an entry channel
+ * {@code runner.registerFactory(Echo.class)}, which declares a relay wiring an entry channel
  * into the class and, when a sink is written, the class to that plugin sink. It takes the settings
- * tree the full form takes. Nothing is generated. The tasklet takes the operator's {@code id} as
+ * tree the full form takes. Nothing is generated. The tasklet takes the relay's {@code id} as
  * its name, so a short form carries {@code @Tasklet.Spec} only for its settings.
  */
 @javax.annotation.ParametersAreNonnullByDefault

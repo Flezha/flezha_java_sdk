@@ -1,7 +1,7 @@
 /**
  * Executing a complete graph inside the calling JVM, with no controller.
  *
- * <p>{@link com.flezha.sdk.LocalOperator} takes the same operator class that would be deployed,
+ * <p>{@link com.flezha.sdk.LocalRelay} takes the same relay class that would be deployed,
  * runs its declared wiring in this process, and delivers sink output to a callback. No controller,
  * no socket and no container are involved, which makes this both the fastest way to try an idea and
  * the basis for a test that exercises real wiring rather than a mock.
@@ -20,7 +20,7 @@
  * <p>Declarations requiring a controller, including durability, effectively-once delivery, plugins,
  * placement and migration, observability export and multi-runner scale, are refused at startup, and
  * the refusal names the declaration responsible.
- * {@link com.flezha.examples.local.WordCountOperator} declares a two-stage graph, splitting lines
+ * {@link com.flezha.examples.local.WordCountRelay} declares a two-stage graph, splitting lines
  * into words and counting each word in its own cell, so the run also demonstrates keying.
  */
 package com.flezha.examples.local;

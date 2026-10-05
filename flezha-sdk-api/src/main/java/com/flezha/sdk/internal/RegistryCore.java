@@ -1,7 +1,7 @@
 package com.flezha.sdk.internal;
 
 import com.flezha.sdk.FlezhaException;
-import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.relay.Relay;
 import java.lang.reflect.InvocationTargetException;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,7 +44,7 @@ public final class RegistryCore {
      */
     public String register(Class<?> cls) {
         if (cls == null) {
-            throw new IllegalArgumentException("operator class must not be null");
+            throw new IllegalArgumentException("relay class must not be null");
         }
         synchronized (lock) {
             // Delegate to the runtime side (which validates the authoring and
@@ -67,7 +67,7 @@ public final class RegistryCore {
                 runtimeRegistryFqn,
                 "registerClass",
                 new Class<?>[] {Class.class},
-                "Failed to register operator '" + cls.getName() + "'",
+                "Failed to register relay '" + cls.getName() + "'",
                 cls);
     }
 
@@ -76,7 +76,7 @@ public final class RegistryCore {
                 runtimeRegistryFqn,
                 "unregisterClass",
                 new Class<?>[] {String.class},
-                "Failed to remove operator factory '" + factoryId + "'",
+                "Failed to remove relay factory '" + factoryId + "'",
                 factoryId);
     }
 
@@ -159,8 +159,8 @@ public final class RegistryCore {
         String factoryId = shortForm == null ? null : shortForm.id();
         Throwable cause = null;
         try {
-            if (factoryId == null && Operator.class.isAssignableFrom(cls)) {
-                factoryId = ((Operator) cls.getDeclaredConstructor().newInstance()).factoryId();
+            if (factoryId == null && Relay.class.isAssignableFrom(cls)) {
+                factoryId = ((Relay) cls.getDeclaredConstructor().newInstance()).factoryId();
             }
         } catch (InvocationTargetException e) {
             cause = e.getCause();

@@ -16,7 +16,7 @@
  * rather than appending a second one. This is the same keyed-emit mechanism the
  * {@code effectivelyonce} example relies on, applied to a different problem.
  *
- * <p>The correction window, {@code correctionMs} on the operator's {@code EffectivelyOnce}, bounds
+ * <p>The correction window, {@code correctionMs} on the relay's {@code EffectivelyOnce}, bounds
  * how far back the runtime will replay, and it is not free: the window sizes the controller's
  * input-log retention, so it should reflect the lateness actually expected. Its
  * {@code beyondWindow} governs a message older than the window, treated here as a fresh arrival.

@@ -4,7 +4,7 @@ package com.flezha.test;
  * Shared crash-window gate for the durable structured steps crash-resume e2e
  * (§7c.3). A tasklet (or a compensation hook) parks a pool/driver thread
  * until {@code FLEZHA_STEPS_E2E_RELEASE} is present in the environment. The
- * first runner is launched WITHOUT it (so a SIGKILL lands while the operator
+ * first runner is launched WITHOUT it (so a SIGKILL lands while the relay
  * is mid-chain, with earlier tasklets' Cell state already durable); the
  * respawned runner is launched WITH it, so the resumed instance runs to
  * completion. Mirrors the Rust test app's {@code block_until_released}.

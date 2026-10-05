@@ -5,8 +5,8 @@ import javax.annotation.Nonnull;
 
 /**
  * Producer-first fluent graph builder consumed by
- * {@link com.flezha.sdk.operator.Operator#channels(ChannelBuilder)}, the
- * graph body of every operator.
+ * {@link com.flezha.sdk.relay.Relay#channels(ChannelBuilder)}, the
+ * graph body of every relay.
  *
  * <p>{@code c.input(T.class, "name").into(A.class).into(B.class).sink("plugin")}
  * — {@code .into} wires a consumer and returns that tasklet's <b>output
@@ -16,9 +16,9 @@ import javax.annotation.Nonnull;
  * streams naming the same consumer class.
  *
  * <p>Entry channel names stay explicit and mandatory — they are the
- * operator's external input address. Inter-tasklet channel names
+ * relay's external input address. Inter-tasklet channel names
  * auto-derive from the producer node's identity, with {@link Stream#named}
- * as the override. Declarations land in a per-operator topology the runtime
+ * as the override. Declarations land in a per-relay topology the runtime
  * freezes at registration.
  */
 public interface ChannelBuilder {
@@ -57,7 +57,7 @@ public interface ChannelBuilder {
     <I> Merge<I> merge(Class<I> type);
 
     /**
-     * Turn an operator-wide document stream into per-key deliveries: every key
+     * Turn a relay-wide document stream into per-key deliveries: every key
      * seen on {@code traffic} receives each distinct document exactly once, on
      * that key's own next traffic item, as a {@link RoutedDocument} the consumer
      * keys by.
@@ -109,7 +109,7 @@ public interface ChannelBuilder {
      * tasklet whose {@code {document, version, delivered}} state rides the
      * standard change journal: authoring sugar over existing primitives, not a
      * runtime feature. The node is named {@code route_latest} like any tasklet
-     * node, so a second router in one operator needs
+     * node, so a second router in one relay needs
      * {@link #routeLatest(Class, EdgeStream, EdgeStream, Function, String)} to
      * name it.
      *
@@ -123,7 +123,7 @@ public interface ChannelBuilder {
 
     /**
      * {@link #routeLatest(Class, EdgeStream, EdgeStream, Function)} with an
-     * explicit node identity, so one operator may carry several routers (the
+     * explicit node identity, so one relay may carry several routers (the
      * node-identity rule makes unnamed mentions of one class one node).
      */
     @Nonnull

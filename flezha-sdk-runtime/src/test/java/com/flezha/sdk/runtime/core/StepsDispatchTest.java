@@ -3,8 +3,8 @@ package com.flezha.sdk.runtime.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.Operator;
-import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
+import com.flezha.sdk.relay.Relay;
+import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.runtime.state.TimerOp;
 import com.flezha.sdk.state.TimerKind;
@@ -19,7 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Steps operator activations: a tasklet's completion request, the one edge output a
+ * Steps relay activations: a tasklet's completion request, the one edge output a
  * stage releases, the transform each consumer applies at delivery, and
  * compensation.
  */
@@ -28,7 +28,7 @@ class StepsDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("a steps tasklet's complete rides its effect, the later call winning")
     void aStepsTaskletsCompleteRidesItsEffect() {
-        OperatorClassRegistry.registerClass(CompletingSteps.class);
+        RelayClassRegistry.registerClass(CompletingSteps.class);
         ItemEffect effect = soleEffect(work("completing_steps", 0, Optional.empty(), 0, input(0, "bob", 1)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.Ok.class);
@@ -38,9 +38,9 @@ class StepsDispatchTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("A durable steps operator invocation ships the same record: one Change and one keyed output")
+    @DisplayName("A durable steps relay invocation ships the same record: one Change and one keyed output")
     void aDurableStepsInvocationShipsTheSameRecord() {
-        OperatorClassRegistry.registerClass(DurableCountSteps.class);
+        RelayClassRegistry.registerClass(DurableCountSteps.class);
         ItemEffect effect = soleEffect(work("durable_count_steps", 0, Optional.empty(), 0, input(0, "key:a", 1)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.Ok.class);
@@ -52,7 +52,7 @@ class StepsDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("A Java steps tasklet's emit rides its cell's record with its key and metadata")
     void aStepsTaskletsKeyedEmitRidesItsEffect() {
-        OperatorClassRegistry.registerClass(KeyedMetaSteps.class);
+        RelayClassRegistry.registerClass(KeyedMetaSteps.class);
         ItemEffect effect = soleEffect(work("keyed_meta_steps", 0, Optional.empty(), 0, input(0, "x", 1)));
 
         assertThat(effect.outputs()).hasSize(1);
@@ -64,7 +64,7 @@ class StepsDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("an item that fails after completing carries no completion")
     void aFailedItemCarriesNoCompletion() {
-        OperatorClassRegistry.registerClass(CompletingSteps.class);
+        RelayClassRegistry.registerClass(CompletingSteps.class);
         ItemEffect effect = soleEffect(work("completing_steps", 0, Optional.empty(), 0, input(0, "fail", 1)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
@@ -74,10 +74,10 @@ class StepsDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("a steps stage releases ONE untransformed edge output, whatever the consumer count")
     void stepsStageReleasesOneEdgeOutputPerValue() {
-        OperatorClassRegistry.registerClass(FanOutSteps.class);
+        RelayClassRegistry.registerClass(FanOutSteps.class);
         ItemEffect effect = soleEffect(work("fanout_steps", 0, Optional.empty(), 0, input(0, "v", 1)));
 
-        // The steps operator fold discards the consumer and the driver fans the
+        // The steps relay fold discards the consumer and the driver fans the
         // released batch out itself, so `steps_fan`'s two consumers must not
         // double it.
         assertThat(effect.outputs()).hasSize(1);
@@ -94,7 +94,7 @@ class StepsDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("a steps terminal nothing consumes hands its value to the core as the pass's carry")
     void stepsTerminalHandsItsCarry() {
-        OperatorClassRegistry.registerClass(CarrySteps.class);
+        RelayClassRegistry.registerClass(CarrySteps.class);
         ItemEffect effect = soleEffect(work("carry_steps", 0, Optional.empty(), 0, input(0, "3", 1)));
 
         assertThat(effect.outputs()).hasSize(1);
@@ -105,7 +105,7 @@ class StepsDispatchTest extends DispatchTestBase {
     }
 
     /** A chained loop whose terminal channel nothing consumes: its value is the carry. */
-    public static final class CarrySteps implements Operator {
+    public static final class CarrySteps implements Relay {
         @Override
         public String factoryId() {
             return "carry_steps";
@@ -130,7 +130,7 @@ class StepsDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("each steps consumer applies its own edge transform exactly once, at delivery")
     void stepsConsumerAppliesItsEdgeOnce() {
-        OperatorClassRegistry.registerClass(FanOutSteps.class);
+        RelayClassRegistry.registerClass(FanOutSteps.class);
         ItemEffect stage = soleEffect(work("fanout_steps", 0, Optional.empty(), 0, input(0, "v", 1)));
         byte[] released = stage.outputs().get(0).payload();
 
@@ -160,7 +160,7 @@ class StepsDispatchTest extends DispatchTestBase {
         // Durable, and the chain says nothing about how the value between two
         // tasklets is encoded: the core derives the journal codec from the
         // channel's kind, and this SDK hands it bytes either way.
-        OperatorClassRegistry.registerClass(DurableHandoffSteps.class);
+        RelayClassRegistry.registerClass(DurableHandoffSteps.class);
         ItemEffect effect = soleEffect(work("durable_handoff_steps", 0, Optional.empty(), 0, input(0, "v", 1)));
 
         assertThat(effect.outputs()).hasSize(1);
@@ -174,7 +174,7 @@ class StepsDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("A timer inside a steps tasklet fires: its registration reaches the effect, as in a stream")
     void aTimerInsideABoundedTaskletFires() {
-        OperatorClassRegistry.registerClass(TimerSteps.class);
+        RelayClassRegistry.registerClass(TimerSteps.class);
         ItemEffect effect = soleEffect(work("timer_steps", 0, Optional.empty(), 0, input(0, "x", 1)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.Ok.class);
@@ -184,15 +184,15 @@ class StepsDispatchTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("The retired wake method does not compile: Operator declares no wakeAfter")
+    @DisplayName("The retired wake method does not compile: Relay declares no wakeAfter")
     void theRetiredWakeMethodDoesNotCompile() {
-        assertThat(java.util.Arrays.stream(com.flezha.sdk.operator.Operator.class.getMethods())
+        assertThat(java.util.Arrays.stream(com.flezha.sdk.relay.Relay.class.getMethods())
                         .map(java.lang.reflect.Method::getName))
                 .doesNotContain("wakeAfter");
     }
 
-    /** A durable steps operator whose one tasklet applies a Change and emits keyed. */
-    public static final class DurableCountSteps implements com.flezha.sdk.operator.Operator {
+    /** A durable steps relay whose one tasklet applies a Change and emits keyed. */
+    public static final class DurableCountSteps implements com.flezha.sdk.relay.Relay {
         @Override
         public String factoryId() {
             return "durable_count_steps";
@@ -209,8 +209,8 @@ class StepsDispatchTest extends DispatchTestBase {
         }
     }
 
-    /** A durable steps operator whose one tasklet emits with a key and metadata. */
-    public static final class KeyedMetaSteps implements com.flezha.sdk.operator.Operator {
+    /** A durable steps relay whose one tasklet emits with a key and metadata. */
+    public static final class KeyedMetaSteps implements com.flezha.sdk.relay.Relay {
         @Override
         public String factoryId() {
             return "keyed_meta_steps";
@@ -227,8 +227,8 @@ class StepsDispatchTest extends DispatchTestBase {
         }
     }
 
-    /** A steps operator whose one tasklet registers a processing-time timer. */
-    public static final class TimerSteps implements com.flezha.sdk.operator.Operator {
+    /** A steps relay whose one tasklet registers a processing-time timer. */
+    public static final class TimerSteps implements com.flezha.sdk.relay.Relay {
         @Override
         public String factoryId() {
             return "timer_steps";
@@ -258,7 +258,7 @@ class StepsDispatchTest extends DispatchTestBase {
     }
 
     /** A DURABLE structured chain that declares nothing about its handoff. */
-    public static final class DurableHandoffSteps implements com.flezha.sdk.operator.Operator {
+    public static final class DurableHandoffSteps implements com.flezha.sdk.relay.Relay {
         @Override
         public String factoryId() {
             return "durable_handoff_steps";
@@ -281,7 +281,7 @@ class StepsDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("CompensateRun decodes the recorded outputs and collects the undo emits")
     void compensateRunUndoesWithDecodedOutputs() {
-        OperatorClassRegistry.registerClass(SagaSteps.class);
+        RelayClassRegistry.registerClass(SagaSteps.class);
         ItemEffect forward = soleEffect(work("saga_steps", 0, Optional.empty(), 0, input(0, "job", 1)));
         assertThat(forward.outputs()).hasSize(1);
 

@@ -2,9 +2,9 @@
 package nowhere;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.relay.Relay;
 
-final class Misplaced implements Operator {
+final class Misplaced implements Relay {
     @Override
     public String factoryId() {
         return "ack_under_at_least_once";

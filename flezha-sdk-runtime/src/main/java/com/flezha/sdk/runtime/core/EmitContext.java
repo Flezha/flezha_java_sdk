@@ -2,10 +2,10 @@ package com.flezha.sdk.runtime.core;
 
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelKind;
-import com.flezha.sdk.runtime.operator.ChannelDescriptor;
-import com.flezha.sdk.runtime.operator.ConsumerEdge;
-import com.flezha.sdk.runtime.operator.PluginSink;
-import com.flezha.sdk.runtime.operator.TaskletDescriptor;
+import com.flezha.sdk.runtime.relay.ChannelDescriptor;
+import com.flezha.sdk.runtime.relay.ConsumerEdge;
+import com.flezha.sdk.runtime.relay.PluginSink;
+import com.flezha.sdk.runtime.relay.TaskletDescriptor;
 import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.runtime.state.TimerSession;
 import com.flezha.sdk.state.Change;
@@ -35,7 +35,7 @@ import javax.annotation.Nullable;
  */
 final class EmitContext implements Ctx<Object, Object> {
 
-    private final OperatorInstance instance;
+    private final RelayInstance instance;
     private final Cell cell;
     private final long token;
     private final long invocationSeq;
@@ -59,13 +59,7 @@ final class EmitContext implements Ctx<Object, Object> {
     private int emitOrdinal;
 
     EmitContext(
-            OperatorInstance instance,
-            Cell cell,
-            long token,
-            long invocationSeq,
-            long now,
-            boolean replay,
-            long offset) {
+            RelayInstance instance, Cell cell, long token, long invocationSeq, long now, boolean replay, long offset) {
         this.instance = instance;
         this.cell = cell;
         this.token = token;
@@ -236,7 +230,7 @@ final class EmitContext implements Ctx<Object, Object> {
             throw FlezhaException.of(
                     "runtime.channel_wrong_kind",
                     Map.of(
-                            "operator",
+                            "relay",
                             instance.factoryId(),
                             "channel",
                             descriptor.name(),
@@ -312,7 +306,7 @@ final class EmitContext implements Ctx<Object, Object> {
      * consumer itself when the stage commits. One output per consumer would
      * therefore multiply the stage's released batch (and every downstream
      * node's work) by the channel's consumer count. So a structured
-     * steps operator releases the value once, untransformed and unkeyed; each
+     * steps relay releases the value once, untransformed and unkeyed; each
      * consumer applies its own edge on delivery in
      * {@link CellRouting#valuesForCell}, which is the seam a live run and a
      * journal re-seed both cross.
@@ -360,7 +354,7 @@ final class EmitContext implements Ctx<Object, Object> {
     /**
      * A plugin output. A keyed channel of a class that records no effects
      * carries the identity stamps; under the tier, and for a durable
-     * steps operator, the controller derives them from the effect record at flush
+     * steps relay, the controller derives them from the effect record at flush
      * time, so none ride here.
      */
     private void collectPluginOutput(

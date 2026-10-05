@@ -3,13 +3,13 @@ package com.flezha.sdk.runtime.core;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.native_.FlzCore;
-import com.flezha.sdk.operator.Operator;
-import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
-import com.flezha.sdk.runtime.operator.OperatorTopology;
-import com.flezha.sdk.runtime.operator.TaskletModel;
-import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder.ChannelEntry;
-import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder.PendingEdge;
-import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder.TaskletEntry;
+import com.flezha.sdk.relay.Relay;
+import com.flezha.sdk.runtime.relay.RelayClassRegistry;
+import com.flezha.sdk.runtime.relay.RelayTopology;
+import com.flezha.sdk.runtime.relay.TaskletModel;
+import com.flezha.sdk.runtime.relay.builder.RelayTopologyBuilder.ChannelEntry;
+import com.flezha.sdk.runtime.relay.builder.RelayTopologyBuilder.PendingEdge;
+import com.flezha.sdk.runtime.relay.builder.RelayTopologyBuilder.TaskletEntry;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -63,7 +63,7 @@ public final class HostClassDeclaration {
      */
     @Nonnull
     public static byte[] forFactory(@Nonnull String factoryId) {
-        OperatorTopology topology = OperatorClassRegistry.getTopology(factoryId);
+        RelayTopology topology = RelayClassRegistry.getTopology(factoryId);
         if (topology == null) {
             throw new IllegalStateException("factory `" + factoryId + "` is not registered");
         }
@@ -79,7 +79,7 @@ public final class HostClassDeclaration {
     @Nonnull
     public static Map<String, Object> forClass(
             @Nonnull String factoryId,
-            @Nonnull Operator settings,
+            @Nonnull Relay settings,
             @Nonnull List<ChannelEntry> channels,
             @Nonnull List<TaskletEntry> tasklets,
             @Nonnull int[] capacities) {
@@ -120,10 +120,10 @@ public final class HostClassDeclaration {
     }
 
     /** {@code run} as the tree's JSON: {@code {"flow":{"exactly":...}}} or {@code {"steps":{...}}}. */
-    private static Map<String, Object> runJson(Operator.Run run) {
+    private static Map<String, Object> runJson(Relay.Run run) {
         return switch (run) {
-            case Operator.Run.Flow flow -> Map.of("flow", Map.of("exactly", exactlyJson(flow.exactly())));
-            case Operator.Run.Steps steps -> Map.of(
+            case Relay.Run.Flow flow -> Map.of("flow", Map.of("exactly", exactlyJson(flow.exactly())));
+            case Relay.Run.Steps steps -> Map.of(
                     "steps",
                     Map.of(
                             "each", steps.each().name().toLowerCase(Locale.ROOT),
@@ -131,8 +131,8 @@ public final class HostClassDeclaration {
         };
     }
 
-    private static Object exactlyJson(Operator.Exactly exactly) {
-        if (!(exactly instanceof Operator.Exactly.EffectivelyOnce tier)) {
+    private static Object exactlyJson(Relay.Exactly exactly) {
+        if (!(exactly instanceof Relay.Exactly.EffectivelyOnce tier)) {
             return "at_least_once";
         }
         Map<String, Object> members = new LinkedHashMap<>();
@@ -142,8 +142,8 @@ public final class HostClassDeclaration {
         return Map.of("effectively_once", members);
     }
 
-    private static Object ackJson(Operator.Ack ack) {
-        if (!(ack instanceof Operator.Ack.Checkpoint checkpoint)) {
+    private static Object ackJson(Relay.Ack ack) {
+        if (!(ack instanceof Relay.Ack.Checkpoint checkpoint)) {
             return "per_input";
         }
         Map<String, Object> members = new LinkedHashMap<>();
@@ -157,19 +157,19 @@ public final class HostClassDeclaration {
      * {@code durable} as the tree's JSON: {@code false}, or the level with its {@code sleep_after};
      * the run's default leaves {@code sleep_after} out.
      */
-    private static Object durableJson(Operator.Durable durable) {
+    private static Object durableJson(Relay.Durable durable) {
         return switch (durable) {
-            case Operator.Durable.Memory ignored -> false;
-            case Operator.Durable.Local local -> level("local", local.sleepAfter());
-            case Operator.Durable.Remote remote -> level("remote", remote.sleepAfter());
+            case Relay.Durable.Memory ignored -> false;
+            case Relay.Durable.Local local -> level("local", local.sleepAfter());
+            case Relay.Durable.Remote remote -> level("remote", remote.sleepAfter());
         };
     }
 
-    private static Object level(String name, Operator.Durable.SleepAfter sleepAfter) {
+    private static Object level(String name, Relay.Durable.SleepAfter sleepAfter) {
         return switch (sleepAfter) {
-            case Operator.Durable.SleepAfter.RunDefault ignored -> name;
-            case Operator.Durable.SleepAfter.Never ignored -> Map.of(name, Map.of("sleep_after", false));
-            case Operator.Durable.SleepAfter.After after -> Map.of(
+            case Relay.Durable.SleepAfter.RunDefault ignored -> name;
+            case Relay.Durable.SleepAfter.Never ignored -> Map.of(name, Map.of("sleep_after", false));
+            case Relay.Durable.SleepAfter.After after -> Map.of(
                     name, Map.of("sleep_after", after.interval().toMillis()));
         };
     }

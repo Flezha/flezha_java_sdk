@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The dynamic-mode consumer of {@link DynamicCellOperator}. It
+ * The dynamic-mode consumer of {@link DynamicCellRelay}. It
  * declares no keying member of any kind — the edge's {@code keyBy} is what makes
  * it dynamic — and applies a Change per input so the controller writes a WAL
  * file per lazily-created Cell. It declares no idle TTL, so every Cell is kept.

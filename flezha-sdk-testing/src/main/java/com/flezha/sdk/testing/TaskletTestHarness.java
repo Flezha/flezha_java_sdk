@@ -1,7 +1,7 @@
 package com.flezha.sdk.testing;
 
 import com.flezha.sdk.FlezhaException;
-import com.flezha.sdk.runtime.operator.TaskletModel;
+import com.flezha.sdk.runtime.relay.TaskletModel;
 import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.state.Change;

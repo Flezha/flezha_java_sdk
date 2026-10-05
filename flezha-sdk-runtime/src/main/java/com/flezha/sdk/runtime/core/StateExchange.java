@@ -11,7 +11,7 @@ import java.util.function.BiFunction;
  * The state crossing, in both directions: restore bodies folded onto a cell,
  * the JSON shape the controller reads and writes, and the change buffer one
  * invocation produced. Every method is handed the cell it works on — the cell
- * map itself is {@link OperatorInstance}'s and stays there.
+ * map itself is {@link RelayInstance}'s and stays there.
  */
 final class StateExchange {
 
@@ -50,7 +50,7 @@ final class StateExchange {
 
     static byte[] stateJson(Cell cell) {
         // A Void state has nothing to ship. It ships `{}`, and `applyState`
-        // keeps it absent, so a stateless operator's migration serialize and
+        // keeps it absent, so a stateless relay's migration serialize and
         // its shutdown state ship succeed.
         if (cell.state == null) {
             return "{}".getBytes(StandardCharsets.UTF_8);

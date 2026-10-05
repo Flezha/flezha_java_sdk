@@ -1,0 +1,27 @@
+package com.flezha.test;
+
+import com.flezha.sdk.channel.ChannelBuilder;
+import com.flezha.sdk.channel.OverflowPolicy;
+import com.flezha.sdk.relay.Relay;
+
+/**
+ * Mirror of the Rust test app's {@code BenchKeyedRelay}: {@code tier_store}
+ * minus the effectively-once declaration, so the round-trip bench can measure the
+ * same keyed upsert under both durability postures.
+ */
+public final class BenchKeyedRelay implements Relay {
+
+    @Override
+    public String factoryId() {
+        return "bench_keyed";
+    }
+
+    @Override
+    public void channels(ChannelBuilder c) {
+        c.input(String.class, "input")
+                .onFull(OverflowPolicy.DROP_NOTHING)
+                .into(TierStoreTasklet.class)
+                .keyed()
+                .sink("sink");
+    }
+}

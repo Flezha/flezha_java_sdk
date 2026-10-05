@@ -23,7 +23,7 @@ new idea, so reading them out of order will leave gaps.
 **1. [`examples/echo`](../examples/echo)** is the minimal complete application,
 and it sits outside this module as a standalone project so it can be opened and
 built on its own. It establishes the three-part structure every Flezha
-application has: a tasklet holding the code invoked per message, an operator
+application has: a tasklet holding the code invoked per message, a relay
 declaring the graph, and a main starting a runner. It declares no state, which
 keeps the whole example short enough to hold in mind at once.
 

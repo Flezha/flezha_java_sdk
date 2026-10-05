@@ -1,6 +1,6 @@
 package com.flezha.test;
 
-import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.relay.Relay;
 import java.time.Duration;
 import java.util.Optional;
 
@@ -32,9 +32,9 @@ final class TestEnv {
      * drill or the bench driving it shortens the interval through
      * {@code FLEZHA_FIXTURE_SLEEP_AFTER_MS}.
      */
-    static Operator.Durable fixtureDurable() {
-        return new Operator.Durable.Local(optLong("FLEZHA_FIXTURE_SLEEP_AFTER_MS")
+    static Relay.Durable fixtureDurable() {
+        return new Relay.Durable.Local(optLong("FLEZHA_FIXTURE_SLEEP_AFTER_MS")
                 .map(Duration::ofMillis)
-                .orElse(Operator.DEFAULT_SLEEP_AFTER));
+                .orElse(Relay.DEFAULT_SLEEP_AFTER));
     }
 }

@@ -5,7 +5,7 @@ import com.flezha.sdk.control.Control;
 import com.flezha.sdk.internal.RegistryCore;
 import com.flezha.sdk.internal.RunnerHandle;
 import com.flezha.sdk.internal.RuntimeBridge;
-import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.relay.Relay;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +19,7 @@ import javax.annotation.Nullable;
  * This JVM's runner: create → declare ({@link #registerFactory} /
  * {@link #unregisterFactory}) → start on one object, returned by
  * {@link Flezha#createRunner(String)}.
- * Operator types may be declared and removed before AND after
+ * Relay types may be declared and removed before AND after
  * {@link #start()}, until the started runner is closed; a post-start change
  * is declared to the core immediately and reaches the controller on the next
  * connect/reconnect init frame, which carries the runner's full factory set.
@@ -50,7 +50,7 @@ public final class FlezhaRunner implements AutoCloseable {
      * empty; generation 2 must re-define its types). The runtime-side class
      * registry stays process-global behind it.
      */
-    private final RegistryCore factories = new RegistryCore("com.flezha.sdk.runtime.operator.OperatorClassRegistry");
+    private final RegistryCore factories = new RegistryCore("com.flezha.sdk.runtime.relay.RelayClassRegistry");
 
     private final AtomicReference<RunnerHandle> handle = new AtomicReference<>();
 
@@ -76,56 +76,56 @@ public final class FlezhaRunner implements AutoCloseable {
     }
 
     /**
-     * Declare an operator class the runtime can spawn instances of later (via the controller's
-     * {@code AddOperator}). Calls the class's {@code channels(...)} and reads its settings once,
+     * Declare a relay class the runtime can spawn instances of later (via the controller's
+     * {@code AddRelay}). Calls the class's {@code channels(...)} and reads its settings once,
      * and records the topology in the class registry.
      * Legal before and after {@link #start()}. Invalid authoring is reported here, at the declaring
      * call site, as a {@link FlezhaException} whose code names the refusal.
      *
      * <p>A short form is registered by the tasklet class the author wrote, annotated
-     * {@link com.flezha.sdk.authoring.Operator @Operator}: the call reads the annotation and
-     * declares the one-tasklet operator it describes. Nothing is generated.
+     * {@link com.flezha.sdk.authoring.Relay @Relay}: the call reads the annotation and
+     * declares the one-tasklet relay it describes. Nothing is generated.
      *
      * @throws FlezhaException on a duplicate factory id ({@code topology.duplicate_factory_id}), when
-     *     the class is neither an operator nor a short form ({@code topology.no_operator_exported}),
+     *     the class is neither a relay nor a short form ({@code topology.no_relay_exported}),
      *     when its authoring is refused, and on a closed runner ({@code runtime.runner_closed}).
      */
     @Nonnull
-    public FlezhaRunner registerFactory(Class<?> operatorClass) {
+    public FlezhaRunner registerFactory(Class<?> relayClass) {
         open();
-        checked(operatorClass, "registerFactory()").register(operatorClass);
+        checked(relayClass, "registerFactory()").register(relayClass);
         syncFactoriesIfStarted();
         return this;
     }
 
     /**
-     * Remove a declared operator class from this runner — the inverse of
+     * Remove a declared relay class from this runner — the inverse of
      * {@link #registerFactory(Class)}, taking what it took. Legal before and after
      * {@link #start()}.
      *
      * @throws FlezhaException {@code runtime.class_not_registered} if the class's factory id is not
-     *     currently defined on this runner, {@code runtime.operator_type_in_use} if the runner is
-     *     started and live operator instances of the factory exist (the type stays defined),
+     *     currently defined on this runner, {@code runtime.relay_type_in_use} if the runner is
+     *     started and live relay instances of the factory exist (the type stays defined),
      *     {@code runtime.runner_closed} on a closed runner, and
-     *     {@code topology.no_operator_exported} as {@link #registerFactory} names it.
+     *     {@code topology.no_relay_exported} as {@link #registerFactory} names it.
      */
     @Nonnull
-    public FlezhaRunner unregisterFactory(Class<?> operatorClass) {
+    public FlezhaRunner unregisterFactory(Class<?> relayClass) {
         open();
-        return remove(checked(operatorClass, "unregisterFactory()"), operatorClass);
+        return remove(checked(relayClass, "unregisterFactory()"), relayClass);
     }
 
     /**
-     * The registry, for a class that is an operator or a short form; anything else is refused by
+     * The registry, for a class that is a relay or a short form; anything else is refused by
      * the contract's name for it ({@code docs/sdk/authoring_contract.md} §5.1).
      */
     private RegistryCore checked(Class<?> declared, String what) {
         if (declared == null) {
-            throw new IllegalArgumentException(what + ": the operator class must not be null");
+            throw new IllegalArgumentException(what + ": the relay class must not be null");
         }
-        if (!Operator.class.isAssignableFrom(declared)
-                && !declared.isAnnotationPresent(com.flezha.sdk.authoring.Operator.class)) {
-            throw FlezhaException.of("topology.no_operator_exported", Map.of("module", declared.getName()));
+        if (!Relay.class.isAssignableFrom(declared)
+                && !declared.isAnnotationPresent(com.flezha.sdk.authoring.Relay.class)) {
+            throw FlezhaException.of("topology.no_relay_exported", Map.of("module", declared.getName()));
         }
         return factories;
     }
@@ -182,7 +182,7 @@ public final class FlezhaRunner implements AutoCloseable {
      * controller is reachable), never for the runner's ongoing lifetime.
      * Claims the JVM-wide singleton slot by compare-and-set; the loser fails
      * WITHOUT connecting, mutating shared state, or spawning a thread.
-     * Starting with zero declared operator types is legal — the init frame
+     * Starting with zero declared relay types is legal — the init frame
      * carries an empty factory list, and types may be defined later.
      *
      * @throws FlezhaException {@code runtime.runner_already_running} if a runner is already
@@ -225,7 +225,7 @@ public final class FlezhaRunner implements AutoCloseable {
 
     /**
      * Administer this namespace from ordinary application code: start and
-     * stop operators, enable and disable plugins, read what is running.
+     * stop relays, enable and disable plugins, read what is running.
      *
      * <p>The controller judges every call as the identity this connection
      * proved, so no credential is held here and nothing expires. A user
@@ -242,44 +242,44 @@ public final class FlezhaRunner implements AutoCloseable {
 
     /**
      * Send {@code message} to the entry channel {@code channel} of
-     * {@code operatorId} through the controller, under the same role check as
+     * {@code relayId} through the controller, under the same role check as
      * {@link #control()}, and answer its verdict:
-     * {@code {"to": <operator>, "verdict": "delivered" | "absorbed" | "suspended"}}.
+     * {@code {"to": <relay>, "verdict": "delivered" | "absorbed" | "suspended"}}.
      *
      * @throws FlezhaException {@code runtime.runner_not_started} on a never-started runner.
      */
     @Nonnull
-    public JsonNode send(String operatorId, String message, String channel) {
-        return send(operatorId, message, channel, SendOpts.of());
+    public JsonNode send(String relayId, String message, String channel) {
+        return send(relayId, message, channel, SendOpts.of());
     }
 
     /**
      * {@link #send(String, String, String)} with a message id or a partition
-     * key, or locally: in process to an operator bound on this runner,
+     * key, or locally: in process to a relay bound on this runner,
      * answering {@code null}. See {@link SendOpts#local()} for what a local
      * send gives up.
      *
      * @throws FlezhaException {@code usage.options_conflict} for a local send
-     *     with an id or a key; {@code runtime.operator_not_local} for a local
-     *     send to an operator this runner does not hold.
+     *     with an id or a key; {@code runtime.relay_not_local} for a local
+     *     send to a relay this runner does not hold.
      */
     @Nullable
-    public JsonNode send(String operatorId, String message, String channel, SendOpts opts) {
+    public JsonNode send(String relayId, String message, String channel, SendOpts opts) {
         String answer = started()
-                .send(operatorId, channel, message.getBytes(StandardCharsets.UTF_8), opts.msgId, opts.key, opts.local);
-        JsonNode verdict = Control.read("Operator.send", answer);
+                .send(relayId, channel, message.getBytes(StandardCharsets.UTF_8), opts.msgId, opts.key, opts.local);
+        JsonNode verdict = Control.read("Relay.send", answer);
         return verdict.isNull() ? null : verdict;
     }
 
     /**
-     * The ids of the operator instances bound on this runner now, a partition
+     * The ids of the relay instances bound on this runner now, a partition
      * member by its member id, read without the controller.
      *
      * @throws FlezhaException {@code runtime.runner_not_started} on a never-started runner.
      */
     @Nonnull
-    public List<String> getOperators() {
-        return started().operators();
+    public List<String> getRelays() {
+        return started().relays();
     }
 
     /**

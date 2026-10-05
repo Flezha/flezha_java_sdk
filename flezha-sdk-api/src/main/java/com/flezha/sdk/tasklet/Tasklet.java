@@ -14,7 +14,7 @@ import javax.annotation.Nonnull;
  * The unit of user code: handles one message at a time for one cell.
  *
  * <p>A tasklet is your own class. It implements this interface with its three types, carries
- * {@link Spec @Tasklet.Spec} for its name and settings, and is the class the operator names:
+ * {@link Spec @Tasklet.Spec} for its name and settings, and is the class the relay names:
  *
  * <pre>{@code
  * @Tasklet.Spec(name = "track_prices")
@@ -78,15 +78,15 @@ public interface Tasklet<Input, State, Output> {
 
     /**
      * The tasklet's name and scalar settings, read at registration. Every tasklet class carries
-     * it, except a short form ({@code @Operator} / {@code @Operator}), whose
-     * tasklet takes the operator's {@code id} as its name.
+     * it, except a short form ({@code @Relay} / {@code @Relay}), whose
+     * tasklet takes the relay's {@code id} as its name.
      */
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.TYPE)
     @interface Spec {
 
         /**
-         * The durable name the tasklet's state is saved under, unique within its operator. Never
+         * The durable name the tasklet's state is saved under, unique within its relay. Never
          * derived from the class name, so renaming the class keeps the state.
          */
         String name();
@@ -174,7 +174,7 @@ public interface Tasklet<Input, State, Output> {
     }
 
     /**
-     * Undoes a reversible side effect of {@link #run} (steps operators only). The steps driver
+     * Undoes a reversible side effect of {@link #run} (steps relays only). The steps driver
      * calls it only while rolling back an abnormal termination, once per cell that ran, in reverse
      * completion order, with that cell's own outputs and its context. It must be idempotent: a
      * crash mid-rollback may call it again, and after one {@code completedOutput} can be empty.

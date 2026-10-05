@@ -5,11 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.sdk.FlezhaException;
-import com.flezha.sdk.LocalOperator;
+import com.flezha.sdk.LocalRelay;
 import com.flezha.sdk.SinkOutput;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.OverflowPolicy;
-import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.relay.Relay;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.Ctx;
@@ -32,12 +32,12 @@ import org.junit.jupiter.api.Test;
  * passes end to end are not two different graphs.
  *
  * <p>The other ten capabilities in the vocabulary are the controller's: persistence,
- * effectively-once, correction, partitioning, steps operators, liveness, restarts. Local mode refuses them
+ * effectively-once, correction, partitioning, steps relays, liveness, restarts. Local mode refuses them
  * by name rather than approximating them.
  *
  * <p>What each test can assert is what a run with no controller can see. A durable write reaches a
  * null sink, a parked payload has nowhere to park, and a partition member's key range arrives with
- * {@code AddOperator}, so the assertions here are the output side of each capability, which is the
+ * {@code AddRelay}, so the assertions here are the output side of each capability, which is the
  * half the language layer produces.
  *
  * <p>The classes are DECLARED HERE rather than imported, which the other SDKs' local-mode suites do
@@ -77,13 +77,13 @@ class LocalModeCapabilitiesTest {
     @Test
     @DisplayName("keyed_channels: a keyed sink stamps the key the class resolved")
     void aKeyedSinkStampsTheKeyTheClassResolved() {
-        // `partition_relay` is the manifest's only keyed-channel class. Partitioning itself is the
-        // controller's (a member's key-group range arrives with `AddOperator`), so what is asserted
+        // `partition_pass` is the manifest's only keyed-channel class. Partitioning itself is the
+        // controller's (a member's key-group range arrives with `AddRelay`), so what is asserted
         // here is the half the language layer owns: the key it resolves and the stamps it puts on
         // the released value.
-        declares("keyed_channels", "partition_relay");
+        declares("keyed_channels", "partition_pass");
 
-        List<SinkOutput> released = release(PartitionRelayOperator.class, "in", "input", List.of("a:1", "b:1", "a:2"));
+        List<SinkOutput> released = release(PartitionPassRelay.class, "in", "input", List.of("a:1", "b:1", "a:2"));
 
         assertThat(payloads(released)).containsExactlyInAnyOrder("a:1", "b:1", "a:2");
         assertThat(payloadsOfKey(released, "a")).containsExactly("a:1", "a:2");
@@ -97,14 +97,14 @@ class LocalModeCapabilitiesTest {
     @DisplayName("dynamic_cell: the declared filter runs before keying and nothing else is lost")
     void theDeclaredFilterRunsBeforeKeyingAndNothingElseIsLost() {
         // The class's sink is not keyed, so a released value carries no cell stamp and the per-key
-        // minting is not visible on this channel. It is asserted above, on `partition_relay`, whose
+        // minting is not visible on this channel. It is asserted above, on `partition_pass`, whose
         // tasklet is dynamic too and whose sink IS keyed. What this class shows that that one does
         // not is the declared filter: a value it rejects answers no key, so the core is never asked
         // to mint a Cell for it.
         declares("dynamic_cell", "dynamic_cell");
 
         List<SinkOutput> released =
-                release(DynamicCellOperator.class, "input", "kafka", List.of("a:1", "b:1", "drop", "a:2"));
+                release(DynamicCellRelay.class, "input", "kafka", List.of("a:1", "b:1", "drop", "a:2"));
 
         assertThat(payloads(released))
                 .as("the filter dropped `drop` before it was keyed, and every other value reached its Cell")
@@ -126,7 +126,7 @@ class LocalModeCapabilitiesTest {
 
         List<String> inputs = IntStream.range(0, 24).mapToObj(at -> "n" + at).toList();
         List<SinkOutput> released =
-                release(BoundedMailboxDropNothingOperator.class, "drop_nothing_input", "drop_nothing_echo", inputs);
+                release(BoundedMailboxDropNothingRelay.class, "drop_nothing_input", "drop_nothing_echo", inputs);
 
         assertThat(payloads(released))
                 .as("the mailbox holds 4 and 24 were fed: under `drop_nothing` the feed waits, in order")
@@ -138,7 +138,7 @@ class LocalModeCapabilitiesTest {
     void aDeclaredTimerFiresLocallyWithItsScheduledTime() {
         declares("cell_timers", "session_timeout");
 
-        List<SinkOutput> released = release(SessionTimeoutOperator.class, "input", "kafka", List.of("open"));
+        List<SinkOutput> released = release(SessionTimeoutRelay.class, "input", "kafka", List.of("open"));
 
         assertThat(payloads(released))
                 .as("the timer fired exactly once, carrying the timestamp it was scheduled for")
@@ -155,7 +155,7 @@ class LocalModeCapabilitiesTest {
         declares("effectively_once", "tier_store");
 
         FlezhaException refused =
-                Refused.by("runtime.local_needs_controller", () -> LocalOperator.start(TierStoreOperator.class));
+                Refused.by("runtime.local_needs_controller", () -> LocalRelay.start(TierStoreRelay.class));
         assertThat(refused.details()).containsEntry("capability", "effectively_once");
     }
 
@@ -164,7 +164,7 @@ class LocalModeCapabilitiesTest {
     void aLocalRunDropsEveryPart() {
         declares("parts", "part_echo");
 
-        List<SinkOutput> released = release(PartEchoOperator.class, "in", "answer", List.of("3"));
+        List<SinkOutput> released = release(PartEchoRelay.class, "in", "answer", List.of("3"));
 
         assertThat(payloads(released)).containsExactly("done:3");
     }
@@ -173,8 +173,8 @@ class LocalModeCapabilitiesTest {
     @DisplayName("parts: the core refuses a part whose channel ends in no sink")
     void aPartWithNoSinkIsRefused() {
         PART_REFUSALS.clear();
-        for (Class<?> operator : List.of(PartToTaskletOperator.class, PartToResponseOperator.class)) {
-            try (LocalOperator run = LocalOperator.start(operator)) {
+        for (Class<?> relay : List.of(PartToTaskletRelay.class, PartToResponseRelay.class)) {
+            try (LocalRelay run = LocalRelay.start(relay)) {
                 run.feed("input", "x");
                 run.runUntilIdle(BUDGET);
             }
@@ -190,9 +190,9 @@ class LocalModeCapabilitiesTest {
      * run's own delivery thread, which can be behind the graph, and closing is what hands the last of
      * the released values over.
      */
-    private static List<SinkOutput> release(Class<?> operator, String channel, String sink, List<String> inputs) {
+    private static List<SinkOutput> release(Class<?> relay, String channel, String sink, List<String> inputs) {
         ConcurrentLinkedQueue<SinkOutput> released = new ConcurrentLinkedQueue<>();
-        try (LocalOperator run = LocalOperator.start(operator)) {
+        try (LocalRelay run = LocalRelay.start(relay)) {
             run.onSink(sink, released::add);
             inputs.forEach(input -> run.feed(channel, input));
             run.runUntilIdle(BUDGET);
@@ -241,7 +241,7 @@ class LocalModeCapabilitiesTest {
         return at < 0 ? input : input.substring(0, at);
     }
 
-    /** Releases the input's bytes on the operator's sink. */
+    /** Releases the input's bytes on the relay's sink. */
     abstract static class EchoTasklet implements Tasklet<String, Void, byte[]> {
         @Override
         public void run(String input, Ctx<Void, byte[]> ctx) throws TaskletException {
@@ -250,31 +250,31 @@ class LocalModeCapabilitiesTest {
     }
 
     /** The test app's {@code SugarDoNothing} short form. */
-    @com.flezha.sdk.authoring.Operator(id = "sugar_do_nothing", sink = "sugar_do_nothing_echo")
+    @com.flezha.sdk.authoring.Relay(id = "sugar_do_nothing", sink = "sugar_do_nothing_echo")
     public static final class SugarDoNothing extends EchoTasklet {}
 
     /** Releases the input under the key it resolves to, on the class's keyed sink. */
-    @Tasklet.Spec(name = "partition_relay_tasklet")
-    public static final class PartitionRelayTasklet implements Tasklet<String, Void, String> {
+    @Tasklet.Spec(name = "partition_pass_tasklet")
+    public static final class PartitionPassTasklet implements Tasklet<String, Void, String> {
         @Override
         public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
             ctx.emitKeyed(key(input), input);
         }
     }
 
-    public static final class PartitionRelayOperator implements Operator {
+    public static final class PartitionPassRelay implements Relay {
         @Override
         public String factoryId() {
-            return "partition_relay";
+            return "partition_pass";
         }
 
         @Override
         public void channels(ChannelBuilder c) {
             // The entry channel is `in` and the sink `input` because a forwarded frame keeps its
-            // producing channel's name, and that is what selects the receiving operator's channel.
+            // producing channel's name, and that is what selects the receiving relay's channel.
             c.input(String.class, "in")
                     .keyBy(LocalModeCapabilitiesTest::key)
-                    .into(PartitionRelayTasklet.class)
+                    .into(PartitionPassTasklet.class)
                     .keyed()
                     .sink("input");
         }
@@ -283,7 +283,7 @@ class LocalModeCapabilitiesTest {
     @Tasklet.Spec(name = "dynamic_cell_tasklet")
     public static final class DynamicCellTasklet extends EchoTasklet {}
 
-    public static final class DynamicCellOperator implements Operator {
+    public static final class DynamicCellRelay implements Relay {
         @Override
         public String factoryId() {
             return "dynamic_cell";
@@ -303,7 +303,7 @@ class LocalModeCapabilitiesTest {
     @Tasklet.Spec(name = "drop_nothing_test_tasklet", capacity = 4)
     public static final class DropNothingTasklet extends EchoTasklet {}
 
-    public static final class BoundedMailboxDropNothingOperator implements Operator {
+    public static final class BoundedMailboxDropNothingRelay implements Relay {
         @Override
         public String factoryId() {
             return "bounded_mailbox_drop_nothing";
@@ -336,7 +336,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class SessionTimeoutOperator implements Operator {
+    public static final class SessionTimeoutRelay implements Relay {
         @Override
         public String factoryId() {
             return "session_timeout";
@@ -360,7 +360,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class PartEchoOperator implements Operator {
+    public static final class PartEchoRelay implements Relay {
         @Override
         public String factoryId() {
             return "part_echo";
@@ -397,7 +397,7 @@ class LocalModeCapabilitiesTest {
         public void run(String input, Ctx<Void, String> ctx) {}
     }
 
-    public static final class PartToTaskletOperator implements Operator {
+    public static final class PartToTaskletRelay implements Relay {
         @Override
         public String factoryId() {
             return "part_to_tasklet";
@@ -409,7 +409,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class PartToResponseOperator implements Operator {
+    public static final class PartToResponseRelay implements Relay {
         @Override
         public String factoryId() {
             return "part_to_response";
@@ -447,7 +447,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    public static final class TierStoreOperator implements Operator {
+    public static final class TierStoreRelay implements Relay {
         @Override
         public String factoryId() {
             return "tier_store";

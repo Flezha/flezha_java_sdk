@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
  *
  * <pre>{@code flz role bind runner@team-orders app team-orders}</pre>
  *
- * <p>Sending to an operator is not here: it is
+ * <p>Sending to a relay is not here: it is
  * {@link com.flezha.sdk.FlezhaRunner#send(String, String, String, com.flezha.sdk.SendOpts)}.
  *
  * <p>Every method here is one line over a single native entry point, because
@@ -43,24 +43,24 @@ public final class Control {
     }
 
     /**
-     * Start an operator, answering the id it runs under and what the start
+     * Start a relay, answering the id it runs under and what the start
      * did. A refused start throws, as every refused call here does.
      */
     @Nonnull
-    public StartResult startOperator(OperatorSpec spec) {
-        JsonNode answer = call("Operator.start", spec.fields());
+    public StartResult startRelay(RelaySpec spec) {
+        JsonNode answer = call("Relay.start", spec.fields());
         try {
             String outcome = answer.required("outcome").asText().toUpperCase(Locale.ROOT);
             return new StartResult(answer.required("id").asText(), StartOutcome.valueOf(outcome));
         } catch (IllegalArgumentException e) {
-            throw FlezhaException.of("control.unreadable_answer", Map.of("verb", "Operator.start"), e);
+            throw FlezhaException.of("control.unreadable_answer", Map.of("verb", "Relay.start"), e);
         }
     }
 
-    /** Stop an operator, or the whole partition group it names. */
+    /** Stop a relay, or the whole partition group it names. */
     @Nonnull
-    public JsonNode stopOperator(String operatorId) {
-        return call("Operator.stop", operatorId);
+    public JsonNode stopRelay(String relayId) {
+        return call("Relay.stop", relayId);
     }
 
     /** Enable the plugin {@code name} in this namespace, as {@code spec} describes it. */
@@ -69,21 +69,21 @@ public final class Control {
         return call("PluginManager.enable", name, spec.fields());
     }
 
-    /** Bind the operator {@code operatorId} to the enabled plugin {@code name}, with no hooks. */
+    /** Bind the relay {@code relayId} to the enabled plugin {@code name}, with no hooks. */
     @Nonnull
-    public JsonNode bindPlugin(String name, String operatorId) {
-        return bindPlugin(name, operatorId, null, null);
+    public JsonNode bindPlugin(String name, String relayId) {
+        return bindPlugin(name, relayId, null, null);
     }
 
     /**
-     * Bind the operator {@code operatorId} to the enabled plugin {@code name}.
+     * Bind the relay {@code relayId} to the enabled plugin {@code name}.
      *
      * @param hooks names or {@code [name, opts]} pairs, or null for none
      * @param channel the channel the plugin feeds or reads, or null for none
      */
     @Nonnull
-    public JsonNode bindPlugin(String name, String operatorId, @Nullable JsonNode hooks, @Nullable String channel) {
-        ObjectNode fields = operatorFields(operatorId);
+    public JsonNode bindPlugin(String name, String relayId, @Nullable JsonNode hooks, @Nullable String channel) {
+        ObjectNode fields = relayFields(relayId);
         if (hooks != null) {
             fields.set("hooks", hooks);
         }
@@ -93,10 +93,10 @@ public final class Control {
         return call("PluginManager.bind", name, fields);
     }
 
-    /** Unbind the operator {@code operatorId} from the plugin {@code name}, which stays enabled. */
+    /** Unbind the relay {@code relayId} from the plugin {@code name}, which stays enabled. */
     @Nonnull
-    public JsonNode unbindPlugin(String name, String operatorId) {
-        return call("PluginManager.unbind", name, operatorFields(operatorId));
+    public JsonNode unbindPlugin(String name, String relayId) {
+        return call("PluginManager.unbind", name, relayFields(relayId));
     }
 
     /** Disable the plugin {@code name}, stopping it wherever it runs. */
@@ -105,13 +105,13 @@ public final class Control {
         return call("PluginManager.disable", name, JsonNodeFactory.instance.objectNode());
     }
 
-    /** The operator ids running in this namespace. */
+    /** The relay ids running in this namespace. */
     @Nonnull
-    public JsonNode listOperators() {
-        return call("Operator.list_operators");
+    public JsonNode listRelays() {
+        return call("Relay.list_relays");
     }
 
-    /** The plugins enabled in this namespace: name, provider, single, bound operators. */
+    /** The plugins enabled in this namespace: name, provider, single, bound relays. */
     @Nonnull
     public JsonNode listPlugins() {
         return call("PluginManager.list");
@@ -119,8 +119,8 @@ public final class Control {
 
     /** One cell's live state, and the change sequence it was read at. */
     @Nonnull
-    public JsonNode cellState(String operatorId, String cellKey) {
-        return call("Operator.cell_state", operatorId, cellKey);
+    public JsonNode cellState(String relayId, String cellKey) {
+        return call("Relay.cell_state", relayId, cellKey);
     }
 
     /**
@@ -151,7 +151,7 @@ public final class Control {
         }
     }
 
-    private static ObjectNode operatorFields(String operatorId) {
-        return JsonNodeFactory.instance.objectNode().put("operator_id", operatorId);
+    private static ObjectNode relayFields(String relayId) {
+        return JsonNodeFactory.instance.objectNode().put("relay_id", relayId);
     }
 }

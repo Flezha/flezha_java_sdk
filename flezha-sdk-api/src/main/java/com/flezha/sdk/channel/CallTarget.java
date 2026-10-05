@@ -5,7 +5,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * The operator a {@link OutputChain#call call} reaches: a named instance (or a partition group,
+ * The relay a {@link OutputChain#call call} reaches: a named instance (or a partition group,
  * whose member the request's key chooses), or an instance of a factory.
  *
  * <pre>{@code
@@ -38,7 +38,7 @@ public record CallTarget(@Nullable String target, @Nullable String factory, bool
 
     /**
      * Whether a factory call starts the instance its key names when none holds it (the default);
-     * {@code false} answers {@code operator.not_found} instead.
+     * {@code false} answers {@code relay.not_found} instead.
      */
     @Nonnull
     public CallTarget create(boolean create) {

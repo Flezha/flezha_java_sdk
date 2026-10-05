@@ -19,8 +19,8 @@ public sealed interface Verdict {
 
     /**
      * Discriminant 3: the entry channel's decoder, or a transform on its edge,
-     * rejected the payload before any tasklet ran. A flow operator parks the item as
-     * a non-retryable error would; a steps operator parks the message under the entry
+     * rejected the payload before any tasklet ran. A flow relay parks the item as
+     * a non-retryable error would; a steps relay parks the message under the entry
      * channel once the stage's ladder exhausts, and goes on waiting instead of
      * ending.
      */

@@ -28,11 +28,11 @@
  * <p>With authorization on, the default in a release, the namespace's {@code runner@<namespace>}
  * principal needs the {@code spawner} role, or every spawn is refused:
  * {@code flz role bind runner@<namespace> spawner <namespace>}. The role also lets this runner's
- * {@code control()} start operators and its {@code send} reach operators in its namespace,
+ * {@code control()} start relays and its {@code send} reach relays in its namespace,
  * and nothing else.
  *
- * <p>{@link com.flezha.examples.spawn.Main} declares both operators on one runner, since the
- * requesting flow operator and the steps operator it requests are ordinary declarations with
+ * <p>{@link com.flezha.examples.spawn.Main} declares both relays on one runner, since the
+ * requesting flow relay and the steps relay it requests are ordinary declarations with
  * no special relationship beyond the factory id.
  */
 package com.flezha.examples.spawn;

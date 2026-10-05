@@ -10,7 +10,7 @@ import com.flezha.sdk.runtime.config.FlezhaEnv;
 import com.flezha.sdk.runtime.core.ActivationDispatcher;
 import com.flezha.sdk.runtime.core.CoreSpawnRequester;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
-import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
+import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import com.flezha.sdk.tasklet.SpawnRequests;
 import java.util.ArrayList;
 import java.util.List;
@@ -123,9 +123,9 @@ public final class FlezhaImpl implements RunnerHandle {
 
     @Override
     @Nonnull
-    public List<String> operators() {
+    public List<String> relays() {
         List<String> ids = new ArrayList<>();
-        Control.read("operators", FlzCore.operators(core)).forEach(id -> ids.add(id.asText()));
+        Control.read("relays", FlzCore.relays(core)).forEach(id -> ids.add(id.asText()));
         return ids;
     }
 
@@ -134,9 +134,9 @@ public final class FlezhaImpl implements RunnerHandle {
         long live = dispatcher.instancesOf(factoryId);
         if (live > 0) {
             throw FlezhaException.of(
-                    "runtime.operator_type_in_use", Map.of("factory_id", factoryId, "live_instances", live));
+                    "runtime.relay_type_in_use", Map.of("factory_id", factoryId, "live_instances", live));
         }
-        OperatorClassRegistry.unregisterClass(factoryId);
+        RelayClassRegistry.unregisterClass(factoryId);
         declared.remove(factoryId);
     }
 
@@ -149,14 +149,9 @@ public final class FlezhaImpl implements RunnerHandle {
     @Override
     @Nonnull
     public String send(
-            String operator,
-            String channel,
-            byte[] message,
-            @Nullable String msgId,
-            @Nullable String key,
-            boolean local) {
+            String relay, String channel, byte[] message, @Nullable String msgId, @Nullable String key, boolean local) {
         return FlzCore.sendMessage(
-                core, operator, channel, message, msgId == null ? "" : msgId, key == null ? "" : key, local);
+                core, relay, channel, message, msgId == null ? "" : msgId, key == null ? "" : key, local);
     }
 
     /**
@@ -170,7 +165,7 @@ public final class FlezhaImpl implements RunnerHandle {
             if (declared.contains(factoryId)) {
                 continue;
             }
-            if (OperatorClassRegistry.getTopology(factoryId) == null) {
+            if (RelayClassRegistry.getTopology(factoryId) == null) {
                 LOG.warn("syncFactories: `{}` is not in the class registry; skipping", factoryId);
                 continue;
             }

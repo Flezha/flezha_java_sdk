@@ -3,7 +3,7 @@ package com.flezha.sdk.runtime.core;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
+import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import com.flezha.sdk.tasklet.SpawnOptions;
 import com.flezha.sdk.tasklet.SpawnRequests;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -23,7 +23,7 @@ class ActivationDispatcherTest extends DispatchTestBase {
     @Test
     @DisplayName("verdict classification: NonRetryable vs retryable, stopping at the first failed item")
     void verdictClassificationStopsAtFirstFailure() {
-        OperatorClassRegistry.registerClass(PoisonOperator.class);
+        RelayClassRegistry.registerClass(PoisonRelay.class);
         ActivationOutcome out = outcome(work(
                 "poison_op", 0, Optional.empty(), 0, input(0, "ok-1", 1), input(0, "bad", 2), input(0, "ok-2", 3)));
         List<ItemEffect> effects = ((ActivationOutcome.Work) out).effects();
@@ -42,7 +42,7 @@ class ActivationDispatcherTest extends DispatchTestBase {
     @Test
     @DisplayName("a payload the entry decoder rejects is Unreadable; a tasklet throwing on a readable one is retryable")
     void unreadableEntryPayloadIsToldApartFromATaskletFailure() {
-        OperatorClassRegistry.registerClass(TypedEntryOperator.class);
+        RelayClassRegistry.registerClass(TypedEntryRelay.class);
 
         ItemEffect unreadable = soleEffect(work("typed_entry_op", 0, Optional.empty(), 0, input(0, "not json", 1)));
         assertThat(unreadable.verdict()).isInstanceOf(Verdict.Unreadable.class);
@@ -72,7 +72,7 @@ class ActivationDispatcherTest extends DispatchTestBase {
     @Test
     @DisplayName("a replayed item serves ctx.replaying() = true")
     void replayFlagReachesTheContext() {
-        OperatorClassRegistry.registerClass(ReplayProbeOperator.class);
+        RelayClassRegistry.registerClass(ReplayProbeRelay.class);
         soleEffect(work("replay_probe", 0, Optional.empty(), 0, input(0, "x", 1, OptionalLong.empty(), true)));
         assertThat(RECORDED).containsExactly("replaying=true");
     }
@@ -80,7 +80,7 @@ class ActivationDispatcherTest extends DispatchTestBase {
     @Test
     @DisplayName("a spawn carries the activation's token and the item's replay flag and offset to the core")
     void aSpawnCarriesTheTokenAndTheReplayFlagAndOffset() {
-        OperatorClassRegistry.registerClass(SpawnProbeOperator.class);
+        RelayClassRegistry.registerClass(SpawnProbeRelay.class);
         SpawnRequests.install(new SpawnRequests.Requester() {
             @Override
             public long request(
@@ -121,16 +121,16 @@ class ActivationDispatcherTest extends DispatchTestBase {
     @Test
     @DisplayName("a tasklet constructor that throws at materialization surfaces the author's error")
     void throwingTaskletConstructorAtMaterializationIsTheAuthorsError() {
-        OperatorClassRegistry.registerClass(RefusingOperator.class);
+        RelayClassRegistry.registerClass(RefusingRelay.class);
         REFUSE.set(true);
 
-        assertThatThrownBy(() -> OperatorInstance.materialize(OP, "refusing_op"))
+        assertThatThrownBy(() -> RelayInstance.materialize(OP, "refusing_op"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage(REFUSAL);
     }
 
-    public static final class SpawnProbeOperator extends Op {
-        public SpawnProbeOperator() {
+    public static final class SpawnProbeRelay extends Op {
+        public SpawnProbeRelay() {
             super("spawn_probe", c -> c.input(String.class, "in").into(SpawnProbeTask.class));
         }
     }
@@ -146,8 +146,8 @@ class ActivationDispatcherTest extends DispatchTestBase {
         }
     }
 
-    public static final class RefusingOperator extends Op {
-        public RefusingOperator() {
+    public static final class RefusingRelay extends Op {
+        public RefusingRelay() {
             super("refusing_op", c -> c.input(String.class, "in").into(RefusingTask.class));
         }
     }

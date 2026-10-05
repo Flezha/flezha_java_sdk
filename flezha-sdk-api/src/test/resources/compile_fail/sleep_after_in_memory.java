@@ -2,10 +2,10 @@
 package nowhere;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.relay.Relay;
 import java.time.Duration;
 
-final class Misplaced implements Operator {
+final class Misplaced implements Relay {
     @Override
     public String factoryId() {
         return "sleep_after_in_memory";

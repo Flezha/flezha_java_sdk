@@ -14,7 +14,7 @@
     <packaging>jar</packaging>
 
     <name>Flezha agentdesk example</name>
-    <description>The Part 3 chat sessions: the runner that serves the agent operator.</description>
+    <description>The Part 3 chat sessions: the runner that serves the agent relay.</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

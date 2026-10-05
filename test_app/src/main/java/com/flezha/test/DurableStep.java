@@ -15,7 +15,7 @@ import java.util.List;
  */
 public abstract class DurableStep implements Tasklet<String, SeenState, String> {
 
-    // A durable operator must register its Change type for the Kryo codec.
+    // A durable relay must register its Change type for the Kryo codec.
     @Override
     public List<Class<?>> kryoTypes() {
         return List.of(Insert.class, SeenState.class);

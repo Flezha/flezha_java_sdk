@@ -1,7 +1,7 @@
 package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.relay.Relay;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -15,7 +15,7 @@ import java.util.Optional;
  * of them; each cell that runs emits {@code <cell key>:<message>}, so one
  * message yields exactly two outputs.
  */
-public final class StaticCellSteps implements Operator {
+public final class StaticCellSteps implements Relay {
 
     @Override
     public String factoryId() {

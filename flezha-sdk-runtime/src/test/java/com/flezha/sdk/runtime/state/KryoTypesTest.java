@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flezha.sdk.FlezhaException;
-import com.flezha.sdk.runtime.operator.TaskletModel;
+import com.flezha.sdk.runtime.relay.TaskletModel;
 import com.flezha.sdk.runtime.state.moved.MovedDesk;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.StateSerializeException;

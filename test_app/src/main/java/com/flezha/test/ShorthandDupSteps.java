@@ -1,18 +1,18 @@
 package com.flezha.test;
 
-import com.flezha.sdk.authoring.Operator;
-import com.flezha.sdk.authoring.Operator.Run;
-import com.flezha.sdk.authoring.Operator.Steps;
+import com.flezha.sdk.authoring.Relay;
+import com.flezha.sdk.authoring.Relay.Run;
+import com.flezha.sdk.authoring.Relay.Steps;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * The other half of {@code shorthand_duplicate_id}: a steps operator claiming the factory id
- * {@link ShorthandDupFlow} holds, which is what proves a flow and a steps operator share one namespace.
+ * The other half of {@code shorthand_duplicate_id}: a steps relay claiming the factory id
+ * {@link ShorthandDupFlow} holds, which is what proves a flow and a steps relay share one namespace.
  */
-@Operator(id = "plain", sink = "twin_sink", run = @Run(steps = @Steps))
+@Relay(id = "plain", sink = "twin_sink", run = @Run(steps = @Steps))
 public class ShorthandDupSteps implements Tasklet<String, Void, byte[]> {
 
     @Override

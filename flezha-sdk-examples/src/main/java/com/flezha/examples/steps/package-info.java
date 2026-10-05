@@ -7,9 +7,9 @@
  * failure that exhausts its retries unwinds the completed steps by invoking their
  * {@code compensate}.
  *
- * <p>{@link com.flezha.examples.steps.CheckoutOperator} declares the chain and its failure
+ * <p>{@link com.flezha.examples.steps.CheckoutRelay} declares the chain and its failure
  * policy, and nothing about how the handoffs are encoded. The value passed between two steps is
- * written down at that boundary, and that record is what allows a steps operator that died after
+ * written down at that boundary, and that record is what allows a steps relay that died after
  * charging to resume at dispatch rather than at reservation; the runtime derives how to write it.
  *
  * <p>Two details govern correctness in the compensating path.
@@ -20,9 +20,9 @@
  * is restored on resume and emitted output is not: after a crash-resumed rollback the
  * completed-output list handed to {@code compensate} may be empty.
  *
- * <p>{@link com.flezha.sdk.operator.OnFailure} selects between unwinding everything and
+ * <p>{@link com.flezha.sdk.relay.OnFailure} selects between unwinding everything and
  * retaining progress, the latter being meaningful only for loops. Where work is one message in and
- * one result out, a plain {@link com.flezha.sdk.operator.Operator} is the correct choice;
+ * one result out, a plain {@link com.flezha.sdk.relay.Relay} is the correct choice;
  * this is the heavier mechanism and costs a journal write per step.
  */
 package com.flezha.examples.steps;

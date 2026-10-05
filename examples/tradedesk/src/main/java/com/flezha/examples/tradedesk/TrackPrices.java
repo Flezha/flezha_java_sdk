@@ -11,7 +11,7 @@ import java.util.Deque;
 /**
  * Keeps a symbol's last ten prices, and compares each new trade with their average.
  *
- * <p>One cell per symbol, because the operator keys the channel by symbol, and the window is that
+ * <p>One cell per symbol, because the relay keys the channel by symbol, and the window is that
  * cell's state. Every change to it is recorded as it happens, so a runner that is killed and
  * started again finds the window it had rather than an empty one.
  */

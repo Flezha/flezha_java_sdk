@@ -37,7 +37,7 @@ public final class FlezhaImpl implements RunnerHandle {
     /** Every {@code (verb, args)} an administration call carried, in call order. */
     public static final List<List<String>> ADMIN_CALLS = new ArrayList<>();
 
-    /** Every {@code (operator, channel, message, msgId, key, local)} a send carried, in call order. */
+    /** Every {@code (relay, channel, message, msgId, key, local)} a send carried, in call order. */
     public static final List<List<Object>> SENDS = new ArrayList<>();
 
     /** What {@link #send} answers. */
@@ -86,7 +86,7 @@ public final class FlezhaImpl implements RunnerHandle {
 
     @Override
     @Nonnull
-    public List<String> operators() {
+    public List<String> relays() {
         return List.of();
     }
 
@@ -100,9 +100,9 @@ public final class FlezhaImpl implements RunnerHandle {
         int live = LIVE_INSTANCES.getOrDefault(factoryId, 0);
         if (live > 0) {
             throw FlezhaException.of(
-                    "runtime.operator_type_in_use", java.util.Map.of("factory_id", factoryId, "live_instances", live));
+                    "runtime.relay_type_in_use", java.util.Map.of("factory_id", factoryId, "live_instances", live));
         }
-        com.flezha.sdk.runtime.operator.OperatorClassRegistry.unregisterClass(factoryId);
+        com.flezha.sdk.runtime.relay.RelayClassRegistry.unregisterClass(factoryId);
     }
 
     @Override
@@ -121,9 +121,9 @@ public final class FlezhaImpl implements RunnerHandle {
 
     @Override
     @Nonnull
-    public String send(String operator, String channel, byte[] message, String msgId, String key, boolean local) {
+    public String send(String relay, String channel, byte[] message, String msgId, String key, boolean local) {
         SENDS.add(java.util.Arrays.asList(
-                operator, channel, new String(message, java.nio.charset.StandardCharsets.UTF_8), msgId, key, local));
+                relay, channel, new String(message, java.nio.charset.StandardCharsets.UTF_8), msgId, key, local));
         return SEND_ANSWER;
     }
 

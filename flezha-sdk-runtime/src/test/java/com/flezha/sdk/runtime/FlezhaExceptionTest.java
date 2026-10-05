@@ -50,15 +50,14 @@ class FlezhaExceptionTest {
     @DisplayName("an error document reads back as the error it carries")
     void anErrorDocumentReadsBack() {
         FlezhaException read = FlezhaException.fromDocument("{\"error\":{\"code\":\"quota.exceeded\","
-                + "\"class\":\"conflict\",\"message\":\"the namespace's max_operators quota is reached (3 of 3)\","
-                + "\"details\":{\"current\":3,\"kind\":\"max_operators\",\"limit\":3},"
+                + "\"class\":\"conflict\",\"message\":\"the namespace's max_relays quota is reached (3 of 3)\","
+                + "\"details\":{\"current\":3,\"kind\":\"max_relays\",\"limit\":3},"
                 + "\"hint\":\"flz namespace show\"}}");
 
         assertThat(read.code()).isEqualTo("quota.exceeded");
         assertThat(read.errorClass()).isEqualTo("conflict");
-        assertThat(read.getMessage())
-                .isEqualTo("quota.exceeded: the namespace's max_operators quota is reached (3 of 3)");
-        assertThat(read.details()).containsEntry("limit", 3).containsEntry("kind", "max_operators");
+        assertThat(read.getMessage()).isEqualTo("quota.exceeded: the namespace's max_relays quota is reached (3 of 3)");
+        assertThat(read.details()).containsEntry("limit", 3).containsEntry("kind", "max_relays");
         assertThat(read.hint()).contains("flz namespace show");
     }
 

@@ -11,12 +11,12 @@ import com.flezha.sdk.channel.EdgeStream;
 import com.flezha.sdk.channel.OutputChain;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.Stream;
-import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.relay.Relay;
 import com.flezha.sdk.runtime.core.DerivedDeclaration;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
-import com.flezha.sdk.runtime.operator.ChannelDescriptor;
-import com.flezha.sdk.runtime.operator.OperatorTopology;
-import com.flezha.sdk.runtime.operator.builder.OperatorTopologyBuilder;
+import com.flezha.sdk.runtime.relay.ChannelDescriptor;
+import com.flezha.sdk.runtime.relay.RelayTopology;
+import com.flezha.sdk.runtime.relay.builder.RelayTopologyBuilder;
 import com.flezha.sdk.tasklet.Tasklet;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -36,7 +36,7 @@ import java.util.function.Consumer;
  * <p>{@code flz_core/src/host/check_tests.rs} is the same table driven against
  * the record directly, because the core has no builder. This one maps the same
  * step vocabulary onto the Java graph builder, so what is measured here is what
- * an author of a Java operator actually writes.
+ * an author of a Java relay actually writes.
  *
  * <p>Two entry points, both off {@link Main}:
  *
@@ -83,7 +83,7 @@ public final class ConformanceRun {
     /** The capacity a row declared per role, read as the tasklet is minted. */
     private static final Map<String, Integer> MAILBOX = new HashMap<>();
 
-    /** The row a {@link RowOperator} declares when the runner defines it. */
+    /** The row a {@link RowRelay} declares when the runner defines it. */
     private static Row current;
 
     private ConformanceRun() {}
@@ -153,7 +153,7 @@ public final class ConformanceRun {
     // The interpreter.
 
     /** The class a row declares: the row's graph under the settings tree its class steps wrote. */
-    public static final class RowOperator implements Operator {
+    public static final class RowRelay implements Relay {
 
         @Override
         public String factoryId() {
@@ -204,7 +204,7 @@ public final class ConformanceRun {
         String head = step.substring(0, dot);
         String rest = step.substring(dot + 1);
         if (head.equals("class")) {
-            // Read by RowOperator's run() and durable().
+            // Read by RowRelay's run() and durable().
             return;
         }
         List<String> links = new ArrayList<>(List.of(rest.split("\\.")));
@@ -246,7 +246,7 @@ public final class ConformanceRun {
         long deadlineMs = call[0].equals("call_deadline") ? Long.parseLong(call[1]) : 500;
         var response = chain.call(target, String.class, deadlineMs);
         if (!call[0].equals("call_unread")) {
-            wire(response.map(String.class, OperatorCallOperators::render), role);
+            wire(response.map(String.class, RelayCallRelays::render), role);
         }
     }
 
@@ -402,21 +402,21 @@ public final class ConformanceRun {
      * The two twins the fixture cites rather than re-spells: this app's own
      * fixtures, which is what the seven-column table states.
      */
-    private static OperatorTopology cited(String topology) {
+    private static RelayTopology cited(String topology) {
         return switch (topology) {
-            case "hybrid_channel" -> OperatorTopologyBuilder.build(new HybridChannelOperator());
-            case "commit_block_chain" -> OperatorTopologyBuilder.build(new TierCommitBlockOperator());
+            case "hybrid_channel" -> RelayTopologyBuilder.build(new HybridChannelRelay());
+            case "commit_block_chain" -> RelayTopologyBuilder.build(new TierCommitBlockRelay());
             default -> throw new IllegalStateException(
                     "the fixture cites a topology this app does not declare: " + topology);
         };
     }
 
-    private static OperatorTopology topologyOf(Row row) {
+    private static RelayTopology topologyOf(Row row) {
         if (row.steps().equals("cited above")) {
             return cited(row.topology());
         }
         load(row);
-        return OperatorTopologyBuilder.build(new RowOperator());
+        return RelayTopologyBuilder.build(new RowRelay());
     }
 
     /**
@@ -453,7 +453,7 @@ public final class ConformanceRun {
             return judgeShorthand(json, entry, shorthand);
         }
         try {
-            OperatorTopology topology = topologyOf(row);
+            RelayTopology topology = topologyOf(row);
             entry.put("outcome", "accepted");
             entry.set("derived", derived(json, topology));
         } catch (FlezhaException refusal) {
@@ -467,7 +467,7 @@ public final class ConformanceRun {
     /**
      * A {@code shorthand(<id>|-, <sink>|-, <input>|-)} step. {@code -} is a field the row leaves
      * unwritten; {@code .noout} marks a body declaring no output, and {@code .topology} a class that
-     * also implements the operator interface.
+     * also implements the relay interface.
      */
     private record Shorthand(boolean hasSink, boolean noout, boolean topology) {
 
@@ -543,7 +543,7 @@ public final class ConformanceRun {
      * The derived declaration, in the columns the fixture's seven-column table
      * states: what the core answered, as the topology materialised it.
      */
-    private static ArrayNode derived(ObjectMapper json, OperatorTopology topology) {
+    private static ArrayNode derived(ObjectMapper json, RelayTopology topology) {
         ArrayNode channels = json.createArrayNode();
         DerivedDeclaration answer = HostClassDeclaration.check(topology.declaration());
         for (int index = 0; index < topology.channels().size(); index++) {
@@ -636,7 +636,7 @@ public final class ConformanceRun {
         }
         load(row);
         try {
-            runner.registerFactory(RowOperator.class);
+            runner.registerFactory(RowRelay.class);
         } catch (FlezhaException refusal) {
             System.err.println(
                     topology + ": " + refusal.getMessage() + "; issues: " + String.join(", ", refusal.issueCodes()));

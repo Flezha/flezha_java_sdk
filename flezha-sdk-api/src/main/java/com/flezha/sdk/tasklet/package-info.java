@@ -28,7 +28,7 @@
  * <p>{@link com.flezha.sdk.tasklet.SpawnRequests}, {@link com.flezha.sdk.tasklet.SpawnOptions},
  * {@link com.flezha.sdk.tasklet.IfRunning}, {@link com.flezha.sdk.tasklet.SpawnHandle},
  * {@link com.flezha.sdk.tasklet.SpawnResult} and {@link com.flezha.sdk.tasklet.SpawnOutcome}
- * cover tasklet-requested steps operator spawning, in which a tasklet asks the controller for a
+ * cover tasklet-requested steps relay spawning, in which a tasklet asks the controller for a
  * worker instance rather than dispatching one itself. Without an id the controller generates one
  * and starts a new instance; with one, the request is resolved controller-side, so concurrent
  * requests against that id converge on a single instance.

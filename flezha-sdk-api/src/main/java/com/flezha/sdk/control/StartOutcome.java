@@ -1,9 +1,9 @@
 package com.flezha.sdk.control;
 
-/** What an operator start did. */
+/** What a relay start did. */
 public enum StartOutcome {
-    /** The start ran the operator. */
+    /** The start ran the relay. */
     STARTED,
-    /** The named operator was already running and was left untouched. */
+    /** The named relay was already running and was left untouched. */
     ALREADY_RUNNING
 }

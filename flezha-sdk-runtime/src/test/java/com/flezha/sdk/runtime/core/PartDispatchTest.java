@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.Operator;
-import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
+import com.flezha.sdk.relay.Relay;
+import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -45,7 +45,7 @@ class PartDispatchTest extends DispatchTestBase {
     @DisplayName(
             "each item's parts carry the activation's token, the item's index and the sink's encoding, before run returns")
     void partsCarryTheTokenAndTheItemIndex() {
-        OperatorClassRegistry.registerClass(PartOperator.class);
+        RelayClassRegistry.registerClass(PartRelay.class);
         ActivationOutcome out = outcome(work("part_op", 0, Optional.empty(), 0, input(0, "2", 1), input(0, "1", 2)));
 
         assertThat(RECORDED)
@@ -62,7 +62,7 @@ class PartDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("a timer handler sends a part under its own item")
     void aTimerHandlerSendsAPart() {
-        OperatorClassRegistry.registerClass(PartOperator.class);
+        RelayClassRegistry.registerClass(PartRelay.class);
         soleEffect(work("part_op", 0, Optional.empty(), 0, new WorkItem.Timer(TimerKind.PROCESSING_TIME, 5)));
 
         assertThat(RECORDED).containsExactly("part 1/0/<fired 5>");
@@ -71,7 +71,7 @@ class PartDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("a per_input steps stage sends its parts as a flow tasklet does")
     void aStepsStageSendsParts() {
-        OperatorClassRegistry.registerClass(PartSteps.class);
+        RelayClassRegistry.registerClass(PartSteps.class);
         ItemEffect effect = soleEffect(work("part_steps", 0, Optional.empty(), 0, input(0, "2", 1)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.Ok.class);
@@ -81,7 +81,7 @@ class PartDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("a refused part fails the invocation as any raise does")
     void aRefusedPartFailsTheInvocation() {
-        OperatorClassRegistry.registerClass(PartOperator.class);
+        RelayClassRegistry.registerClass(PartRelay.class);
         REFUSING.set(true);
         ItemEffect effect = soleEffect(work("part_op", 0, Optional.empty(), 0, input(0, "1", 1)));
 
@@ -91,8 +91,8 @@ class PartDispatchTest extends DispatchTestBase {
         assertThat(RECORDED).isEmpty();
     }
 
-    public static final class PartOperator extends Op {
-        public PartOperator() {
+    public static final class PartRelay extends Op {
+        public PartRelay() {
             super(
                     "part_op",
                     c -> c.input(String.class, "in").into(PartTask.class).sink("answer", PartDispatchTest::bracketed));
@@ -100,7 +100,7 @@ class PartDispatchTest extends DispatchTestBase {
     }
 
     /** {@code PER_INPUT}, as a session turn is. */
-    public static final class PartSteps implements Operator {
+    public static final class PartSteps implements Relay {
         @Override
         public String factoryId() {
             return "part_steps";

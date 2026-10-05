@@ -4,20 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flezha.sdk.FlezhaException;
-import com.flezha.sdk.authoring.Operator;
-import com.flezha.sdk.authoring.Operator.Checkpoint;
-import com.flezha.sdk.authoring.Operator.Durable;
-import com.flezha.sdk.authoring.Operator.EffectivelyOnce;
-import com.flezha.sdk.authoring.Operator.Flow;
-import com.flezha.sdk.authoring.Operator.Level;
-import com.flezha.sdk.authoring.Operator.Run;
-import com.flezha.sdk.authoring.Operator.Steps;
+import com.flezha.sdk.authoring.Relay;
+import com.flezha.sdk.authoring.Relay.Checkpoint;
+import com.flezha.sdk.authoring.Relay.Durable;
+import com.flezha.sdk.authoring.Relay.EffectivelyOnce;
+import com.flezha.sdk.authoring.Relay.Flow;
+import com.flezha.sdk.authoring.Relay.Level;
+import com.flezha.sdk.authoring.Relay.Run;
+import com.flezha.sdk.authoring.Relay.Steps;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.ChannelKind;
-import com.flezha.sdk.operator.Operator.Each;
+import com.flezha.sdk.relay.Relay.Each;
 import com.flezha.sdk.runtime.Refused;
-import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
-import com.flezha.sdk.runtime.operator.OperatorTopology;
+import com.flezha.sdk.runtime.relay.RelayClassRegistry;
+import com.flezha.sdk.runtime.relay.RelayTopology;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -33,10 +33,10 @@ import org.junit.jupiter.api.Test;
 class ShortFormTest extends DispatchTestBase {
 
     @Test
-    @DisplayName("An annotated class is a whole flow operator: entry `input`, the tasklet, sink `out`")
-    void anAnnotatedClassIsAWholeOperator() {
-        assertThat(OperatorClassRegistry.registerClass(Echo.class)).isEqualTo("echo");
-        OperatorTopology topology = OperatorClassRegistry.getTopology("echo");
+    @DisplayName("An annotated class is a whole flow relay: entry `input`, the tasklet, sink `out`")
+    void anAnnotatedClassIsAWholeRelay() {
+        assertThat(RelayClassRegistry.registerClass(Echo.class)).isEqualTo("echo");
+        RelayTopology topology = RelayClassRegistry.getTopology("echo");
 
         assertThat(topology.tasklets()).singleElement().satisfies(t -> {
             assertThat(t.name()).isEqualTo("echo");
@@ -52,10 +52,10 @@ class ShortFormTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("An annotated class is a whole steps operator, run once on its named entry")
-    void anAnnotatedClassIsAWholeStepsOperator() {
-        OperatorClassRegistry.registerClass(Place.class);
-        OperatorTopology topology = OperatorClassRegistry.getTopology("place");
+    @DisplayName("An annotated class is a whole steps relay, run once on its named entry")
+    void anAnnotatedClassIsAWholeStepsRelay() {
+        RelayClassRegistry.registerClass(Place.class);
+        RelayTopology topology = RelayClassRegistry.getTopology("place");
 
         assertThat(topology.lookupChannelId("order")).isNotNull();
         assertThat(stepsBlock(topology)).containsEntry("each", "once").containsEntry("on_failure", "undo_all");
@@ -68,17 +68,17 @@ class ShortFormTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("A short-form steps operator declares its loop shape")
-    void aShortFormOperatorDeclaresItsEach() {
-        OperatorClassRegistry.registerClass(Chat.class);
-        assertThat(stepsBlock(OperatorClassRegistry.getTopology("chat"))).containsEntry("each", "per_input");
+    @DisplayName("A short-form steps relay declares its loop shape")
+    void aShortFormRelayDeclaresItsEach() {
+        RelayClassRegistry.registerClass(Chat.class);
+        assertThat(stepsBlock(RelayClassRegistry.getTopology("chat"))).containsEntry("each", "per_input");
     }
 
     @Test
     @DisplayName("A short form with no sink is declared: its entry channel into the tasklet and no plugin channel")
     void aShortFormWithNoSinkIsDeclared() {
-        OperatorClassRegistry.registerClass(Counter.class);
-        OperatorTopology topology = OperatorClassRegistry.getTopology("counter");
+        RelayClassRegistry.registerClass(Counter.class);
+        RelayTopology topology = RelayClassRegistry.getTopology("counter");
 
         assertThat(topology.channels()).singleElement().satisfies(c -> assertThat(c.name())
                 .isEqualTo("ticks"));
@@ -88,26 +88,26 @@ class ShortFormTest extends DispatchTestBase {
     @Test
     @DisplayName("The entry channel keeps its default name; the annotation names the entry channel")
     void theEntryChannelIsNamedByTheAnnotationOrInput() {
-        OperatorClassRegistry.registerClass(Echo.class);
-        OperatorClassRegistry.registerClass(Prices.class);
+        RelayClassRegistry.registerClass(Echo.class);
+        RelayClassRegistry.registerClass(Prices.class);
 
-        assertThat(OperatorClassRegistry.getTopology("echo").lookupChannelId("input"))
+        assertThat(RelayClassRegistry.getTopology("echo").lookupChannelId("input"))
                 .isNotNull();
-        assertThat(OperatorClassRegistry.getTopology("prices").lookupChannelId("prices"))
+        assertThat(RelayClassRegistry.getTopology("prices").lookupChannelId("prices"))
                 .isNotNull();
     }
 
     @Test
-    @DisplayName("Nothing registers itself: an annotated class never registered declares no operator")
+    @DisplayName("Nothing registers itself: an annotated class never registered declares no relay")
     void nothingRegistersItself() {
-        assertThat(OperatorClassRegistry.factoryIds()).doesNotContain("never_registered");
+        assertThat(RelayClassRegistry.factoryIds()).doesNotContain("never_registered");
     }
 
     @Test
     @DisplayName("A short form takes settings from @Tasklet.Spec")
     void aShortFormTakesSettingsFromTaskletSpec() {
-        OperatorClassRegistry.registerClass(Counter.class);
-        assertThat(OperatorClassRegistry.getTopology("counter").tasklets())
+        RelayClassRegistry.registerClass(Counter.class);
+        assertThat(RelayClassRegistry.getTopology("counter").tasklets())
                 .singleElement()
                 .satisfies(t -> {
                     assertThat(t.name()).isEqualTo("counter");
@@ -119,36 +119,35 @@ class ShortFormTest extends DispatchTestBase {
     @DisplayName("An annotation with no id is refused naming the required id")
     void anAnnotationWithNoIdIsRefused() {
         FlezhaException refused =
-                Refused.by("topology.missing_factory_id", () -> OperatorClassRegistry.registerClass(Upcase.class));
-        assertThat(refused.details()).containsEntry("operator", Upcase.class.getName());
+                Refused.by("topology.missing_factory_id", () -> RelayClassRegistry.registerClass(Upcase.class));
+        assertThat(refused.details()).containsEntry("relay", Upcase.class.getName());
     }
 
     @Test
-    @DisplayName(
-            "An annotated class implementing an operator interface is refused as topology.short_form_with_topology")
-    void anAnnotatedClassImplementingAnOperatorInterfaceIsRefused() {
-        Refused.by("topology.short_form_with_topology", () -> OperatorClassRegistry.registerClass(Both.class));
+    @DisplayName("An annotated class implementing a relay interface is refused as topology.short_form_with_topology")
+    void anAnnotatedClassImplementingARelayInterfaceIsRefused() {
+        Refused.by("topology.short_form_with_topology", () -> RelayClassRegistry.registerClass(Both.class));
     }
 
     @Test
     @DisplayName("A short form whose tasklet name differs from its id is refused as topology.short_form_name_mismatch")
     void aShortFormWhoseTaskletNameDiffersFromItsIdIsRefused() {
         FlezhaException refused =
-                Refused.by("topology.short_form_name_mismatch", () -> OperatorClassRegistry.registerClass(Tally.class));
+                Refused.by("topology.short_form_name_mismatch", () -> RelayClassRegistry.registerClass(Tally.class));
         assertThat(refused.details()).containsEntry("factory_id", "counter").containsEntry("name", "tally");
     }
 
     @Test
     @DisplayName("A sink on a Void output is refused as topology.sink_without_output")
     void aSinkOnAVoidOutputIsRefused() {
-        Refused.by("topology.sink_without_output", () -> OperatorClassRegistry.registerClass(Drain.class));
+        Refused.by("topology.sink_without_output", () -> RelayClassRegistry.registerClass(Drain.class));
     }
 
     @Test
     @DisplayName("The author's class is the class the wiring names")
     void theAuthorsClassIsTheClassTheWiringNames() {
-        OperatorClassRegistry.registerClass(WiredOperator.class);
-        assertThat(OperatorClassRegistry.getTopology("wired").tasklets())
+        RelayClassRegistry.registerClass(WiredRelay.class);
+        assertThat(RelayClassRegistry.getTopology("wired").tasklets())
                 .singleElement()
                 .satisfies(t -> {
                     assertThat(t.name()).isEqualTo("track_prices");
@@ -159,13 +158,13 @@ class ShortFormTest extends DispatchTestBase {
     @Test
     @DisplayName("Only the author's classes exist: no annotation processor ships, and no class is generated")
     void onlyTheAuthorsClassesExist() throws Exception {
-        OperatorClassRegistry.registerClass(Echo.class);
+        RelayClassRegistry.registerClass(Echo.class);
 
         assertThat(Collections.list(ShortFormTest.class
                         .getClassLoader()
                         .getResources("META-INF/services/javax.annotation.processing.Processor")))
                 .noneMatch(url -> url.toString().contains("flezha"));
-        for (String suffix : List.of("Tasklet", "Operator", "Handle", "Change")) {
+        for (String suffix : List.of("Tasklet", "Relay", "Handle", "Change")) {
             assertThatThrownBy(() -> Class.forName(Echo.class.getName() + suffix))
                     .isInstanceOf(ClassNotFoundException.class);
         }
@@ -174,9 +173,9 @@ class ShortFormTest extends DispatchTestBase {
     @Test
     @DisplayName("The short form takes the settings tree the full form takes")
     void theShortFormTakesTheTree() {
-        OperatorClassRegistry.registerClass(Ticker.class);
+        RelayClassRegistry.registerClass(Ticker.class);
         Map<String, Object> declaration =
-                OperatorClassRegistry.getTopology("ticker").declaration();
+                RelayClassRegistry.getTopology("ticker").declaration();
 
         assertThat(declaration)
                 .containsEntry("description", "every setting written")
@@ -199,11 +198,11 @@ class ShortFormTest extends DispatchTestBase {
     @Test
     @DisplayName("A short form kept in memory never sleeps, and one with no settings leaves its sleep to its run")
     void theShortFormSpellsTheDurableLevels() {
-        OperatorClassRegistry.registerClass(Volatile.class);
-        OperatorClassRegistry.registerClass(Echo.class);
+        RelayClassRegistry.registerClass(Volatile.class);
+        RelayClassRegistry.registerClass(Echo.class);
 
-        assertThat(OperatorClassRegistry.getTopology("volatile").declaration()).containsEntry("durable", false);
-        assertThat(OperatorClassRegistry.getTopology("echo").declaration())
+        assertThat(RelayClassRegistry.getTopology("volatile").declaration()).containsEntry("durable", false);
+        assertThat(RelayClassRegistry.getTopology("echo").declaration())
                 .containsEntry("durable", "local")
                 .containsEntry("run", Map.of("flow", Map.of("exactly", "at_least_once")));
     }
@@ -212,16 +211,16 @@ class ShortFormTest extends DispatchTestBase {
     @DisplayName("Two branches of one setting written at once are refused naming the setting")
     void twoBranchesAreRefused() {
         FlezhaException refused =
-                Refused.by("topology.invalid_setting", () -> OperatorClassRegistry.registerClass(TwoRuns.class));
+                Refused.by("topology.invalid_setting", () -> RelayClassRegistry.registerClass(TwoRuns.class));
         assertThat(refused.details()).containsEntry("setting", "run");
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> stepsBlock(OperatorTopology topology) {
+    private static Map<String, Object> stepsBlock(RelayTopology topology) {
         return ((Map<String, Map<String, Object>>) topology.declaration().get("run")).get("steps");
     }
 
-    @Operator(
+    @Relay(
             id = "ticker",
             description = "every setting written",
             maxDurationMs = 60_000,
@@ -234,13 +233,13 @@ class ShortFormTest extends DispatchTestBase {
         public void run(String input, Ctx<Count, Void> ctx) {}
     }
 
-    @Operator(id = "volatile", durable = @Durable(false))
+    @Relay(id = "volatile", durable = @Durable(false))
     public static final class Volatile extends EchoBody {}
 
-    @Operator(id = "two_runs", run = @Run(flow = @Flow, steps = @Steps))
+    @Relay(id = "two_runs", run = @Run(flow = @Flow, steps = @Steps))
     public static final class TwoRuns extends EchoBody {}
 
-    @Operator(id = "echo", sink = "out")
+    @Relay(id = "echo", sink = "out")
     public static final class Echo implements Tasklet<String, Void, String> {
         @Override
         public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
@@ -248,7 +247,7 @@ class ShortFormTest extends DispatchTestBase {
         }
     }
 
-    @Operator(id = "place", sink = "placed", input = "order", run = @Run(steps = @Steps))
+    @Relay(id = "place", sink = "placed", input = "order", run = @Run(steps = @Steps))
     public static final class Place implements Tasklet<String, Void, String> {
         @Override
         public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
@@ -256,7 +255,7 @@ class ShortFormTest extends DispatchTestBase {
         }
     }
 
-    @Operator(id = "chat", sink = "replies", run = @Run(steps = @Steps(each = Each.PER_INPUT)))
+    @Relay(id = "chat", sink = "replies", run = @Run(steps = @Steps(each = Each.PER_INPUT)))
     public static final class Chat implements Tasklet<String, Void, String> {
         @Override
         public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
@@ -264,37 +263,37 @@ class ShortFormTest extends DispatchTestBase {
         }
     }
 
-    @Operator(id = "counter", input = "ticks")
+    @Relay(id = "counter", input = "ticks")
     @Tasklet.Spec(name = "counter", maxCells = 10)
     public static final class Counter implements Tasklet<String, Void, Void> {
         @Override
         public void run(String input, Ctx<Void, Void> ctx) {}
     }
 
-    @Operator(id = "prices", sink = "out", input = "prices")
+    @Relay(id = "prices", sink = "out", input = "prices")
     public static final class Prices extends EchoBody {}
 
-    @Operator(id = "never_registered", sink = "out")
+    @Relay(id = "never_registered", sink = "out")
     public static final class NeverRegistered extends EchoBody {}
 
-    @Operator(sink = "out")
+    @Relay(sink = "out")
     public static final class Upcase extends EchoBody {}
 
-    @Operator(id = "counter")
+    @Relay(id = "counter")
     @Tasklet.Spec(name = "tally")
     public static final class Tally implements Tasklet<String, Void, Void> {
         @Override
         public void run(String input, Ctx<Void, Void> ctx) {}
     }
 
-    @Operator(id = "drain", sink = "out")
+    @Relay(id = "drain", sink = "out")
     public static final class Drain implements Tasklet<String, Void, Void> {
         @Override
         public void run(String input, Ctx<Void, Void> ctx) {}
     }
 
-    @Operator(id = "both")
-    public static final class Both implements Tasklet<String, Void, Void>, com.flezha.sdk.operator.Operator {
+    @Relay(id = "both")
+    public static final class Both implements Tasklet<String, Void, Void>, com.flezha.sdk.relay.Relay {
         @Override
         public void run(String input, Ctx<Void, Void> ctx) {}
 
@@ -324,8 +323,8 @@ class ShortFormTest extends DispatchTestBase {
         }
     }
 
-    public static final class WiredOperator extends Op {
-        public WiredOperator() {
+    public static final class WiredRelay extends Op {
+        public WiredRelay() {
             super(
                     "wired",
                     c -> c.input(Trade.class, "trades").into(TrackPrices.class).sink("moves"));

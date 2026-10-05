@@ -1,13 +1,13 @@
 package com.flezha.test;
 
-import com.flezha.sdk.authoring.Operator;
+import com.flezha.sdk.authoring.Relay;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 
 /** Single-tasklet stateful short-form twin of {@link StoreInputTasklet}. */
-@Operator(id = "sugar_store_input", sink = "sugar_store_sink")
+@Relay(id = "sugar_store_input", sink = "sugar_store_sink")
 public class SugarStore implements Tasklet<String, SugarStoreState, String> {
 
     /** One text input to append. */

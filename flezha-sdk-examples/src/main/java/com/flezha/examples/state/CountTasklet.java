@@ -10,7 +10,7 @@ import com.flezha.sdk.tasklet.TaskletException;
  *
  * <p>Compared with the echo example's tasklet, two things are new: a state class in place of
  * {@code Void}, and {@link Increment}, the change that writes it. Declaring them is the whole of
- * what makes a tasklet durable; the operator is unmodified.
+ * what makes a tasklet durable; the relay is unmodified.
  *
  * <p>State is not persisted by serialising the state object. The runtime records the ordered list
  * of changes applied and reconstructs the object after a restart by replaying that list, over the

@@ -57,25 +57,25 @@ public final class Main {
     }
 
     /**
-     * The local-send drill: a JSON array of {@code {operator, channel,
+     * The local-send drill: a JSON array of {@code {relay, channel,
      * message, when}} sends this app's own code makes with {@code local},
      * each once the file {@code when} names exists, printing
-     * {@code local_send <operator> ok} or {@code local_send <operator> err <code>}.
+     * {@code local_send <relay> ok} or {@code local_send <relay> err <code>}.
      */
     private static void startLocalSends(FlezhaRunner runner, String script) throws Exception {
         JsonNode sends = new ObjectMapper().readTree(script);
         Thread drill = new Thread(() -> {
             for (JsonNode send : sends) {
-                String operator = send.path("operator").asText();
+                String relay = send.path("relay").asText();
                 try {
                     while (!Files.exists(Path.of(send.path("when").asText()))) {
                         Thread.sleep(50);
                     }
-                    runner.send(operator, send.path("message").asText(), send.path("channel").asText(),
+                    runner.send(relay, send.path("message").asText(), send.path("channel").asText(),
                             SendOpts.of().local());
-                    System.out.println("local_send " + operator + " ok");
+                    System.out.println("local_send " + relay + " ok");
                 } catch (FlezhaException e) {
-                    System.out.println("local_send " + operator + " err " + e.code());
+                    System.out.println("local_send " + relay + " err " + e.code());
                 } catch (InterruptedException e) {
                     return;
                 }
@@ -104,95 +104,95 @@ public final class Main {
      * factory-id set is the set this app actually advertises.
      */
     public static FlezhaRunner define(FlezhaRunner runner) {
-        runner.registerFactory(DoNothingOperator.class)
-                .registerFactory(CompleteFlowOperator.class)
-                .registerFactory(StoreInputOperator.class)
-                .registerFactory(CompareFilterOperator.class)
-                .registerFactory(StaticCellOperator.class)
-                .registerFactory(CellStressOperator.class)
-                .registerFactory(BoundedMailboxDropNothingOperator.class)
-                .registerFactory(BoundedMailboxDropNewestOperator.class)
-                .registerFactory(BoundedMailboxDropOldestOperator.class)
-                .registerFactory(StatefulCounterOperator.class)
-                .registerFactory(CoalescingCounterOperator.class)
-                .registerFactory(PersistenceOffOperator.class)
-                .registerFactory(SleepingCounterOperator.class)
-                .registerFactory(HybridChannelOperator.class)
-                .registerFactory(MergedInputOperator.class)
-                .registerFactory(TransformChainOperator.class)
-                .registerFactory(ResumeProbeOperator.class)
-                .registerFactory(SchemaEvolutionFlowOperators.V1.class)
-                .registerFactory(SchemaEvolutionFlowOperators.V2.class)
-                .registerFactory(DynamicCellOperator.class)
-                .registerFactory(PartitionRelayOperator.class)
-                .registerFactory(SessionTimeoutOperator.class)
-                .registerFactory(MixedOperator.class)
-                .registerFactory(TierStoreOperator.class)
-                .registerFactory(RemoteTierStoreOperator.class)
-                .registerFactory(TierChainOperator.class)
-                .registerFactory(BenchEchoOperator.class)
-                .registerFactory(BenchKeyedOperator.class)
-                .registerFactory(BenchKeyedNoPersistOperator.class)
-                .registerFactory(CheckpointStoreOperator.class)
-                .registerFactory(CheckpointBatchedStoreOperator.class)
-                .registerFactory(BenchCheckpointOperator.class)
-                .registerFactory(PoisonProbeOperator.class)
-                .registerFactory(WedgeProbeOperator.class)
-                .registerFactory(CandleOperator.class)
-                .registerFactory(SpawnRequesterOperator.class)
-                .registerFactory(SpawnOnceRequesterOperator.class)
-                .registerFactory(SpawnHoldRequesterOperator.class)
-                .registerFactory(EchoOperator.class)
-                .registerFactory(TypedOnceOperator.class)
-                .registerFactory(CommitBlockOperator.class)
-                .registerFactory(SyncDurableOperator.class)
-                .registerFactory(OptOutCommitBlockOperator.class)
-                .registerFactory(TierCommitBlockOperator.class)
-                .registerFactory(SagaBlockOperator.class)
-                .registerFactory(KeyedStepsOperators.KeyedBlock.class)
-                .registerFactory(KeyedStepsOperators.KeyedSaga.class)
-                .registerFactory(OutboxBlockOperator.class)
-                .registerFactory(UndoOutboxOperator.class)
-                .registerFactory(FailedStageOperator.class)
-                .registerFactory(ChatLoopOperator.class)
-                .registerFactory(NoStateLoopOperator.class)
-                .registerFactory(ChainedStepsOperator.class)
-                .registerFactory(KeyedLoopOperator.class)
-                .registerFactory(ChatRewindOperator.class)
-                .registerFactory(FailingTurnLoopOperator.class)
-                .registerFactory(FailingTurnUndoAllOperator.class)
-                .registerFactory(ReplyBlockLoopOperator.class)
-                .registerFactory(RetryOperator.class)
-                .registerFactory(BranchOperator.class)
-                .registerFactory(DiamondOperator.class)
-                .registerFactory(BenchChain1Operator.class)
-                .registerFactory(BenchChain4Operator.class)
-                .registerFactory(BenchChain16Operator.class)
-                .registerFactory(BenchChainOptOut4Operator.class)
-                .registerFactory(BenchLoopOperator.class)
-                .registerFactory(StepsTimerOperators.TimerLoop.class)
-                .registerFactory(StepsTimerOperators.EventTimer.class)
+        runner.registerFactory(DoNothingRelay.class)
+                .registerFactory(CompleteFlowRelay.class)
+                .registerFactory(StoreInputRelay.class)
+                .registerFactory(CompareFilterRelay.class)
+                .registerFactory(StaticCellRelay.class)
+                .registerFactory(CellStressRelay.class)
+                .registerFactory(BoundedMailboxDropNothingRelay.class)
+                .registerFactory(BoundedMailboxDropNewestRelay.class)
+                .registerFactory(BoundedMailboxDropOldestRelay.class)
+                .registerFactory(StatefulCounterRelay.class)
+                .registerFactory(CoalescingCounterRelay.class)
+                .registerFactory(PersistenceOffRelay.class)
+                .registerFactory(SleepingCounterRelay.class)
+                .registerFactory(HybridChannelRelay.class)
+                .registerFactory(MergedInputRelay.class)
+                .registerFactory(TransformChainRelay.class)
+                .registerFactory(ResumeProbeRelay.class)
+                .registerFactory(SchemaEvolutionFlowRelays.V1.class)
+                .registerFactory(SchemaEvolutionFlowRelays.V2.class)
+                .registerFactory(DynamicCellRelay.class)
+                .registerFactory(PartitionPassRelay.class)
+                .registerFactory(SessionTimeoutRelay.class)
+                .registerFactory(MixedRelay.class)
+                .registerFactory(TierStoreRelay.class)
+                .registerFactory(RemoteTierStoreRelay.class)
+                .registerFactory(TierChainRelay.class)
+                .registerFactory(BenchEchoRelay.class)
+                .registerFactory(BenchKeyedRelay.class)
+                .registerFactory(BenchKeyedNoPersistRelay.class)
+                .registerFactory(CheckpointStoreRelay.class)
+                .registerFactory(CheckpointBatchedStoreRelay.class)
+                .registerFactory(BenchCheckpointRelay.class)
+                .registerFactory(PoisonProbeRelay.class)
+                .registerFactory(WedgeProbeRelay.class)
+                .registerFactory(CandleRelay.class)
+                .registerFactory(SpawnRequesterRelay.class)
+                .registerFactory(SpawnOnceRequesterRelay.class)
+                .registerFactory(SpawnHoldRequesterRelay.class)
+                .registerFactory(EchoRelay.class)
+                .registerFactory(TypedOnceRelay.class)
+                .registerFactory(CommitBlockRelay.class)
+                .registerFactory(SyncDurableRelay.class)
+                .registerFactory(OptOutCommitBlockRelay.class)
+                .registerFactory(TierCommitBlockRelay.class)
+                .registerFactory(SagaBlockRelay.class)
+                .registerFactory(KeyedStepsRelays.KeyedBlock.class)
+                .registerFactory(KeyedStepsRelays.KeyedSaga.class)
+                .registerFactory(OutboxBlockRelay.class)
+                .registerFactory(UndoOutboxRelay.class)
+                .registerFactory(FailedStageRelay.class)
+                .registerFactory(ChatLoopRelay.class)
+                .registerFactory(NoStateLoopRelay.class)
+                .registerFactory(ChainedStepsRelay.class)
+                .registerFactory(KeyedLoopRelay.class)
+                .registerFactory(ChatRewindRelay.class)
+                .registerFactory(FailingTurnLoopRelay.class)
+                .registerFactory(FailingTurnUndoAllRelay.class)
+                .registerFactory(ReplyBlockLoopRelay.class)
+                .registerFactory(RetryRelay.class)
+                .registerFactory(BranchRelay.class)
+                .registerFactory(DiamondRelay.class)
+                .registerFactory(BenchChain1Relay.class)
+                .registerFactory(BenchChain4Relay.class)
+                .registerFactory(BenchChain16Relay.class)
+                .registerFactory(BenchChainOptOut4Relay.class)
+                .registerFactory(BenchLoopRelay.class)
+                .registerFactory(StepsTimerRelays.TimerLoop.class)
+                .registerFactory(StepsTimerRelays.EventTimer.class)
                 .registerFactory(StaticCellSteps.class)
-                .registerFactory(CallOperators.CallEcho.class)
-                .registerFactory(CallOperators.CallDownstream.class)
-                .registerFactory(CallOperators.CallSplit.class)
-                .registerFactory(CallOperators.CallTurn.class)
-                .registerFactory(OperatorCallOperators.CallPricing.class)
-                .registerFactory(OperatorCallOperators.CallOrders.class)
-                .registerFactory(OperatorCallOperators.CallAgent.class)
-                .registerFactory(OperatorCallOperators.CallGateway.class)
-                .registerFactory(OperatorCallOperators.CallToolSession.class)
-                .registerFactory(PartOperators.PartEcho.class)
-                .registerFactory(PartOperators.PartEchoSteps.class)
+                .registerFactory(CallRelays.CallEcho.class)
+                .registerFactory(CallRelays.CallDownstream.class)
+                .registerFactory(CallRelays.CallSplit.class)
+                .registerFactory(CallRelays.CallTurn.class)
+                .registerFactory(RelayCallRelays.CallPricing.class)
+                .registerFactory(RelayCallRelays.CallOrders.class)
+                .registerFactory(RelayCallRelays.CallAgent.class)
+                .registerFactory(RelayCallRelays.CallGateway.class)
+                .registerFactory(RelayCallRelays.CallToolSession.class)
+                .registerFactory(PartRelays.PartEcho.class)
+                .registerFactory(PartRelays.PartEchoSteps.class)
                 // The §5 short forms, registered by the classes the author wrote, as
-                // every hand-written operator is: nothing collects itself.
+                // every hand-written relay is: nothing collects itself.
                 .registerFactory(SugarDoNothing.class)
                 .registerFactory(SugarStore.class)
                 .registerFactory(SugarNamedInput.class)
                 .registerFactory(SugarSteps.class)
                 .registerFactory(SugarStepsPerInput.class)
                 .registerFactory(SugarStateOnly.class)
-                .registerFactory(SugarStaticCellOperator.class);
+                .registerFactory(SugarStaticCellRelay.class);
         return runner;
     }
 

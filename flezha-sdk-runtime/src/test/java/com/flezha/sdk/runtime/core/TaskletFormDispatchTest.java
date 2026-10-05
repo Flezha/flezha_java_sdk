@@ -2,8 +2,8 @@ package com.flezha.sdk.runtime.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
-import com.flezha.sdk.runtime.operator.TaskletDescriptor;
+import com.flezha.sdk.runtime.relay.RelayClassRegistry;
+import com.flezha.sdk.runtime.relay.TaskletDescriptor;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -21,7 +21,7 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("One run emits any number of values through the context; A Java tasklet that emits nothing")
     void oneRunEmitsAnyNumberOfValuesThroughTheContext() {
-        OperatorClassRegistry.registerClass(EmitManyOperator.class);
+        RelayClassRegistry.registerClass(EmitManyRelay.class);
 
         ItemEffect two = soleEffect(work("emit_many", 0, Optional.empty(), 0, input(0, "two", 1)));
         ItemEffect none = soleEffect(work("emit_many", 0, Optional.empty(), 1, input(0, "none", 2)));
@@ -35,12 +35,12 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("A Void state keeps nothing, and a Void output declares no output channel")
     void aVoidStateKeepsNothing() {
-        OperatorClassRegistry.registerClass(StaticOperator.class);
+        RelayClassRegistry.registerClass(StaticRelay.class);
         ItemEffect effect = soleEffect(work("static_op", 0, Optional.of("a"), 0, input(0, "a:1", 1)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.Ok.class);
         assertThat(effect.changes()).isEmpty();
-        TaskletDescriptor desc = OperatorClassRegistry.getTopology("static_op").tasklet(0);
+        TaskletDescriptor desc = RelayClassRegistry.getTopology("static_op").tasklet(0);
         assertThat(desc.model().stateless()).isTrue();
         assertThat(desc.outputChannelId()).isEqualTo(OptionalInt.empty());
     }
@@ -48,7 +48,7 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("a Void-state tasklet that records a change fails its input, recording nothing")
     void aVoidStateChangeIsRefused() {
-        OperatorClassRegistry.registerClass(VoidChangeOperator.class);
+        RelayClassRegistry.registerClass(VoidChangeRelay.class);
         ItemEffect effect = soleEffect(work("void_change", 0, Optional.empty(), 0, input(0, "x", 1)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
@@ -58,7 +58,7 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("A change is applied and recorded")
     void aChangeIsAppliedAndRecorded() {
-        OperatorClassRegistry.registerClass(CounterOperator.class);
+        RelayClassRegistry.registerClass(CounterRelay.class);
         ItemEffect effect = soleEffect(work("counter_op", 0, Optional.empty(), 0, input(0, "a", 1)));
 
         assertThat(effect.changes()).hasSize(1);
@@ -68,7 +68,7 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("A restart folds the log through applyTo, in seq order, back to the state before it")
     void aRestartFoldsTheLogThroughApplyTo() {
-        OperatorClassRegistry.registerClass(CounterOperator.class);
+        RelayClassRegistry.registerClass(CounterRelay.class);
         List<byte[]> log = new java.util.ArrayList<>();
         for (int seq = 0; seq < 3; seq++) {
             log.addAll(soleEffect(work("counter_op", 0, Optional.empty(), seq, input(0, "a", seq)))
@@ -93,11 +93,11 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("Static-mode Tasklet creates one cell per key, each with its own instance")
     void staticModeTaskletCreatesOneCellPerKey() {
-        OperatorClassRegistry.registerClass(StaticOperator.class);
-        TaskletDescriptor desc = OperatorClassRegistry.getTopology("static_op").tasklet(0);
+        RelayClassRegistry.registerClass(StaticRelay.class);
+        TaskletDescriptor desc = RelayClassRegistry.getTopology("static_op").tasklet(0);
         assertThat(desc.cellKeys()).containsExactly("a", "b");
         @SuppressWarnings("unchecked")
-        Map<String, Object> declared = ((List<Map<String, Object>>) OperatorClassRegistry.getTopology("static_op")
+        Map<String, Object> declared = ((List<Map<String, Object>>) RelayClassRegistry.getTopology("static_op")
                         .declaration()
                         .get("tasklets"))
                 .get(0);
@@ -113,8 +113,8 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     @Test
     @DisplayName("Logical clock re-arms on restore: ctx.now() serves the seq the core hands the invocation")
     void logicalClockReArmsOnRestore() {
-        OperatorClassRegistry.registerClass(LogicalOperator.class);
-        TaskletDescriptor desc = OperatorClassRegistry.getTopology("logical_op").tasklet(0);
+        RelayClassRegistry.registerClass(LogicalRelay.class);
+        TaskletDescriptor desc = RelayClassRegistry.getTopology("logical_op").tasklet(0);
         assertThat(desc.clock().wireName()).isEqualTo("logical");
 
         outcome(command(
@@ -129,8 +129,8 @@ class TaskletFormDispatchTest extends DispatchTestBase {
         return new String(((ActivationOutcome.StateJson) json).json(), StandardCharsets.UTF_8);
     }
 
-    public static final class EmitManyOperator extends Op {
-        public EmitManyOperator() {
+    public static final class EmitManyRelay extends Op {
+        public EmitManyRelay() {
             super("emit_many", c -> c.input(String.class, "in")
                     .into(EmitManyTask.class)
                     .sink("out", s -> s.getBytes(StandardCharsets.UTF_8)));
@@ -149,8 +149,8 @@ class TaskletFormDispatchTest extends DispatchTestBase {
         }
     }
 
-    public static final class VoidChangeOperator extends Op {
-        public VoidChangeOperator() {
+    public static final class VoidChangeRelay extends Op {
+        public VoidChangeRelay() {
             super("void_change", c -> c.input(String.class, "in").into(VoidChangeTask.class));
         }
     }
@@ -164,8 +164,8 @@ class TaskletFormDispatchTest extends DispatchTestBase {
         }
     }
 
-    public static final class LogicalOperator extends Op {
-        public LogicalOperator() {
+    public static final class LogicalRelay extends Op {
+        public LogicalRelay() {
             super("logical_op", c -> c.input(String.class, "in").into(LogicalTask.class));
         }
     }

@@ -1,0 +1,22 @@
+package com.flezha.test;
+
+import com.flezha.sdk.channel.ChannelBuilder;
+import com.flezha.sdk.relay.Relay;
+
+/**
+ * Mirror of the Rust test app's {@code PoisonProbeRelay}: tier-off
+ * retry-then-park probe for the dead-letter-queue e2e.
+ */
+public final class PoisonProbeRelay implements Relay {
+
+    @Override
+    public String factoryId() {
+        return "poison_probe";
+    }
+
+    @Override
+    public void channels(ChannelBuilder c) {
+        var sPoisonProbeTasklet = c.input(String.class, "input").retryBackoffMs(25).into(PoisonProbeTasklet.class);
+        sPoisonProbeTasklet.sink("out");
+    }
+}

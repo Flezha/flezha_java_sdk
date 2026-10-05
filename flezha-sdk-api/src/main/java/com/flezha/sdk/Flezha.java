@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
  *
  * <pre>{@code
  * Flezha.createRunner("my_app")
- *     .registerFactory(MyOperator.class)
+ *     .registerFactory(MyRelay.class)
  *     .run(); // .start() instead to keep the calling thread
  * }</pre>
  *
@@ -67,7 +67,7 @@ public final class Flezha {
 
     /**
      * Create this JVM's runner for {@code namespace} — one object carries
-     * declaration and lifecycle. Declare operator classes with
+     * declaration and lifecycle. Declare relay classes with
      * {@link FlezhaRunner#registerFactory(Class)} (legal before AND after
      * start), then {@link FlezhaRunner#start()} (keep the calling thread) or
      * {@link FlezhaRunner#run()} (block until shutdown). Creating a runner

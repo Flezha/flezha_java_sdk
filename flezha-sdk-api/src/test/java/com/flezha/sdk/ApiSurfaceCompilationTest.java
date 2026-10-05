@@ -54,18 +54,18 @@ class ApiSurfaceCompilationTest {
                         compiles(
                                 """
                         package nowhere;
-                        import com.flezha.sdk.operator.Operator;
+                        import com.flezha.sdk.relay.Relay;
                         import java.time.Duration;
                         public final class UsesLegacyApi {
-                            Operator.Run steps = new Operator.Run.Steps(
-                                    Operator.Each.CHAINED, Operator.OnFailure.KEEP_PROGRESS);
-                            Operator.Run flow = new Operator.Run.Flow(new Operator.Exactly.EffectivelyOnce()
-                                    .withAck(new Operator.Ack.Checkpoint().withEvery(500))
+                            Relay.Run steps = new Relay.Run.Steps(
+                                    Relay.Each.CHAINED, Relay.OnFailure.KEEP_PROGRESS);
+                            Relay.Run flow = new Relay.Run.Flow(new Relay.Exactly.EffectivelyOnce()
+                                    .withAck(new Relay.Ack.Checkpoint().withEvery(500))
                                     .withCorrectionMs(60_000));
-                            Operator.Durable durable = new Operator.Durable.Local(Duration.ofMinutes(10));
+                            Relay.Durable durable = new Relay.Durable.Local(Duration.ofMinutes(10));
                         }
                         """))
-                .as("the base and every node of the tree resolve from com.flezha.sdk.operator")
+                .as("the base and every node of the tree resolve from com.flezha.sdk.relay")
                 .isTrue();
     }
 
@@ -96,7 +96,7 @@ class ApiSurfaceCompilationTest {
     void theFixtureClassCompilesWithItsSettingsInPlace() {
         assertThat(
                         compiles(
-                                operatorWith(
+                                relayWith(
                                         "",
                                         """
                 @Override public Run run() {
@@ -139,13 +139,13 @@ class ApiSurfaceCompilationTest {
     @Test
     @DisplayName("The retry knobs are gone from the interface")
     void theRetryKnobsAreGoneFromTheInterface() {
-        assertThat(compiles(operatorWith("c.input(String.class, \"in\").retryMax(2).retryBackoffMs(20);", "")))
+        assertThat(compiles(relayWith("c.input(String.class, \"in\").retryMax(2).retryBackoffMs(20);", "")))
                 .as("the edge's retry declaration must compile, or the refusals prove nothing")
                 .isTrue();
 
-        assertDoesNotCompile(operatorWith("", "@Override public int retryAttempts() { return 1; }"));
-        assertDoesNotCompile(operatorWith("", "@Override public java.time.Duration retryBackoff() { return null; }"));
-        assertDoesNotCompile(operatorWith("", "@Override public int barrierRetryAttempts() { return 1; }"));
+        assertDoesNotCompile(relayWith("", "@Override public int retryAttempts() { return 1; }"));
+        assertDoesNotCompile(relayWith("", "@Override public java.time.Duration retryBackoff() { return null; }"));
+        assertDoesNotCompile(relayWith("", "@Override public int barrierRetryAttempts() { return 1; }"));
     }
 
     @Test
@@ -155,8 +155,8 @@ class ApiSurfaceCompilationTest {
                 """
                 package nowhere;
                 import com.flezha.sdk.channel.ChannelBuilder;
-                import com.flezha.sdk.operator.Operator;
-                public final class UsesLegacyApi implements Operator {
+                import com.flezha.sdk.relay.Relay;
+                public final class UsesLegacyApi implements Relay {
                     @Override public String factoryId() { return "legacy"; }
                     public void tasklets(ChannelBuilder c) {}
                 }
@@ -179,17 +179,17 @@ class ApiSurfaceCompilationTest {
             }
         }
         assertThat(found)
-                .as("an operator that runs in steps is a graph committed stage by stage")
+                .as("a relay that runs in steps is a graph committed stage by stage")
                 .isEmpty();
     }
 
-    /** An operator class whose graph body is {@code graph} and whose remaining members are {@code members}. */
-    private static String operatorWith(String graph, String members) {
+    /** A relay class whose graph body is {@code graph} and whose remaining members are {@code members}. */
+    private static String relayWith(String graph, String members) {
         return """
                 package nowhere;
                 import com.flezha.sdk.channel.ChannelBuilder;
-                import com.flezha.sdk.operator.Operator;
-                public final class UsesLegacyApi implements Operator {
+                import com.flezha.sdk.relay.Relay;
+                public final class UsesLegacyApi implements Relay {
                     @Override public String factoryId() { return "legacy"; }
                     @Override public void channels(ChannelBuilder c) { %s }
                     %s

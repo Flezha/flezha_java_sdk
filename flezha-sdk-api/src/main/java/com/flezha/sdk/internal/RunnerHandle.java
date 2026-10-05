@@ -19,9 +19,9 @@ public interface RunnerHandle {
     @Nonnull
     String runnerId();
 
-    /** The ids of the operator instances bound on this runner, read from the core. */
+    /** The ids of the relay instances bound on this runner, read from the core. */
     @Nonnull
-    List<String> operators();
+    List<String> relays();
 
     /** Block until the runner shuts down. */
     void awaitTermination() throws InterruptedException;
@@ -32,9 +32,9 @@ public interface RunnerHandle {
     /**
      * Remove {@code factoryId}'s class from the runtime class registries —
      * unregister-first, then scan live instances; a live hit re-registers the
-     * class and throws {@code runtime.operator_type_in_use}
+     * class and throws {@code runtime.relay_type_in_use}
      * (the transient unregistered window is benign: a failing
-     * {@code AddOperator} is re-placed by convergence).
+     * {@code AddRelay} is re-placed by convergence).
      */
     void removeType(String factoryId);
 
@@ -56,16 +56,11 @@ public interface RunnerHandle {
 
     /**
      * Send {@code message} to the entry channel {@code channel} of
-     * {@code operator}, through the controller or with {@code local} in
+     * {@code relay}, through the controller or with {@code local} in
      * process. Answers the controller's verdict as JSON, or {@code null} as
      * JSON for a local send. A null {@code msgId} or {@code key} is none.
      */
     @Nonnull
     String send(
-            String operator,
-            String channel,
-            byte[] message,
-            @Nullable String msgId,
-            @Nullable String key,
-            boolean local);
+            String relay, String channel, byte[] message, @Nullable String msgId, @Nullable String key, boolean local);
 }

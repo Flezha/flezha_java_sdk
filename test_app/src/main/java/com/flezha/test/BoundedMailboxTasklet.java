@@ -11,7 +11,7 @@ import java.util.List;
  * Shared base for the three bounded-mailbox probes: a capacity-4 per-Cell
  * mailbox counting what it processed and echoing the input bytes. One concrete
  * tasklet per overflow policy, because the graph-shape rule allows exactly one
- * entry channel per operator; each declares {@link #CAPACITY} with its name.
+ * entry channel per relay; each declares {@link #CAPACITY} with its name.
  * Mirrors the Rust test app's {@code DropNothingTestTasklet} /
  * {@code DropNewestTestTasklet} / {@code DropOldestTestTasklet}.
  */

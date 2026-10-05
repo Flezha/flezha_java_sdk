@@ -9,7 +9,7 @@ Three files, one for each part the guides describe:
 | File | Part | What it does |
 |---|---|---|
 | `Echo.java` | the tasklet | the processing stage: prefixes each message |
-| `EchoOperator.java` | the operator | the graph: `in` feeds the tasklet, output lands on `out` |
+| `EchoRelay.java` | the relay | the graph: `in` feeds the tasklet, output lands on `out` |
 | `Main.java` | the runner | this process: registers the echo factory and waits |
 
 ## Run it
@@ -24,8 +24,8 @@ mvn -q package && java -jar target/echo.jar
 Then, from another terminal:
 
 ```sh
-flz operator start echo --id my_echo
-flz operator send my_echo --text 'hello world' --await 2000
+flz relay start echo --id my_echo
+flz relay send my_echo --text 'hello world' --await 2000
 ```
 
 ```
@@ -55,6 +55,6 @@ above is all you need.
 
 [`docs/guides/runner_deployment.md`](../../../../docs/guides/runner_deployment.md)
 walks through what each of the three parts is and why the split is the way it
-is. The other worked examples, covering state, keys, timers, steps operators and the
+is. The other worked examples, covering state, keys, timers, steps relays and the
 rest, stay inside the SDK's own build at
 [`sdk/java/flezha-sdk-examples/`](../../flezha-sdk-examples/README.md).

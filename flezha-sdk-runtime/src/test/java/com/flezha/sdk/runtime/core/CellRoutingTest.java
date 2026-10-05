@@ -2,7 +2,7 @@ package com.flezha.sdk.runtime.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
+import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
@@ -20,7 +20,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("a transform chain is one fused closure; KeyRequest answers the key of the MAPPED value")
     void transformChainAndKeyRequest() {
-        OperatorClassRegistry.registerClass(DynamicChainOperator.class);
+        RelayClassRegistry.registerClass(DynamicChainRelay.class);
 
         ActivationOutcome prepared = outcome(command(
                 "dyn_chain",
@@ -52,7 +52,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("a filtered-out payload consumes its offset with no invocation")
     void filteredPayloadStillAcks() {
-        OperatorClassRegistry.registerClass(DynamicChainOperator.class);
+        RelayClassRegistry.registerClass(DynamicChainRelay.class);
         ItemEffect effect = soleEffect(
                 work("dyn_chain", 0, Optional.of("AAPL"), 0, input(0, "#comment", 1, OptionalLong.of(4), false)));
         assertThat(effect.verdict()).isInstanceOf(Verdict.Ok.class);
@@ -63,7 +63,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("flatMap fans one payload across keys; each Cell receives only its own slot")
     void fanOutKeysEveryYieldedValue() {
-        OperatorClassRegistry.registerClass(FanOutOperator.class);
+        RelayClassRegistry.registerClass(FanOutRelay.class);
 
         ActivationOutcome prepared = outcome(command(
                 "fan_out",
@@ -84,7 +84,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("static mode: cellsFor routes, and each Cell runs its OWN Tasklet instance")
     void staticCellsUsePerCellInstances() {
-        OperatorClassRegistry.registerClass(StaticOperator.class);
+        RelayClassRegistry.registerClass(StaticRelay.class);
 
         soleEffect(work("static_op", 0, Optional.of("a"), 0, input(0, "a:1", 1)));
         soleEffect(work("static_op", 0, Optional.of("a"), 0, input(0, "a:2", 2)));
@@ -108,7 +108,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("merged entry channels each apply their own mapping at delivery")
     void mergedInputAppliesEdgeMapping() {
-        OperatorClassRegistry.registerClass(MergeOperator.class);
+        RelayClassRegistry.registerClass(MergeRelay.class);
         soleEffect(work("merge_op", 0, Optional.empty(), 0, input(0, "x", 1)));
         soleEffect(work("merge_op", 0, Optional.empty(), 0, input(1, "y", 2)));
         assertThat(RECORDED).containsExactly("=A:x", "=B:y");
@@ -117,7 +117,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("an inter-task emit becomes per-consumer Edge outputs carrying the post-transform value")
     void interTaskEmitBecomesEdgeOutputs() {
-        OperatorClassRegistry.registerClass(PipelineOperator.class);
+        RelayClassRegistry.registerClass(PipelineRelay.class);
         ItemEffect effect = soleEffect(work("pipeline_op", 0, Optional.empty(), 0, input(0, "v", 1)));
 
         assertThat(effect.outputs()).hasSize(1);
@@ -140,7 +140,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("an FLOW inter-task edge map applies exactly once, producer-side")
     void interTaskEdgeMapAppliesOnce() {
-        OperatorClassRegistry.registerClass(MappedPipelineOperator.class);
+        RelayClassRegistry.registerClass(MappedPipelineRelay.class);
         ItemEffect produced = soleEffect(work("mapped_pipeline_op", 0, Optional.empty(), 0, input(0, "v", 1)));
         Output edge = produced.outputs().get(0);
         soleEffect(work(
@@ -160,8 +160,8 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("an inter-task consumer narrows on the once-transformed value, by key and by cellsFor")
     void interTaskConsumersNarrowOnTheTransformedValue() {
-        OperatorClassRegistry.registerClass(MappedStaticPipelineOperator.class);
-        OperatorClassRegistry.registerClass(MappedKeyedPipelineOperator.class);
+        RelayClassRegistry.registerClass(MappedStaticPipelineRelay.class);
+        RelayClassRegistry.registerClass(MappedKeyedPipelineRelay.class);
 
         // cellsFor: the core cannot narrow an unkeyed edge output to a
         // static Cell, so it fans and delivery narrows. `a:mid:1` names
@@ -198,7 +198,7 @@ class CellRoutingTest extends DispatchTestBase {
     @Test
     @DisplayName("KeyRequest answers the extractor's event time; a failing parse is a per-payload Err")
     void prepareEventTimeAndPerPayloadFailure() {
-        OperatorClassRegistry.registerClass(TimerOperator.class);
+        RelayClassRegistry.registerClass(TimerRelay.class);
         ActivationOutcome prepared = outcome(command(
                 "timer_op",
                 0,

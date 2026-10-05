@@ -17,7 +17,7 @@ public enum TimerKind {
 
     /**
      * Fires when wall-clock time reaches the scheduled timestamp, via the
-     * Operator's timer wheel. The answer to "nothing has arrived".
+     * Relay's timer wheel. The answer to "nothing has arrived".
      */
     PROCESSING_TIME;
 

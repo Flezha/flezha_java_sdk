@@ -1,6 +1,6 @@
 package com.flezha.examples.tradedesk;
 
-import com.flezha.examples.tradedesk.OrderExecutorOperator.OrderTicket;
+import com.flezha.examples.tradedesk.OrderExecutorRelay.OrderTicket;
 import com.flezha.examples.tradedesk.TrackPrices.Move;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -13,7 +13,7 @@ import com.flezha.sdk.tasklet.TaskletException;
  * function of one value, and a restart costs this stage nothing because there is nothing to bring
  * back. That is why its state is {@code Void}, beside {@link TrackPrices}, which keeps the window.
  *
- * <p>It does two things per input, both through the context: it starts a steps operator and it
+ * <p>It does two things per input, both through the context: it starts a steps relay and it
  * emits.
  */
 @Tasklet.Spec(name = "buy_above_average")
@@ -30,7 +30,7 @@ public final class BuyAboveAverage implements Tasklet<Move, Void, String> {
         }
         int quantity = (int) Math.round(percent * UNITS_PER_PERCENT);   // a stronger move buys more
 
-        ctx.spawnSteps("order_executor", new OrderTicket(move.symbol(), quantity));   // one steps operator per order
+        ctx.spawnSteps("order_executor", new OrderTicket(move.symbol(), quantity));   // one steps relay per order
 
         ctx.emit(String.format(
                 "%s %.4f is %.2f%% above its average of %.4f, buying %d",

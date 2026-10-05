@@ -28,9 +28,9 @@ class ControlTest {
     void aStartWithoutAnIdAnswersTheGeneratedId() {
         FlezhaImpl.ADMIN_ANSWER = "{\"id\":\"echo-k7m2qzxw4pd3fn2a\",\"outcome\":\"started\"}";
 
-        assertThat(control.startOperator(OperatorSpec.of("echo")))
+        assertThat(control.startRelay(RelaySpec.of("echo")))
                 .isEqualTo(new StartResult("echo-k7m2qzxw4pd3fn2a", StartOutcome.STARTED));
-        assertThat(FlezhaImpl.ADMIN_CALLS).containsExactly(List.of("Operator.start", "[{\"factory_id\":\"echo\"}]"));
+        assertThat(FlezhaImpl.ADMIN_CALLS).containsExactly(List.of("Relay.start", "[{\"factory_id\":\"echo\"}]"));
     }
 
     @Test
@@ -38,24 +38,23 @@ class ControlTest {
     void aStartWithAnIdAnswersAlreadyRunning() {
         FlezhaImpl.ADMIN_ANSWER = "{\"id\":\"my_echo\",\"outcome\":\"already_running\"}";
 
-        assertThat(control.startOperator(OperatorSpec.of("echo").id("my_echo")))
+        assertThat(control.startRelay(RelaySpec.of("echo").id("my_echo")))
                 .isEqualTo(new StartResult("my_echo", StartOutcome.ALREADY_RUNNING));
         assertThat(FlezhaImpl.ADMIN_CALLS)
-                .containsExactly(List.of("Operator.start", "[{\"factory_id\":\"echo\",\"id\":\"my_echo\"}]"));
+                .containsExactly(List.of("Relay.start", "[{\"factory_id\":\"echo\",\"id\":\"my_echo\"}]"));
     }
 
     @Test
-    @DisplayName("a plugin is enabled by name, and bound and unbound by operator")
-    void aPluginIsEnabledByNameAndBoundAndUnboundByOperator() {
+    @DisplayName("a plugin is enabled by name, and bound and unbound by relay")
+    void aPluginIsEnabledByNameAndBoundAndUnboundByRelay() {
         JsonNodeFactory json = JsonNodeFactory.instance;
         ArrayNode hooks = json.arrayNode();
         hooks.addArray().add("on_output").addObject();
 
         control.enablePlugin(
                 "writer",
-                PluginSpec.of("operator_file_sink").opts(json.objectNode().put("path", "out.txt")));
-        control.enablePlugin(
-                "feed", PluginSpec.of("operator_websocket").single().bind("my_echo", hooks));
+                PluginSpec.of("relay_file_sink").opts(json.objectNode().put("path", "out.txt")));
+        control.enablePlugin("feed", PluginSpec.of("relay_websocket").single().bind("my_echo", hooks));
         control.bindPlugin("writer", "my_echo");
         control.bindPlugin("writer", "my_other", json.arrayNode().add("on_output"), "in");
         control.unbindPlugin("writer", "my_echo");
@@ -66,16 +65,16 @@ class ControlTest {
                 .containsExactly(
                         List.of(
                                 "PluginManager.enable",
-                                "[\"writer\",{\"provider\":\"operator_file_sink\",\"opts\":{\"path\":\"out.txt\"}}]"),
+                                "[\"writer\",{\"provider\":\"relay_file_sink\",\"opts\":{\"path\":\"out.txt\"}}]"),
                         List.of(
                                 "PluginManager.enable",
-                                "[\"feed\",{\"provider\":\"operator_websocket\",\"opts\":{},\"single\":true,"
-                                        + "\"operator_id\":\"my_echo\",\"hooks\":[[\"on_output\",{}]]}]"),
-                        List.of("PluginManager.bind", "[\"writer\",{\"operator_id\":\"my_echo\"}]"),
+                                "[\"feed\",{\"provider\":\"relay_websocket\",\"opts\":{},\"single\":true,"
+                                        + "\"relay_id\":\"my_echo\",\"hooks\":[[\"on_output\",{}]]}]"),
+                        List.of("PluginManager.bind", "[\"writer\",{\"relay_id\":\"my_echo\"}]"),
                         List.of(
                                 "PluginManager.bind",
-                                "[\"writer\",{\"operator_id\":\"my_other\",\"hooks\":[\"on_output\"],\"channel\":\"in\"}]"),
-                        List.of("PluginManager.unbind", "[\"writer\",{\"operator_id\":\"my_echo\"}]"),
+                                "[\"writer\",{\"relay_id\":\"my_other\",\"hooks\":[\"on_output\"],\"channel\":\"in\"}]"),
+                        List.of("PluginManager.unbind", "[\"writer\",{\"relay_id\":\"my_echo\"}]"),
                         List.of("PluginManager.disable", "[\"writer\",{}]"),
                         List.of("PluginManager.list", "[]"));
     }
@@ -84,14 +83,14 @@ class ControlTest {
     @DisplayName("a start answer of another shape is refused naming it")
     void aStartAnswerOfAnotherShapeIsRefused() {
         FlezhaImpl.ADMIN_ANSWER = "{\"id\":\"my_echo\",\"outcome\":\"duplicate\"}";
-        assertThatThrownBy(() -> control.startOperator(OperatorSpec.of("echo").id("my_echo")))
+        assertThatThrownBy(() -> control.startRelay(RelaySpec.of("echo").id("my_echo")))
                 .isInstanceOfSatisfying(FlezhaException.class, e -> {
                     assertThat(e.code()).isEqualTo("control.unreadable_answer");
-                    assertThat(e.details()).containsEntry("verb", "Operator.start");
+                    assertThat(e.details()).containsEntry("verb", "Relay.start");
                 });
 
         FlezhaImpl.ADMIN_ANSWER = "{\"outcome\":\"started\"}";
-        assertThatThrownBy(() -> control.startOperator(OperatorSpec.of("echo")))
+        assertThatThrownBy(() -> control.startRelay(RelaySpec.of("echo")))
                 .isInstanceOfSatisfying(
                         FlezhaException.class, e -> assertThat(e.code()).isEqualTo("control.unreadable_answer"));
     }

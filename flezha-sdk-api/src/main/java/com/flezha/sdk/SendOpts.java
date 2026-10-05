@@ -29,7 +29,7 @@ public final class SendOpts {
     }
 
     /**
-     * The message's id, stamped as {@code flz.msg_id}: an operator whose input
+     * The message's id, stamped as {@code flz.msg_id}: a relay whose input
      * log still holds an input of this id absorbs the repeat and answers
      * {@code absorbed}.
      */
@@ -46,7 +46,7 @@ public final class SendOpts {
 
     /**
      * In process, without the controller: the message is on no disk, is lost
-     * if the runner stops before handling it, and an operator's input log does
+     * if the runner stops before handling it, and a relay's input log does
      * not cover it.
      */
     @Nonnull

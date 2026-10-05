@@ -3,7 +3,7 @@ package com.flezha.test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.flezha.sdk.Flezha;
-import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
+import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import java.util.HashSet;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,12 +66,12 @@ class FactoryIdsTest {
             "keyed_loop_steps",
             "keyed_saga_steps",
             "merged_input",
-            "mixed_operator",
+            "mixed_relay",
             "optout_commit_block",
             "outbox_block_steps",
             "part_echo",
             "part_echo_steps",
-            "partition_relay",
+            "partition_pass",
             "persistence_off_counter",
             "poison_probe",
             "remote_tier_store",
@@ -110,8 +110,8 @@ class FactoryIdsTest {
 
     @BeforeEach
     void reset() {
-        OperatorClassRegistry.reset();
-        OperatorClassRegistry.reset();
+        RelayClassRegistry.reset();
+        RelayClassRegistry.reset();
     }
 
     @Test
@@ -119,8 +119,8 @@ class FactoryIdsTest {
     void sameIds() {
         Main.define(Flezha.createRunner("factory_ids_ns"));
 
-        Set<String> live = new HashSet<>(OperatorClassRegistry.factoryIds());
-        live.addAll(OperatorClassRegistry.factoryIds());
+        Set<String> live = new HashSet<>(RelayClassRegistry.factoryIds());
+        live.addAll(RelayClassRegistry.factoryIds());
         assertEquals(RUST_FACTORY_IDS, live);
     }
 }

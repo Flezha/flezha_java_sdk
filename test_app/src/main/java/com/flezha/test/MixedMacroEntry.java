@@ -4,7 +4,7 @@ import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 
-/** Pass-through entry tasklet of {@link MixedOperator}. */
+/** Pass-through entry tasklet of {@link MixedRelay}. */
 @Tasklet.Spec(name = "mixed_macro_entry_tasklet")
 public class MixedMacroEntry implements Tasklet<String, Void, String> {
 

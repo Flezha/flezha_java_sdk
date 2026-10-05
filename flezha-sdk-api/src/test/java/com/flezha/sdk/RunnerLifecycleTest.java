@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.Operator;
+import com.flezha.sdk.relay.Relay;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -34,7 +34,7 @@ class RunnerLifecycleTest {
 
     private static final String AUTHORS_REFUSAL = "the author's own refusal";
 
-    public static final class OperatorA implements Operator {
+    public static final class RelayA implements Relay {
         @Override
         public String factoryId() {
             return "lifecycle_a";
@@ -44,7 +44,7 @@ class RunnerLifecycleTest {
         public void channels(ChannelBuilder c) {}
     }
 
-    public static final class OperatorB implements Operator {
+    public static final class RelayB implements Relay {
         @Override
         public String factoryId() {
             return "lifecycle_b";
@@ -54,7 +54,7 @@ class RunnerLifecycleTest {
         public void channels(ChannelBuilder c) {}
     }
 
-    public static final class OperatorC implements Operator {
+    public static final class RelayC implements Relay {
         @Override
         public String factoryId() {
             return "lifecycle_c";
@@ -64,7 +64,7 @@ class RunnerLifecycleTest {
         public void channels(ChannelBuilder c) {}
     }
 
-    public static final class StepsD implements Operator {
+    public static final class StepsD implements Relay {
         @Override
         public String factoryId() {
             return "lifecycle_d";
@@ -79,8 +79,8 @@ class RunnerLifecycleTest {
         public void channels(ChannelBuilder c) {}
     }
 
-    /** A short form: the tasklet class itself declares the operator. */
-    @com.flezha.sdk.authoring.Operator(id = "lifecycle_short", sink = "out")
+    /** A short form: the tasklet class itself declares the relay. */
+    @com.flezha.sdk.authoring.Relay(id = "lifecycle_short", sink = "out")
     public static final class ShortForm implements Tasklet<String, Void, String> {
         @Override
         public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
@@ -88,11 +88,11 @@ class RunnerLifecycleTest {
         }
     }
 
-    /** Neither an operator nor a short form. */
-    public static final class NotAnOperator {}
+    /** Neither a relay nor a short form. */
+    public static final class NotARelay {}
 
-    public static final class ThrowingConstructorOperator implements Operator {
-        public ThrowingConstructorOperator() {
+    public static final class ThrowingConstructorRelay implements Relay {
+        public ThrowingConstructorRelay() {
             throw new IllegalStateException(AUTHORS_REFUSAL);
         }
 
@@ -110,7 +110,7 @@ class RunnerLifecycleTest {
     void releaseSingletonSlot() {
         Flezha.currentRunner().ifPresent(FlezhaRunner::close);
         com.flezha.sdk.runtime.FlezhaImpl.resetForTests();
-        com.flezha.sdk.runtime.operator.OperatorClassRegistry.reset();
+        com.flezha.sdk.runtime.relay.RelayClassRegistry.reset();
     }
 
     @Test
@@ -118,7 +118,7 @@ class RunnerLifecycleTest {
             "second start() in the same JVM is rejected naming the running namespace, without reaching the runtime")
     void secondStartIsRejected() {
         FlezhaRunner first =
-                Flezha.createRunner("ns1").registerFactory(OperatorA.class).start();
+                Flezha.createRunner("ns1").registerFactory(RelayA.class).start();
         int startsBefore = com.flezha.sdk.runtime.FlezhaImpl.STARTS.get();
 
         assertThatThrownBy(() -> Flezha.createRunner("ns2").start())
@@ -138,11 +138,10 @@ class RunnerLifecycleTest {
     @DisplayName("creating and mutating runners never claims the slot")
     void creatingRunnersNeverClaimsTheSlot() {
         FlezhaRunner active =
-                Flezha.createRunner("ns1").registerFactory(OperatorA.class).start();
+                Flezha.createRunner("ns1").registerFactory(RelayA.class).start();
 
-        assertThatCode(() -> Flezha.createRunner("ns2")
-                        .registerFactory(OperatorB.class)
-                        .unregisterFactory(OperatorB.class))
+        assertThatCode(() ->
+                        Flezha.createRunner("ns2").registerFactory(RelayB.class).unregisterFactory(RelayB.class))
                 .as("mutating an unstarted runner while another is active is legal")
                 .doesNotThrowAnyException();
 
@@ -152,24 +151,23 @@ class RunnerLifecycleTest {
     @Test
     @DisplayName("start() twice on the same runner is rejected")
     void doubleStartOnOneRunnerIsRejected() {
-        FlezhaRunner runner = Flezha.createRunner("ns_double")
-                .registerFactory(OperatorA.class)
-                .start();
+        FlezhaRunner runner =
+                Flezha.createRunner("ns_double").registerFactory(RelayA.class).start();
         assertThatThrownBy(runner::start).isInstanceOfSatisfying(FlezhaException.class, e -> {
             assertThat(e.code()).isEqualTo("runtime.runner_already_running");
         });
     }
 
     @Test
-    @DisplayName("zero-operator start is legal; the handshake supplier serves an empty set")
-    void zeroOperatorStartIsLegal() {
+    @DisplayName("zero-relay start is legal; the handshake supplier serves an empty set")
+    void zeroRelayStartIsLegal() {
         FlezhaRunner runner = Flezha.createRunner("ns_zero").start();
         assertThat(runner.getNamespace()).isEqualTo("ns_zero");
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
                 .as("the init handshake must carry an empty factory list")
                 .isEmpty();
         // Types may be defined later on the live runner.
-        runner.registerFactory(OperatorA.class);
+        runner.registerFactory(RelayA.class);
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
                 .containsExactly("lifecycle_a");
     }
@@ -178,9 +176,9 @@ class RunnerLifecycleTest {
     @DisplayName("a pre-start remove shapes the declared set the handshake reads")
     void preStartRemoveShapesTheHandshake() {
         FlezhaRunner runner = Flezha.createRunner("ns_shape")
-                .registerFactory(OperatorA.class)
-                .registerFactory(OperatorB.class)
-                .unregisterFactory(OperatorB.class)
+                .registerFactory(RelayA.class)
+                .registerFactory(RelayB.class)
+                .unregisterFactory(RelayB.class)
                 .start();
         assertThat(runner.getNamespace()).isEqualTo("ns_shape");
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
@@ -193,7 +191,7 @@ class RunnerLifecycleTest {
     @Test
     @DisplayName("a post-start define ships the full factory set")
     void postStartDefineShipsTheFullSet() {
-        Flezha.createRunner("ns_def").registerFactory(OperatorA.class).start().registerFactory(OperatorC.class);
+        Flezha.createRunner("ns_def").registerFactory(RelayA.class).start().registerFactory(RelayC.class);
 
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.SYNCED_SETS)
                 .containsExactly(List.of("lifecycle_a", "lifecycle_c"));
@@ -203,13 +201,13 @@ class RunnerLifecycleTest {
     @DisplayName("a post-start remove (no live instances) ships the remaining full set")
     void postStartRemoveShipsTheRemainingSet() {
         Flezha.createRunner("ns_rem")
-                .registerFactory(OperatorA.class)
-                .registerFactory(OperatorC.class)
+                .registerFactory(RelayA.class)
+                .registerFactory(RelayC.class)
                 .start()
-                .unregisterFactory(OperatorC.class);
+                .unregisterFactory(RelayC.class);
 
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.SYNCED_SETS).containsExactly(List.of("lifecycle_a"));
-        assertThat(com.flezha.sdk.runtime.operator.OperatorClassRegistry.registeredIds())
+        assertThat(com.flezha.sdk.runtime.relay.RelayClassRegistry.registeredIds())
                 .as("the runtime-side class must be unregistered")
                 .doesNotContain("lifecycle_c");
     }
@@ -218,29 +216,29 @@ class RunnerLifecycleTest {
     @DisplayName("a steps class is defined and removed through the one registry and declared beside the flows")
     void stepsDefineAndRemoveReachTheOneRegistry() {
         FlezhaRunner runner = Flezha.createRunner("ns_steps").registerFactory(StepsD.class);
-        assertThat(com.flezha.sdk.runtime.operator.OperatorClassRegistry.registeredIds())
+        assertThat(com.flezha.sdk.runtime.relay.RelayClassRegistry.registeredIds())
                 .containsExactly("lifecycle_d");
 
         runner.unregisterFactory(StepsD.class);
-        assertThat(com.flezha.sdk.runtime.operator.OperatorClassRegistry.registeredIds())
+        assertThat(com.flezha.sdk.runtime.relay.RelayClassRegistry.registeredIds())
                 .as("a pre-start remove unregisters the runtime-side class")
                 .isEmpty();
 
-        runner.registerFactory(OperatorA.class).registerFactory(StepsD.class).start();
+        runner.registerFactory(RelayA.class).registerFactory(StepsD.class).start();
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
                 .containsExactly("lifecycle_a", "lifecycle_d");
     }
 
     @Test
-    @DisplayName("removing a type with live instances throws runtime.operator_type_in_use and keeps it defined")
+    @DisplayName("removing a type with live instances throws runtime.relay_type_in_use and keeps it defined")
     void removeWithLiveInstancesRefuses() {
         FlezhaRunner runner =
-                Flezha.createRunner("ns_live").registerFactory(OperatorA.class).start();
+                Flezha.createRunner("ns_live").registerFactory(RelayA.class).start();
         com.flezha.sdk.runtime.FlezhaImpl.LIVE_INSTANCES.put("lifecycle_a", 1);
 
-        assertThatThrownBy(() -> runner.unregisterFactory(OperatorA.class))
+        assertThatThrownBy(() -> runner.unregisterFactory(RelayA.class))
                 .isInstanceOfSatisfying(FlezhaException.class, e -> {
-                    assertThat(e.code()).isEqualTo("runtime.operator_type_in_use");
+                    assertThat(e.code()).isEqualTo("runtime.relay_type_in_use");
                     assertThat(e.details())
                             .containsEntry("factory_id", "lifecycle_a")
                             .containsEntry("live_instances", 1);
@@ -255,22 +253,22 @@ class RunnerLifecycleTest {
 
         // Once the instances stop, the removal succeeds.
         com.flezha.sdk.runtime.FlezhaImpl.LIVE_INSTANCES.remove("lifecycle_a");
-        runner.unregisterFactory(OperatorA.class);
+        runner.unregisterFactory(RelayA.class);
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.SYNCED_SETS).containsExactly(List.of());
     }
 
     @Test
     @DisplayName("removing an undefined type throws runtime.class_not_registered naming the factory id")
     void removeUndefinedTypeIsRejected() {
-        FlezhaRunner runner = Flezha.createRunner("ns_undef").registerFactory(OperatorA.class);
-        assertThatThrownBy(() -> runner.unregisterFactory(OperatorB.class))
+        FlezhaRunner runner = Flezha.createRunner("ns_undef").registerFactory(RelayA.class);
+        assertThatThrownBy(() -> runner.unregisterFactory(RelayB.class))
                 .isInstanceOfSatisfying(FlezhaException.class, e -> {
                     assertThat(e.code()).isEqualTo("runtime.class_not_registered");
                     assertThat(e.details()).containsEntry("factory", "lifecycle_b");
                 });
         // Already-removed counts as undefined too.
-        runner.unregisterFactory(OperatorA.class);
-        assertThatThrownBy(() -> runner.unregisterFactory(OperatorA.class))
+        runner.unregisterFactory(RelayA.class);
+        assertThatThrownBy(() -> runner.unregisterFactory(RelayA.class))
                 .isInstanceOfSatisfying(FlezhaException.class, e -> {
                     assertThat(e.code()).isEqualTo("runtime.class_not_registered");
                     assertThat(e.details()).containsEntry("factory", "lifecycle_a");
@@ -280,8 +278,8 @@ class RunnerLifecycleTest {
     @Test
     @DisplayName("defining a duplicate factory id on one runner is rejected")
     void duplicateFactoryIdIsRejected() {
-        FlezhaRunner runner = Flezha.createRunner("ns_dup").registerFactory(OperatorA.class);
-        assertThatThrownBy(() -> runner.registerFactory(OperatorA.class))
+        FlezhaRunner runner = Flezha.createRunner("ns_dup").registerFactory(RelayA.class);
+        assertThatThrownBy(() -> runner.registerFactory(RelayA.class))
                 .isInstanceOfSatisfying(FlezhaException.class, e -> {
                     assertThat(e.code()).isEqualTo("topology.duplicate_factory_id");
                     assertThat(e.details()).containsEntry("factory_id", "lifecycle_a");
@@ -292,57 +290,57 @@ class RunnerLifecycleTest {
     @DisplayName("one registerFactory takes either run")
     void oneMethodRegistersEitherRun() {
         FlezhaRunner runner = Flezha.createRunner("ns_both_runs")
-                .registerFactory(OperatorA.class)
+                .registerFactory(RelayA.class)
                 .registerFactory(StepsD.class)
                 .start();
 
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.SYNCED_SETS).isEmpty();
-        assertThat(com.flezha.sdk.runtime.operator.OperatorClassRegistry.registeredIds())
+        assertThat(com.flezha.sdk.runtime.relay.RelayClassRegistry.registeredIds())
                 .containsExactlyInAnyOrder("lifecycle_a", "lifecycle_d");
 
         runner.unregisterFactory(StepsD.class);
-        assertThat(com.flezha.sdk.runtime.operator.OperatorClassRegistry.registeredIds())
+        assertThat(com.flezha.sdk.runtime.relay.RelayClassRegistry.registeredIds())
                 .containsExactly("lifecycle_a");
     }
 
     @Test
-    @DisplayName("A class that is neither an operator nor a short form is refused at registration")
-    void aClassThatIsNoOperatorIsRefused() {
-        FlezhaRunner runner = Flezha.createRunner("ns_no_operator");
+    @DisplayName("A class that is neither a relay nor a short form is refused at registration")
+    void aClassThatIsNoRelayIsRefused() {
+        FlezhaRunner runner = Flezha.createRunner("ns_no_relay");
 
-        assertThatThrownBy(() -> runner.registerFactory(NotAnOperator.class))
+        assertThatThrownBy(() -> runner.registerFactory(NotARelay.class))
                 .isInstanceOfSatisfying(FlezhaException.class, e -> {
-                    assertThat(e.code()).isEqualTo("topology.no_operator_exported");
-                    assertThat(e.details()).containsEntry("module", NotAnOperator.class.getName());
+                    assertThat(e.code()).isEqualTo("topology.no_relay_exported");
+                    assertThat(e.details()).containsEntry("module", NotARelay.class.getName());
                 });
 
-        assertThat(com.flezha.sdk.runtime.operator.OperatorClassRegistry.registeredIds())
+        assertThat(com.flezha.sdk.runtime.relay.RelayClassRegistry.registeredIds())
                 .isEmpty();
     }
 
     @Test
-    @DisplayName("the author registers the class they wrote, and a hand-written operator beside it")
+    @DisplayName("the author registers the class they wrote, and a hand-written relay beside it")
     void theAuthorRegistersTheClassTheyWrote() {
         FlezhaRunner runner = Flezha.createRunner("ns_short_form")
                 .registerFactory(ShortForm.class)
-                .registerFactory(OperatorA.class);
-        assertThat(com.flezha.sdk.runtime.operator.OperatorClassRegistry.registeredIds())
+                .registerFactory(RelayA.class);
+        assertThat(com.flezha.sdk.runtime.relay.RelayClassRegistry.registeredIds())
                 .containsExactly("lifecycle_short", "lifecycle_a");
 
         runner.unregisterFactory(ShortForm.class);
-        assertThat(com.flezha.sdk.runtime.operator.OperatorClassRegistry.registeredIds())
+        assertThat(com.flezha.sdk.runtime.relay.RelayClassRegistry.registeredIds())
                 .as("unregister takes what register took")
                 .containsExactly("lifecycle_a");
     }
 
     @Test
-    @DisplayName("pre-start awaitTermination()/getOperators() throw runtime.runner_not_started; close() is a no-op")
+    @DisplayName("pre-start awaitTermination()/getRelays() throw runtime.runner_not_started; close() is a no-op")
     void preStartLifecycleCalls() {
         FlezhaRunner runner = Flezha.createRunner("ns_cold");
         assertThatThrownBy(runner::awaitTermination).isInstanceOfSatisfying(FlezhaException.class, e -> {
             assertThat(e.code()).isEqualTo("runtime.runner_not_started");
         });
-        assertThatThrownBy(runner::getOperators).isInstanceOfSatisfying(FlezhaException.class, e -> {
+        assertThatThrownBy(runner::getRelays).isInstanceOfSatisfying(FlezhaException.class, e -> {
             assertThat(e.code()).isEqualTo("runtime.runner_not_started");
         });
         assertThatCode(runner::close).doesNotThrowAnyException();
@@ -354,14 +352,13 @@ class RunnerLifecycleTest {
     @Test
     @DisplayName("define/remove on a closed runner are refused and never reach the runtime")
     void mutatingAClosedRunnerIsRefused() {
-        FlezhaRunner runner = Flezha.createRunner("ns_closed")
-                .registerFactory(OperatorA.class)
-                .start();
+        FlezhaRunner runner =
+                Flezha.createRunner("ns_closed").registerFactory(RelayA.class).start();
         runner.close();
 
         // close() destroys the core context; a mutation that got through would
         // carry the freed handle back across the JNI boundary.
-        assertThatThrownBy(() -> runner.registerFactory(OperatorB.class))
+        assertThatThrownBy(() -> runner.registerFactory(RelayB.class))
                 .isInstanceOfSatisfying(FlezhaException.class, e -> {
                     assertThat(e.code()).isEqualTo("runtime.runner_closed");
                     assertThat(e.details()).containsEntry("namespace", "ns_closed");
@@ -371,7 +368,7 @@ class RunnerLifecycleTest {
                     assertThat(e.code()).isEqualTo("runtime.runner_closed");
                     assertThat(e.details()).containsEntry("namespace", "ns_closed");
                 });
-        assertThatThrownBy(() -> runner.unregisterFactory(OperatorA.class))
+        assertThatThrownBy(() -> runner.unregisterFactory(RelayA.class))
                 .isInstanceOfSatisfying(FlezhaException.class, e -> {
                     assertThat(e.code()).isEqualTo("runtime.runner_closed");
                     assertThat(e.details()).containsEntry("namespace", "ns_closed");
@@ -385,7 +382,7 @@ class RunnerLifecycleTest {
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.SYNCED_SETS)
                 .as("a refused mutation must not reach the runtime")
                 .isEmpty();
-        assertThat(com.flezha.sdk.runtime.operator.OperatorClassRegistry.registeredIds())
+        assertThat(com.flezha.sdk.runtime.relay.RelayClassRegistry.registeredIds())
                 .as("a refused define must not register the class")
                 .doesNotContain("lifecycle_b");
     }
@@ -393,11 +390,11 @@ class RunnerLifecycleTest {
     @Test
     @DisplayName("a runner may be started again after the first one closes")
     void restartAfterCloseSucceeds() {
-        Flezha.createRunner("ns1").registerFactory(OperatorA.class).start().close();
+        Flezha.createRunner("ns1").registerFactory(RelayA.class).start().close();
         assertThat(Flezha.currentRunner()).isEmpty();
 
         FlezhaRunner second =
-                Flezha.createRunner("ns2").registerFactory(OperatorB.class).start();
+                Flezha.createRunner("ns2").registerFactory(RelayB.class).start();
         assertThat(second.getNamespace()).isEqualTo("ns2");
         assertThat(Flezha.currentRunner()).containsSame(second);
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
@@ -409,7 +406,7 @@ class RunnerLifecycleTest {
     @DisplayName("try-with-resources starts the runner for the block and closes it at the end")
     void tryWithResourcesWorks() {
         try (FlezhaRunner r =
-                Flezha.createRunner("ns_try").registerFactory(OperatorA.class).start()) {
+                Flezha.createRunner("ns_try").registerFactory(RelayA.class).start()) {
             assertThat(r.getNamespace()).isEqualTo("ns_try");
             assertThat(Flezha.currentRunner()).containsSame(r);
         }
@@ -420,7 +417,7 @@ class RunnerLifecycleTest {
     @DisplayName("close() from another thread wakes a thread blocked in awaitTermination()")
     void closeWakesAwaitTermination() throws Exception {
         FlezhaRunner runner =
-                Flezha.createRunner("ns_await").registerFactory(OperatorA.class).start();
+                Flezha.createRunner("ns_await").registerFactory(RelayA.class).start();
         ExecutorService pool = Executors.newSingleThreadExecutor();
         try {
             Future<?> blocked = pool.submit(() -> {
@@ -443,7 +440,7 @@ class RunnerLifecycleTest {
     void currentRunnerReflectsLifecycle() {
         assertThat(Flezha.currentRunner()).isEmpty();
         FlezhaRunner runner =
-                Flezha.createRunner("ns_cur").registerFactory(OperatorA.class).start();
+                Flezha.createRunner("ns_cur").registerFactory(RelayA.class).start();
         assertThat(Flezha.currentRunner()).containsSame(runner);
         runner.close();
         assertThat(Flezha.currentRunner()).isEmpty();
@@ -452,8 +449,8 @@ class RunnerLifecycleTest {
     @Test
     @DisplayName("two concurrent start() calls — exactly one wins, the loser is told the winner's namespace")
     void concurrentStartsExactlyOneWins() throws Exception {
-        FlezhaRunner r1 = Flezha.createRunner("ns_one").registerFactory(OperatorA.class);
-        FlezhaRunner r2 = Flezha.createRunner("ns_two").registerFactory(OperatorB.class);
+        FlezhaRunner r1 = Flezha.createRunner("ns_one").registerFactory(RelayA.class);
+        FlezhaRunner r2 = Flezha.createRunner("ns_two").registerFactory(RelayB.class);
 
         CyclicBarrier barrier = new CyclicBarrier(2);
         ExecutorService pool = Executors.newFixedThreadPool(2);
@@ -486,7 +483,7 @@ class RunnerLifecycleTest {
     void removeUndefinedTypeWithThrowingConstructorCarriesTheAuthorsError() {
         FlezhaRunner runner = Flezha.createRunner("ns_throwing_ctor");
 
-        Throwable thrown = catchThrowable(() -> runner.unregisterFactory(ThrowingConstructorOperator.class));
+        Throwable thrown = catchThrowable(() -> runner.unregisterFactory(ThrowingConstructorRelay.class));
 
         assertThat(thrown).isNotNull();
         assertThat(Arrays.asList(thrown, thrown.getCause()))

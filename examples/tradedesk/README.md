@@ -4,16 +4,16 @@ The toy trader the [Part 2 guides](../../../../docs/guides/guides.md) build, as 
 standalone project. Nothing here depends on the Flezha source tree: the
 `pom.xml` names one released coordinate, the way your own project would.
 
-It holds the desk's two operators and the runner that serves them. The guides
+It holds the desk's two relays and the runner that serves them. The guides
 write them one tasklet at a time.
 
 | File | What is in it |
 |---|---|
 | `Main.java` | the runner: this process joins the `trading` namespace and registers both factories |
-| `TradeWatcherOperator.java` | the ETL stream, a flow operator: the exchange's trade messages in, a cell per symbol, buy signals out |
+| `TradeWatcherRelay.java` | the ETL stream, a flow relay: the exchange's trade messages in, a cell per symbol, buy signals out |
 | `TrackPrices.java` | keeps each symbol's last ten prices, and compares a new price with their average |
 | `BuyAboveAverage.java` | starts an order when a price is 2 % or more above its average |
-| `OrderExecutorOperator.java` | the workflow, a steps operator: two steps in order, then two side by side. The order an instance is started with is the `OrderTicket` record here |
+| `OrderExecutorRelay.java` | the workflow, a steps relay: two steps in order, then two side by side. The order an instance is started with is the `OrderTicket` record here |
 | `ReserveFunds.java` | step one: puts the money aside, and releases it again if the order is undone |
 | `PlaceOrder.java` | step two: places the paper order, and cancels it if the order is undone |
 | `ConfirmFill.java` | waits ten seconds for the exchange, confirms the fill and ends the order with its result, and refuses an order above the exchange's limit |
@@ -51,7 +51,7 @@ One instance of `order_executor` is one order. `--text` carries the order on the
 `order` channel:
 
 ```sh
-flz operator start order_executor --id order_1 --namespace trading \
+flz relay start order_executor --id order_1 --namespace trading \
   --text '{"symbol": "EUR/USD", "quantity": 10}' --channel order
 ```
 
@@ -63,15 +63,15 @@ The runner's terminal shows the order being booked. The ids come from
 ```
 
 About ten seconds later, once the exchange has answered, the instance ends on
-its own, and `flz operator info` shows how:
+its own, and `flz relay info` shows how:
 
 ```sh
-flz operator info order_1 --namespace trading
+flz relay info order_1 --namespace trading
 ```
 
 ```
 ...
-Operator: order_1
+Relay: order_1
   Run: steps (each: once, on_failure: undo_all)
   Phase: finished
   Status: ok
@@ -84,7 +84,7 @@ The paper exchange fills at most 100 at a time, so `confirm_fill` refuses a
 larger order. Start one the same way, with a quantity above the limit:
 
 ```sh
-flz operator start order_executor --id order_2 --namespace trading \
+flz relay start order_executor --id order_2 --namespace trading \
   --text '{"symbol": "EUR/USD", "quantity": 500}' --channel order
 ```
 
@@ -102,12 +102,12 @@ money is released. `record_order` has no undo, so the booking stays:
 ```
 
 ```sh
-flz operator info order_2 --namespace trading
+flz relay info order_2 --namespace trading
 ```
 
 ```
 ...
-Operator: order_2
+Relay: order_2
   Run: steps (each: once, on_failure: undo_all)
   Phase: finished
   Status: error
@@ -132,4 +132,4 @@ above is all you need.
 
 The echo in [`../echo`](../echo/README.md) is the Part 1 project, and
 [`docs/guides/runner_deployment.md`](../../../../docs/guides/runner_deployment.md)
-walks through what a tasklet, an operator and a runner each are.
+walks through what a tasklet, a relay and a runner each are.

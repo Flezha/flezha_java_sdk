@@ -6,7 +6,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * The SDK's default payload codec, used wherever nothing names one: a {@code byte[]} as it is, a
  * {@code String} as its UTF-8 bytes, anything else as JSON. An entry channel decodes with it, and
- * a sink, a spawned steps operator's first input and a completion result encode with it, so
+ * a sink, a spawned steps relay's first input and a completion result encode with it, so
  * what a tasklet sends reads the same on each.
  */
 public final class PlainPayload {

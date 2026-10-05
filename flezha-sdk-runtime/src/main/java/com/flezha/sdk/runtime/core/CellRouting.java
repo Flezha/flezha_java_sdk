@@ -1,10 +1,10 @@
 package com.flezha.sdk.runtime.core;
 
 import com.flezha.sdk.channel.ChannelKind;
-import com.flezha.sdk.runtime.operator.ChannelDescriptor;
-import com.flezha.sdk.runtime.operator.ConsumerEdge;
-import com.flezha.sdk.runtime.operator.OperatorTopology;
-import com.flezha.sdk.runtime.operator.TaskletDescriptor;
+import com.flezha.sdk.runtime.relay.ChannelDescriptor;
+import com.flezha.sdk.runtime.relay.ConsumerEdge;
+import com.flezha.sdk.runtime.relay.RelayTopology;
+import com.flezha.sdk.runtime.relay.TaskletDescriptor;
 import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -23,11 +23,11 @@ import javax.annotation.Nullable;
  * for the channel's kind and evaluate the consumer edge.
  *
  * <p>Nothing here outlives the call it is made in, which is why one instance
- * per operator is built at materialization and reused for every activation.
+ * per relay is built at materialization and reused for every activation.
  */
 final class CellRouting {
 
-    private final OperatorTopology topology;
+    private final RelayTopology topology;
 
     /** Per-Tasklet routing instances — {@code cellsFor} / {@code eventTime} only. */
     @SuppressWarnings("rawtypes")
@@ -39,7 +39,7 @@ final class CellRouting {
     private final boolean structuredSteps;
 
     @SuppressWarnings("rawtypes")
-    CellRouting(OperatorTopology topology, List<Tasklet> routers, KryoCodec edgeCodec, boolean structuredSteps) {
+    CellRouting(RelayTopology topology, List<Tasklet> routers, KryoCodec edgeCodec, boolean structuredSteps) {
         this.topology = topology;
         this.routers = routers;
         this.edgeCodec = edgeCodec;

@@ -3,8 +3,8 @@ package com.flezha.sdk.runtime.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.operator.Operator;
-import com.flezha.sdk.runtime.operator.OperatorClassRegistry;
+import com.flezha.sdk.relay.Relay;
+import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.Ctx;
@@ -26,7 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
  * The pure host layer, driven entirely through
  * {@link ActivationDispatcher#dispatch}: constructed Activations in, asserted
  * ActivationResults out — no native core, no wire. This base owns the driving
- * helpers and the operator / tasklet fixtures the behaviour classes below it
+ * helpers and the relay / tasklet fixtures the behaviour classes below it
  * share; each subclass owns one behaviour of the host.
  */
 abstract class DispatchTestBase {
@@ -50,8 +50,8 @@ abstract class DispatchTestBase {
         TRAVERSALS.set(0);
         TIMER_EVENTS.clear();
         REFUSE.set(false);
-        OperatorClassRegistry.reset();
-        OperatorClassRegistry.reset();
+        RelayClassRegistry.reset();
+        RelayClassRegistry.reset();
         dispatcher = new ActivationDispatcher();
     }
 
@@ -100,11 +100,11 @@ abstract class DispatchTestBase {
     // ==================================================================
 
     /**
-     * An Operator fixture: an id and a wiring, which is all any of these
+     * A Relay fixture: an id and a wiring, which is all any of these
      * vary. The class stays real (the registry instantiates it by name) and
      * declares only what it is.
      */
-    public abstract static class Op implements Operator {
+    public abstract static class Op implements Relay {
         private final String factoryId;
         private final Consumer<ChannelBuilder> wiring;
 
@@ -167,8 +167,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class CounterOperator extends Op {
-        public CounterOperator() {
+    public static final class CounterRelay extends Op {
+        public CounterRelay() {
             super("counter_op", c -> c.input(String.class, "in")
                     .into(CountTask.class)
                     .sink("out", s -> ("seen:" + s).getBytes(StandardCharsets.UTF_8)));
@@ -200,8 +200,8 @@ abstract class DispatchTestBase {
      * the test proves is that the runtime routes an older body to the
      * migration instead of to the codec.
      */
-    public static final class MigratingCounterOperator extends Op {
-        public MigratingCounterOperator() {
+    public static final class MigratingCounterRelay extends Op {
+        public MigratingCounterRelay() {
             super("migrating_counter_op", c -> c.input(String.class, "in")
                     .into(MigratingCountTask.class)
                     .sink("out", s -> ("seen:" + s).getBytes(StandardCharsets.UTF_8)));
@@ -244,16 +244,16 @@ abstract class DispatchTestBase {
      * `sink("items_output")` and no `.named(...)` anywhere: the string an
      * author can read in the source is the channel the frame is addressed by.
      */
-    public static final class SinkNamesChannelOperator extends Op {
-        public SinkNamesChannelOperator() {
+    public static final class SinkNamesChannelRelay extends Op {
+        public SinkNamesChannelRelay() {
             super("sink_names_channel", c -> c.input(String.class, "in")
                     .into(StatelessStateTask.class)
                     .sink("items_output", s -> s.getBytes(StandardCharsets.UTF_8)));
         }
     }
 
-    public static final class KeyedEmitOperator extends Op {
-        public KeyedEmitOperator() {
+    public static final class KeyedEmitRelay extends Op {
+        public KeyedEmitRelay() {
             super("keyed_op", c -> c.input(String.class, "in")
                     .into(KeyedTask.class)
                     .keyed()
@@ -261,8 +261,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class StatelessStateOperator extends Op {
-        public StatelessStateOperator() {
+    public static final class StatelessStateRelay extends Op {
+        public StatelessStateRelay() {
             super("stateless_state_op", c -> c.input(String.class, "in")
                     .into(StatelessStateTask.class)
                     .sink("out", s -> s.getBytes(StandardCharsets.UTF_8)));
@@ -292,8 +292,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class DynamicChainOperator extends Op {
-        public DynamicChainOperator() {
+    public static final class DynamicChainRelay extends Op {
+        public DynamicChainRelay() {
             super("dyn_chain", c -> c.input(String.class, "in")
                     .filter(raw -> {
                         TRAVERSALS.incrementAndGet();
@@ -305,8 +305,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class FanOutOperator extends Op {
-        public FanOutOperator() {
+    public static final class FanOutRelay extends Op {
+        public FanOutRelay() {
             super("fan_out", c -> c.input(String.class, "in")
                     .flatMap(String.class, raw -> List.of(raw.split(":")[0] + "@1m", raw.split(":")[0] + "@5m"))
                     .keyBy(slot -> slot)
@@ -323,8 +323,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class StaticOperator extends Op {
-        public StaticOperator() {
+    public static final class StaticRelay extends Op {
+        public StaticRelay() {
             super("static_op", c -> c.input(String.class, "in").into(StaticTask.class));
         }
     }
@@ -348,8 +348,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class MergeOperator extends Op {
-        public MergeOperator() {
+    public static final class MergeRelay extends Op {
+        public MergeRelay() {
             super("merge_op", c -> c.merge(String.class)
                     .from(c.input(String.class, "a"), s -> "A:" + s)
                     .from(c.input(String.class, "b"), s -> "B:" + s)
@@ -357,8 +357,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class PipelineOperator extends Op {
-        public PipelineOperator() {
+    public static final class PipelineRelay extends Op {
+        public PipelineRelay() {
             super(
                     "pipeline_op",
                     c -> c.input(String.class, "in").into(MidTask.class).into(KeyRecorder.class));
@@ -372,8 +372,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class MappedPipelineOperator extends Op {
-        public MappedPipelineOperator() {
+    public static final class MappedPipelineRelay extends Op {
+        public MappedPipelineRelay() {
             super("mapped_pipeline_op", c -> c.input(String.class, "in")
                     .into(MidTask.class)
                     .named("mapped_mid")
@@ -383,8 +383,8 @@ abstract class DispatchTestBase {
     }
 
     /** A mapped inter-task edge whose consumer narrows by its own `cellsFor`. */
-    public static final class MappedStaticPipelineOperator extends Op {
-        public MappedStaticPipelineOperator() {
+    public static final class MappedStaticPipelineRelay extends Op {
+        public MappedStaticPipelineRelay() {
             super("mapped_static_op", c -> c.input(String.class, "in")
                     .into(MidTask.class)
                     .named("mapped_static_mid")
@@ -394,8 +394,8 @@ abstract class DispatchTestBase {
     }
 
     /** A mapped inter-task edge that keys the value it yields. */
-    public static final class MappedKeyedPipelineOperator extends Op {
-        public MappedKeyedPipelineOperator() {
+    public static final class MappedKeyedPipelineRelay extends Op {
+        public MappedKeyedPipelineRelay() {
             super("mapped_keyed_op", c -> c.input(String.class, "in")
                     .into(MidTask.class)
                     .named("mapped_keyed_mid")
@@ -405,8 +405,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class PoisonOperator extends Op {
-        public PoisonOperator() {
+    public static final class PoisonRelay extends Op {
+        public PoisonRelay() {
             super("poison_op", c -> c.input(String.class, "in").into(PoisonTask.class));
         }
     }
@@ -429,8 +429,8 @@ abstract class DispatchTestBase {
     /** A JSON-typed entry: what the default entry decoder rejects is the seam's to classify. */
     public record Ticket(String text) {}
 
-    public static final class TypedEntryOperator extends Op {
-        public TypedEntryOperator() {
+    public static final class TypedEntryRelay extends Op {
+        public TypedEntryRelay() {
             super("typed_entry_op", c -> c.input(Ticket.class, "in").into(TypedEntryTask.class));
         }
     }
@@ -446,8 +446,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class TimerOperator extends Op {
-        public TimerOperator() {
+    public static final class TimerRelay extends Op {
+        public TimerRelay() {
             super("timer_op", c -> c.input(String.class, "in").into(TimerTask.class));
         }
     }
@@ -474,8 +474,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class WallTimerOperator extends Op {
-        public WallTimerOperator() {
+    public static final class WallTimerRelay extends Op {
+        public WallTimerRelay() {
             super("wall_timer_op", c -> c.input(String.class, "in").into(WallTimerTask.class));
         }
     }
@@ -487,8 +487,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class LeafEmitOperator extends Op {
-        public LeafEmitOperator() {
+    public static final class LeafEmitRelay extends Op {
+        public LeafEmitRelay() {
             super("leaf_emit_op", c -> c.input(String.class, "in").into(LeafEmitTask.class));
         }
     }
@@ -501,8 +501,8 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class CheckpointOperator extends Op {
-        public CheckpointOperator() {
+    public static final class CheckpointRelay extends Op {
+        public CheckpointRelay() {
             super("ckpt_op", c -> c.input(String.class, "in")
                     .into(CkptTask.class)
                     .keyed()
@@ -534,8 +534,8 @@ abstract class DispatchTestBase {
     /** The checkpoint fixture's state, which it never changes. */
     public static final class CkptState {}
 
-    public static final class ReplayProbeOperator extends Op {
-        public ReplayProbeOperator() {
+    public static final class ReplayProbeRelay extends Op {
+        public ReplayProbeRelay() {
             super("replay_probe", c -> c.input(String.class, "in").into(ReplayProbeTask.class));
         }
     }
@@ -561,13 +561,13 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class CompletingOperator extends Op {
-        public CompletingOperator() {
+    public static final class CompletingRelay extends Op {
+        public CompletingRelay() {
             super("completing_flow", c -> c.input(String.class, "in").into(CompletingTask.class));
         }
     }
 
-    public static final class CompletingSteps implements Operator {
+    public static final class CompletingSteps implements Relay {
         @Override
         public String factoryId() {
             return "completing_steps";
@@ -590,11 +590,11 @@ abstract class DispatchTestBase {
     }
 
     /**
-     * A structured steps operator whose producing channel `steps_fan` has TWO consumers,
+     * A structured steps relay whose producing channel `steps_fan` has TWO consumers,
      * one of them behind a map — the shape the fan-in diamond's root has, and
      * the one a per-consumer producer-side emit multiplies.
      */
-    public static final class FanOutSteps implements Operator {
+    public static final class FanOutSteps implements Relay {
         @Override
         public String factoryId() {
             return "fanout_steps";
@@ -618,7 +618,7 @@ abstract class DispatchTestBase {
         }
     }
 
-    public static final class SagaSteps implements Operator {
+    public static final class SagaSteps implements Relay {
         @Override
         public String factoryId() {
             return "saga_steps";

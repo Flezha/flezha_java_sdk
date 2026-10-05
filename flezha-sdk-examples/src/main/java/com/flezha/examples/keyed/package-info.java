@@ -6,7 +6,7 @@
  * A hundred symbols across four timeframes is four hundred independent cells, none of which is
  * declared in advance: a cell is created on first sight of its key.
  *
- * <p>{@link com.flezha.examples.keyed.CandleOperator} carries the lesson. Three transforms run on
+ * <p>{@link com.flezha.examples.keyed.CandleRelay} carries the lesson. Three transforms run on
  * the wiring itself before any user code is invoked: {@code filter} discards values, {@code flatMap}
  * expands one value into several, and {@code keyBy} assigns each result to a cell. These execute
  * without a cell, a mailbox or a dispatch hop, which makes them the appropriate place to reshape

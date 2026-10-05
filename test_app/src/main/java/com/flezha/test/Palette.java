@@ -1,6 +1,6 @@
 package com.flezha.test;
 
-import com.flezha.sdk.authoring.Operator;
+import com.flezha.sdk.authoring.Relay;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.tasklet.Ctx;
@@ -105,10 +105,10 @@ final class Palette {
         }
     }
 
-    /** {@code shorthand(plain, out, -).topology}: a short form that also implements the operator interface. */
-    @Operator(id = "plain", sink = "out")
+    /** {@code shorthand(plain, out, -).topology}: a short form that also implements the relay interface. */
+    @Relay(id = "plain", sink = "out")
     public static final class ShortFormWithTopology
-            implements Tasklet<String, Void, String>, com.flezha.sdk.operator.Operator {
+            implements Tasklet<String, Void, String>, com.flezha.sdk.relay.Relay {
 
         @Override
         public String factoryId() {
@@ -125,7 +125,7 @@ final class Palette {
     }
 
     /** {@code shorthand(plain, out, -).noout}: a short form with a sink and no output. */
-    @Operator(id = "plain", sink = "out")
+    @Relay(id = "plain", sink = "out")
     public static final class SinkWithoutOutput implements Tasklet<String, Void, Void> {
 
         @Override
