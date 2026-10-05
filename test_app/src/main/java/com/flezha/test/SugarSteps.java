@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets;
  * The steps short form: one declaration is a whole {@code once} steps relay, run on its
  * first message on {@code order} and completing after one run.
  */
-@Relay(id = "sugar_steps", sink = "sugar_steps_placed", input = "order", run = @Run(steps = @Steps))
+@Relay(id = "sugar_steps", output = "sugar_steps_placed", input = "order", run = @Run(steps = @Steps))
 public class SugarSteps implements Tasklet<String, Void, byte[]> {
 
     @Override

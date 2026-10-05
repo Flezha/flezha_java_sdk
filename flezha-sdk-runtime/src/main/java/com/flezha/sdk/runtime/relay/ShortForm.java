@@ -25,7 +25,7 @@ import javax.annotation.Nonnull;
 /**
  * The short form, read at registration: a tasklet class annotated
  * {@link com.flezha.sdk.authoring.Relay @Relay} becomes a relay whose topology wires the
- * entry channel into the class and, when a sink is written, the class to that plugin sink, under
+ * entry channel into the class and, when an output is written, the class to that plugin output, under
  * the settings tree the annotation writes.
  */
 final class ShortForm {
@@ -173,8 +173,8 @@ final class ShortForm {
                     Map.of("class", cls.getName(), "factory_id", d.id(), "name", spec.name()));
         }
         TaskletModel model = TaskletModel.read(cls, null);
-        if (!d.sink().isEmpty() && model.typesResolved() && model.outputType() == Void.class) {
-            throw FlezhaException.of("topology.sink_without_output", Map.of("factory_id", d.id()));
+        if (!d.output().isEmpty() && model.typesResolved() && model.outputType() == Void.class) {
+            throw FlezhaException.of("topology.output_without_type", Map.of("factory_id", d.id()));
         }
         if (!d.onFull().isEmpty() && overflow(d.onFull()) == null) {
             throw FlezhaException.of(
@@ -192,7 +192,7 @@ final class ShortForm {
         return null;
     }
 
-    /** The one-tasklet topology: the entry channel into the class, and the class to its sink. */
+    /** The one-tasklet topology: the entry channel into the class, and the class to its output. */
     private record Wiring(Class<?> cls, Class<?> inputType, ShortFormDeclaration d) {
         @SuppressWarnings({"unchecked", "rawtypes"})
         void declare(ChannelBuilder c) {
@@ -201,8 +201,8 @@ final class ShortForm {
                 entry = entry.onFull(overflow(d.onFull()));
             }
             Stream out = entry.into((Class) cls);
-            if (!d.sink().isEmpty()) {
-                out.sink(d.sink());
+            if (!d.output().isEmpty()) {
+                out.output(d.output());
             }
         }
     }

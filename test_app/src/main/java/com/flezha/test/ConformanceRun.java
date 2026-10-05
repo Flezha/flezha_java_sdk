@@ -56,7 +56,7 @@ import java.util.function.Consumer;
  * them but a row that names them, and they are in no capability's fixture set.
  *
  * <p>What this builder cannot author, and why the report skips it: the
- * producer-side links ({@code named}, {@code sink}, {@code keyed},
+ * producer-side links ({@code named}, {@code output}, {@code keyed},
  * {@code branch}) live on {@link Stream} and an entry channel's handle is an
  * {@link EdgeStream}, so a row applying one to an entry channel has no Java
  * spelling; and a settings tree with a setting under the wrong parent is a
@@ -296,11 +296,11 @@ public final class ConformanceRun {
         }
         switch (call[0]) {
             case "named" -> producer.named(call[1]);
-            case "sink" -> {
+            case "output" -> {
                 if (call[1].isEmpty()) {
-                    producer.sink();
+                    producer.output();
                 } else {
-                    producer.sink(call[1]);
+                    producer.output(call[1]);
                 }
             }
             case "keyed" -> producer.keyed();
@@ -464,7 +464,7 @@ public final class ConformanceRun {
     }
 
     /**
-     * A {@code shorthand(<id>|-, <sink>|-, <input>|-)} step. {@code -} is a field the row leaves
+     * A {@code shorthand(<id>|-, <output>|-, <input>|-)} step. {@code -} is a field the row leaves
      * unwritten; {@code .noout} marks a body declaring no output, and {@code .topology} a class that
      * also implements the relay interface.
      */
@@ -476,7 +476,7 @@ public final class ConformanceRun {
                 return Palette.ShortFormWithTopology.class;
             }
             if (noout && hasSink) {
-                return Palette.SinkWithoutOutput.class;
+                return Palette.OutputWithoutType.class;
             }
             throw new IllegalStateException("a well-formed shorthand declaration earns no refusal of its own");
         }
@@ -558,9 +558,9 @@ public final class ConformanceRun {
             }
             ArrayNode consumers = node.putArray("consumers");
             channel.consumerIds().forEach(consumers::add);
-            // The core's answer: a call end serializes like a sink but is not
+            // The core's answer: a call end serializes like an output but is not
             // one, so the descriptor alone cannot tell the two apart.
-            node.put("sink", answer.channel(index).sink());
+            node.put("sink", answer.channel(index).output());
         }
         return channels;
     }

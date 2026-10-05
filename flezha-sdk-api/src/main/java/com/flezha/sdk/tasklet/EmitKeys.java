@@ -12,7 +12,7 @@ import javax.annotation.Nullable;
  * dispatcher and the test harness alike — so an author's harness-green test
  * cannot pass under a rule the runtime does not apply.
  *
- * <p>The Rust SDK gets this for free: its single emit funnel serves both sinks.
+ * <p>The Rust SDK gets this for free: its single emit funnel serves both outputs.
  * Java's ctx is an interface with independent implementations, so the funnel is
  * this method.
  */

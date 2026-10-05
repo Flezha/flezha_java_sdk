@@ -9,7 +9,7 @@ import javax.annotation.Nonnull;
  *
  * <p>The preceding examples each declare a single tasklet, which can suggest that chaining is a
  * distinct feature. It is not. A tasklet's output travels on an ordinary channel, and a channel
- * can be routed to another tasklet as readily as to a sink.
+ * can be routed to another tasklet as readily as to an output.
  */
 public final class PipelineRelay implements Relay {
 
@@ -23,7 +23,7 @@ public final class PipelineRelay implements Relay {
     public void channels(@Nonnull ChannelBuilder c) {
         // Read top to bottom as the path a message takes: it arrives on "in", Normalize handles
         // it, Normalize's output travels on a channel labelled "normalized", Shout consumes that,
-        // and Shout's output reaches a plugin sink.
+        // and Shout's output reaches a plugin output.
         //
         // Each stage is an independent tasklet with its own state, scheduled and restarted
         // separately, so a slow or failing stage does not halt the others. The chain extends to any
@@ -31,11 +31,11 @@ public final class PipelineRelay implements Relay {
         // the next stage's input type.
         //
         // The labels are identities rather than documentation: "normalized" and "shouted" are what
-        // a sink registers against and what a test feeds or reads.
+        // an output registers against and what a test feeds or reads.
         c.input(String.class, "in")
                 .into(Normalize.class)
                 .named("normalized")
                 .into(Shout.class)
-                .sink("shouted");
+                .output("shouted");
     }
 }

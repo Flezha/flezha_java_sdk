@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
  * Half of the refusal table's {@code shorthand_duplicate_id} pair. Not a fixture: nothing but that
  * row and the test beside it registers this class.
  */
-@Relay(id = "plain", sink = "out")
+@Relay(id = "plain", output = "out")
 public class ShorthandDupFlow implements Tasklet<String, Void, byte[]> {
 
     @Override

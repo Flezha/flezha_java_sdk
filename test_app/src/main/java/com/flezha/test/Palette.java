@@ -106,7 +106,7 @@ final class Palette {
     }
 
     /** {@code shorthand(plain, out, -).topology}: a short form that also implements the relay interface. */
-    @Relay(id = "plain", sink = "out")
+    @Relay(id = "plain", output = "out")
     public static final class ShortFormWithTopology
             implements Tasklet<String, Void, String>, com.flezha.sdk.relay.Relay {
 
@@ -117,16 +117,16 @@ final class Palette {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(ShortFormWithTopology.class).sink("out");
+            c.input(String.class, "input").into(ShortFormWithTopology.class).output("out");
         }
 
         @Override
         public void run(String input, Ctx<Void, String> ctx) {}
     }
 
-    /** {@code shorthand(plain, out, -).noout}: a short form with a sink and no output. */
-    @Relay(id = "plain", sink = "out")
-    public static final class SinkWithoutOutput implements Tasklet<String, Void, Void> {
+    /** {@code shorthand(plain, out, -).noout}: a short form with an output and no output. */
+    @Relay(id = "plain", output = "out")
+    public static final class OutputWithoutType implements Tasklet<String, Void, Void> {
 
         @Override
         public void run(String input, Ctx<Void, Void> ctx) {}

@@ -30,7 +30,7 @@ public final class StaticCellRelay implements Relay {
                 .into(StaticEntryTasklet.class)
                 .named("hop")
                 .into(StaticDownstreamTasklet.class)
-                .sink("kafka");
+                .output("kafka");
     }
 
     @Tasklet.Spec(name = "static_entry_tasklet", keys = {"a", "b", "c", "d"})

@@ -9,7 +9,7 @@ import com.flezha.sdk.tasklet.TaskletException;
 /**
  * Run-once steps relay mirroring {@code rust_runner}'s
  * {@code echo_steps}: its one tasklet emits {@code echo:<message>} to the
- * sink once for the first message the instance receives, the pass ends, and
+ * output once for the first message the instance receives, the pass ends, and
  * the controller deregisters it.
  */
 public final class EchoRelay implements Relay {
@@ -31,7 +31,7 @@ public final class EchoRelay implements Relay {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "in").into(Echo.class).sink("out");
+        c.input(String.class, "in").into(Echo.class).output("out");
     }
 
     /** Echoes the message a {@code ONCE} steps relay's single pass runs over. */

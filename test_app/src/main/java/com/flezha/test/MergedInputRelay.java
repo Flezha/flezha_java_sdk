@@ -30,7 +30,7 @@ public final class MergedInputRelay implements Relay {
                 .keyBy(MergedInput::symbol)
                 .into(MergeLabelTasklet.class)
                 .keyed()
-                .sink("merged");
+                .output("merged");
     }
 
     public record MergedInput(String source, String symbol, String payload) {}

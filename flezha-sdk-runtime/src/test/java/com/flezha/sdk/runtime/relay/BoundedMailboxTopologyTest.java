@@ -170,7 +170,7 @@ class BoundedMailboxTopologyTest {
                     .onFull(OverflowPolicy.DROP_NEWEST)
                     .into(A.class)
                     .keyed()
-                    .sink("out");
+                    .output("out");
         }
     }
 

@@ -20,7 +20,7 @@ public final class CompleteFlowRelay implements Relay {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "input").into(Echo.class).sink("complete_flow_out");
+        c.input(String.class, "input").into(Echo.class).output("complete_flow_out");
     }
 
     @Tasklet.Spec(name = "complete_flow_tasklet")

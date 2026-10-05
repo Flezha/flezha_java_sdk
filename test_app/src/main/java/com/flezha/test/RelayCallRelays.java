@@ -63,7 +63,7 @@ public final class RelayCallRelays {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(PricingQuote.class).sink("quotes");
+            c.input(String.class, "in").into(PricingQuote.class).output("quotes");
         }
     }
 
@@ -80,7 +80,7 @@ public final class RelayCallRelays {
                     .named("order")
                     .call(CallTarget.id("pricing").answerChannel("quotes"), String.class, DEADLINE_MS)
                     .into(OrderPriced.class)
-                    .sink("priced");
+                    .output("priced");
         }
     }
 
@@ -108,7 +108,7 @@ public final class RelayCallRelays {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "turn").into(AgentTurn.class).sink();
+            c.input(String.class, "turn").into(AgentTurn.class).output();
         }
     }
 
@@ -149,7 +149,7 @@ public final class RelayCallRelays {
                     .keyBy(RelayCallRelays::session)
                     .into(GatewayLog.class)
                     .keyed()
-                    .sink("gateway_out");
+                    .output("gateway_out");
         }
     }
 
@@ -185,7 +185,7 @@ public final class RelayCallRelays {
                     .call(CallTarget.id("pricing"), String.class, DEADLINE_MS)
                     .map(Turn.class, Turn::of)
                     .into(ToolTurn.class);
-            turn.filter(line -> line.startsWith(OUTCOME)).into(ToolLog.class).sink("tool_out");
+            turn.filter(line -> line.startsWith(OUTCOME)).into(ToolLog.class).output("tool_out");
         }
     }
 

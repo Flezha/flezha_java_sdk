@@ -34,6 +34,6 @@ public final class CheckoutRelay implements Relay {
                 .into(Charge.class)
                 .named("charged")
                 .into(Ship.class)
-                .sink("shipped");
+                .output("shipped");
     }
 }

@@ -117,7 +117,7 @@ public final class ChannelDescriptor {
     }
 
     /**
-     * The channel's plugin egress, declared with {@code sink(...)}. The one
+     * The channel's plugin egress, declared with {@code output(...)}. The one
      * representation for both shapes — which of the two a channel is, is read
      * off {@link #consumers()}: with consumers it is hybrid, without them it
      * is the {@link ChannelKind#PLUGIN_BOUND} terminal.

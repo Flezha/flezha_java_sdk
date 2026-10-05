@@ -33,7 +33,7 @@ import javax.annotation.Nonnull;
  *                 .into(SplitTasklet.class)
  *                 .keyBy(word -> word)
  *                 .into(TallyTasklet.class)
- *                 .sink("totals");
+ *                 .output("totals");
  *     }
  * }
  * }</pre>
@@ -172,7 +172,7 @@ public interface Relay {
          * The effectively-once tier: each invocation's state changes, plugin outputs and consumed
          * input offset ship as one effect record the controller persists under one fsync. Every
          * plugin-bound channel must be declared {@code .keyed()}, because the tier's replay
-         * re-emits outputs and only a keyed sink absorbs that as an idempotent upsert. The tier
+         * re-emits outputs and only a keyed output absorbs that as an idempotent upsert. The tier
          * needs a disk: with {@link Durable.Memory} it is refused as
          * {@code topology.effectively_once_without_persistence}.
          *

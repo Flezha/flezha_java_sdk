@@ -9,7 +9,7 @@ import javax.annotation.Nullable;
 /**
  * What {@code flz_core::host::register::check} answered about a record: the
  * consumers each chain wires, the kind each channel ends up with, the name a
- * {@code named} link overrode, and the plugin descriptor a {@code sink} link
+ * {@code named} link overrode, and the plugin descriptor a {@code output} link
  * named. The answer also carries the acknowledgement granularity the
  * checkpoint keys imply; no Java behaviour reads it (the controller derives it
  * from the registered topology), so it is not modelled here.
@@ -26,7 +26,7 @@ public record DerivedDeclaration(@Nonnull List<Channel> channels) {
             @Nonnull String kind,
             @Nullable Integer producer,
             @Nonnull List<Edge> consumers,
-            @Nullable String sink) {}
+            @Nullable String output) {}
 
     /**
      * One consumer edge as the core derived it: the tasklet it feeds, and

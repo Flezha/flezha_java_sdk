@@ -19,6 +19,6 @@ public class SugarStaticCellRelay implements com.flezha.sdk.relay.Relay {
         c.input(String.class, "input")
                 .into(SugarEntry.class)
                 .into(SugarDownstream.class)
-                .sink("test_kafka");
+                .output("test_kafka");
     }
 }

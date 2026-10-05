@@ -1,8 +1,8 @@
 package com.flezha.sdk.runtime;
 
 import com.flezha.sdk.Flezha;
+import com.flezha.sdk.LocalOutput;
 import com.flezha.sdk.Logger;
-import com.flezha.sdk.SinkOutput;
 import com.flezha.sdk.internal.LocalRunHandle;
 import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.runtime.config.FlezhaEnv;
@@ -26,7 +26,7 @@ import javax.annotation.Nonnull;
  * {@link FlezhaImpl}: it declares the class exactly as a deployed runner
  * does and brings the same {@link PollHost} threads, and differs in one call
  * — {@code localStart} instead of {@code start}, so nothing dials a
- * controller. Sink output is drained from the core on a thread of its own
+ * controller. Output output is drained from the core on a thread of its own
  * and handed to the callback registered for the channel.
  */
 public final class LocalImpl implements LocalRunHandle {
@@ -38,7 +38,7 @@ public final class LocalImpl implements LocalRunHandle {
 
     private final long core;
     private final PollHost pollHost;
-    private final Map<String, Consumer<SinkOutput>> sinks = new ConcurrentHashMap<>();
+    private final Map<String, Consumer<LocalOutput>> sinks = new ConcurrentHashMap<>();
     private final Thread outputs;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -71,7 +71,7 @@ public final class LocalImpl implements LocalRunHandle {
     }
 
     @Override
-    public void onSink(@Nonnull String channel, @Nonnull Consumer<SinkOutput> callback) {
+    public void onOutput(@Nonnull String channel, @Nonnull Consumer<LocalOutput> callback) {
         // Registered with the core first: a channel the declaration does not
         // carry is refused there, naming it, rather than silently accepted.
         FlzCore.localOnSink(core, channel);
@@ -132,19 +132,19 @@ public final class LocalImpl implements LocalRunHandle {
         String channel =
                 switch (output.target()) {
                     case OutputTarget.Plugin plugin -> plugin.channel();
-                        // The core queues what a sink released and nothing else; an edge
+                        // The core queues what an output released and nothing else; an edge
                         // output is an in-process mailbox push that never leaves.
                     case OutputTarget.Edge edge -> throw new IllegalStateException(
                             "local mode released an edge output on channel " + edge.channel());
                 };
-        Consumer<SinkOutput> callback = sinks.get(channel);
+        Consumer<LocalOutput> callback = sinks.get(channel);
         if (callback == null) {
-            LOG.warn("local mode: a value was released on sink `{}`, which has no callback", channel);
+            LOG.warn("local mode: a value was released on output `{}`, which has no callback", channel);
             return;
         }
         Map<String, String> metadata = new LinkedHashMap<>();
         output.metadata().forEach(entry -> metadata.put(entry.getKey(), entry.getValue()));
-        callback.accept(new SinkOutput(channel, output.payload(), Map.copyOf(metadata)));
+        callback.accept(new LocalOutput(channel, output.payload(), Map.copyOf(metadata)));
     }
 
     private void joinOutputs() {

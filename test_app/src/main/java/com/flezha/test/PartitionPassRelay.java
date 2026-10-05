@@ -34,7 +34,7 @@ public final class PartitionPassRelay implements Relay {
                 .keyBy(DynamicCellRelay::key)
                 .into(PartitionPassTasklet.class)
                 .keyed()
-                .sink("input");
+                .output("input");
     }
 
     @Tasklet.Spec(name = "partition_pass_tasklet")

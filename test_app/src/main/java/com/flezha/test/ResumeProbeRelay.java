@@ -26,7 +26,7 @@ public final class ResumeProbeRelay implements Relay {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "input").into(ResumeProbeTasklet.class).sink("total");
+        c.input(String.class, "input").into(ResumeProbeTasklet.class).output("total");
     }
 
     @Tasklet.Spec(name = "resume_probe_tasklet")

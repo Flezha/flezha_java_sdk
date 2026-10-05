@@ -122,16 +122,17 @@ class ApiSurfaceCompilationTest {
     }
 
     @Test
-    @DisplayName("user code calling the removed output / alsoOutput egress fails to compile")
+    @DisplayName("user code calling the removed sink / alsoOutput egress fails to compile")
     void callingRemovedEgressMethodsFails() {
         // Control first: without it a classpath that resolved nothing would
         // make every refusal below vacuously true.
-        assertThat(compiles(usesStream("s.sink(\"x\");")))
+        assertThat(compiles(usesStream("s.output(\"x\");")))
                 .as("the replacement spelling must compile — otherwise the refusals prove nothing")
                 .isTrue();
 
-        assertDoesNotCompile(usesStream("s.output(\"x\");"));
-        assertDoesNotCompile(usesStream("s.output(\"x\", v -> v.getBytes());"));
+        assertDoesNotCompile(usesStream("s.sink(\"x\");"));
+        assertDoesNotCompile(usesStream("s.sink(\"x\", v -> v.getBytes());"));
+        assertDoesNotCompile(usesStream("s.sink();"));
         assertDoesNotCompile(usesStream("s.alsoOutput(\"x\");"));
         assertDoesNotCompile(usesStream("s.alsoOutput(\"x\", v -> v.getBytes());"));
     }

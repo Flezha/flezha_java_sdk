@@ -164,7 +164,7 @@ class ClockAndKeyedValidationTest {
         @Override
         public void channels(ChannelBuilder c) {
             var sPlainTask = c.input(String.class, "in").into(PlainTask.class);
-            sPlainTask.keyed().sink("out");
+            sPlainTask.keyed().output("out");
         }
     }
 

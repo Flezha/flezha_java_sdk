@@ -22,8 +22,8 @@ import javax.annotation.Nonnull;
  *       producers' contributions.
  *   <li>Per-channel configuration ({@link #named}, {@link #keyed},
  *       {@link #onFull}, {@link #retryMax}, {@link #retryBackoffMs},
- *       {@link #sink}) chains in any order relative to consumer wiring.
- *   <li>A channel ends in at most one of {@link #sink} and {@link #call}.
+ *       {@link #output}) chains in any order relative to consumer wiring.
+ *   <li>A channel ends in at most one of {@link #output} and {@link #call}.
  * </ul>
  *
  * <p>Chaining, which is the common case, reads in flow order:
@@ -33,7 +33,7 @@ import javax.annotation.Nonnull;
  *         .into(NormalizeTasklet.class)
  *         .named("normalized")
  *         .into(ShoutTasklet.class)
- *         .sink("shouted");
+ *         .output("shouted");
  * }</pre>
  *
  * <p>Fan-out is the same handle used twice, so both consumers receive every value:
@@ -54,7 +54,7 @@ import javax.annotation.Nonnull;
  *
  * <p>The channel out of a node is created lazily on first use of the handle
  * and named by the node's identity string (the tasklet's {@code @Tasklet.Spec} name, or
- * the explicit node name given at wiring time) unless a {@link #sink(String)}
+ * the explicit node name given at wiring time) unless a {@link #output(String)}
  * name or a {@link #named(String)} override supplies one.
  *
  * <p>Handles are only usable inside {@code channels()}:
@@ -71,9 +71,9 @@ public abstract class Stream<T> implements OutputChain<T> {
     /**
      * Override the auto-derived channel name (the producer node's identity)
      * everywhere the channel name appears: wire metadata, journals, errors.
-     * This is how a channel with no {@link #sink(String)} to name it is named;
+     * This is how a channel with no {@link #output(String)} to name it is named;
      * using both on one channel fails registration, naming both declarations.
-     * Derived, sink-supplied, overridden, and entry names share one
+     * Derived, output-supplied, overridden, and entry names share one
      * per-relay namespace with a duplicate check at registration.
      */
     @Nonnull
@@ -82,7 +82,7 @@ public abstract class Stream<T> implements OutputChain<T> {
     /**
      * Declare that emits on this channel carry a natural key, supplied via
      * {@code ctx.emitKeyed(key, value)}. The runtime stamps {@code flz.key}
-     * on the plugin frame. Requires a plugin wire ({@link #sink}); a keyed
+     * on the plugin frame. Requires a plugin wire ({@link #output}); a keyed
      * channel without one fails registration.
      */
     @Nonnull
@@ -116,40 +116,40 @@ public abstract class Stream<T> implements OutputChain<T> {
      *
      * <p>The handle is returned, so {@code .into(...)} consumer wiring chains
      * after it and the value then reaches both the consumer mailboxes (typed)
-     * and the sink (as bytes). A channel with no consumers is the plugin-bound
+     * and the output (as bytes). A channel with no consumers is the plugin-bound
      * terminal — terminality is the absence of further wiring, not a different
      * method.
      *
      * <p>The serializer runs once per emit regardless of consumer count.
-     * Declaring a second sink on one channel fails registration, and so does
+     * Declaring a second output on one channel fails registration, and so does
      * naming the channel here and with {@link #named(String)}, or naming two
      * channels the same way.
      */
     @Nonnull
-    public abstract Stream<T> sink(String channel, Function<T, byte[]> serializer);
+    public abstract Stream<T> output(String channel, Function<T, byte[]> serializer);
 
     /**
-     * {@link #sink(String, Function)} with the default serialization rules:
+     * {@link #output(String, Function)} with the default serialization rules:
      * passthrough for {@code byte[]}, UTF-8 for {@code String}, Jackson JSON
      * otherwise.
      */
     @Nonnull
-    public abstract Stream<T> sink(String channel);
+    public abstract Stream<T> output(String channel);
 
     /**
-     * {@link #sink(String, Function)} leaving the channel's name derived as it
-     * would be without a sink — the producer node's identity, or a
+     * {@link #output(String, Function)} leaving the channel's name derived as it
+     * would be without an output — the producer node's identity, or a
      * {@link #named(String)} override.
      */
     @Nonnull
-    public abstract Stream<T> sink(Function<T, byte[]> serializer);
+    public abstract Stream<T> output(Function<T, byte[]> serializer);
 
     /**
-     * {@link #sink()} with the default serialization rules: the no-argument
+     * {@link #output()} with the default serialization rules: the no-argument
      * form, where the channel keeps the name it already has.
      */
     @Nonnull
-    public abstract Stream<T> sink();
+    public abstract Stream<T> output();
 
     /**
      * Branching sugar: each arm receives <b>this</b> handle, so

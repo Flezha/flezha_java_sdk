@@ -3,7 +3,7 @@
  * routes each message into, and a main that serves it.
  *
  * <p>This example deliberately introduces nothing else. A line of text arrives on an entry channel,
- * the tasklet prefixes it, and the result is delivered to a plugin sink.
+ * the tasklet prefixes it, and the result is delivered to a plugin output.
  *
  * <p>{@link com.flezha.examples.echo.EchoRelay} declares the graph and is the unit the cluster
  * actually schedules. {@link com.flezha.examples.echo.Echo} is the processing stage invoked once per

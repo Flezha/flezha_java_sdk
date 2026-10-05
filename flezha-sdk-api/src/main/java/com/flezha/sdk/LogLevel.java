@@ -6,7 +6,7 @@ import javax.annotation.Nullable;
 
 /**
  * The four diagnostic levels every Flezha SDK carries, least severe first.
- * {@link Enum#compareTo} is the severity order, so a sink filters with it
+ * {@link Enum#compareTo} is the severity order, so an output filters with it
  * rather than with a table of its own.
  */
 public enum LogLevel {

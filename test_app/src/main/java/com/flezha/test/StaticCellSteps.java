@@ -39,7 +39,7 @@ public final class StaticCellSteps implements Relay {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "in").into(Keyed.class).sink("out");
+        c.input(String.class, "in").into(Keyed.class).output("out");
     }
 
     /** Emits its cell key beside the message, on the two cells it names. */

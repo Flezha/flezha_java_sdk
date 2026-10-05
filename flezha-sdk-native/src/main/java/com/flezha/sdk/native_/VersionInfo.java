@@ -8,7 +8,7 @@ package com.flezha.sdk.native_;
 public final class VersionInfo {
     /**
      * Keep this in sync with the Maven project version. The Maven build could
-     * generate this file in the future via a templated source plugin; for now
+     * generate this file in the future via a templated input plugin; for now
      * it is a hand-maintained constant that CI validates against the pom.
      */
     public static final String VERSION = "0.1.0";

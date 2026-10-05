@@ -17,6 +17,6 @@ public final class PoisonProbeRelay implements Relay {
     @Override
     public void channels(ChannelBuilder c) {
         var sPoisonProbeTasklet = c.input(String.class, "input").retryBackoffMs(25).into(PoisonProbeTasklet.class);
-        sPoisonProbeTasklet.sink("out");
+        sPoisonProbeTasklet.output("out");
     }
 }

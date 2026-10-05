@@ -16,6 +16,6 @@ public final class CompareFilterRelay implements Relay {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "input").into(CompareFilterTasklet.class).sink("sink");
+        c.input(String.class, "input").into(CompareFilterTasklet.class).output("sink");
     }
 }

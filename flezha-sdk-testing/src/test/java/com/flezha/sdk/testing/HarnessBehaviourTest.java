@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>{@code replayEquals} alone is not enough: a Tasklet can rebuild
  * identical state on replay while emitting a different key or timestamp each
- * run — and a keyed sink's idempotence depends on exactly that not happening.
+ * run — and a keyed output's idempotence depends on exactly that not happening.
  *
  * <p>Java's bypass is structural: {@code ctx.state()} returns the live State
  * object, so {@code ctx.state().field = x} compiles, runs, and is NEVER

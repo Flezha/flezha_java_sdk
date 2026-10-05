@@ -133,7 +133,7 @@ public final class FlezhaRunner implements AutoCloseable {
     /**
      * Send the SDK's diagnostics to {@code logger} instead of the default,
      * which writes {@code [flezha] <message>} to standard error at the level
-     * {@code FLEZHA_LOG_LEVEL} names. The sink is JVM-wide and survives
+     * {@code FLEZHA_LOG_LEVEL} names. The output is JVM-wide and survives
      * {@link #close()}, so the diagnostics a runner writes while shutting down
      * still reach it. Legal before {@link #start()}, and after.
      *
@@ -148,7 +148,7 @@ public final class FlezhaRunner implements AutoCloseable {
      * }</pre>
      *
      * <p>The supplied logger decides for itself what it writes:
-     * {@code FLEZHA_LOG_LEVEL} filters the default sink and nothing else.
+     * {@code FLEZHA_LOG_LEVEL} filters the default output and nothing else.
      */
     @Nonnull
     public FlezhaRunner logger(Logger logger) {

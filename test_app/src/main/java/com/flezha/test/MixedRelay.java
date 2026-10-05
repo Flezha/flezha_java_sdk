@@ -26,7 +26,7 @@ public final class MixedRelay implements Relay {
                 .into(MixedMacroEntry.class)
                 .named("hop")
                 .into(MixedHandDownstream.class)
-                .sink("kafka");
+                .output("kafka");
     }
 
     @Tasklet.Spec(name = "mixed_hand_downstream")

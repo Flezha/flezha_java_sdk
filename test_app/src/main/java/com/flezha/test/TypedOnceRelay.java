@@ -9,8 +9,8 @@ import com.flezha.sdk.tasklet.TaskletException;
 /**
  * Mirror of the Rust test app's {@code typed_once_steps}: a {@code ONCE} steps relay whose entry
  * channel {@code order} decodes a JSON ticket. Its one tasklet prints the ticket's text, emits it to
- * the {@code placed} sink and completes the instance with it, so the message a spawn or a send
- * carried is observable on the runner's stdout, on the sink and in the completion.
+ * the {@code placed} output and completes the instance with it, so the message a spawn or a send
+ * carried is observable on the runner's stdout, on the output and in the completion.
  */
 public final class TypedOnceRelay implements Relay {
 
@@ -36,7 +36,7 @@ public final class TypedOnceRelay implements Relay {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(Ticket.class, "order").into(OncePlaced.class).sink("placed");
+        c.input(Ticket.class, "order").into(OncePlaced.class).output("placed");
     }
 
     @Tasklet.Spec(name = "once_placed")

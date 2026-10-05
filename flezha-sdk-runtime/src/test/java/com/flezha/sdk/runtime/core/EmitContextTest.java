@@ -48,14 +48,14 @@ class EmitContextTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("the sink names the channel the plugin output is addressed by")
-    void sinkNamesTheChannel() {
+    @DisplayName("the output names the channel the plugin output is addressed by")
+    void outputNamesTheChannel() {
         RelayClassRegistry.registerClass(SinkNamesChannelRelay.class);
         ItemEffect effect = soleEffect(work("sink_names_channel", 0, Optional.empty(), 5, input(0, "v", 1_000)));
 
         assertThat(effect.outputs()).hasSize(1);
         assertThat(effect.outputs().get(0).target())
-                .as("`.sink(\"items_output\")` with no `.named(...)` names the channel")
+                .as("`.output(\"items_output\")` with no `.named(...)` names the channel")
                 .isEqualTo(new OutputTarget.Plugin("items_output"));
     }
 

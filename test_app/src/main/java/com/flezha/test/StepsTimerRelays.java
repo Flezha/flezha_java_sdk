@@ -14,7 +14,7 @@ import java.util.Optional;
  * {@code timer_loop_steps} and {@code event_timer_steps}, the Java mirror of the Rust test
  * app's timers inside a steps relay. {@code tick} arms a processing-time timer of the delay
  * {@code after:<ms>} names and emits {@code armed:<at>}; its firing emits {@code fired:<at>}
- * and opens a pass of its own, which {@code tock} prefixes onto the sink. {@code slow:<ms>}
+ * and opens a pass of its own, which {@code tock} prefixes onto the output. {@code slow:<ms>}
  * holds {@code tick} that long. On a runner booted with {@code FLEZHA_STEPS_E2E_HOLD} the firing
  * parks at the gate: {@code timer} inside {@code onTimer}, before {@code tick} commits; {@code tock}
  * in {@code tock}, after. {@code event_tick}'s clock is the message's leading event time:
@@ -47,7 +47,7 @@ public final class StepsTimerRelays {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(Tick.class).named("ticked").into(Tock.class).sink("out");
+            c.input(String.class, "in").into(Tick.class).named("ticked").into(Tock.class).output("out");
         }
     }
 
@@ -74,7 +74,7 @@ public final class StepsTimerRelays {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(EventTick.class).sink("out");
+            c.input(String.class, "in").into(EventTick.class).output("out");
         }
     }
 

@@ -38,7 +38,7 @@ public final class UndoOutboxRelay implements Relay {
     public void channels(ChannelBuilder c) {
         c.input(String.class, "in")
                 .into(UndoOutboxA.class)
-                .sink("mid", s -> ("out:" + s).getBytes(StandardCharsets.UTF_8))
+                .output("mid", s -> ("out:" + s).getBytes(StandardCharsets.UTF_8))
                 .into(UndoC.class);
     }
 

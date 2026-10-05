@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 class ShortFormTest extends DispatchTestBase {
 
     @Test
-    @DisplayName("An annotated class is a whole flow relay: entry `input`, the tasklet, sink `out`")
+    @DisplayName("An annotated class is a whole flow relay: entry `input`, the tasklet, output `out`")
     void anAnnotatedClassIsAWholeRelay() {
         assertThat(RelayClassRegistry.registerClass(Echo.class)).isEqualTo("echo");
         RelayTopology topology = RelayClassRegistry.getTopology("echo");
@@ -75,8 +75,8 @@ class ShortFormTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("A short form with no sink is declared: its entry channel into the tasklet and no plugin channel")
-    void aShortFormWithNoSinkIsDeclared() {
+    @DisplayName("A short form with no output is declared: its entry channel into the tasklet and no plugin channel")
+    void aShortFormWithNoOutputIsDeclared() {
         RelayClassRegistry.registerClass(Counter.class);
         RelayTopology topology = RelayClassRegistry.getTopology("counter");
 
@@ -138,9 +138,9 @@ class ShortFormTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("A sink on a Void output is refused as topology.sink_without_output")
-    void aSinkOnAVoidOutputIsRefused() {
-        Refused.by("topology.sink_without_output", () -> RelayClassRegistry.registerClass(Drain.class));
+    @DisplayName("An output on a Void output type is refused as topology.output_without_type")
+    void anOutputOnAVoidOutputIsRefused() {
+        Refused.by("topology.output_without_type", () -> RelayClassRegistry.registerClass(Drain.class));
     }
 
     @Test
@@ -239,7 +239,7 @@ class ShortFormTest extends DispatchTestBase {
     @Relay(id = "two_runs", run = @Run(flow = @Flow, steps = @Steps))
     public static final class TwoRuns extends EchoBody {}
 
-    @Relay(id = "echo", sink = "out")
+    @Relay(id = "echo", output = "out")
     public static final class Echo implements Tasklet<String, Void, String> {
         @Override
         public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
@@ -247,7 +247,7 @@ class ShortFormTest extends DispatchTestBase {
         }
     }
 
-    @Relay(id = "place", sink = "placed", input = "order", run = @Run(steps = @Steps))
+    @Relay(id = "place", output = "placed", input = "order", run = @Run(steps = @Steps))
     public static final class Place implements Tasklet<String, Void, String> {
         @Override
         public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
@@ -255,7 +255,7 @@ class ShortFormTest extends DispatchTestBase {
         }
     }
 
-    @Relay(id = "chat", sink = "replies", run = @Run(steps = @Steps(each = Each.PER_INPUT)))
+    @Relay(id = "chat", output = "replies", run = @Run(steps = @Steps(each = Each.PER_INPUT)))
     public static final class Chat implements Tasklet<String, Void, String> {
         @Override
         public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
@@ -270,13 +270,13 @@ class ShortFormTest extends DispatchTestBase {
         public void run(String input, Ctx<Void, Void> ctx) {}
     }
 
-    @Relay(id = "prices", sink = "out", input = "prices")
+    @Relay(id = "prices", output = "out", input = "prices")
     public static final class Prices extends EchoBody {}
 
-    @Relay(id = "never_registered", sink = "out")
+    @Relay(id = "never_registered", output = "out")
     public static final class NeverRegistered extends EchoBody {}
 
-    @Relay(sink = "out")
+    @Relay(output = "out")
     public static final class Upcase extends EchoBody {}
 
     @Relay(id = "counter")
@@ -286,7 +286,7 @@ class ShortFormTest extends DispatchTestBase {
         public void run(String input, Ctx<Void, Void> ctx) {}
     }
 
-    @Relay(id = "drain", sink = "out")
+    @Relay(id = "drain", output = "out")
     public static final class Drain implements Tasklet<String, Void, Void> {
         @Override
         public void run(String input, Ctx<Void, Void> ctx) {}
@@ -327,7 +327,7 @@ class ShortFormTest extends DispatchTestBase {
         public WiredRelay() {
             super(
                     "wired",
-                    c -> c.input(Trade.class, "trades").into(TrackPrices.class).sink("moves"));
+                    c -> c.input(Trade.class, "trades").into(TrackPrices.class).output("moves"));
         }
     }
 }

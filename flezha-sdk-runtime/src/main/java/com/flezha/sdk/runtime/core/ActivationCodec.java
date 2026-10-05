@@ -69,7 +69,7 @@ public final class ActivationCodec {
     // Output on its own
     // ------------------------------------------------------------------
 
-    /** One {@link Output} released on a sink in local mode. */
+    /** One {@link Output} released on an output in local mode. */
     @Nonnull
     public static Output decodeOutput(@Nonnull byte[] bytes) {
         Postcard.Reader r = new Postcard.Reader(bytes);

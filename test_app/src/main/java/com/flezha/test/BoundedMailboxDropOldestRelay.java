@@ -18,7 +18,7 @@ public final class BoundedMailboxDropOldestRelay implements Relay {
         c.input(String.class, "drop_oldest_input")
                 .onFull(OverflowPolicy.DROP_OLDEST)
                 .into(DropOldestTestTasklet.class)
-                .sink("drop_oldest_echo");
+                .output("drop_oldest_echo");
     }
 
     @Tasklet.Spec(name = "drop_oldest_test_tasklet", capacity = BoundedMailboxTasklet.CAPACITY)

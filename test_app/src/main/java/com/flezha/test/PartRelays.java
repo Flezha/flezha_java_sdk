@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Mirrors of the Rust test app's part fixtures. For an input {@code n} the tasklet sends the parts
- * {@code "1"} to {@code "<n>"} and then emits {@code done:<n>} on its sink {@code answer}; for
+ * {@code "1"} to {@code "<n>"} and then emits {@code done:<n>} on its output {@code answer}; for
  * {@code retry:<n>} it sends the same parts and fails retryably the first time it sees that input,
  * so the second attempt's parts number from 0 again.
  */
@@ -30,7 +30,7 @@ public final class PartRelays {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").retryBackoffMs(25).into(Echo.class).sink("answer");
+            c.input(String.class, "in").retryBackoffMs(25).into(Echo.class).output("answer");
         }
     }
 
@@ -58,7 +58,7 @@ public final class PartRelays {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").retryBackoffMs(25).into(StepsEcho.class).sink("answer");
+            c.input(String.class, "in").retryBackoffMs(25).into(StepsEcho.class).output("answer");
         }
     }
 

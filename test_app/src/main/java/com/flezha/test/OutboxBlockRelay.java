@@ -12,7 +12,7 @@ import java.util.Map;
  * Mirror of the Rust test app's {@code outbox_block_steps}: a steps relay
  * output's identity. Task A commits durable state AND emits once, keyed
  * {@code k} with one metadata pair, on a keyed hybrid channel; the output rides
- * A's cell record and reaches the sink once A's stage commits. Task B blocks, so
+ * A's cell record and reaches the output once A's stage commits. Task B blocks, so
  * a SIGKILL lands with A committed and B unfinished.
  */
 public final class OutboxBlockRelay implements Relay {
@@ -37,7 +37,7 @@ public final class OutboxBlockRelay implements Relay {
         c.input(String.class, "in")
                 .into(OutboxA.class)
                 .keyed()
-                .sink("mid", s -> ("a-out:" + s).getBytes(StandardCharsets.UTF_8))
+                .output("mid", s -> ("a-out:" + s).getBytes(StandardCharsets.UTF_8))
                 .into(CommitBlockRelay.BlockB.class);
     }
 

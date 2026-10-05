@@ -34,7 +34,7 @@ public final class SchemaEvolutionFlowRelays {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(Task.class).sink("total");
+            c.input(String.class, "input").into(Task.class).output("total");
         }
 
         public static final class CartV1 {
@@ -84,7 +84,7 @@ public final class SchemaEvolutionFlowRelays {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(Task.class).sink("total");
+            c.input(String.class, "input").into(Task.class).output("total");
         }
 
         public static final class CartV2 {

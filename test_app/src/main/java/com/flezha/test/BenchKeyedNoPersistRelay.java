@@ -27,6 +27,6 @@ public final class BenchKeyedNoPersistRelay implements Relay {
                 .onFull(OverflowPolicy.DROP_NOTHING)
                 .into(TierStoreTasklet.class)
                 .keyed()
-                .sink("sink");
+                .output("sink");
     }
 }

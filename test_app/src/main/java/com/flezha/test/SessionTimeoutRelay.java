@@ -15,6 +15,6 @@ public final class SessionTimeoutRelay implements Relay {
     public void channels(ChannelBuilder c) {
         c.input(String.class, "input")
                 .into(SessionTimeoutTasklet.class)
-                .sink("kafka");
+                .output("kafka");
     }
 }

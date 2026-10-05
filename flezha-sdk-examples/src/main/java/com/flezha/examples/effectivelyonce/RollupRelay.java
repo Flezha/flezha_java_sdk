@@ -11,7 +11,7 @@ import javax.annotation.Nonnull;
  * record, so a crash cannot advance the offset while losing the output. Its {@code Ack.Checkpoint}
  * is what withholds the offset until your code says the state is coherent.
  *
- * <p>Registration refuses this combination without keyed sinks, because without a key the sink has
+ * <p>Registration refuses this combination without keyed outputs, because without a key the output has
  * no way to recognise a repeat.
  */
 public final class RollupRelay implements Relay {
@@ -30,6 +30,6 @@ public final class RollupRelay implements Relay {
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
 
-        c.input(String.class, "ticks").into(RollupTasklet.class).keyed().sink("rollups");
+        c.input(String.class, "ticks").into(RollupTasklet.class).keyed().output("rollups");
     }
 }

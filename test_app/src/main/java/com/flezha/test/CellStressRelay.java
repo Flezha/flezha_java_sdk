@@ -34,7 +34,7 @@ public final class CellStressRelay implements Relay {
                 .into(StressTaskletC.class)
                 .named("c_to_d")
                 .into(StressTaskletD.class)
-                .sink("echo");
+                .output("echo");
     }
 
     /** Shared stateless surface of the four stress tasklets; only the fan-out differs. */

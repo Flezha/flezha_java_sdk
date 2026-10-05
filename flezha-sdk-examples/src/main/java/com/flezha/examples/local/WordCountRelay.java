@@ -20,6 +20,6 @@ public final class WordCountRelay implements Relay {
                 .keyBy(word -> word)
                 .into(Tally.class)
                 .keyed()
-                .sink("totals");
+                .output("totals");
     }
 }

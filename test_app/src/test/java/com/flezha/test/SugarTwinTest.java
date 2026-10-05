@@ -120,11 +120,11 @@ class SugarTwinTest {
     }
 
     /**
-     * fails when: a short form with no sink stops declaring its entry channel and tasklet alone, or
+     * fails when: a short form with no output stops declaring its entry channel and tasklet alone, or
      * stops keeping what it is sent in the state its tasklet, named after the factory id, owns.
      */
     @Test
-    void aShortFormWithNoSinkDeclaresNoPluginChannelAndKeepsState() {
+    void aShortFormWithNoOutputDeclaresNoPluginChannelAndKeepsState() {
         var topology = shortForm(SugarStateOnly.class);
         assertThat(topology.channels()).hasSize(1);
         assertThat(topology.channels().get(0).name()).isEqualTo("ticks");

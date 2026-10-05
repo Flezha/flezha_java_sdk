@@ -46,16 +46,16 @@ public final class DiamondRelay implements Relay {
         // (unnamed, same class) = the fan-in.
         var fan = c.input(String.class, "in")
                 .into(DiamA.class)
-                .sink("dfan", s -> ("a:" + s).getBytes(StandardCharsets.UTF_8));
+                .output("dfan", s -> ("a:" + s).getBytes(StandardCharsets.UTF_8));
         fan.into(DiamB1.class)
                 .named("db1")
                 .into(DiamB2.class)
-                .sink("db2", s -> s.getBytes(StandardCharsets.UTF_8))
+                .output("db2", s -> s.getBytes(StandardCharsets.UTF_8))
                 .into(DiamJoin.class);
         fan.into(DiamC.class)
-                .sink("dc", s -> s.getBytes(StandardCharsets.UTF_8))
+                .output("dc", s -> s.getBytes(StandardCharsets.UTF_8))
                 .into(DiamJoin.class)
-                .sink("j_out");
+                .output("j_out");
     }
 
     /** The shared root: commits durable state and fans out unchanged. */

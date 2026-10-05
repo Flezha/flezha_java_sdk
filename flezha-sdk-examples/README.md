@@ -68,7 +68,7 @@ point into user code alongside `run`, and the cancel-then-rearm pattern that
 keeps one live deadline per cell.
 
 **[`effectivelyonce/`](src/main/java/com/flezha/examples/effectivelyonce)**
-prevents a retry writing the same result twice, which matters when the sink is a
+prevents a retry writing the same result twice, which matters when the output becomes a
 database row, a payment, or anything else that cannot absorb a duplicate. Two
 mechanisms are required together, and the example explains why neither alone is
 sufficient.

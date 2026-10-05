@@ -38,6 +38,6 @@ public final class ChatRewindRelay implements Relay {
                 .into(ChatSteps.Turn.class)
                 .named("mid")
                 .into(ChatSteps.ReplyUndoable.class)
-                .sink("out");
+                .output("out");
     }
 }

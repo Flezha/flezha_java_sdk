@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
  * </ul>
  *
  * <p>Both are needed. A Tasklet can rebuild identical state while emitting a
- * fresh {@code UUID} or timestamp each run — and a keyed sink's idempotence depends
+ * fresh {@code UUID} or timestamp each run — and a keyed output's idempotence depends
  * on exactly that not happening.
  *
  * <p>Run these against your own Tasklets in CI. They are cheap, and they are the

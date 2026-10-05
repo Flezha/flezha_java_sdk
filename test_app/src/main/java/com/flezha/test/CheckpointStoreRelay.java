@@ -7,7 +7,7 @@ import com.flezha.sdk.relay.Relay;
  * Mirror of the Rust test app's {@code CheckpointStoreRelay}: the
  * {@link TierStoreRelay} store acknowledging its consumed offsets only
  * at an explicit {@code ctx.checkpoint()}. Emits still flush as they happen, so
- * the sink sees an interval's outputs long before its offsets are acknowledged.
+ * the output sees an interval's outputs long before its offsets are acknowledged.
  */
 public final class CheckpointStoreRelay implements Relay {
 
@@ -26,6 +26,6 @@ public final class CheckpointStoreRelay implements Relay {
         c.input(String.class, "input")
                 .into(CheckpointStoreTasklet.class)
                 .keyed()
-                .sink("sink");
+                .output("sink");
     }
 }

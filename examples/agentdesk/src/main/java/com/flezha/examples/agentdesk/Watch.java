@@ -10,7 +10,7 @@ public final class Watch implements Tasklet<Request, Void, Http> {
 
     @Override
     public void run(Request request, Ctx<Void, Http> ctx) throws TaskletException {
-        // keyed by the user: a sink of an effectively-once relay needs a key
+        // keyed by the user: an output of an effectively-once relay needs a key
         ctx.emitKeyed(
                 request.user(), request.listens() ? Http.stream(request.user()) : Http.of(404, "no such route"));
     }

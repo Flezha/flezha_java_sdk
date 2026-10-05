@@ -33,7 +33,7 @@ public final class Main {
         // control.startRelay(RelaySpec.of("echo").id("my_echo"));
         //
         // ObjectNode opts = JsonNodeFactory.instance.objectNode().put("path", "echo-out.txt");
-        // control.enablePlugin("writer", PluginSpec.of("relay_file_sink").opts(opts));
+        // control.enablePlugin("writer", PluginSpec.of("relay_file_output").opts(opts));
         // ArrayNode hooks = JsonNodeFactory.instance.arrayNode();
         // hooks.addArray().add("on_output").addObject();
         // control.bindPlugin("writer", "my_echo", hooks, null);

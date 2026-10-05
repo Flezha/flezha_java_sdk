@@ -444,14 +444,14 @@ class RelayTopologyBuilderTest {
         }
 
         @Test
-        @DisplayName("a sink with no consumers is the terminal")
-        void sinkTerminalityIsDerivedFromTheWiring() {
+        @DisplayName("an output with no consumers is the terminal")
+        void outputTerminalityIsDerivedFromTheWiring() {
             var terminal = RelayTopologyBuilder.build(
                     "g13",
-                    c -> c.input(String.class, "in").into(SingleTasklet.class).sink("egress"));
+                    c -> c.input(String.class, "in").into(SingleTasklet.class).output("egress"));
             var hybrid = RelayTopologyBuilder.build("g15", c -> c.input(String.class, "in")
                     .into(SingleTasklet.class)
-                    .sink("egress")
+                    .output("egress")
                     .into(GraphStage1.class));
 
             assertThat(sinkShape(terminal)).isEqualTo(List.of(ChannelKind.PLUGIN_BOUND.name(), "0", "egress"));
@@ -459,18 +459,18 @@ class RelayTopologyBuilderTest {
         }
 
         @Test
-        @DisplayName("the sink names the channel, and the no-argument form leaves it derived")
-        void sinkNamesTheChannelAndTheNoArgumentFormDoesNot() {
+        @DisplayName("the output names the channel, and the no-argument form leaves it derived")
+        void outputNamesTheChannelAndTheNoArgumentFormDoesNot() {
             var named = RelayTopologyBuilder.build(
                     "g13a",
-                    c -> c.input(String.class, "in").into(SingleTasklet.class).sink("items_output"));
+                    c -> c.input(String.class, "in").into(SingleTasklet.class).output("items_output"));
             var derived = RelayTopologyBuilder.build(
                     "g13b",
-                    c -> c.input(String.class, "in").into(SingleTasklet.class).sink());
+                    c -> c.input(String.class, "in").into(SingleTasklet.class).output());
 
             assertThat(named.channels().get(1).name()).isEqualTo("items_output");
             assertThat(derived.channels().get(1).name())
-                    .as("sink() derives exactly as a channel with no sink does")
+                    .as("output() derives exactly as a channel with no output does")
                     .isEqualTo("single_tasklet");
             assertThat(derived.channels().get(1).pluginSink()).isPresent();
         }
@@ -482,7 +482,7 @@ class RelayTopologyBuilderTest {
             return ((List<List<Object>>) channels.get(channel).get("chains")).get(0);
         }
 
-        /** Everything about the `egress` channel the sink declaration decides. */
+        /** Everything about the `egress` channel the output declaration decides. */
         private java.util.List<String> sinkShape(RelayTopology t) {
             var channel = t.channels().stream()
                     .filter(ch -> ch.name().equals("egress"))
@@ -565,40 +565,40 @@ class RelayTopologyBuilderTest {
         }
 
         @Test
-        @DisplayName("a second sink on one channel is refused by name; the first still registered")
-        void duplicatePluginSinkRefused() {
+        @DisplayName("a second output on one channel is refused by name; the first still registered")
+        void duplicatePluginOutputRefused() {
             assertThatThrownBy(() -> RelayTopologyBuilder.build("r3", c -> c.input(String.class, "in")
                             .into(SingleTasklet.class)
-                            .sink("egress")
-                            .sink()))
-                    .isInstanceOfSatisfying(
-                            FlezhaException.class, e -> assertThat(Refused.details(e, "topology.duplicate_plugin_sink"))
-                                    .containsEntry("channel", "egress"));
+                            .output("egress")
+                            .output()))
+                    .isInstanceOfSatisfying(FlezhaException.class, e -> assertThat(
+                                    Refused.details(e, "topology.duplicate_plugin_output"))
+                            .containsEntry("channel", "egress"));
         }
 
         @Test
-        @DisplayName("a channel named by both named() and sink() is refused naming both")
+        @DisplayName("a channel named by both named() and output() is refused naming both")
         void channelNamedTwiceRefused() {
             assertThatThrownBy(() -> RelayTopologyBuilder.build("r3b", c -> c.input(String.class, "in")
                             .into(SingleTasklet.class)
                             .named("a")
-                            .sink("b")))
+                            .output("b")))
                     .isInstanceOfSatisfying(
                             FlezhaException.class, e -> assertThat(Refused.details(e, "topology.channel_named_twice"))
                                     .containsEntry("named", "a")
-                                    .containsEntry("sink", "b"));
+                                    .containsEntry("output", "b"));
         }
 
         @Test
-        @DisplayName("two channels naming one sink is refused as a duplicate sink name")
-        void duplicateSinkNameRefused() {
+        @DisplayName("two channels naming one output is refused as a duplicate output name")
+        void duplicateOutputNameRefused() {
             assertThatThrownBy(() -> RelayTopologyBuilder.build("r3c", c -> {
                         var in = c.input(String.class, "in");
-                        in.into(SingleTasklet.class).sink("shared");
-                        in.into(GraphStage1.class).sink("shared");
+                        in.into(SingleTasklet.class).output("shared");
+                        in.into(GraphStage1.class).output("shared");
                     }))
                     .isInstanceOfSatisfying(
-                            FlezhaException.class, e -> assertThat(Refused.details(e, "topology.duplicate_sink_name"))
+                            FlezhaException.class, e -> assertThat(Refused.details(e, "topology.duplicate_output_name"))
                                     .containsEntry("channel", "shared"));
         }
 
@@ -608,7 +608,7 @@ class RelayTopologyBuilderTest {
             assertThatThrownBy(() -> build("r4", new Relay.Run.Flow(new Relay.Exactly.EffectivelyOnce()), c -> c.input(
                                     String.class, "in")
                             .into(SingleTasklet.class)
-                            .sink("egress")))
+                            .output("egress")))
                     .isInstanceOfSatisfying(FlezhaException.class, e -> assertThat(
                                     Refused.details(e, "topology.unkeyed_channel_under_effectively_once"))
                             .containsEntry("channel", "egress"));

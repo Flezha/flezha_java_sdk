@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.sdk.FlezhaException;
+import com.flezha.sdk.LocalOutput;
 import com.flezha.sdk.LocalRelay;
-import com.flezha.sdk.SinkOutput;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.relay.Relay;
@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
  * by name rather than approximating them.
  *
  * <p>What each test can assert is what a run with no controller can see. A durable write reaches a
- * null sink, a parked payload has nowhere to park, and a partition member's key range arrives with
+ * null output, a parked payload has nowhere to park, and a partition member's key range arrives with
  * {@code AddRelay}, so the assertions here are the output side of each capability, which is the
  * half the language layer produces.
  *
@@ -51,7 +51,7 @@ import org.junit.jupiter.api.Test;
  * whose declaration the core refuses without it.
  *
  * <p>Release order is asserted per key, not across keys. Java dispatches activations on a worker
- * pool and keeps one Cell on one worker at a time, so the order two keys reach the sink in is not
+ * pool and keeps one Cell on one worker at a time, so the order two keys reach the output in is not
  * something the language layer promises.
  */
 class LocalModeCapabilitiesTest {
@@ -66,7 +66,7 @@ class LocalModeCapabilitiesTest {
     void aShortFormIsBuiltAndRunWithNoController() {
         declares("shorthand", "sugar_do_nothing");
 
-        List<SinkOutput> released =
+        List<LocalOutput> released =
                 release(SugarDoNothing.class, "input", "sugar_do_nothing_echo", List.of("alpha", "beta"));
 
         assertThat(payloads(released))
@@ -75,15 +75,15 @@ class LocalModeCapabilitiesTest {
     }
 
     @Test
-    @DisplayName("keyed_channels: a keyed sink stamps the key the class resolved")
-    void aKeyedSinkStampsTheKeyTheClassResolved() {
+    @DisplayName("keyed_channels: a keyed output stamps the key the class resolved")
+    void aKeyedOutputStampsTheKeyTheClassResolved() {
         // `partition_pass` is the manifest's only keyed-channel class. Partitioning itself is the
         // controller's (a member's key-group range arrives with `AddRelay`), so what is asserted
         // here is the half the language layer owns: the key it resolves and the stamps it puts on
         // the released value.
         declares("keyed_channels", "partition_pass");
 
-        List<SinkOutput> released = release(PartitionPassRelay.class, "in", "input", List.of("a:1", "b:1", "a:2"));
+        List<LocalOutput> released = release(PartitionPassRelay.class, "in", "input", List.of("a:1", "b:1", "a:2"));
 
         assertThat(payloads(released)).containsExactlyInAnyOrder("a:1", "b:1", "a:2");
         assertThat(payloadsOfKey(released, "a")).containsExactly("a:1", "a:2");
@@ -96,14 +96,14 @@ class LocalModeCapabilitiesTest {
     @Test
     @DisplayName("dynamic_cell: the declared filter runs before keying and nothing else is lost")
     void theDeclaredFilterRunsBeforeKeyingAndNothingElseIsLost() {
-        // The class's sink is not keyed, so a released value carries no cell stamp and the per-key
+        // The class's output is not keyed, so a released value carries no cell stamp and the per-key
         // minting is not visible on this channel. It is asserted above, on `partition_pass`, whose
-        // tasklet is dynamic too and whose sink IS keyed. What this class shows that that one does
+        // tasklet is dynamic too and whose output IS keyed. What this class shows that that one does
         // not is the declared filter: a value it rejects answers no key, so the core is never asked
         // to mint a Cell for it.
         declares("dynamic_cell", "dynamic_cell");
 
-        List<SinkOutput> released =
+        List<LocalOutput> released =
                 release(DynamicCellRelay.class, "input", "kafka", List.of("a:1", "b:1", "drop", "a:2"));
 
         assertThat(payloads(released))
@@ -125,7 +125,7 @@ class LocalModeCapabilitiesTest {
         declares("retry_ladder", "bounded_mailbox_drop_nothing");
 
         List<String> inputs = IntStream.range(0, 24).mapToObj(at -> "n" + at).toList();
-        List<SinkOutput> released =
+        List<LocalOutput> released =
                 release(BoundedMailboxDropNothingRelay.class, "drop_nothing_input", "drop_nothing_echo", inputs);
 
         assertThat(payloads(released))
@@ -138,7 +138,7 @@ class LocalModeCapabilitiesTest {
     void aDeclaredTimerFiresLocallyWithItsScheduledTime() {
         declares("cell_timers", "session_timeout");
 
-        List<SinkOutput> released = release(SessionTimeoutRelay.class, "input", "kafka", List.of("open"));
+        List<LocalOutput> released = release(SessionTimeoutRelay.class, "input", "kafka", List.of("open"));
 
         assertThat(payloads(released))
                 .as("the timer fired exactly once, carrying the timestamp it was scheduled for")
@@ -164,34 +164,34 @@ class LocalModeCapabilitiesTest {
     void aLocalRunDropsEveryPart() {
         declares("parts", "part_echo");
 
-        List<SinkOutput> released = release(PartEchoRelay.class, "in", "answer", List.of("3"));
+        List<LocalOutput> released = release(PartEchoRelay.class, "in", "answer", List.of("3"));
 
         assertThat(payloads(released)).containsExactly("done:3");
     }
 
     @Test
-    @DisplayName("parts: the core refuses a part whose channel ends in no sink")
-    void aPartWithNoSinkIsRefused() {
+    @DisplayName("parts: the core refuses a part whose channel ends in no output")
+    void aPartWithNoOutputIsRefused() {
         PART_REFUSALS.clear();
         try (LocalRelay run = LocalRelay.start(PartToTaskletRelay.class)) {
             run.feed("input", "x");
             run.runUntilIdle(BUDGET);
         }
 
-        assertThat(PART_REFUSALS).containsExactly("part.no_sink");
+        assertThat(PART_REFUSALS).containsExactly("part.no_output");
     }
 
     /**
-     * Run one class over {@code inputs} on {@code channel}, and return what {@code sink} released.
+     * Run one class over {@code inputs} on {@code channel}, and return what {@code output} released.
      *
      * <p>Read after the run is closed, not at the moment it settles: the callback is invoked from the
      * run's own delivery thread, which can be behind the graph, and closing is what hands the last of
      * the released values over.
      */
-    private static List<SinkOutput> release(Class<?> relay, String channel, String sink, List<String> inputs) {
-        ConcurrentLinkedQueue<SinkOutput> released = new ConcurrentLinkedQueue<>();
+    private static List<LocalOutput> release(Class<?> relay, String channel, String sink, List<String> inputs) {
+        ConcurrentLinkedQueue<LocalOutput> released = new ConcurrentLinkedQueue<>();
         try (LocalRelay run = LocalRelay.start(relay)) {
-            run.onSink(sink, released::add);
+            run.onOutput(sink, released::add);
             inputs.forEach(input -> run.feed(channel, input));
             run.runUntilIdle(BUDGET);
         }
@@ -218,18 +218,18 @@ class LocalModeCapabilitiesTest {
                 .contains(factoryId);
     }
 
-    private static List<String> payloads(List<SinkOutput> released) {
+    private static List<String> payloads(List<LocalOutput> released) {
         return released.stream().map(LocalModeCapabilitiesTest::payload).toList();
     }
 
     /** What one key released, in release order: the order a single Cell does promise. */
-    private static List<String> payloadsOfKey(List<SinkOutput> released, String key) {
+    private static List<String> payloadsOfKey(List<LocalOutput> released, String key) {
         return payloads(released).stream()
                 .filter(value -> key(value).equals(key))
                 .toList();
     }
 
-    private static String payload(SinkOutput output) {
+    private static String payload(LocalOutput output) {
         return new String(output.payload(), StandardCharsets.UTF_8);
     }
 
@@ -239,7 +239,7 @@ class LocalModeCapabilitiesTest {
         return at < 0 ? input : input.substring(0, at);
     }
 
-    /** Releases the input's bytes on the relay's sink. */
+    /** Releases the input's bytes on the relay's output. */
     abstract static class EchoTasklet implements Tasklet<String, Void, byte[]> {
         @Override
         public void run(String input, Ctx<Void, byte[]> ctx) throws TaskletException {
@@ -248,10 +248,10 @@ class LocalModeCapabilitiesTest {
     }
 
     /** The test app's {@code SugarDoNothing} short form. */
-    @com.flezha.sdk.authoring.Relay(id = "sugar_do_nothing", sink = "sugar_do_nothing_echo")
+    @com.flezha.sdk.authoring.Relay(id = "sugar_do_nothing", output = "sugar_do_nothing_echo")
     public static final class SugarDoNothing extends EchoTasklet {}
 
-    /** Releases the input under the key it resolves to, on the class's keyed sink. */
+    /** Releases the input under the key it resolves to, on the class's keyed output. */
     @Tasklet.Spec(name = "partition_pass_tasklet")
     public static final class PartitionPassTasklet implements Tasklet<String, Void, String> {
         @Override
@@ -268,13 +268,13 @@ class LocalModeCapabilitiesTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            // The entry channel is `in` and the sink `input` because a forwarded frame keeps its
+            // The entry channel is `in` and the output `input` because a forwarded frame keeps its
             // producing channel's name, and that is what selects the receiving relay's channel.
             c.input(String.class, "in")
                     .keyBy(LocalModeCapabilitiesTest::key)
                     .into(PartitionPassTasklet.class)
                     .keyed()
-                    .sink("input");
+                    .output("input");
         }
     }
 
@@ -294,7 +294,7 @@ class LocalModeCapabilitiesTest {
                     .filter(input -> !input.equals("drop"))
                     .keyBy(LocalModeCapabilitiesTest::key)
                     .into(DynamicCellTasklet.class)
-                    .sink("kafka");
+                    .output("kafka");
         }
     }
 
@@ -312,7 +312,7 @@ class LocalModeCapabilitiesTest {
             c.input(String.class, "drop_nothing_input")
                     .onFull(OverflowPolicy.DROP_NOTHING)
                     .into(DropNothingTasklet.class)
-                    .sink("drop_nothing_echo");
+                    .output("drop_nothing_echo");
         }
     }
 
@@ -342,7 +342,7 @@ class LocalModeCapabilitiesTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(SessionTimeoutTasklet.class).sink("kafka");
+            c.input(String.class, "input").into(SessionTimeoutTasklet.class).output("kafka");
         }
     }
 
@@ -369,7 +369,7 @@ class LocalModeCapabilitiesTest {
             c.input(String.class, "in")
                     .retryBackoffMs(25)
                     .into(PartEchoTasklet.class)
-                    .sink("answer");
+                    .output("answer");
         }
     }
 
@@ -450,7 +450,7 @@ class LocalModeCapabilitiesTest {
                     .onFull(OverflowPolicy.DROP_NOTHING)
                     .into(TierStoreTasklet.class)
                     .keyed()
-                    .sink("sink");
+                    .output("sink");
         }
     }
 }

@@ -28,7 +28,7 @@ public final class TransformChainRelay implements Relay {
                 .keyBy(DynamicCellRelay::key)
                 .into(TransformLabelTasklet.class)
                 .keyed()
-                .sink("transformed");
+                .output("transformed");
     }
 
     @Tasklet.Spec(name = "transform_label_tasklet")

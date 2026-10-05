@@ -46,7 +46,7 @@ public final class ReplyBlockLoopRelay implements Relay {
                 .into(ChatSteps.Turn.class)
                 .named("mid")
                 .into(BlockingReply.class)
-                .sink("out");
+                .output("out");
     }
 
     /** Blocks on the crash turn, then emits {@code reply:<input>} as the plain reply does. */

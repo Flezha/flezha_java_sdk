@@ -57,7 +57,7 @@ public final class RelayInstance {
      */
     final KryoCodec edgeCodec = new KryoCodec(List.of(), false);
 
-    /** A class that runs in steps, whose stages the core folds into the driver's collect sink instead of routing them. */
+    /** A class that runs in steps, whose stages the core folds into the driver's collect output instead of routing them. */
     final boolean steps;
 
     private final CellRouting routing;

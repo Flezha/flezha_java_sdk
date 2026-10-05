@@ -19,6 +19,6 @@ public final class DoNothingRelay implements Relay {
     @Override
     public void channels(ChannelBuilder c) {
         var sDoNothingTasklet = c.input(String.class, "input").into(DoNothingTasklet.class);
-        sDoNothingTasklet.sink("echo");
+        sDoNothingTasklet.output("echo");
     }
 }

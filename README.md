@@ -89,7 +89,7 @@ public final class EchoRelay implements Relay {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "in").into(Echo.class).sink("out");
+        c.input(String.class, "in").into(Echo.class).output("out");
     }
 }
 ```
@@ -101,10 +101,10 @@ handle in the chain, so a graph of any size is expressed as one fluent
 expression, and the whole declaration is validated at registration rather than
 failing later during processing.
 
-The name a `sink` carries is an identity rather than documentation: it is the
+The name an `output` carries is an identity rather than documentation: it is the
 channel's name, what a plugin filter matches and what a test feeds or reads.
-The no-argument `sink()` leaves the channel named after its producing
-tasklet, and `named(...)` renames a channel that has no sink to name it.
+The no-argument `output()` leaves the channel named after its producing
+tasklet, and `named(...)` renames a channel that has no output to name it.
 Naming one channel both ways is refused.
 
 **The main** starts a runner: the process that connects to a controller and serves
@@ -171,7 +171,7 @@ misuse such as an emit on a channel the tasklet does not own. Branch on its
 the values its message names from `details()`.
 
 To run this without a controller, replace the main with `LocalRelay`, which
-executes the same declared wiring inside the calling JVM and delivers sink output
+executes the same declared wiring inside the calling JVM and delivers output
 to a callback. Nothing is durable in that mode, and declarations requiring a
 controller are refused at startup with the responsible declaration named.
 
@@ -216,18 +216,18 @@ controller are refused at startup with the responsible declaration named.
 
 Each is a declaration the controller must honour, so declare what you need rather
 than what sounds reassuring: a correction window sizes the controller's input-log
-retention, and a tier without keyed sinks is refused at registration.
+retention, and a tier without keyed outputs is refused at registration.
 
 ## Answering and calling
 
-A channel ends in one sink or one `call(...)`. The first sink output an input
-causes answers the outside caller of that input, and still reaches the sink's
+A channel ends in one output or one `call(...)`. The first output an input
+causes answers the outside caller of that input, and still reaches the output's
 plugins and listeners. `call(target, Answer.class, deadlineMs)` sends each value,
 after the chain's transforms and key, to another relay: `CallTarget.id("pricing")`
 names an instance, and `CallTarget.factory("agent")` an instance of a factory, the
 one the chain's `keyBy` names (`.create(false)` refuses to start it,
 `.channel("turn")` picks its entry channel, `.answerChannel("quotes")` names the
-callee's channel whose output answers). The request is written as `sink()`
+callee's channel whose output answers). The request is written as `output()`
 writes it.
 
 The call waits for nothing. Its outcome arrives later as a
@@ -303,7 +303,7 @@ runner.logger((level, format, args) ->
         slf4j.atLevel(Level.valueOf(level.name())).log(format, args));
 ```
 
-`docs/sdk/java_sdk.md` has the rest: what a supplied sink is and is not
+`docs/sdk/java_sdk.md` has the rest: what a supplied output is and is not
 filtered by, where the substitution lives, and what a failed write does.
 
 ## Further reading

@@ -17,6 +17,6 @@ public final class StoreInputRelay implements Relay {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "input").into(StoreInputTasklet.class).sink("sink");
+        c.input(String.class, "input").into(StoreInputTasklet.class).output("sink");
     }
 }

@@ -4,7 +4,7 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * Plugin sink attached to a channel via {@code sink(...)} — the one
+ * Plugin output attached to a channel via {@code output(...)} — the one
  * representation of plugin egress. A channel that also has consumers keeps
  * {@link com.flezha.sdk.channel.ChannelKind#INTER_TASKLET}; one with none is
  * the {@link com.flezha.sdk.channel.ChannelKind#PLUGIN_BOUND} terminal, a kind
@@ -16,7 +16,7 @@ import java.util.function.Function;
  */
 public record PluginSink(Function<Object, byte[]> serializer, Optional<ConsumerEdge> call) {
 
-    /** A sink. */
+    /** An output. */
     public PluginSink(Function<Object, byte[]> serializer) {
         this(serializer, Optional.empty());
     }

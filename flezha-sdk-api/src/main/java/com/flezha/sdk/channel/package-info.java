@@ -1,5 +1,5 @@
 /**
- * Channel declarations: the graph connecting entry points, tasklets and sinks.
+ * Channel declarations: the graph connecting entry points, tasklets and outputs.
  *
  * <p>These types are declared inside a relay's {@code channels(ChannelBuilder)} method, the
  * one graph body every relay writes, and are never constructed directly.
@@ -16,9 +16,9 @@
  * retry and dead-letter path.
  *
  * <p>{@link com.flezha.sdk.channel.Stream} is a tasklet's output handle. {@code named} labels the
- * channel, and that label is the identity the rest of the system uses, including sink registration
+ * channel, and that label is the identity the rest of the system uses, including output registration
  * and test feeds; unlabelled, a channel takes the producing tasklet's name. {@code into} wires a
- * further tasklet as a consumer, which is how multi-stage graphs are expressed. {@code sink}
+ * further tasklet as a consumer, which is how multi-stage graphs are expressed. {@code output}
  * attaches a plugin, {@code keyed} declares that emits carry a natural key supplied through
  * {@code emitKeyed}. A durable relay that runs in steps journals the handoff at every stage boundary of
  * its graph; the payload codec it uses there is derived by the runtime and is declared nowhere.

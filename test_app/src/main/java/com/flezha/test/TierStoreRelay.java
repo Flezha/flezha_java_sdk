@@ -30,6 +30,6 @@ public final class TierStoreRelay implements Relay {
                 .retryBackoffMs(300)
                 .into(TierStoreTasklet.class)
                 .keyed()
-                .sink("sink");
+                .output("sink");
     }
 }

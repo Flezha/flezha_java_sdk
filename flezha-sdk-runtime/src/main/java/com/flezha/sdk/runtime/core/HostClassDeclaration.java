@@ -73,7 +73,7 @@ public final class HostClassDeclaration {
     /**
      * The record a class submits: its settings tree as declared, one entry per
      * channel and tasklet in id order, and per channel the chains its handles
-     * were given. Consumers, channel kinds, sink names and the acknowledgement
+     * were given. Consumers, channel kinds, output names and the acknowledgement
      * granularity are NOT here — they are the core's answer.
      */
     @Nonnull

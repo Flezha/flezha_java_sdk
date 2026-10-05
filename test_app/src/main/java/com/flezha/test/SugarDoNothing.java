@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
  * Single-tasklet stateless short-form twin of {@link DoNothingTasklet}: the annotation makes this
  * tasklet a whole relay, and {@code Main} registers this class.
  */
-@Relay(id = "sugar_do_nothing", sink = "sugar_do_nothing_echo")
+@Relay(id = "sugar_do_nothing", output = "sugar_do_nothing_echo")
 public class SugarDoNothing implements Tasklet<String, Void, byte[]> {
 
     @Override

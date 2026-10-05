@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
  */
 class PartDispatchTest extends DispatchTestBase {
 
-    /** Arms the recording entry to refuse, as the core refuses a channel with no sink. */
+    /** Arms the recording entry to refuse, as the core refuses a channel with no output. */
     static final AtomicBoolean REFUSING = new AtomicBoolean();
 
     @BeforeEach
@@ -35,7 +35,7 @@ class PartDispatchTest extends DispatchTestBase {
         REFUSING.set(false);
         dispatcher = new ActivationDispatcher((token, item, payload) -> {
             if (REFUSING.get()) {
-                throw FlezhaException.of("part.no_sink", Map.of("tasklet", "part_task", "channel", "answer"));
+                throw FlezhaException.of("part.no_output", Map.of("tasklet", "part_task", "channel", "answer"));
             }
             RECORDED.add("part " + token + "/" + item + "/" + new String(payload, StandardCharsets.UTF_8));
         });
@@ -86,16 +86,16 @@ class PartDispatchTest extends DispatchTestBase {
         ItemEffect effect = soleEffect(work("part_op", 0, Optional.empty(), 0, input(0, "1", 1)));
 
         assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
-        assertThat(((Verdict.RetryableError) effect.verdict()).message()).contains("part.no_sink");
+        assertThat(((Verdict.RetryableError) effect.verdict()).message()).contains("part.no_output");
         assertThat(effect.outputs()).isEmpty();
         assertThat(RECORDED).isEmpty();
     }
 
     public static final class PartRelay extends Op {
         public PartRelay() {
-            super(
-                    "part_op",
-                    c -> c.input(String.class, "in").into(PartTask.class).sink("answer", PartDispatchTest::bracketed));
+            super("part_op", c -> c.input(String.class, "in")
+                    .into(PartTask.class)
+                    .output("answer", PartDispatchTest::bracketed));
         }
     }
 
@@ -118,7 +118,7 @@ class PartDispatchTest extends DispatchTestBase {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(PartTask.class).sink("answer", PartDispatchTest::bracketed);
+            c.input(String.class, "in").into(PartTask.class).output("answer", PartDispatchTest::bracketed);
         }
     }
 
@@ -140,7 +140,7 @@ class PartDispatchTest extends DispatchTestBase {
         }
     }
 
-    /** A sink encoding a part could not be mistaken for the default one. */
+    /** An output encoding a part could not be mistaken for the default one. */
     private static byte[] bracketed(String value) {
         return ("<" + value + ">").getBytes(StandardCharsets.UTF_8);
     }

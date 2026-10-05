@@ -11,7 +11,7 @@ import javax.annotation.Nullable;
  *
  * @param settings the annotation itself, whose nested settings the runtime reads as the tree
  */
-public record ShortFormDeclaration(String id, String sink, String input, String onFull, Relay settings) {
+public record ShortFormDeclaration(String id, String output, String input, String onFull, Relay settings) {
 
     /** The annotation's spelling, for refusals. */
     public static final String ANNOTATION = "@Relay";
@@ -23,6 +23,6 @@ public record ShortFormDeclaration(String id, String sink, String input, String 
         return declared == null
                 ? null
                 : new ShortFormDeclaration(
-                        declared.id(), declared.sink(), declared.input(), declared.onFull(), declared);
+                        declared.id(), declared.output(), declared.input(), declared.onFull(), declared);
     }
 }

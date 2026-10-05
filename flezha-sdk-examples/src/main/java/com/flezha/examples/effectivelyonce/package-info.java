@@ -1,12 +1,12 @@
 /**
- * Output that a retry cannot duplicate, for sinks where a duplicate is not acceptable.
+ * Output that a retry cannot duplicate, for outputs where a duplicate is not acceptable.
  *
- * <p>Recovery re-executes user code, so a naive emit can reach a sink more than once for one
- * logical input. Where the sink is a database row, a payment or any other system that cannot absorb
+ * <p>Recovery re-executes user code, so a naive emit can reach an output more than once for one
+ * logical input. Where the output is a database row, a payment or any other system that cannot absorb
  * a repeat, two mechanisms together prevent it, and both are required.
  *
  * <p>The first is keyed emission. {@code ctx.emitKeyed} attaches a key derived from the input, so a
- * replay of the same input produces the same key and the sink updates the record it already wrote
+ * replay of the same input produces the same key and the output updates the record it already wrote
  * rather than appending a second one. It is the key, not the delivery machinery, that makes a
  * repeated emit harmless.
  *
@@ -19,7 +19,7 @@
  * {@code Exactly.EffectivelyOnce} with {@code Ack.Checkpoint}. The first makes state, output and consumed
  * offset durable together in a single record, so a crash cannot advance the offset while losing the
  * output. The second is what withholds the offset until the tasklet declares the state coherent.
- * Registration refuses this combination without keyed sinks, because without a key the sink has no
+ * Registration refuses this combination without keyed outputs, because without a key the output has no
  * means of recognising a repeat.
  */
 package com.flezha.examples.effectivelyonce;

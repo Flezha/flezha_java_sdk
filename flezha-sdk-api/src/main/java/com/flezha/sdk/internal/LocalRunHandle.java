@@ -1,6 +1,6 @@
 package com.flezha.sdk.internal;
 
-import com.flezha.sdk.SinkOutput;
+import com.flezha.sdk.LocalOutput;
 import java.time.Duration;
 import java.util.function.Consumer;
 
@@ -16,7 +16,7 @@ import java.util.function.Consumer;
 public interface LocalRunHandle {
 
     /** Deliver every value released on {@code channel} to {@code callback}, in release order. */
-    void onSink(String channel, Consumer<SinkOutput> callback);
+    void onOutput(String channel, Consumer<LocalOutput> callback);
 
     /** Feed one value's wire bytes to a declared entry channel. */
     void feed(String channel, byte[] payload);

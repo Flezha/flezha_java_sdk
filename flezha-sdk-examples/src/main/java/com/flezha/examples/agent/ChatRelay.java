@@ -21,6 +21,6 @@ public final class ChatRelay implements Relay {
 
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
-        c.input(String.class, "message").into(Reply.class).sink("reply");
+        c.input(String.class, "message").into(Reply.class).output("reply");
     }
 }

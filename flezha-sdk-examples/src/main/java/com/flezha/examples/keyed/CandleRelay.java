@@ -36,7 +36,7 @@ public final class CandleRelay implements Relay {
                 .keyBy(slot -> slot.symbol() + "@" + slot.tf())
                 .into(CandleTasklet.class)
                 .keyed()
-                .sink("candles");
+                .output("candles");
     }
 
     /** One trade becomes one slot per timeframe. Must be pure, and should be cheap. */

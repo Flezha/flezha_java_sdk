@@ -62,8 +62,8 @@ class SpawnHandleTest {
     record Ticket(String symbol, int quantity) {}
 
     @Test
-    @DisplayName("a payload is encoded as a sink with no encoder encodes it: a string as UTF-8, a record as JSON")
-    void aPayloadIsEncodedAsASinkWithNoEncoder() {
+    @DisplayName("a payload is encoded as an output with no encoder encodes it: a string as UTF-8, a record as JSON")
+    void aPayloadIsEncodedAsAnOutputWithNoEncoder() {
         SpawnRequests.install(core);
         Ctx<Void, Object> ctx = new StubCtx(false, 42);
 

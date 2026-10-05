@@ -27,7 +27,7 @@ public final class HybridChannelRelay implements Relay {
     @Override
     public void channels(ChannelBuilder c) {
         var sHybridProducerTasklet = c.input(String.class, "input").into(HybridProducerTasklet.class);
-        sHybridProducerTasklet.sink("hybrid_indicator", v -> { if (v == 0xDEAD_BEEFL) { throw new RuntimeException("hybrid_indicators: serializer rejected sentinel 0xDEADBEEF"); } return ByteBuffer.allocate(4) .order(ByteOrder.BIG_ENDIAN) .putInt(v.intValue()) .array(); }).into(HybridConsumerTasklet.class);
+        sHybridProducerTasklet.output("hybrid_indicator", v -> { if (v == 0xDEAD_BEEFL) { throw new RuntimeException("hybrid_indicators: serializer rejected sentinel 0xDEADBEEF"); } return ByteBuffer.allocate(4) .order(ByteOrder.BIG_ENDIAN) .putInt(v.intValue()) .array(); }).into(HybridConsumerTasklet.class);
     }
 
     @Tasklet.Spec(name = "hybrid_producer_tasklet")

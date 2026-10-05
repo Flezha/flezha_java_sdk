@@ -44,7 +44,7 @@ public final class KeyedLoopRelay implements Relay {
         c.input(String.class, "trades")
                 .keyBy(DynamicCellRelay::key)
                 .into(Count.class)
-                .sink("keyed_loop_steps_out");
+                .output("keyed_loop_steps_out");
     }
 
     @Tasklet.Spec(name = "keyed_loop_count")

@@ -14,7 +14,7 @@ import com.flezha.sdk.tasklet.TaskletException;
  */
 @Relay(
         id = "sugar_steps_per_input",
-        sink = "sugar_steps_per_input_out",
+        output = "sugar_steps_per_input_out",
         run = @Run(steps = @Steps(each = Each.PER_INPUT)))
 public class SugarStepsPerInput implements Tasklet<String, Void, String> {
 

@@ -36,7 +36,7 @@ public final class FailedStageRelay implements Relay {
         c.input(String.class, "in")
                 .into(KeyedStepsRelays.KeySplit.class)
                 .into(FailedStage.class)
-                .sink("mid", s -> ("lost:" + s).getBytes(StandardCharsets.UTF_8));
+                .output("mid", s -> ("lost:" + s).getBytes(StandardCharsets.UTF_8));
     }
 
     /** Emits the first value; fails on {@code b}. */

@@ -36,7 +36,7 @@ public final class TierChainRelay implements Relay {
                 .retryMax(1_000)
                 .into(TierTallyTasklet.class)
                 .keyed()
-                .sink("sink");
+                .output("sink");
     }
 
     /** The counter shape both tasklets share. */

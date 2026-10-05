@@ -37,7 +37,7 @@ public final class Flezha {
     static final AtomicReference<FlezhaRunner> CURRENT = new AtomicReference<>();
 
     /**
-     * The sink every SDK diagnostic reaches, replaced by
+     * The output every SDK diagnostic reaches, replaced by
      * {@link FlezhaRunner#logger(Logger)}. Deliberately outside
      * {@link #releaseSlot()}: a logger is configured once per process, and a
      * runner's most interesting diagnostics are the ones it writes while
@@ -48,7 +48,7 @@ public final class Flezha {
     /**
      * Forwards to whatever {@link #LOGGER} holds at the moment of the call, so
      * a class may keep the SDK's logger in a {@code static final} field and
-     * still reach a sink the host supplies later.
+     * still reach an output the host supplies later.
      */
     private static final Logger ACTIVE = (level, format, args) -> LOGGER.get().log(level, format, args);
 

@@ -19,7 +19,7 @@ import javax.annotation.Nonnull;
  *
  * <pre>{@code
  * try (LocalRelay run = LocalRelay.start(WordCount.class)) {
- *     run.onSink("totals", out -> System.out.println(new String(out.payload())));
+ *     run.onOutput("totals", out -> System.out.println(new String(out.payload())));
  *     run.feed("lines", "the quick brown fox");
  *     run.runUntilIdle(Duration.ofSeconds(5));
  * }
@@ -54,13 +54,13 @@ public final class LocalRelay implements AutoCloseable {
     }
 
     /**
-     * Deliver every value released on the sink {@code channel} to
-     * {@code callback}, in release order. A sink channel takes the producing
+     * Deliver every value released on the output {@code channel} to
+     * {@code callback}, in release order. An output channel takes the producing
      * tasklet's name unless the declaration {@code named} it.
      */
     @Nonnull
-    public LocalRelay onSink(String channel, Consumer<SinkOutput> callback) {
-        handle.onSink(channel, callback);
+    public LocalRelay onOutput(String channel, Consumer<LocalOutput> callback) {
+        handle.onOutput(channel, callback);
         return this;
     }
 

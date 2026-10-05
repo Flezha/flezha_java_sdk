@@ -7,7 +7,7 @@ import com.flezha.sdk.tasklet.TaskletException;
 /**
  * Mirror of the Rust test app's {@code TierStoreTasklet}: upserts the latest
  * value per key and emits {@code key=value} under the natural key, so a
- * changelog sink converges to the last value per key. The value {@code poison}
+ * changelog output converges to the last value per key. The value {@code poison}
  * fails every attempt, which is what drives the dead-letter e2e's park.
  */
 @Tasklet.Spec(name = "tier_store_tasklet")

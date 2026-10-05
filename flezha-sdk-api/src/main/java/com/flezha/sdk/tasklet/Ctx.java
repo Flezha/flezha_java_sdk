@@ -120,7 +120,7 @@ public interface Ctx<State, Output> {
     void complete(byte[] result);
 
     /**
-     * {@link #complete(byte[])} with {@code result} encoded as a sink with no encoder encodes a
+     * {@link #complete(byte[])} with {@code result} encoded as an output with no encoder encodes a
      * value ({@link PlainPayload}): a {@code String} as UTF-8, anything else as JSON.
      */
     default void complete(Object result) {
@@ -129,8 +129,8 @@ public interface Ctx<State, Output> {
 
     /**
      * Ask the controller for a new steps instance of {@code factoryId}, under an id it
-     * generates, with {@code payload} as the instance's first input. The payload is encoded as a
-     * sink with no encoder encodes a value ({@link PlainPayload}): a {@code byte[]} as it is, a
+     * generates, with {@code payload} as the instance's first input. The payload is encoded as an
+     * output with no encoder encodes a value ({@link PlainPayload}): a {@code byte[]} as it is, a
      * {@code String} as UTF-8, anything else as JSON, which the instance's entry channel decodes.
      *
      * <p>Returns a handle at once. The request cannot fault this tasklet: a refusal, an
@@ -278,7 +278,7 @@ public interface Ctx<State, Output> {
      * natural key — for the output whose key differs from the key its Cell
      * was routed by, since {@link #emit} already carries that one. The runtime
      * stamps {@code flz.key} (alongside {@code flz.cell} and
-     * {@code flz.seq}) on the plugin frame, which is what lets a keyed sink
+     * {@code flz.seq}) on the plugin frame, which is what lets a keyed output
      * absorb a replayed emit as an idempotent upsert rather than a duplicate
      * row.
      *
@@ -316,15 +316,15 @@ public interface Ctx<State, Output> {
     /**
      * Send a part: a preview of the output this invocation is producing, which leaves the runner
      * now rather than when the invocation returns. A listener attached to the relay receives
-     * it; a sink never does, and nothing about the part is durable or replayed.
+     * it; an output never does, and nothing about the part is durable or replayed.
      *
      * <p>The part previews this tasklet's own output channel, and {@code value} is encoded exactly
      * as {@link #emit} would encode it there. The call never waits: a part that cannot leave at
      * once is dropped and counted, and a replayed input sends none. The runtime numbers the parts
      * of each attempt from 0 and stamps the attempt, the Cell and the channel.
      *
-     * @throws com.flezha.sdk.FlezhaException {@code part.no_sink} if the output channel does not
-     *     end in a sink (a {@code call(...)} end is not one), {@code part.outside_invocation} if
+     * @throws com.flezha.sdk.FlezhaException {@code part.no_output} if the output channel does not
+     *     end in an output (a {@code call(...)} end is not one), {@code part.outside_invocation} if
      *     this context's invocation has already returned
      */
     void part(Output value);

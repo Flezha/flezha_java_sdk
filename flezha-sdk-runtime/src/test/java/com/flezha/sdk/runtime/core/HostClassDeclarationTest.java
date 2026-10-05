@@ -256,7 +256,7 @@ class HostClassDeclarationTest {
         // declareClass — and is not restated in this SDK, exactly as the
         // branching-chained-loop refusal already is. Only an inter-tasklet
         // channel carries a journal codec, so a terminal whose only wiring is a
-        // plugin sink ships an empty handoff and the crash-resumed loop reads
+        // plugin output ships an empty handoff and the crash-resumed loop reads
         // that as convergence.
         RelayClassRegistry.registerClass(ChainedTerminalIntoSinkSteps.class);
         byte[] declaration = HostClassDeclaration.forFactory("decl_chained_sink");
@@ -348,7 +348,7 @@ class HostClassDeclarationTest {
                     .retryBackoffMs(300)
                     .into(FullyDeclaredTask.class)
                     .keyed()
-                    .sink(s -> s.getBytes(StandardCharsets.UTF_8));
+                    .output(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -364,7 +364,7 @@ class HostClassDeclarationTest {
             c.input(String.class, "in")
                     .keyBy(input -> input.split(":")[0])
                     .into(FullyDeclaredDynamicTask.class)
-                    .sink("out", s -> s.getBytes(StandardCharsets.UTF_8));
+                    .output("out", s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -436,11 +436,11 @@ class HostClassDeclarationTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(UndoTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "in").into(UndoTask.class).output(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
-    /** A durable CHAINED loop whose terminal task's only output is a plugin sink. */
+    /** A durable CHAINED loop whose terminal task's only output is a plugin output. */
     public static final class ChainedTerminalIntoSinkSteps implements Relay {
         @Override
         public String factoryId() {
@@ -454,7 +454,7 @@ class HostClassDeclarationTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(ChainedSinkTask.class).sink("out");
+            c.input(String.class, "in").into(ChainedSinkTask.class).output("out");
         }
     }
 
@@ -484,7 +484,7 @@ class HostClassDeclarationTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "in").into(DeclTask.class).keyed().output(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -501,7 +501,7 @@ class HostClassDeclarationTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "in").into(DeclTask.class).keyed().output(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -523,7 +523,7 @@ class HostClassDeclarationTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "in").into(DeclTask.class).keyed().output(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -541,7 +541,7 @@ class HostClassDeclarationTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "in").into(DeclTask.class).keyed().output(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -558,7 +558,7 @@ class HostClassDeclarationTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(DeclTask.class).keyed().sink(s -> s.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "in").into(DeclTask.class).keyed().output(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -580,7 +580,7 @@ class HostClassDeclarationTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(VersionOneTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "in").into(VersionOneTask.class).output(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -597,7 +597,7 @@ class HostClassDeclarationTest {
                     .into(VersionTwoTask.class)
                     .named("mid")
                     .into(VersionOneTask.class)
-                    .sink(s -> s.getBytes(StandardCharsets.UTF_8));
+                    .output(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -660,7 +660,7 @@ class HostClassDeclarationTest {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(VersionOneTask.class).sink(s -> s.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "in").into(VersionOneTask.class).output(s -> s.getBytes(StandardCharsets.UTF_8));
         }
     }
 }

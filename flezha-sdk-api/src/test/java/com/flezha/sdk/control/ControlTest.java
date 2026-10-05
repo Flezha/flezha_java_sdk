@@ -53,7 +53,7 @@ class ControlTest {
 
         control.enablePlugin(
                 "writer",
-                PluginSpec.of("relay_file_sink").opts(json.objectNode().put("path", "out.txt")));
+                PluginSpec.of("relay_file_output").opts(json.objectNode().put("path", "out.txt")));
         control.enablePlugin("feed", PluginSpec.of("relay_websocket").single().bind("my_echo", hooks));
         control.bindPlugin("writer", "my_echo");
         control.bindPlugin("writer", "my_other", json.arrayNode().add("on_output"), "in");
@@ -65,7 +65,7 @@ class ControlTest {
                 .containsExactly(
                         List.of(
                                 "PluginManager.enable",
-                                "[\"writer\",{\"provider\":\"relay_file_sink\",\"opts\":{\"path\":\"out.txt\"}}]"),
+                                "[\"writer\",{\"provider\":\"relay_file_output\",\"opts\":{\"path\":\"out.txt\"}}]"),
                         List.of(
                                 "PluginManager.enable",
                                 "[\"feed\",{\"provider\":\"relay_websocket\",\"opts\":{},\"single\":true,"

@@ -5,7 +5,7 @@ package com.flezha.sdk.channel;
  * {@link ChannelBuilder#input(Class, String)}. This is where a graph starts.
  *
  * <pre>{@code
- * c.input(String.class, "lines").into(SplitTasklet.class).sink("words");
+ * c.input(String.class, "lines").into(SplitTasklet.class).output("words");
  * }</pre>
  *
  * <p>An entry channel is fed by the controller, so it has no producer side. Everything it offers is

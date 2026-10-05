@@ -17,12 +17,12 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The SDK's own logger: the level rule {@code FLEZHA_LOG_LEVEL} feeds, the
- * default sink's filtering and formatting, and the JVM-wide holder the runner
+ * default output's filtering and formatting, and the JVM-wide holder the runner
  * builder replaces. The holder is process state, so every test restores it.
  */
 class LoggerTest {
 
-    /** Records what reached it, so a test asserts on the sink rather than on a stream. */
+    /** Records what reached it, so a test asserts on the output rather than on a stream. */
     private static final class Recorder implements Logger {
         private final List<String> lines = new ArrayList<>();
 

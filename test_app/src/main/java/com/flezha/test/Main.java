@@ -37,7 +37,7 @@ public final class Main {
             return;
         }
         spawnStdinEofExit();
-        // The same sink and the same default the other conformance runners
+        // The same output and the same default the other conformance runners
         // supply, so one FLEZHA_LOG_LEVEL governs every language in a drill.
         FlezhaRunner runner = Flezha.createRunner(namespace)
                 .logger(new ConsoleLogger(LogLevel.from(System.getenv(ConsoleLogger.FLEZHA_LOG_LEVEL), LogLevel.INFO)));

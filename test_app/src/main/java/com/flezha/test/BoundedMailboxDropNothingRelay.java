@@ -18,7 +18,7 @@ public final class BoundedMailboxDropNothingRelay implements Relay {
         c.input(String.class, "drop_nothing_input")
                 .onFull(OverflowPolicy.DROP_NOTHING)
                 .into(DropNothingTestTasklet.class)
-                .sink("drop_nothing_echo");
+                .output("drop_nothing_echo");
     }
 
     @Tasklet.Spec(name = "drop_nothing_test_tasklet", capacity = BoundedMailboxTasklet.CAPACITY)

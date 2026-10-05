@@ -63,6 +63,6 @@ public final class TradeWatcherRelay implements Relay {
                 .keyBy(Trade::symbol)                                // one cell per symbol
                 .into(TrackPrices.class)
                 .into(BuyAboveAverage.class)                         // fed by the tasklet above
-                .sink("signals");                                    // out to the file plugin
+                .output("signals");                                  // out to the file plugin
     }
 }

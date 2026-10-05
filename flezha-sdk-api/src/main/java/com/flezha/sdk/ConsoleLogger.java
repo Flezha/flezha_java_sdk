@@ -12,7 +12,7 @@ import javax.annotation.Nonnull;
  */
 public final class ConsoleLogger implements Logger {
 
-    /** Selects the default sink's level. {@code debug} | {@code info} | {@code warn} | {@code error}. */
+    /** Selects the default output's level. {@code debug} | {@code info} | {@code warn} | {@code error}. */
     public static final String FLEZHA_LOG_LEVEL = "FLEZHA_LOG_LEVEL";
 
     private static final String PREFIX = "[flezha] ";
@@ -23,7 +23,7 @@ public final class ConsoleLogger implements Logger {
         this.level = level;
     }
 
-    /** The sink the SDK starts with, at the level {@code FLEZHA_LOG_LEVEL} names. */
+    /** The output the SDK starts with, at the level {@code FLEZHA_LOG_LEVEL} names. */
     @Nonnull
     public static ConsoleLogger fromEnv() {
         return new ConsoleLogger(LogLevel.from(System.getenv(FLEZHA_LOG_LEVEL)));

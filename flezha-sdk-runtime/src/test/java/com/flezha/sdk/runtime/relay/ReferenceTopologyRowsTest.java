@@ -80,10 +80,10 @@ class ReferenceTopologyRowsTest {
                         .keyBy(value -> value)
                         .map(String.class, value -> value)
                         .into(RelayTopologyBuilderTest.SingleTasklet.class)),
-                // entry(in); in.into(plain); plain.sink(out); plain.map.into(second)
+                // entry(in); in.into(plain); plain.output(out); plain.map.into(second)
                 new Row("map_after_sink", c -> {
                     var plain = c.input(String.class, "in").into(RelayTopologyBuilderTest.SingleTasklet.class);
-                    plain.sink("out");
+                    plain.output("out");
                     plain.map(String.class, value -> value).into(RelayTopologyBuilderTest.GraphStage1.class);
                 }),
                 // entry(in); in.into(plain); in.map
@@ -109,21 +109,21 @@ class ReferenceTopologyRowsTest {
                     in.keyBy(value -> value).into(RelayTopologyBuilderTest.DynamicModeOnlyTasklet.class);
                     other.into(RelayTopologyBuilderTest.DynamicModeOnlyTasklet.class);
                 }),
-                // entry(in); in.into(plain); plain.named(a); plain.sink(b)
+                // entry(in); in.into(plain); plain.named(a); plain.output(b)
                 new Row("named_twice", c -> c.input(String.class, "in")
                         .into(RelayTopologyBuilderTest.SingleTasklet.class)
                         .named("a")
-                        .sink("b")),
-                // entry(in); in.into(plain); in.into(second); plain.sink(out); second.sink(out)
+                        .output("b")),
+                // entry(in); in.into(plain); in.into(second); plain.output(out); second.output(out)
                 new Row("two_channels_one_sink", c -> {
                     var in = c.input(String.class, "in");
-                    in.into(RelayTopologyBuilderTest.SingleTasklet.class).sink("out");
-                    in.into(RelayTopologyBuilderTest.GraphStage1.class).sink("out");
+                    in.into(RelayTopologyBuilderTest.SingleTasklet.class).output("out");
+                    in.into(RelayTopologyBuilderTest.GraphStage1.class).output("out");
                 }),
-                // entry(in); in.into(plain); plain.sink(out); plain.call(pricing)
+                // entry(in); in.into(plain); plain.output(out); plain.call(pricing)
                 new Row("call_beside_sink", c -> {
                     var plain = plain(c);
-                    plain.sink("out");
+                    plain.output("out");
                     callBack(plain, CallTarget.id("pricing"), 500);
                 }),
                 // entry(in); in.into(plain); plain.named(ask); plain.call_factory_nocreate(agent)
@@ -160,16 +160,16 @@ class ReferenceTopologyRowsTest {
                     in.into(RelayTopologyBuilderTest.SingleTasklet.class);
                     in.into(RelayTopologyBuilderTest.SingleTasklet.class);
                 }),
-                // entry(in); in.into(plain); plain.named(renamed); plain.sink
+                // entry(in); in.into(plain); plain.named(renamed); plain.output
                 new Row("named_sink", c -> {
                     var plain = c.input(String.class, "in").into(RelayTopologyBuilderTest.SingleTasklet.class);
                     plain.named("renamed");
-                    plain.sink();
+                    plain.output();
                 }),
-                // entry(in); in.into(plain); plain.sink(items_output)
+                // entry(in); in.into(plain); plain.output(items_output)
                 new Row("sink_names_channel", c -> c.input(String.class, "in")
                         .into(RelayTopologyBuilderTest.SingleTasklet.class)
-                        .sink("items_output")),
+                        .output("items_output")),
                 // entry(in); in.into(plain); plain.named(ask); plain.call(pricing)
                 new Row("call_back_into_caller", c -> callBack(plain(c).named("ask"), CallTarget.id("pricing"), 500)),
                 // entry(in); in.into(plain); plain.named(ask); plain.key.call_factory(agent)
@@ -255,7 +255,7 @@ class ReferenceTopologyRowsTest {
         return lines;
     }
 
-    /** The core's answer in the fixture's columns: index, name, kind, producer, consumers, sink. */
+    /** The core's answer in the fixture's columns: index, name, kind, producer, consumers, output. */
     private List<List<String>> columns(DerivedDeclaration derived) {
         List<List<String>> lines = new ArrayList<>();
         for (DerivedDeclaration.Channel channel : derived.channels()) {
@@ -269,7 +269,7 @@ class ReferenceTopologyRowsTest {
                             : channel.consumers().stream()
                                     .map(edge -> String.valueOf(edge.tasklet()))
                                     .collect(Collectors.joining(",")),
-                    absent(channel.sink())));
+                    absent(channel.output())));
         }
         return lines;
     }

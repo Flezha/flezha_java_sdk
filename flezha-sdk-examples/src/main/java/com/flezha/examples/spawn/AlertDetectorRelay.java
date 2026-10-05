@@ -15,6 +15,6 @@ public final class AlertDetectorRelay implements Relay {
 
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
-        c.input(String.class, "events").into(Detect.class).sink("alerts");
+        c.input(String.class, "events").into(Detect.class).output("alerts");
     }
 }

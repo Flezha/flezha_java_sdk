@@ -24,7 +24,7 @@ public final class DynamicCellRelay implements Relay {
                 .filter(input -> !input.equals("drop"))
                 .keyBy(DynamicCellRelay::key)
                 .into(DynamicCellTasklet.class)
-                .sink("kafka");
+                .output("kafka");
     }
 
     /** Key = text before the first {@code :}; {@code partition_pass} shares it. */

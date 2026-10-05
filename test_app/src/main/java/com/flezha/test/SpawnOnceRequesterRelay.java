@@ -22,7 +22,7 @@ public final class SpawnOnceRequesterRelay implements Relay {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "in").into(SpawnOnceRequesterTasklet.class).sink("out");
+        c.input(String.class, "in").into(SpawnOnceRequesterTasklet.class).output("out");
     }
 
     @Tasklet.Spec(name = "spawn_once_requester")

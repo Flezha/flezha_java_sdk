@@ -318,7 +318,7 @@ public final class TaskletTestHarness<Input, State, Output> {
      * resulting emit sequence. Equal emits mean the Tasklet's OUTPUT is a
      * deterministic function of its inputs — which {@code replayEquals} alone does
      * not prove: a Tasklet can rebuild identical state while emitting a
-     * different key or timestamp each run, and only a keyed sink's idempotence
+     * different key or timestamp each run, and only a keyed output's idempotence
      * depends on that not happening.
      *
      * <p>A Tasklet that reads {@code System.currentTimeMillis()} or
@@ -472,7 +472,7 @@ public final class TaskletTestHarness<Input, State, Output> {
         }
 
         /**
-         * No-op: a part never reaches a sink, so it is not an emit to record, and the harness
+         * No-op: a part never reaches an output, so it is not an emit to record, and the harness
          * encodes no emit either, so there is no encoding to check.
          */
         @Override

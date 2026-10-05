@@ -10,12 +10,12 @@ import javax.annotation.Nullable;
 /**
  * One link of a declared chain, as the {@code HostClassDecl} record spells it.
  * A chain is one fluent sequence off a channel handle, in the order the author
- * called it; {@code into}, {@code merge}, {@code sink},
+ * called it; {@code into}, {@code merge}, {@code output},
  * {@code call} and {@code branch} close the chain they stand in.
  *
  * <p>Closures never enter the record — the builder keeps them beside it and
  * attaches them to the edge the core derived from the chain. What a chain
- * MEANS (its consumers, the channel's kind, its name, its sink) is
+ * MEANS (its consumers, the channel's kind, its name, its output) is
  * {@code flz_core::host::register::check}'s answer, never a claim made here.
  */
 public record HostLink(
@@ -46,10 +46,10 @@ public record HostLink(
 
     /**
      * Terminates the channel on the plugin layer, naming it — or leaving the
-     * name derived, for the no-argument {@code sink()}.
+     * name derived, for the no-argument {@code output()}.
      */
     @Nonnull
-    public static HostLink sink(@Nullable String name) {
+    public static HostLink output(@Nullable String name) {
         return new HostLink("sink", name, null, null, null, null);
     }
 

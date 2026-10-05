@@ -44,7 +44,7 @@ public final class RollupTasklet implements Tasklet<String, RollupTasklet.Totals
     public void run(String input, Ctx<Totals, String> ctx) throws TaskletException {
         ctx.change(new AddTick(valueOf(input)));
 
-        // The key comes from the input, so a replay emits under the same key and the sink
+        // The key comes from the input, so a replay emits under the same key and the output
         // updates rather than inserting. That is what makes a repeated emit harmless.
         ctx.emitKeyed(symbolOf(input), "sum=" + ctx.state().sum);
 

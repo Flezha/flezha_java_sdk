@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flezha.examples.local.WordCountRelay;
 import com.flezha.sdk.FlezhaException;
+import com.flezha.sdk.LocalOutput;
 import com.flezha.sdk.LocalRelay;
-import com.flezha.sdk.SinkOutput;
 import com.flezha.sdk.runtime.RepositoryFixture;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -39,9 +39,9 @@ class LocalModeTest {
         List<String> lines = scenarioRows("lines: ");
         Map<String, Integer> expected = multiset(scenarioRows("totals: "));
 
-        ConcurrentLinkedQueue<SinkOutput> released = new ConcurrentLinkedQueue<>();
+        ConcurrentLinkedQueue<LocalOutput> released = new ConcurrentLinkedQueue<>();
         try (LocalRelay run = LocalRelay.start(WordCountRelay.class)) {
-            run.onSink("totals", released::add);
+            run.onOutput("totals", released::add);
             lines.forEach(line -> run.feed("lines", line));
             run.runUntilIdle(Duration.ofSeconds(20));
         }
@@ -50,7 +50,7 @@ class LocalModeTest {
         released.forEach(out -> payloads.add(new String(out.payload(), StandardCharsets.UTF_8)));
         assertThat(multiset(payloads)).isEqualTo(expected);
 
-        SinkOutput first = released.peek();
+        LocalOutput first = released.peek();
         assertThat(first.channel()).isEqualTo("totals");
         assertThat(first.metadata()).containsKeys("flz.cell", "flz.seq", "flz.key");
     }
@@ -62,10 +62,11 @@ class LocalModeTest {
                 assertThat(e.code()).isEqualTo("runtime.channel_undeclared");
                 assertThat(e.details()).containsEntry("channel", "nope").containsEntry("channels", List.of("lines"));
             });
-            assertThatThrownBy(() -> run.onSink("nope", out -> {})).isInstanceOfSatisfying(FlezhaException.class, e -> {
-                assertThat(e.code()).isEqualTo("runtime.channel_undeclared");
-                assertThat(e.details()).containsEntry("channel", "nope");
-            });
+            assertThatThrownBy(() -> run.onOutput("nope", out -> {}))
+                    .isInstanceOfSatisfying(FlezhaException.class, e -> {
+                        assertThat(e.code()).isEqualTo("runtime.channel_undeclared");
+                        assertThat(e.details()).containsEntry("channel", "nope");
+                    });
         }
     }
 

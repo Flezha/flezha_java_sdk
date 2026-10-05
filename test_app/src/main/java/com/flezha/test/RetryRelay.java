@@ -38,9 +38,9 @@ public final class RetryRelay implements Relay {
     public void channels(ChannelBuilder c) {
         c.input(String.class, "in")
                 .into(RetryA.class)
-                .sink("mid", s -> ("res:" + s).getBytes(StandardCharsets.UTF_8))
+                .output("mid", s -> ("res:" + s).getBytes(StandardCharsets.UTF_8))
                 .into(RetryFlaky.class)
-                .sink("out");
+                .output("out");
     }
 
     /** Task RA: durable, forwards on the hybrid channel, compensates with an undo record. */

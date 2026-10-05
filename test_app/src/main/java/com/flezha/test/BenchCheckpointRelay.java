@@ -34,6 +34,6 @@ public final class BenchCheckpointRelay implements Relay {
                 .onFull(OverflowPolicy.DROP_NOTHING)
                 .into(BenchCheckpointTasklet.class)
                 .keyed()
-                .sink("sink");
+                .output("sink");
     }
 }

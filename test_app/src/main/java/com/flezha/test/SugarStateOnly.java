@@ -7,8 +7,8 @@ import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 
 /**
- * The short form with no sink: its entry channel {@code ticks} feeds a tasklet that only keeps
- * state, so what it was sent is read back off the Cell rather than off a sink.
+ * The short form with no output: its entry channel {@code ticks} feeds a tasklet that only keeps
+ * state, so what it was sent is read back off the Cell rather than off an output.
  */
 @Relay(id = "sugar_state_only", input = "ticks")
 public class SugarStateOnly implements Tasklet<String, SugarStateOnlyState, Void> {

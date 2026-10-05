@@ -39,7 +39,7 @@ public final class TierCommitBlockRelay implements Relay {
         c.input(String.class, "in")
                 .into(TierCommitA.class)
                 .keyed()
-                .sink("mid", s -> s.getBytes(StandardCharsets.UTF_8))
+                .output("mid", s -> s.getBytes(StandardCharsets.UTF_8))
                 .into(CommitBlockRelay.BlockB.class);
     }
 

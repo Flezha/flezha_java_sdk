@@ -17,7 +17,7 @@ import java.util.List;
  * </pre>
  *
  * Every tasklet commits durable state and compensates by emitting an undo
- * record, so both tree behaviours are observable at one sink: crash-resume
+ * record, so both tree behaviours are observable at one output: crash-resume
  * (BranchD blocks, so the respawn re-runs D alone and the sibling's {@code c:}
  * marker appears exactly once) and compensation (with {@code FLEZHA_BRANCH_FAIL}
  * armed BranchD fails, and the rollback unwinds the two branches before the root
@@ -48,15 +48,15 @@ public final class BranchRelay implements Relay {
         // what BranchA released on it (held handle, wired twice).
         var mid = c.input(String.class, "in")
                 .into(BranchA.class)
-                .sink("mid", s -> ("a:" + s).getBytes(StandardCharsets.UTF_8));
+                .output("mid", s -> ("a:" + s).getBytes(StandardCharsets.UTF_8));
         // Fail fast: the compensation scenario is about the rollback order,
         // not the ladder that precedes it.
         mid.into(BranchB.class)
-                .sink("bmid", s -> ("b:" + s).getBytes(StandardCharsets.UTF_8))
+                .output("bmid", s -> ("b:" + s).getBytes(StandardCharsets.UTF_8))
                 .retryMax(1)
                 .into(BranchD.class)
-                .sink("d_out");
-        mid.into(BranchC.class).sink("c_out");
+                .output("d_out");
+        mid.into(BranchC.class).output("c_out");
     }
 
     /** The shared root. */
@@ -77,7 +77,7 @@ public final class BranchRelay implements Relay {
         }
     }
 
-    /** The sibling leaf: emits straight to the sink, and its undo does too. */
+    /** The sibling leaf: emits straight to the output, and its undo does too. */
     @Tasklet.Spec(name = "branch_c")
     public static final class BranchC extends DurableStep {
         @Override

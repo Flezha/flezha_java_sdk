@@ -80,7 +80,7 @@ class RunnerLifecycleTest {
     }
 
     /** A short form: the tasklet class itself declares the relay. */
-    @com.flezha.sdk.authoring.Relay(id = "lifecycle_short", sink = "out")
+    @com.flezha.sdk.authoring.Relay(id = "lifecycle_short", output = "out")
     public static final class ShortForm implements Tasklet<String, Void, String> {
         @Override
         public void run(String input, Ctx<Void, String> ctx) throws TaskletException {

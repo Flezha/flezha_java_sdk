@@ -25,6 +25,6 @@ public final class CandleRelay implements Relay {
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
 
-        c.input(String.class, "trades").into(CandleTasklet.class).keyed().sink("candles");
+        c.input(String.class, "trades").into(CandleTasklet.class).keyed().output("candles");
     }
 }

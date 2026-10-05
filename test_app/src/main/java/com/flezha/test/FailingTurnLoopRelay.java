@@ -37,6 +37,6 @@ public class FailingTurnLoopRelay implements Relay {
                 .into(FailingTurnSteps.Note.class)
                 .named("noted")
                 .into(FailingTurnSteps.Answer.class)
-                .sink("answer");
+                .output("answer");
     }
 }

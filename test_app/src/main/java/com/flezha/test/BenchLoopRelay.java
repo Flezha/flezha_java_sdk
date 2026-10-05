@@ -37,6 +37,6 @@ public final class BenchLoopRelay implements Relay {
                 .into(BenchSteps.Turn.class)
                 .named("mid")
                 .into(ChatSteps.Reply.class)
-                .sink("out");
+                .output("out");
     }
 }

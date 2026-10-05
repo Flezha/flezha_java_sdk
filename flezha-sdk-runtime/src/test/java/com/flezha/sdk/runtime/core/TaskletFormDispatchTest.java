@@ -133,7 +133,7 @@ class TaskletFormDispatchTest extends DispatchTestBase {
         public EmitManyRelay() {
             super("emit_many", c -> c.input(String.class, "in")
                     .into(EmitManyTask.class)
-                    .sink("out", s -> s.getBytes(StandardCharsets.UTF_8)));
+                    .output("out", s -> s.getBytes(StandardCharsets.UTF_8)));
         }
     }
 

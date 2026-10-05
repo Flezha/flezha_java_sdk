@@ -19,7 +19,7 @@ class PipelineTest {
         List<String> out = new ArrayList<>();
 
         try (LocalRelay run = LocalRelay.start(PipelineRelay.class)) {
-            run.onSink("shouted", frame -> out.add(new String(frame.payload(), UTF_8)));
+            run.onOutput("shouted", frame -> out.add(new String(frame.payload(), UTF_8)));
             run.feed("in", "  Hello World  ");
             run.runUntilIdle(Duration.ofSeconds(5));
         }

@@ -32,7 +32,7 @@ public final class WedgeProbeRelay implements Relay {
 
     @Override
     public void channels(ChannelBuilder c) {
-        c.input(String.class, "input").into(WedgeProbeTasklet.class).sink("out");
+        c.input(String.class, "input").into(WedgeProbeTasklet.class).output("out");
     }
 
     @Tasklet.Spec(name = "wedge_probe_tasklet")

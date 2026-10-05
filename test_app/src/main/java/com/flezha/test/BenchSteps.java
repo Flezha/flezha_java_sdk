@@ -36,7 +36,7 @@ public final class BenchSteps {
         for (int i = 1; i < tasks; i++) {
             s = s.named("edge_BenchS" + i).into(CHAIN.get(i));
         }
-        s.sink("out");
+        s.output("out");
     }
 
     @Tasklet.Spec(name = "bench_s0")

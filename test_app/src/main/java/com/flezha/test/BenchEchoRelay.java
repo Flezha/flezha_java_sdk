@@ -21,6 +21,6 @@ public final class BenchEchoRelay implements Relay {
         c.input(String.class, "input")
                 .onFull(OverflowPolicy.DROP_NOTHING)
                 .into(DoNothingTasklet.class)
-                .sink("echo");
+                .output("echo");
     }
 }

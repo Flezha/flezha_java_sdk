@@ -5,19 +5,19 @@ import java.io.StringWriter;
 import javax.annotation.Nonnull;
 
 /**
- * The SDK's diagnostics, through a sink the host supplies.
+ * The SDK's diagnostics, through an output the host supplies.
  *
  * <p>The default writes to standard error at {@code warn} and above, which is
  * what the other SDKs' defaults amount to: a runner that says nothing about a
  * wedge is the failure mode diagnostics exist to close, and one that narrates
  * every activation is noise. There is no logging dependency: a host that wants
- * SLF4J, Log4j, spans or structured fields supplies its own sink through
+ * SLF4J, Log4j, spans or structured fields supplies its own output through
  * {@link FlezhaRunner#logger(Logger)}.
  *
  * <p>One method carries the diagnostic, so an adapter is a lambda; the four
  * level methods are the call sites' spelling. Messages use SLF4J's {@code {}}
- * placeholder and are substituted by the sink, not before it, so a disabled
- * level costs no formatting. A sink that renders the line itself calls
+ * placeholder and are substituted by the output, not before it, so a disabled
+ * level costs no formatting. An output that renders the line itself calls
  * {@link #render(String, Object...)} rather than writing a second
  * substitution.
  */

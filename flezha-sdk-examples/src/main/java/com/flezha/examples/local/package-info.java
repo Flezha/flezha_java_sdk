@@ -2,12 +2,12 @@
  * Executing a complete graph inside the calling JVM, with no controller.
  *
  * <p>{@link com.flezha.sdk.LocalRelay} takes the same relay class that would be deployed,
- * runs its declared wiring in this process, and delivers sink output to a callback. No controller,
+ * runs its declared wiring in this process, and delivers output to a callback. No controller,
  * no socket and no container are involved, which makes this both the fastest way to try an idea and
  * the basis for a test that exercises real wiring rather than a mock.
  *
  * <p>{@code feed} places a message on a named entry channel and blocks while the consumer's mailbox
- * is full. {@code onSink} registers a callback against a channel name, which is the producing
+ * is full. {@code onOutput} registers a callback against a channel name, which is the producing
  * tasklet's name unless the declaration supplied one through {@code named}.
  * {@code runUntilIdle} drives the graph until it drains or the supplied timeout elapses; the
  * calling thread is the poll loop, so the graph makes no progress without it.

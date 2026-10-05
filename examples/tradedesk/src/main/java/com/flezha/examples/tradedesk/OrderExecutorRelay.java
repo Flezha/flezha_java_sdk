@@ -56,7 +56,7 @@ public final class OrderExecutorRelay implements Relay {
      * children run, so the desk's order of events is fixed rather than a race. A step that fails
      * poisons its whole level, which is why a refusal on either arm unwinds what the other arm did.
      *
-     * <p>Nothing ends on a sink: the last step ends the instance with its result, which
+     * <p>Nothing ends on an output: the last step ends the instance with its result, which
      * {@code flz relay info} shows. Nothing names a channel either, so each one carries the
      * name of the step that produces it, which is what appears in the journal and in an error;
      * {@code named(...)} overrides that where a stable name of your own matters more.

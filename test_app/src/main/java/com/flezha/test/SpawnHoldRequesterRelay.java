@@ -31,7 +31,7 @@ public final class SpawnHoldRequesterRelay implements Relay {
                 .onFull(OverflowPolicy.DROP_NOTHING)
                 .into(SpawnHoldRequesterTasklet.class)
                 .keyed()
-                .sink("out");
+                .output("out");
     }
 
     @Tasklet.Spec(name = "spawn_hold_requester")

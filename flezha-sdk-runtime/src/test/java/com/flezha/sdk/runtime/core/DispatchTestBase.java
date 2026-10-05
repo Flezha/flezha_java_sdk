@@ -171,7 +171,7 @@ abstract class DispatchTestBase {
         public CounterRelay() {
             super("counter_op", c -> c.input(String.class, "in")
                     .into(CountTask.class)
-                    .sink("out", s -> ("seen:" + s).getBytes(StandardCharsets.UTF_8)));
+                    .output("out", s -> ("seen:" + s).getBytes(StandardCharsets.UTF_8)));
         }
     }
 
@@ -204,7 +204,7 @@ abstract class DispatchTestBase {
         public MigratingCounterRelay() {
             super("migrating_counter_op", c -> c.input(String.class, "in")
                     .into(MigratingCountTask.class)
-                    .sink("out", s -> ("seen:" + s).getBytes(StandardCharsets.UTF_8)));
+                    .output("out", s -> ("seen:" + s).getBytes(StandardCharsets.UTF_8)));
         }
     }
 
@@ -241,14 +241,14 @@ abstract class DispatchTestBase {
     }
 
     /**
-     * `sink("items_output")` and no `.named(...)` anywhere: the string an
+     * `output("items_output")` and no `.named(...)` anywhere: the string an
      * author can read in the source is the channel the frame is addressed by.
      */
     public static final class SinkNamesChannelRelay extends Op {
         public SinkNamesChannelRelay() {
             super("sink_names_channel", c -> c.input(String.class, "in")
                     .into(StatelessStateTask.class)
-                    .sink("items_output", s -> s.getBytes(StandardCharsets.UTF_8)));
+                    .output("items_output", s -> s.getBytes(StandardCharsets.UTF_8)));
         }
     }
 
@@ -257,7 +257,7 @@ abstract class DispatchTestBase {
             super("keyed_op", c -> c.input(String.class, "in")
                     .into(KeyedTask.class)
                     .keyed()
-                    .sink(s -> s.getBytes(StandardCharsets.UTF_8)));
+                    .output(s -> s.getBytes(StandardCharsets.UTF_8)));
         }
     }
 
@@ -265,7 +265,7 @@ abstract class DispatchTestBase {
         public StatelessStateRelay() {
             super("stateless_state_op", c -> c.input(String.class, "in")
                     .into(StatelessStateTask.class)
-                    .sink("out", s -> s.getBytes(StandardCharsets.UTF_8)));
+                    .output("out", s -> s.getBytes(StandardCharsets.UTF_8)));
         }
     }
 
@@ -506,7 +506,7 @@ abstract class DispatchTestBase {
             super("ckpt_op", c -> c.input(String.class, "in")
                     .into(CkptTask.class)
                     .keyed()
-                    .sink(s -> s.getBytes(StandardCharsets.UTF_8)));
+                    .output(s -> s.getBytes(StandardCharsets.UTF_8)));
         }
 
         @Override

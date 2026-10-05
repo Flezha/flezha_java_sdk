@@ -10,7 +10,7 @@ import java.util.List;
 /**
  * {@code sleeping_counter}, the Java mirror of the Rust test app's: a flow relay
  * that sleeps when idle. {@code key:delta} inputs fold into one running total
- * per key, and every input emits {@code key=total} on the {@code totals} sink,
+ * per key, and every input emits {@code key=total} on the {@code totals} output,
  * which is what the sleep e2e reads after a wake.
  */
 public final class SleepingCounterRelay implements Relay {
@@ -30,7 +30,7 @@ public final class SleepingCounterRelay implements Relay {
         c.input(String.class, "input")
                 .keyBy(input -> input.split(":", 2)[0])
                 .into(SleepingCounterTasklet.class)
-                .sink("totals");
+                .output("totals");
     }
 
     @Tasklet.Spec(name = "sleeping_counter_tasklet")

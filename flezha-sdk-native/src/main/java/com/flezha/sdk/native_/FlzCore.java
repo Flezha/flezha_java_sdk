@@ -45,7 +45,7 @@ public final class FlzCore {
     /**
      * Judge one host class declaration without registering it: the one seam
      * every SDK's builder submits its record to. Returns the DERIVED
-     * declaration's JSON bytes — the consumers, channel kinds, sink names and
+     * declaration's JSON bytes — the consumers, channel kinds, output names and
      * acknowledgement granularity the core read off the record. A refused
      * declaration throws with the first refusal's code, and
      * {@code details.issues} lists every refusal as {@code {code, message,
@@ -65,7 +65,7 @@ public final class FlzCore {
      */
     public static native void localStart(long ctx, String factoryId, String relayId);
 
-    /** Queue the sink named {@code channel} for {@link #localNextOutput}. */
+    /** Queue the output named {@code channel} for {@link #localNextOutput}. */
     public static native void localOnSink(long ctx, String channel);
 
     /**
@@ -77,7 +77,7 @@ public final class FlzCore {
 
     /**
      * Block up to {@code timeoutMs} for the next value the graph released on
-     * a queued sink. {@code null} = timeout; otherwise the postcard-encoded
+     * a queued output. {@code null} = timeout; otherwise the postcard-encoded
      * Output bytes.
      */
     public static native byte[] localNextOutput(long ctx, long timeoutMs);
@@ -175,8 +175,8 @@ public final class FlzCore {
     /**
      * The ABI form of {@code ctx.part}: send a part of the invocation of work item {@code item}
      * (its index in the polled activation {@code token}'s list) at once. The core numbers, stamps
-     * and, when it cannot leave at once, drops it. Throws {@code part.no_sink} when the tasklet's
-     * output channel ends in no sink, {@code part.outside_invocation} for a token no longer
+     * and, when it cannot leave at once, drops it. Throws {@code part.no_output} when the tasklet's
+     * output channel ends in no output, {@code part.outside_invocation} for a token no longer
      * outstanding or an item it does not hold.
      */
     public static native void part(long ctx, long token, int item, byte[] payload);

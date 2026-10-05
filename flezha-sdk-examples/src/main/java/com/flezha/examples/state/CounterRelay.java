@@ -21,6 +21,6 @@ public final class CounterRelay implements Relay {
 
     @Override
     public void channels(@Nonnull ChannelBuilder c) {
-        c.input(String.class, "in").into(CountTasklet.class).sink("out");
+        c.input(String.class, "in").into(CountTasklet.class).output("out");
     }
 }

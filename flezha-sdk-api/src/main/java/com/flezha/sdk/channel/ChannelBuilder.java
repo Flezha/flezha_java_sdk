@@ -8,7 +8,7 @@ import javax.annotation.Nonnull;
  * {@link com.flezha.sdk.relay.Relay#channels(ChannelBuilder)}, the
  * graph body of every relay.
  *
- * <p>{@code c.input(T.class, "name").into(A.class).into(B.class).sink("plugin")}
+ * <p>{@code c.input(T.class, "name").into(A.class).into(B.class).output("plugin")}
  * — {@code .into} wires a consumer and returns that tasklet's <b>output
  * stream handle</b> ({@link Stream}), so a linear pipeline is one chained
  * expression. Branching is handle reuse (hold the handle in a variable and

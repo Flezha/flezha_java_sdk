@@ -18,7 +18,7 @@ public final class BoundedMailboxDropNewestRelay implements Relay {
         c.input(String.class, "drop_newest_input")
                 .onFull(OverflowPolicy.DROP_NEWEST)
                 .into(DropNewestTestTasklet.class)
-                .sink("drop_newest_echo");
+                .output("drop_newest_echo");
     }
 
     @Tasklet.Spec(name = "drop_newest_test_tasklet", capacity = BoundedMailboxTasklet.CAPACITY)

@@ -155,33 +155,33 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
 
     @Override
     @Nonnull
-    public Stream<T> sink(@Nonnull String channel, @Nonnull Function<T, byte[]> serializer) {
+    public Stream<T> output(@Nonnull String channel, @Nonnull Function<T, byte[]> serializer) {
         return attachSink(channel, serializer);
     }
 
     @Override
     @Nonnull
-    public Stream<T> sink(@Nonnull String channel) {
+    public Stream<T> output(@Nonnull String channel) {
         return attachSink(channel, PlainPayload::encode);
     }
 
     @Override
     @Nonnull
-    public Stream<T> sink(@Nonnull Function<T, byte[]> serializer) {
+    public Stream<T> output(@Nonnull Function<T, byte[]> serializer) {
         return attachSink(null, serializer);
     }
 
     @Override
     @Nonnull
-    public Stream<T> sink() {
+    public Stream<T> output() {
         return attachSink(null, PlainPayload::encode);
     }
 
-    /** Record a sink, which leaves as a plugin output. */
+    /** Record an output, which leaves as a plugin output. */
     private Stream<T> attachSink(@Nullable String channel, Function<T, byte[]> serializer) {
         owner.checkMutable();
         ChannelEntry entry = owner.channel(channelId());
-        owner.closeChain(channelId(), null, HostLink.sink(channel));
+        owner.closeChain(channelId(), null, HostLink.output(channel));
         if (channel != null) {
             // The record is what the core reads; this keeps the builder's own
             // diagnostics naming the channel the author does.

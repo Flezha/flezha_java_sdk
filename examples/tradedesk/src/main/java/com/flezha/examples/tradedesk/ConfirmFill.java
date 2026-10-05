@@ -12,7 +12,7 @@ import com.flezha.sdk.tasklet.TaskletException;
  *
  * <p>It remembers nothing and has nothing to undo, so it writes only {@code run}. It
  * ends the instance with a result rather than emitting one: the order's outcome is the instance's
- * own answer, which {@code flz relay info} reads back, so the desk needs no sink here.
+ * own answer, which {@code flz relay info} reads back, so the desk needs no output here.
  *
  * <p>A failure here is retried first, and once the retries are spent the instance ends abnormally.
  * Everything that finished is then undone in reverse, across both arms: the order is cancelled and

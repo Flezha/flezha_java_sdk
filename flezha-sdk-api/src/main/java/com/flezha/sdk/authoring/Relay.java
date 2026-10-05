@@ -16,7 +16,7 @@ import java.lang.annotation.Target;
  *
  * <p>{@code runner.registerFactory(Echo.class)} reads it and declares a relay whose factory id
  * is {@link #id()}, wiring the entry channel {@link #input()} into the class and, when
- * {@link #sink()} is written, the class to that plugin sink. The tasklet is named {@link #id()}.
+ * {@link #output()} is written, the class to that plugin output. The tasklet is named {@link #id()}.
  * Nothing is generated and nothing registers itself.
  *
  * <p>It takes the class settings the full form ({@link com.flezha.sdk.relay.Relay}) takes,
@@ -43,8 +43,8 @@ public @interface Relay {
      */
     String id() default "";
 
-    /** Plugin sink the tasklet's output is wired to. Empty (the default) declares no plugin channel. */
-    String sink() default "";
+    /** Plugin output the tasklet's output is wired to. Empty (the default) declares no plugin channel. */
+    String output() default "";
 
     /** Name of the entry channel, the address a user injects on. Empty (the default) names it {@code input}. */
     String input() default "";

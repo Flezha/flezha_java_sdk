@@ -185,7 +185,7 @@ final class EmitContext implements Ctx<Object, Object> {
 
     /**
      * Encoded as an emit of {@code value} on this tasklet's output channel would be. The core
-     * refuses a channel that ends in no sink, so a channel with no plugin end sends no bytes.
+     * refuses a channel that ends in no output, so a channel with no plugin end sends no bytes.
      */
     @Override
     public void part(@Nonnull Object value) {
@@ -251,7 +251,7 @@ final class EmitContext implements Ctx<Object, Object> {
                         "runtime.metadata_on_inter_tasklet_channel", Map.of("channel", descriptor.name()));
             }
         }
-        // Fan out to the consumer edges, then to the plugin sink if the
+        // Fan out to the consumer edges, then to the plugin output if the
         // channel has one. The plugin-bound terminal is the same path with
         // no consumer edges, which is why there is no second arm for it.
         collectEdgeOutputs(channelId, descriptor, value);

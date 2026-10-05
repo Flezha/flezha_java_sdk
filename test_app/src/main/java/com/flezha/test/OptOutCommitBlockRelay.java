@@ -7,9 +7,9 @@ import java.nio.charset.StandardCharsets;
 /**
  * Mirror of the Rust test app's {@code optout_commit_block}: the opt-out twin of
  * {@link CommitBlockRelay} with a live mid-chain signal — task A's
- * output also reaches a plugin sink, so the crash-resume e2e can observe the
+ * output also reaches a plugin output, so the crash-resume e2e can observe the
  * mid-run point without durable state (there is none). A crash + resume re-runs
- * the whole chain from the top, so the sink sees task A's marker once per run
+ * the whole chain from the top, so the output sees task A's marker once per run
  * and no journal/WAL file exists.
  */
 public final class OptOutCommitBlockRelay implements Relay {
@@ -33,7 +33,7 @@ public final class OptOutCommitBlockRelay implements Relay {
     public void channels(ChannelBuilder c) {
         c.input(String.class, "in")
                 .into(CommitBlockRelay.CommitA.class)
-                .sink("mid", s -> ("a-ran:" + s).getBytes(StandardCharsets.UTF_8))
+                .output("mid", s -> ("a-ran:" + s).getBytes(StandardCharsets.UTF_8))
                 .into(CommitBlockRelay.BlockB.class);
     }
 }

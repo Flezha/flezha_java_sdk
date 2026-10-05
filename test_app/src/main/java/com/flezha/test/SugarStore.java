@@ -7,7 +7,7 @@ import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 
 /** Single-tasklet stateful short-form twin of {@link StoreInputTasklet}. */
-@Relay(id = "sugar_store_input", sink = "sugar_store_sink")
+@Relay(id = "sugar_store_input", output = "sugar_store_sink")
 public class SugarStore implements Tasklet<String, SugarStoreState, String> {
 
     /** One text input to append. */

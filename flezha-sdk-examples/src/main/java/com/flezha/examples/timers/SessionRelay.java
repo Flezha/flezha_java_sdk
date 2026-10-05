@@ -18,6 +18,6 @@ public final class SessionRelay implements Relay {
         c.input(String.class, "clicks")
                 .keyBy(click -> click.split(":")[0])
                 .into(SessionWindow.class)
-                .sink("closed_sessions");
+                .output("closed_sessions");
     }
 }

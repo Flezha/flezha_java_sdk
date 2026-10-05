@@ -3,12 +3,12 @@
  *
  * <p>Every preceding example has a single tasklet, which can leave the impression that chaining
  * is a distinct feature. It is not. What a tasklet emits travels on a channel, and a channel can
- * feed another tasklet exactly as readily as it can feed a sink, so a chain of stages is the
+ * feed another tasklet exactly as readily as it can feed an output, so a chain of stages is the
  * normal shape rather than a special case.
  *
  * <p>{@link com.flezha.examples.pipeline.PipelineRelay} holds the entire lesson in one
  * expression: an entry channel feeds {@link com.flezha.examples.pipeline.Normalize}, whose output
- * is labelled and feeds {@link com.flezha.examples.pipeline.Shout}, whose output reaches a sink.
+ * is labelled and feeds {@link com.flezha.examples.pipeline.Shout}, whose output reaches an output.
  * The two tasklets are deliberately trivial so that nothing distracts from the wiring.
  *
  * <p>Each stage is an independent tasklet with its own state, scheduled and restarted on its own,
@@ -18,7 +18,7 @@
  * stage's input type.
  *
  * <p>The labels supplied to {@code named} are not documentation. They are the identities the rest of
- * the system uses, including sink registration and the channel a test feeds or reads.
+ * the system uses, including output registration and the channel a test feeds or reads.
  * {@code PipelineTest} exercises this graph end to end in local mode.
  */
 package com.flezha.examples.pipeline;

@@ -205,7 +205,7 @@ class StepsDispatchTest extends DispatchTestBase {
 
         @Override
         public void channels(com.flezha.sdk.channel.ChannelBuilder c) {
-            c.input(String.class, "seed").into(CountTask.class).keyed().sink(v -> v.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "seed").into(CountTask.class).keyed().output(v -> v.getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -223,7 +223,7 @@ class StepsDispatchTest extends DispatchTestBase {
 
         @Override
         public void channels(com.flezha.sdk.channel.ChannelBuilder c) {
-            c.input(String.class, "seed").into(KeyedTask.class).keyed().sink(v -> v.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "seed").into(KeyedTask.class).keyed().output(v -> v.getBytes(StandardCharsets.UTF_8));
         }
     }
 

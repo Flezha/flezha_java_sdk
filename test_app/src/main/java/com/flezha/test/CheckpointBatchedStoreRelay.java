@@ -29,6 +29,6 @@ public final class CheckpointBatchedStoreRelay implements Relay {
         c.input(String.class, "input")
                 .into(CheckpointStoreTasklet.class)
                 .keyed()
-                .sink("sink");
+                .output("sink");
     }
 }

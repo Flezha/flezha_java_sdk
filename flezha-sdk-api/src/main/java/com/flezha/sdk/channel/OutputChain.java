@@ -7,7 +7,7 @@ import javax.annotation.Nonnull;
 /**
  * A chain declared on a tasklet's output channel: the shared {@link EdgeStream} surface, plus the
  * {@link #call call} end only a producer's channel carries. An entry channel's chain has no such
- * end, as it has no sink.
+ * end, as it has no output.
  */
 public interface OutputChain<T> extends EdgeStream<T> {
 
@@ -29,14 +29,14 @@ public interface OutputChain<T> extends EdgeStream<T> {
 
     /**
      * End this chain in a call to another relay: every value that reaches it, after this
-     * chain's transforms and key, is one request, serialized as {@link Stream#sink()} serializes
+     * chain's transforms and key, is one request, serialized as {@link Stream#output()} serializes
      * it. The call waits for nothing: its outcome arrives later as a {@link Response} on the entry
      * channel this answers, named {@code <this channel>.response}, which must feed a tasklet (the
      * one that made the call included) and decodes the answer as {@code input(answer, ...)} decodes.
      * The caller hears of the outcome within {@code deadlineMs} milliseconds of the emit,
      * {@code call.timeout} at the latest.
      *
-     * <p>A call is a plugin end: a channel ends in one sink, one response or one call, and a call
+     * <p>A call is a plugin end: a channel ends in one output, one response or one call, and a call
      * with a zero deadline, a Response channel nothing reads, or a {@code create(false)} factory
      * call with no {@link #keyBy} before it fail registration.
      */

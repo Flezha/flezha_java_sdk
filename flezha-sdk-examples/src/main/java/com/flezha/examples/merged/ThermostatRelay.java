@@ -19,6 +19,6 @@ public final class ThermostatRelay implements Relay {
                 .from(c.input(Reading.class, "readings"), DetectorInput::ofReading)
                 .from(c.input(Threshold.class, "config"), DetectorInput::ofThreshold)
                 .into(Detector.class)
-                .sink("alerts");
+                .output("alerts");
     }
 }

@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets;
  * The other half of {@code shorthand_duplicate_id}: a steps relay claiming the factory id
  * {@link ShorthandDupFlow} holds, which is what proves a flow and a steps relay share one namespace.
  */
-@Relay(id = "plain", sink = "twin_sink", run = @Run(steps = @Steps))
+@Relay(id = "plain", output = "twin_sink", run = @Run(steps = @Steps))
 public class ShorthandDupSteps implements Tasklet<String, Void, byte[]> {
 
     @Override
