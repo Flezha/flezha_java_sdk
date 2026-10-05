@@ -56,6 +56,8 @@ class FactoryIdsTest {
             "do_nothing",
             "dynamic_cell",
             "echo_steps",
+            "effect_block_steps",
+            "effect_flow",
             "event_timer_steps",
             "failed_stage_steps",
             "failing_turn_undo_all_steps",

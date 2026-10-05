@@ -8,6 +8,7 @@ import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.runtime.config.FlezhaEnv;
 import com.flezha.sdk.runtime.core.ActivationCodec;
 import com.flezha.sdk.runtime.core.ActivationDispatcher;
+import com.flezha.sdk.runtime.core.CoreCalls;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.core.Output;
 import com.flezha.sdk.runtime.core.OutputTarget;
@@ -62,8 +63,7 @@ public final class LocalImpl implements LocalRunHandle {
             FlzCore.contextFree(core);
             throw e;
         }
-        ActivationDispatcher dispatcher =
-                new ActivationDispatcher((token, item, payload) -> FlzCore.part(core, token, item, payload));
+        ActivationDispatcher dispatcher = new ActivationDispatcher(CoreCalls.of(core));
         LocalImpl handle = new LocalImpl(core, dispatcher, FlezhaEnv.resolveFromEnv());
         handle.pollHost.start();
         handle.outputs.start();

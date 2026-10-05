@@ -1,6 +1,7 @@
 package com.flezha.sdk.testing;
 
 import com.flezha.sdk.FlezhaException;
+import com.flezha.sdk.runtime.core.CoreCalls;
 import com.flezha.sdk.runtime.relay.TaskletModel;
 import com.flezha.sdk.runtime.state.ClockKind;
 import com.flezha.sdk.runtime.state.KryoCodec;
@@ -12,12 +13,17 @@ import com.flezha.sdk.tasklet.EmitKeys;
 import com.flezha.sdk.tasklet.StableId;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -33,6 +39,11 @@ import javax.annotation.Nullable;
  * compares the Kryo-serialized bytes. Equality means the Tasklet's state is
  * a deterministic function of the Change log — which is the umbrella's
  * correctness contract.
+ *
+ * <p>A {@code ctx.effect} keeps its result on {@link #applyInputs}, and
+ * {@link #replayEmitsEqual} serves the n-th input what the n-th applied input
+ * kept, failing naming the effect when its function runs there or a kept
+ * result is never asked for.
  */
 public final class TaskletTestHarness<Input, State, Output> {
 
@@ -46,6 +57,9 @@ public final class TaskletTestHarness<Input, State, Output> {
     private final List<Change<State>> recordedChanges = new ArrayList<>();
     private final List<Object> recordedEmits = new ArrayList<>();
     private final List<EmitRecord> emitRecords = new ArrayList<>();
+
+    /** Each applied input's effect results, in order. */
+    private final List<Map<EffectCall, byte[]>> keptEffects = new ArrayList<>();
 
     /** Injected clock values, one per successive invocation; empty = ambient wall clock. */
     private final List<Long> clockScript = new ArrayList<>();
@@ -157,7 +171,10 @@ public final class TaskletTestHarness<Input, State, Output> {
     @Nonnull
     public TaskletTestHarness<Input, State, Output> applyInputs(@Nonnull Iterable<Input> inputs) {
         for (Input input : inputs) {
-            TestCtx ctx = new TestCtx(state, recordedChanges, recordedEmits, emitRecords, clockAt(invocation, input));
+            Effects effects = new Effects(new HashMap<>(), false);
+            keptEffects.add(effects.kept);
+            TestCtx ctx = new TestCtx(
+                    state, recordedChanges, recordedEmits, emitRecords, clockAt(invocation, input), effects);
             invocation++;
             int recorded = recordedChanges.size();
             try {
@@ -325,6 +342,10 @@ public final class TaskletTestHarness<Input, State, Output> {
      * {@code UUID.randomUUID()} instead of {@code ctx.now()} / {@code ctx.stableId()}
      * is exactly what this catches.
      *
+     * <p>The replay is served the {@code ctx.effect} results the inputs applied in the same position
+     * kept. A function that runs on the replay, or a kept result the replay never asks for, is a
+     * diagnostic naming the effect: the replay reached outside some other way.
+     *
      * @return empty when the replayed emits match, else a diagnostic
      */
     @Nonnull
@@ -338,12 +359,17 @@ public final class TaskletTestHarness<Input, State, Output> {
         List<Change<State>> replayChanges = new ArrayList<>();
         int n = 0;
         for (Input input : inputs) {
-            TestCtx ctx = new TestCtx(fresh, replayChanges, replayEmits, replayRecords, clockAt(n, input));
+            Effects effects = new Effects(n < keptEffects.size() ? keptEffects.get(n) : Map.of(), true);
+            TestCtx ctx = new TestCtx(fresh, replayChanges, replayEmits, replayRecords, clockAt(n, input), effects);
             n++;
             try {
                 tasklet.run(input, ctx);
             } catch (TaskletException | FlezhaException e) {
                 // Mirror applyInputs: record what happened and keep going.
+            }
+            Optional<String> reachedOutside = effects.replayMismatch();
+            if (reachedOutside.isPresent()) {
+                return reachedOutside;
             }
         }
 
@@ -373,6 +399,7 @@ public final class TaskletTestHarness<Input, State, Output> {
         private final List<Object> recorded;
         private final List<EmitRecord> records;
         private final long now;
+        private final Effects effects;
         private int stableIdOrdinal;
 
         TestCtx(
@@ -380,12 +407,14 @@ public final class TaskletTestHarness<Input, State, Output> {
                 List<Change<State>> changes,
                 List<Object> recorded,
                 List<EmitRecord> records,
-                long now) {
+                long now,
+                Effects effects) {
             this.cellState = cellState;
             this.changes = changes;
             this.recorded = recorded;
             this.records = records;
             this.now = now;
+            this.effects = effects;
         }
 
         @Override
@@ -478,6 +507,12 @@ public final class TaskletTestHarness<Input, State, Output> {
         @Override
         public void part(@Nonnull Output value) {}
 
+        @Override
+        public <T> T effect(@Nonnull String name, @Nonnull Class<T> type, @Nonnull Supplier<T> fn)
+                throws TaskletException {
+            return effects.effect(0, 0, name, type, fn);
+        }
+
         /** Mirror the runtime: a user key in the runtime's namespace is refused, not dropped. */
         private static void rejectReserved(Map<String, String> meta) {
             for (String k : meta.keySet()) {
@@ -485,6 +520,91 @@ public final class TaskletTestHarness<Input, State, Output> {
                     throw FlezhaException.of("runtime.reserved_metadata_key", Map.of("key", k));
                 }
             }
+        }
+    }
+
+    /** One {@code ctx.effect} of an invocation: its name, and how many calls of that name came before. */
+    private record EffectCall(String name, int ordinal) {}
+
+    /**
+     * One invocation's effects, answered as the core answers them: an applied input keeps each
+     * result, and its replay is served them, noting a function that ran and every call it asked for.
+     */
+    private static final class Effects implements CoreCalls {
+
+        /** The longest effect name, in bytes, as the core refuses it. */
+        private static final int MAX_NAME_BYTES = 255;
+
+        final Map<EffectCall, byte[]> kept;
+        private final boolean replaying;
+        private final Map<String, Integer> ordinals = new HashMap<>();
+        private final Set<EffectCall> asked = new HashSet<>();
+        private final List<String> ran = new ArrayList<>();
+
+        @Nullable
+        private EffectCall running;
+
+        Effects(Map<EffectCall, byte[]> kept, boolean replaying) {
+            this.kept = kept;
+            this.replaying = replaying;
+        }
+
+        /** The harness drops parts: {@code TestCtx.part} never reaches here. */
+        @Override
+        public void part(long token, int item, @Nonnull byte[] payload) {}
+
+        @Override
+        @Nonnull
+        public byte[] effectBegin(long token, int item, @Nonnull String name) {
+            if (name.isEmpty() || name.getBytes(StandardCharsets.UTF_8).length > MAX_NAME_BYTES) {
+                throw FlezhaException.of("effect.bad_name", Map.of("name", "\"" + name + "\""));
+            }
+            if (running != null) {
+                throw FlezhaException.of("effect.nested", Map.of("name", name));
+            }
+            EffectCall call = new EffectCall(name, ordinals.merge(name, 1, Integer::sum) - 1);
+            asked.add(call);
+            byte[] result = kept.get(call);
+            if (result != null) {
+                byte[] begun = new byte[result.length + 1];
+                begun[0] = EFFECT_KEPT;
+                System.arraycopy(result, 0, begun, 1, result.length);
+                return begun;
+            }
+            if (replaying) {
+                ran.add(name);
+            }
+            running = call;
+            return new byte[] {EFFECT_RUN};
+        }
+
+        @Override
+        @Nullable
+        public byte[] effectEnd(long token, int item, @Nonnull byte[] payload) {
+            if (!replaying) {
+                kept.put(running, payload);
+            }
+            running = null;
+            return null;
+        }
+
+        @Override
+        public void effectRelease(long token, int item) {
+            running = null;
+        }
+
+        /** On a replay, the first effect that reached outside instead of reading its kept result. */
+        Optional<String> replayMismatch() {
+            if (!ran.isEmpty()) {
+                return Optional.of("effect `" + ran.get(0)
+                        + "` ran its function on replay instead of returning the result the applied input kept");
+            }
+            return kept.keySet().stream()
+                    .filter(call -> !asked.contains(call))
+                    .findFirst()
+                    .map(call -> "effect `" + call.name()
+                            + "` kept a result on the applied input that the replay never asked for:"
+                            + " an outside call made around ctx.effect");
         }
     }
 

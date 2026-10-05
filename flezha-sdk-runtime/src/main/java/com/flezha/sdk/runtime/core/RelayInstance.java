@@ -20,7 +20,6 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 
 /**
@@ -100,9 +99,9 @@ public final class RelayInstance {
         }
     }
 
-    ActivationOutcome dispatch(Activation activation, ActivationDispatcher.Parts parts) {
+    ActivationOutcome dispatch(Activation activation, CoreCalls core) {
         return switch (activation.kind()) {
-            case ActivationKind.Work work -> dispatchWork(activation, work.items(), parts);
+            case ActivationKind.Work work -> dispatchWork(activation, work.items(), core);
             case ActivationKind.RestoreFold fold -> restoreFold(activation, fold);
             case ActivationKind.SnapshotRequest ignored -> {
                 Cell cell = cellFor(activation.target());
@@ -117,7 +116,7 @@ public final class RelayInstance {
                 yield new ActivationOutcome.StateApplied();
             }
             case ActivationKind.KeyRequest request -> new ActivationOutcome.Prepared(routing.prepare(request));
-            case ActivationKind.CompensateRun comp -> compensateRun(activation, comp.outputs(), parts);
+            case ActivationKind.CompensateRun comp -> compensateRun(activation, comp.outputs(), core);
         };
     }
 
@@ -125,14 +124,11 @@ public final class RelayInstance {
     // Work
     // ------------------------------------------------------------------
 
-    private ActivationOutcome dispatchWork(
-            Activation activation, List<WorkItem> items, ActivationDispatcher.Parts parts) {
+    private ActivationOutcome dispatchWork(Activation activation, List<WorkItem> items, CoreCalls core) {
         Cell cell = cellFor(activation.target());
         List<ItemEffect> effects = new ArrayList<>(items.size());
         for (int index = 0; index < items.size(); index++) {
-            int item = index;
-            ItemEffect effect = runItem(
-                    activation, cell, items.get(index), payload -> parts.send(activation.token(), item, payload));
+            ItemEffect effect = runItem(activation, cell, items.get(index), core, index);
             effects.add(effect);
             // Stop at the first failed item; the core re-hands the tail.
             if (!(effect.verdict() instanceof Verdict.Ok)) {
@@ -143,7 +139,7 @@ public final class RelayInstance {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private ItemEffect runItem(Activation activation, Cell cell, WorkItem item, Consumer<byte[]> parts) {
+    private ItemEffect runItem(Activation activation, Cell cell, WorkItem item, CoreCalls core, int index) {
         long now = item instanceof WorkItem.Input in ? in.now() : ((WorkItem.Timer) item).scheduledAt();
         OptionalLong offset = item instanceof WorkItem.Input in ? in.consumedOffset() : OptionalLong.empty();
         boolean replay = item instanceof WorkItem.Input in && in.replay();
@@ -154,7 +150,8 @@ public final class RelayInstance {
                 ? cell.timerPolicy.firingSession(new PendingTimers(), timer.scheduledAt(), timer.kind())
                 : cell.timerPolicy.session(new PendingTimers(), now);
         ctx.timers = session;
-        ctx.parts = parts;
+        ctx.core = core;
+        ctx.item = index;
         Tasklet tasklet = cell.tasklet;
 
         AtomicReference<List<TimerOp>> timerOps = new AtomicReference<>(List.of());
@@ -254,8 +251,7 @@ public final class RelayInstance {
      * the outputs a rolled-back stage produced.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private ActivationOutcome compensateRun(
-            Activation activation, List<byte[]> outputBytes, ActivationDispatcher.Parts parts) {
+    private ActivationOutcome compensateRun(Activation activation, List<byte[]> outputBytes, CoreCalls core) {
         Cell cell = cellFor(activation.target());
         List<Object> outputs = new ArrayList<>(outputBytes.size());
         for (byte[] bytes : outputBytes) {
@@ -266,8 +262,10 @@ public final class RelayInstance {
         // same refusal the pre-core adapter enforced.
         EmitContext ctx = new EmitContext(
                 this, cell, activation.token(), activation.changeSeq(), System.currentTimeMillis(), false, -1);
-        // A compensation runs no work item, so the core answers its part with `part.outside_invocation`.
-        ctx.parts = payload -> parts.send(activation.token(), -1, payload);
+        // A compensation runs no work item: the core answers its part with `part.outside_invocation`,
+        // and reads an effect's origin from the compensation itself.
+        ctx.core = core;
+        ctx.item = -1;
         Tasklet tasklet = cell.tasklet;
         Verdict verdict = runUserCode(() -> tasklet.compensate(outputs, ctx));
         return new ActivationOutcome.Work(List.of(new ItemEffect(

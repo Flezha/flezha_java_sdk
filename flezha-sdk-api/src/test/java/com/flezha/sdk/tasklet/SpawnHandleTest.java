@@ -335,5 +335,10 @@ class SpawnHandleTest {
 
         @Override
         public void part(Object value) {}
+
+        @Override
+        public <T> T effect(String name, Class<T> type, Supplier<T> fn) {
+            return fn.get();
+        }
     }
 }

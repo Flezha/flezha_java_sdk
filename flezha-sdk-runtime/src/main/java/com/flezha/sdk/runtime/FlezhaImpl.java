@@ -8,6 +8,7 @@ import com.flezha.sdk.internal.RunnerHandle;
 import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.runtime.config.FlezhaEnv;
 import com.flezha.sdk.runtime.core.ActivationDispatcher;
+import com.flezha.sdk.runtime.core.CoreCalls;
 import com.flezha.sdk.runtime.core.CoreSpawnRequester;
 import com.flezha.sdk.runtime.core.HostClassDeclaration;
 import com.flezha.sdk.runtime.relay.RelayClassRegistry;
@@ -89,8 +90,7 @@ public final class FlezhaImpl implements RunnerHandle {
             throw e;
         }
 
-        ActivationDispatcher dispatcher =
-                new ActivationDispatcher((token, item, payload) -> FlzCore.part(core, token, item, payload));
+        ActivationDispatcher dispatcher = new ActivationDispatcher(CoreCalls.of(core));
         SpawnRequests.install(new CoreSpawnRequester(core));
 
         FlezhaImpl handle = new FlezhaImpl(

@@ -14,6 +14,7 @@ import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.EmitKeys;
 import com.flezha.sdk.tasklet.StableId;
 import com.flezha.sdk.tasklet.Tasklet;
+import com.flezha.sdk.tasklet.TaskletException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,8 +22,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
-import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -51,8 +52,10 @@ final class EmitContext implements Ctx<Object, Object> {
     @Nullable
     TimerSession timers;
 
-    /** Where this invocation's parts go: the core's part entry for its work item. */
-    Consumer<byte[]> parts;
+    /** The core's entries this invocation's parts and effects reach, under its work item. */
+    CoreCalls core;
+
+    int item;
 
     private byte[] identityBytes;
     private int stableIdOrdinal;
@@ -193,7 +196,12 @@ final class EmitContext implements Ctx<Object, Object> {
         byte[] bytes = descriptor == null || descriptor.pluginSink().isEmpty()
                 ? new byte[0]
                 : serializeOrThrow(descriptor.pluginSink().get().serializer(), value, descriptor.name());
-        parts.accept(bytes);
+        core.part(token, item, bytes);
+    }
+
+    @Override
+    public <T> T effect(@Nonnull String name, @Nonnull Class<T> type, @Nonnull Supplier<T> fn) throws TaskletException {
+        return core.effect(token, item, name, type, fn);
     }
 
     private int defaultOutputChannel() {

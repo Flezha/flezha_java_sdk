@@ -182,6 +182,24 @@ public final class FlzCore {
     public static native void part(long ctx, long token, int item, byte[] payload);
 
     /**
+     * Begin {@code ctx.effect(name)} in work item {@code item} of the activation {@code token}. The
+     * first byte is the status: 0 runs the function, 1 answers the kept result that follows, 2 runs
+     * it with nothing to keep. Never waits. Throws {@code effect.bad_name}, {@code effect.nested} or
+     * {@code effect.outside_invocation}.
+     */
+    public static native byte[] effectBegin(long ctx, long token, int item, String name);
+
+    /**
+     * Keep the encoded result of the function a status-0 begin ran, waiting for the controller:
+     * {@code null} keeps this result, otherwise the result the controller kept first. Throws
+     * {@code effect.too_large} or {@code effect.not_recorded}.
+     */
+    public static native byte[] effectEnd(long ctx, long token, int item, byte[] payload);
+
+    /** End a begun effect without keeping anything. */
+    public static native void effectRelease(long ctx, long token, int item);
+
+    /**
      * Administer the namespace this connection proved: one entry for the whole
      * surface, because the verb is data. {@code verb} names a function of the
      * controller's published consumer surface ({@code "Relay.start"}) and

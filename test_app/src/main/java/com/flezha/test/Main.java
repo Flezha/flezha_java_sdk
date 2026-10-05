@@ -145,6 +145,8 @@ public final class Main {
                 .registerFactory(EchoRelay.class)
                 .registerFactory(TypedOnceRelay.class)
                 .registerFactory(CommitBlockRelay.class)
+                .registerFactory(EffectBlockRelay.class)
+                .registerFactory(EffectFlowRelay.class)
                 .registerFactory(SyncDurableRelay.class)
                 .registerFactory(OptOutCommitBlockRelay.class)
                 .registerFactory(TierCommitBlockRelay.class)

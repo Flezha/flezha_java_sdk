@@ -5,12 +5,13 @@ import com.flezha.sdk.channel.PlainPayload;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 
 /**
  * One invocation's context, passed to {@link Tasklet#run}, {@link Tasklet#onTimer} and
  * {@link Tasklet#compensate}: the cell's state and its changes, emits, the clock, a replay-stable
- * identifier, timers and steps spawns.
+ * identifier, timers, steps spawns and kept outside calls.
  *
  * <pre>{@code
  * @Override
@@ -328,6 +329,38 @@ public interface Ctx<State, Output> {
      *     this context's invocation has already returned
      */
     void part(Output value);
+
+    /**
+     * Runs {@code fn}, a call to anything outside the instance (a model, a tool, a service), and
+     * keeps its result: when this invocation runs again (a crash re-run, a replay, a wake, a move),
+     * the call returns the kept result and {@code fn} does not run.
+     *
+     * <pre>{@code
+     * String answer = ctx.effect("model", String.class, () -> model.ask(question));
+     * }</pre>
+     *
+     * <p>The result is kept, synced on the controller, before this returns. A crash between
+     * {@code fn} finishing and that point runs {@code fn} again, so give the outside service
+     * {@link #stableId()} as an idempotency key where it takes one. {@code name} names the call: a
+     * non-empty string of at most 255 bytes, counted per invocation, so a call of another name added
+     * before this one leaves its kept result where it was. One call runs at a time; a concurrent
+     * one is refused.
+     *
+     * <p>The result is encoded as an output with no encoder encodes a value ({@link PlainPayload}:
+     * a {@code byte[]} as it is, a {@code String} as UTF-8, anything else as JSON) and read back as
+     * {@code type}. The call returns it as it reads back, on a first run and a re-run alike.
+     *
+     * <p>An invocation that took no input-log offset (local mode, a relay with no input log) runs
+     * {@code fn} each time and keeps nothing. An exception {@code fn} throws propagates unchanged and
+     * nothing is kept; a checked one is wrapped by the author, as {@link Supplier} declares none.
+     *
+     * @throws TaskletException.NonRetryable for {@code effect.bad_name}, {@code effect.nested},
+     *     {@code effect.outside_invocation} and {@code effect.too_large}, with the
+     *     {@link FlezhaException} as its cause
+     * @throws FlezhaException {@code effect.not_recorded} when the controller did not keep the
+     *     result, which the invocation's retry runs again
+     */
+    <T> T effect(String name, Class<T> type, Supplier<T> fn) throws TaskletException;
 
     /**
      * Emits on a named channel, for a tasklet that produces on more than one.
