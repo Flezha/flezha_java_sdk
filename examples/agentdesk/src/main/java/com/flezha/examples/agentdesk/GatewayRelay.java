@@ -37,7 +37,8 @@ public final class GatewayRelay implements Relay {
         // route 1: GET .../events gets the session's stream
         http.filter(request -> !request.sends())
                 .into(Watch.class)
-                .response();                                 // a stream, or 404
+                .keyed()
+                .sink();                                     // a stream, or 404
         // route 2: POST .../messages is checked against the user's budget
         Stream<Verdict> verdicts = http.filter(Request::sends)
                 .map(Event.class, request -> new Sent(request.message()))
@@ -46,7 +47,8 @@ public final class GatewayRelay implements Relay {
         // a verdict: the message plus its user's tokens today; used twice
         // use 1: answer the POST
         verdicts.into(Admit.class)
-                .response();                                 // 202, or 429 over the budget
+                .keyed()
+                .sink();                                     // 202, or 429 over the budget
         // use 2: pass an admitted message on to the user's session
         verdicts.filter(Verdict::admitted)
                 .map(Message.class, Verdict::message)

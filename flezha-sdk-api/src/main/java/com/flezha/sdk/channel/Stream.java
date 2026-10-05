@@ -23,8 +23,7 @@ import javax.annotation.Nonnull;
  *   <li>Per-channel configuration ({@link #named}, {@link #keyed},
  *       {@link #onFull}, {@link #retryMax}, {@link #retryBackoffMs},
  *       {@link #sink}) chains in any order relative to consumer wiring.
- *   <li>A channel ends in at most one of {@link #sink}, {@link #response} and
- *       {@link #call}.
+ *   <li>A channel ends in at most one of {@link #sink} and {@link #call}.
  * </ul>
  *
  * <p>Chaining, which is the common case, reads in flow order:
@@ -151,28 +150,6 @@ public abstract class Stream<T> implements OutputChain<T> {
      */
     @Nonnull
     public abstract Stream<T> sink();
-
-    /**
-     * Terminate this channel on the answer to the outside call its input
-     * carried: every value emitted on it is serialized once and answers that
-     * caller; nothing it carries reaches a plugin. It takes no name — the
-     * channel keeps the one it would have without it.
-     *
-     * <p>The handle is returned, so consumers may be wired after it exactly
-     * as after {@link #sink()}; a channel with none is the plugin-bound
-     * terminal. A channel ends in one sink or one response: both on one
-     * channel, or two responses, fail registration.
-     */
-    @Nonnull
-    public abstract Stream<T> response(Function<T, byte[]> serializer);
-
-    /**
-     * {@link #response(Function)} with the default serialization rules:
-     * passthrough for {@code byte[]}, UTF-8 for {@code String}, Jackson JSON
-     * otherwise.
-     */
-    @Nonnull
-    public abstract Stream<T> response();
 
     /**
      * Branching sugar: each arm receives <b>this</b> handle, so

@@ -16,7 +16,7 @@ import java.util.function.Function;
  */
 public record PluginSink(Function<Object, byte[]> serializer, Optional<ConsumerEdge> call) {
 
-    /** A sink or a {@code response()} end. */
+    /** A sink. */
     public PluginSink(Function<Object, byte[]> serializer) {
         this(serializer, Optional.empty());
     }

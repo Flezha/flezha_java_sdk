@@ -63,7 +63,7 @@ public final class RelayCallRelays {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(PricingQuote.class).response();
+            c.input(String.class, "in").into(PricingQuote.class).sink("quotes");
         }
     }
 
@@ -78,7 +78,7 @@ public final class RelayCallRelays {
             c.input(String.class, "in")
                     .into(OrderAsk.class)
                     .named("order")
-                    .call(CallTarget.id("pricing"), String.class, DEADLINE_MS)
+                    .call(CallTarget.id("pricing").answerChannel("quotes"), String.class, DEADLINE_MS)
                     .into(OrderPriced.class)
                     .sink("priced");
         }
@@ -108,7 +108,7 @@ public final class RelayCallRelays {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "turn").into(AgentTurn.class).response();
+            c.input(String.class, "turn").into(AgentTurn.class).sink();
         }
     }
 

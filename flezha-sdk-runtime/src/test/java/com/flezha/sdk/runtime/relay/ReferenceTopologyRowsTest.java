@@ -120,19 +120,6 @@ class ReferenceTopologyRowsTest {
                     in.into(RelayTopologyBuilderTest.SingleTasklet.class).sink("out");
                     in.into(RelayTopologyBuilderTest.GraphStage1.class).sink("out");
                 }),
-                // entry(in); in.into(plain); plain.sink(out); plain.response
-                new Row("response_beside_sink", c -> {
-                    var plain = c.input(String.class, "in").into(RelayTopologyBuilderTest.SingleTasklet.class);
-                    plain.sink("out");
-                    plain.response();
-                }),
-                // entry(in); in.into(plain); plain.named(answer); plain.response; plain.response
-                new Row("two_responses", c -> {
-                    var plain = c.input(String.class, "in").into(RelayTopologyBuilderTest.SingleTasklet.class);
-                    plain.named("answer");
-                    plain.response();
-                    plain.response();
-                }),
                 // entry(in); in.into(plain); plain.sink(out); plain.call(pricing)
                 new Row("call_beside_sink", c -> {
                     var plain = plain(c);
@@ -183,30 +170,12 @@ class ReferenceTopologyRowsTest {
                 new Row("sink_names_channel", c -> c.input(String.class, "in")
                         .into(RelayTopologyBuilderTest.SingleTasklet.class)
                         .sink("items_output")),
-                // entry(in); in.into(plain); in.into(second); plain.named(accepted); plain.response;
-                // second.named(refused); second.response
-                new Row("two_response_ends", c -> {
-                    var in = c.input(String.class, "in");
-                    in.into(RelayTopologyBuilderTest.SingleTasklet.class)
-                            .named("accepted")
-                            .response();
-                    in.into(RelayTopologyBuilderTest.GraphStage1.class)
-                            .named("refused")
-                            .response();
-                }),
                 // entry(in); in.into(plain); plain.named(ask); plain.call(pricing)
                 new Row("call_back_into_caller", c -> callBack(plain(c).named("ask"), CallTarget.id("pricing"), 500)),
                 // entry(in); in.into(plain); plain.named(ask); plain.key.call_factory(agent)
                 new Row(
                         "call_factory_by_key",
-                        c -> callBack(plain(c).named("ask").keyBy(value -> value), CallTarget.factory("agent"), 500)),
-                // class.run({"flow":{"exactly":"effectively_once"}}); entry(in); in.into(plain);
-                // plain.named(answer); plain.response
-                new Row("eo_unkeyed_response", new Relay.Run.Flow(new Relay.Exactly.EffectivelyOnce()), c -> c.input(
-                                String.class, "in")
-                        .into(RelayTopologyBuilderTest.SingleTasklet.class)
-                        .named("answer")
-                        .response()));
+                        c -> callBack(plain(c).named("ask").keyBy(value -> value), CallTarget.factory("agent"), 500)));
     }
 
     @Test

@@ -11,9 +11,8 @@ import java.util.Optional;
 
 /**
  * The {@code call_response} fixtures, the Java mirror of the Rust test app's: relays an outside
- * caller calls and whose graph answers it through {@code response()} — from the first tasklet, from
- * a downstream one, from whichever of two filtered paths the input took, and from a durable steps
- * turn.
+ * caller calls and whose sink output answers it — from the first tasklet, from a downstream one,
+ * from whichever of two filtered paths the input took, and from a durable steps turn.
  */
 public final class CallRelays {
 
@@ -27,7 +26,7 @@ public final class CallRelays {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(Echo.class).response();
+            c.input(String.class, "in").into(Echo.class).sink();
         }
     }
 
@@ -39,7 +38,7 @@ public final class CallRelays {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(Parse.class).into(Answer.class).response();
+            c.input(String.class, "in").into(Parse.class).into(Answer.class).sink();
         }
     }
 
@@ -53,8 +52,8 @@ public final class CallRelays {
         @Override
         public void channels(ChannelBuilder c) {
             var admitted = c.input(String.class, "in").into(Admit.class);
-            admitted.filter(v -> !v.startsWith("no")).into(Accept.class).response();
-            admitted.filter(v -> v.startsWith("no")).into(Refuse.class).response();
+            admitted.filter(v -> !v.startsWith("no")).into(Accept.class).sink();
+            admitted.filter(v -> v.startsWith("no")).into(Refuse.class).sink();
         }
     }
 
@@ -81,7 +80,7 @@ public final class CallRelays {
 
         @Override
         public void channels(ChannelBuilder c) {
-            c.input(String.class, "in").into(Turn.class).response();
+            c.input(String.class, "in").into(Turn.class).sink();
         }
     }
 

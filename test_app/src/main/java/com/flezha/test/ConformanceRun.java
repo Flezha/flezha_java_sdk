@@ -75,7 +75,7 @@ public final class ConformanceRun {
      * BY NAME, which is what makes the skip checkable.
      */
     private static final List<String> SURFACES =
-            List.of("merge", "branch", "steps", "shorthand", "shorthand_typed_output", "response", "call");
+            List.of("merge", "branch", "steps", "shorthand", "shorthand_typed_output", "call");
 
     /** Where the compile-fail fixtures live, relative to the repository root. */
     private static final String COMPILE_FAIL = "sdk/java/flezha-sdk-api/src/test/resources/compile_fail/";
@@ -303,7 +303,6 @@ public final class ConformanceRun {
                     producer.sink(call[1]);
                 }
             }
-            case "response" -> producer.response();
             case "keyed" -> producer.keyed();
             default -> throw new IllegalStateException(
                     "the fixture spells a link this interpreter does not map: " + call[0]);
@@ -559,8 +558,8 @@ public final class ConformanceRun {
             }
             ArrayNode consumers = node.putArray("consumers");
             channel.consumerIds().forEach(consumers::add);
-            // The core's answer: a response end serializes like a sink but is
-            // not one, so the descriptor alone cannot tell the two apart.
+            // The core's answer: a call end serializes like a sink but is not
+            // one, so the descriptor alone cannot tell the two apart.
             node.put("sink", answer.channel(index).sink());
         }
         return channels;

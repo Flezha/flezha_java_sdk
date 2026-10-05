@@ -324,7 +324,7 @@ public interface Ctx<State, Output> {
      * of each attempt from 0 and stamps the attempt, the Cell and the channel.
      *
      * @throws com.flezha.sdk.FlezhaException {@code part.no_sink} if the output channel does not
-     *     end in a sink (a {@code response()} end is not one), {@code part.outside_invocation} if
+     *     end in a sink (a {@code call(...)} end is not one), {@code part.outside_invocation} if
      *     this context's invocation has already returned
      */
     void part(Output value);

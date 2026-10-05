@@ -602,12 +602,6 @@ public final class RelayTopologyBuilder implements ChannelBuilder {
         public final List<PendingEdge> chains = new ArrayList<>();
 
         Function<Object, byte[]> pluginSinkSerializer;
-        /**
-         * The plugin end is a {@code response()}. The core's answer names no
-         * sink for it, yet its emits leave as the plugin output a sink's do.
-         */
-        boolean response;
-
         /** The plugin end is a {@code call(...)}: its chain's closures, applied before each request. */
         ConsumerEdge callEnd;
 

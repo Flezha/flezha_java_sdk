@@ -19,7 +19,6 @@ the session's answer as it is written, and each user has a daily token budget.
 | `Main.java` | the runner: this process joins the `agents` namespace and registers the `agent` and `gateway` factories |
 | `AgentRelay.java` | a session, a steps relay: one turn per message, and a failed turn fails alone |
 | `Reply.java` | answers a message with the demo model, sends the answer as it grows, and keeps the conversation |
-| `Deliver.java` | hands the finished answer to whoever called |
 | `DemoModel.java` | the demo model |
 | `Message.java` | a message for a user's session, as the gateway sends it |
 | `GatewayRelay.java` | the HTTP side, a flow relay: it carries the HTTP plugin, answers every request, and calls the session a message is for |

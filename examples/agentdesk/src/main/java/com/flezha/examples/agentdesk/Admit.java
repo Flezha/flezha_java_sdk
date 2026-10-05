@@ -11,7 +11,7 @@ public final class Admit implements Tasklet<Verdict, Void, Http> {
 
     @Override
     public void run(Verdict verdict, Ctx<Void, Http> ctx) throws TaskletException {
-        ctx.emit(verdict.admitted()
+        ctx.emitKeyed(verdict.message().user(), verdict.admitted()
                 ? Http.of(202, "sent to " + verdict.message().user())
                 : Http.of(429, verdict.message().user() + " has used " + verdict.spent() + " of today's "
                         + Budget.DAILY_TOKENS + " tokens"));

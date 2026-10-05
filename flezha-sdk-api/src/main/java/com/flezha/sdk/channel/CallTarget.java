@@ -11,19 +11,27 @@ import javax.annotation.Nullable;
  * <pre>{@code
  * CallTarget.id("pricing")
  * CallTarget.factory("agent").create(false).channel("turn")
+ * CallTarget.id("pricing").answerChannel("quotes")
  * }</pre>
  *
  * @param target the instance or partition group called, {@code null} for a factory call
  * @param factory the factory called, {@code null} for a call to a named instance
  * @param create whether a factory call starts the instance its key names when none holds it
  * @param channel the callee's entry channel the request enters on; its first when {@code null}
+ * @param answerChannel the callee's channel whose output answers; its first output for the request
+ *     when {@code null}
  */
-public record CallTarget(@Nullable String target, @Nullable String factory, boolean create, @Nullable String channel) {
+public record CallTarget(
+        @Nullable String target,
+        @Nullable String factory,
+        boolean create,
+        @Nullable String channel,
+        @Nullable String answerChannel) {
 
     /** The instance, or partition group, named {@code id}. */
     @Nonnull
     public static CallTarget id(@Nonnull String id) {
-        return new CallTarget(Objects.requireNonNull(id, "id"), null, true, null);
+        return new CallTarget(Objects.requireNonNull(id, "id"), null, true, null, null);
     }
 
     /**
@@ -33,7 +41,7 @@ public record CallTarget(@Nullable String target, @Nullable String factory, bool
      */
     @Nonnull
     public static CallTarget factory(@Nonnull String factory) {
-        return new CallTarget(null, Objects.requireNonNull(factory, "factory"), true, null);
+        return new CallTarget(null, Objects.requireNonNull(factory, "factory"), true, null, null);
     }
 
     /**
@@ -42,12 +50,18 @@ public record CallTarget(@Nullable String target, @Nullable String factory, bool
      */
     @Nonnull
     public CallTarget create(boolean create) {
-        return new CallTarget(target, factory, create, channel);
+        return new CallTarget(target, factory, create, channel, answerChannel);
     }
 
     /** The callee's entry channel the request enters on; its first when unset. */
     @Nonnull
     public CallTarget channel(@Nonnull String channel) {
-        return new CallTarget(target, factory, create, Objects.requireNonNull(channel, "channel"));
+        return new CallTarget(target, factory, create, Objects.requireNonNull(channel, "channel"), answerChannel);
+    }
+
+    /** The callee's channel whose output answers the call; its first output for the request when unset. */
+    @Nonnull
+    public CallTarget answerChannel(@Nonnull String answerChannel) {
+        return new CallTarget(target, factory, create, channel, Objects.requireNonNull(answerChannel, "answerChannel"));
     }
 }

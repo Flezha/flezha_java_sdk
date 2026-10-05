@@ -173,14 +173,12 @@ class LocalModeCapabilitiesTest {
     @DisplayName("parts: the core refuses a part whose channel ends in no sink")
     void aPartWithNoSinkIsRefused() {
         PART_REFUSALS.clear();
-        for (Class<?> relay : List.of(PartToTaskletRelay.class, PartToResponseRelay.class)) {
-            try (LocalRelay run = LocalRelay.start(relay)) {
-                run.feed("input", "x");
-                run.runUntilIdle(BUDGET);
-            }
+        try (LocalRelay run = LocalRelay.start(PartToTaskletRelay.class)) {
+            run.feed("input", "x");
+            run.runUntilIdle(BUDGET);
         }
 
-        assertThat(PART_REFUSALS).containsExactly("part.no_sink", "part.no_sink");
+        assertThat(PART_REFUSALS).containsExactly("part.no_sink");
     }
 
     /**
@@ -406,18 +404,6 @@ class LocalModeCapabilitiesTest {
         @Override
         public void channels(ChannelBuilder c) {
             c.input(String.class, "input").into(RefusedPartTasklet.class).into(PartDrainTasklet.class);
-        }
-    }
-
-    public static final class PartToResponseRelay implements Relay {
-        @Override
-        public String factoryId() {
-            return "part_to_response";
-        }
-
-        @Override
-        public void channels(ChannelBuilder c) {
-            c.input(String.class, "input").into(RefusedPartTasklet.class).response();
         }
     }
 

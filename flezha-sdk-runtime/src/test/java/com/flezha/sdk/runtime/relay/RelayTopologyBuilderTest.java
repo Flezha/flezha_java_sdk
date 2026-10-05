@@ -475,29 +475,6 @@ class RelayTopologyBuilderTest {
             assertThat(derived.channels().get(1).pluginSink()).isPresent();
         }
 
-        @Test
-        @DisplayName("a response is recorded as its link and derives as a sink's end, keeping the name")
-        void responseDerivesAsASinksEnd() {
-            var terminal = RelayTopologyBuilder.build(
-                    "g13c",
-                    c -> c.input(String.class, "in").into(SingleTasklet.class).response());
-            var hybrid = RelayTopologyBuilder.build("g13d", c -> c.input(String.class, "in")
-                    .into(SingleTasklet.class)
-                    .response()
-                    .into(GraphStage1.class));
-
-            assertThat(chainOf(terminal, 1)).isEqualTo(List.of(java.util.Map.of("link", "response")));
-            var answering = terminal.channels().get(1);
-            assertThat(answering.name()).as("response() takes no name").isEqualTo("single_tasklet");
-            assertThat(answering.kind()).isEqualTo(ChannelKind.PLUGIN_BOUND);
-            assertThat(answering.pluginSink())
-                    .as("an emit on it leaves as the plugin output a sink's would")
-                    .isPresent();
-            assertThat(hybrid.channels().get(1).kind()).isEqualTo(ChannelKind.INTER_TASKLET);
-            assertThat(hybrid.channels().get(1).consumerIds()).containsExactly(1);
-            assertThat(hybrid.channels().get(1).pluginSink()).isPresent();
-        }
-
         /** The links of the first chain declared on one channel, as the record spells them. */
         @SuppressWarnings("unchecked")
         private List<Object> chainOf(RelayTopology t, int channel) {
@@ -596,18 +573,6 @@ class RelayTopologyBuilderTest {
                             .sink()))
                     .isInstanceOfSatisfying(
                             FlezhaException.class, e -> assertThat(Refused.details(e, "topology.duplicate_plugin_sink"))
-                                    .containsEntry("channel", "egress"));
-        }
-
-        @Test
-        @DisplayName("a sink beside a response on one channel is refused as ending twice")
-        void sinkBesideResponseRefused() {
-            assertThatThrownBy(() -> RelayTopologyBuilder.build("r3d", c -> c.input(String.class, "in")
-                            .into(SingleTasklet.class)
-                            .sink("egress")
-                            .response()))
-                    .isInstanceOfSatisfying(
-                            FlezhaException.class, e -> assertThat(Refused.details(e, "topology.channel_ends_twice"))
                                     .containsEntry("channel", "egress"));
         }
 

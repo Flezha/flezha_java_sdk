@@ -10,7 +10,7 @@ import javax.annotation.Nullable;
 /**
  * One link of a declared chain, as the {@code HostClassDecl} record spells it.
  * A chain is one fluent sequence off a channel handle, in the order the author
- * called it; {@code into}, {@code merge}, {@code sink}, {@code response},
+ * called it; {@code into}, {@code merge}, {@code sink},
  * {@code call} and {@code branch} close the chain they stand in.
  *
  * <p>Closures never enter the record — the builder keeps them beside it and
@@ -53,12 +53,6 @@ public record HostLink(
         return new HostLink("sink", name, null, null, null, null);
     }
 
-    /** Terminates the channel on the answer to the call its input carried. */
-    @Nonnull
-    public static HostLink response() {
-        return new HostLink("response", null, null, null, null, null);
-    }
-
     /**
      * Ends the chain in a call to {@code target}, whose outcomes arrive on the
      * entry channel {@code response}.
@@ -75,6 +69,9 @@ public record HostLink(
         call.put("create", target.create());
         if (target.channel() != null) {
             call.put("channel", target.channel());
+        }
+        if (target.answerChannel() != null) {
+            call.put("answer_channel", target.answerChannel());
         }
         call.put("response", response);
         return new HostLink("call", null, null, null, null, Collections.unmodifiableMap(call));

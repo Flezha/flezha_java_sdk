@@ -26,7 +26,13 @@ class CallEndTest {
                 .into(SingleTasklet.class)
                 .named("ask")
                 .keyBy(value -> value)
-                .call(CallTarget.factory("agent").create(false).channel("turn"), String.class, 60_000)
+                .call(
+                        CallTarget.factory("agent")
+                                .create(false)
+                                .channel("turn")
+                                .answerChannel("reply"),
+                        String.class,
+                        60_000)
                 .map(String.class, Response::request)
                 .into(SingleTasklet.class));
 
@@ -36,6 +42,7 @@ class CallEndTest {
         call.put("deadline_ms", 60_000L);
         call.put("create", false);
         call.put("channel", "turn");
+        call.put("answer_channel", "reply");
         call.put("response", "ask.response");
         assertThat(chains(topology, 1)).contains(List.of(Map.of("link", "key"), call));
 
