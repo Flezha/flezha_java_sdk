@@ -48,6 +48,11 @@ mvn -B -P native-verify install
 step "building the test app"
 mvn -B -q -DskipTests -f test_app/pom.xml package
 
+# Standalone, as a project of its own resolves the SDK: from the local Maven
+# repository the install above filled. Its package runs its test.
+step "the starter example"
+mvn -B -q -f examples/starter/pom.xml package
+
 step "smoke"
 # The fake controller launches the runner against a socket directory of its own,
 # holds its standard input open for the run and prints its output on failure.
