@@ -136,7 +136,11 @@ class ReferenceTopologyRowsTest {
                 // entry(in); in.into(plain); plain.named(ask); plain.call_deadline(0)
                 new Row("call_deadline_zero", c -> callBack(plain(c).named("ask"), CallTarget.id("pricing"), 0)),
                 // entry(in); in.into(plain); plain.named(ask); plain.call_unread(pricing)
-                new Row("call_unread", c -> plain(c).named("ask").call(CallTarget.id("pricing"), String.class, 500)));
+                new Row("call_unread", c -> plain(c).named("ask").call(CallTarget.id("pricing"), String.class, 500)),
+                // entry(in); in.schema("object"); in.into(plain)
+                new Row("schema_not_object", c -> c.input(String.class, "in")
+                        .schema("\"object\"")
+                        .into(RelayTopologyBuilderTest.SingleTasklet.class)));
     }
 
     /** {@code entry(in); in.into(plain)}, the opening every call row shares. */

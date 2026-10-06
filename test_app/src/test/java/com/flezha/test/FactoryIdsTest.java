@@ -70,6 +70,7 @@ class FactoryIdsTest {
             "merged_input",
             "mixed_relay",
             "optout_commit_block",
+            "orders",
             "outbox_block_steps",
             "part_echo",
             "part_echo_steps",

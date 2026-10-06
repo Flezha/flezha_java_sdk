@@ -1,5 +1,6 @@
 package com.flezha.sdk.runtime.relay.builder;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.CallTarget;
 import com.flezha.sdk.channel.ChannelBuilder;
@@ -129,7 +130,8 @@ public final class RelayTopologyBuilder implements ChannelBuilder {
     public <T> EntryChannel<T> input(@Nonnull Class<T> type, @Nonnull String name) {
         checkMutable();
         boolean parsed = type != byte[].class && type != String.class;
-        return declareEntry(type, name, bytes -> PlainPayload.decode(bytes, type), parsed);
+        return declareEntry(
+                type, name, bytes -> PlainPayload.decode(bytes, type), parsed, DerivedSchema.plainCodec(type));
     }
 
     @Override
@@ -137,14 +139,30 @@ public final class RelayTopologyBuilder implements ChannelBuilder {
     public <T> EntryChannel<T> input(
             @Nonnull Class<T> type, @Nonnull String name, @Nonnull Function<byte[], T> parser) {
         checkMutable();
-        return declareEntry(type, name, parser::apply, true);
+        return declareEntry(type, name, parser::apply, true, "custom");
     }
 
-    <T> EntryChannel<T> declareEntry(Class<T> type, String name, Function<byte[], Object> parser, boolean parsed) {
+    /**
+     * Record the format a channel's values take in the relay's API, and on a JSON channel the
+     * schema its payload type derives. Read once here, never per value.
+     */
+    void declareFormat(int channelId, String codec) {
+        ChannelEntry entry = channels.get(channelId);
+        entry.codec = codec;
+        if (codec.equals("json")) {
+            entry.schema = DerivedSchema.of(entry.payloadType);
+        }
+    }
+
+    <T> EntryChannel<T> declareEntry(
+            Class<T> type, String name, Function<byte[], Object> parser, boolean parsed, String codec) {
         int id = declareChannel(type, name, ChannelKind.ENTRY);
         ChannelEntry entry = channels.get(id);
         entry.entryParser = parser;
         entry.entryParsed = parsed;
+        if (codec != null) {
+            declareFormat(id, codec);
+        }
         return new EntryChannelImpl<>(this, id, name, null, type);
     }
 
@@ -475,8 +493,8 @@ public final class RelayTopologyBuilder implements ChannelBuilder {
         if (entry.pluginSinkSerializer == null) {
             entry.pluginSinkSerializer = PlainPayload::encode;
         }
-        return (EntryChannel)
-                declareEntry(Response.class, response, bytes -> ResponseEnvelope.decode(bytes, request, answer), true);
+        return (EntryChannel) declareEntry(
+                Response.class, response, bytes -> ResponseEnvelope.decode(bytes, request, answer), true, null);
     }
 
     /** One merge's group id, which ties its sources across their channels. */
@@ -618,6 +636,12 @@ public final class RelayTopologyBuilder implements ChannelBuilder {
          * passthrough entries keep the pre-change drop-and-log behaviour.
          */
         boolean entryParsed;
+        /** The format the relay's API announces: an entry's input, an output's value; null is unsaid. */
+        public String codec;
+        /** The JSON Schema of that value, declared or derived; null is none. */
+        public JsonNode schema;
+        /** Entry channels only: what the channel is for. */
+        public String description = "";
     }
 
     /** Record a {@code .retryMax(...)} declaration; the core refuses a zero budget. */

@@ -216,13 +216,60 @@ class HostClassDeclarationTest {
         // A key may live on any node of its section: the entry channel has no
         // `producer`, the plugin-bound one has the `keyed` flag.
         assertEverySpellingExists("class", List.of(flow), Set.of());
-        assertEverySpellingExists("channel", nodes(flow.get("channels")), Set.of());
+        // The API facts ride the entry and output channels of a class that names them.
+        RelayClassRegistry.registerClass(ApiRelay.class);
+        List<JsonNode> channels = new ArrayList<>(nodes(flow.get("channels")));
+        channels.addAll(nodes(
+                JSON.readTree(HostClassDeclaration.forFactory("decl_api_op")).get("channels")));
+        assertEverySpellingExists("channel", channels, Set.of());
         // Cell mode splits the tasklet keys: a static tasklet declares its
         // key set, a dynamic one its TTL and cap. Both modes together are the
         // section.
         List<JsonNode> tasklets = new ArrayList<>(nodes(flow.get("tasklets")));
         tasklets.addAll(nodes(dynamic.get("tasklets")));
         assertEverySpellingExists("tasklet", tasklets, Set.of());
+    }
+
+    @Test
+    @DisplayName("each channel states its API format; a JSON one its schema, derived or declared")
+    void theApiFactsRideTheChannels() throws Exception {
+        RelayClassRegistry.registerClass(ApiRelay.class);
+        Map<String, JsonNode> byName = new LinkedHashMap<>();
+        JSON.readTree(HostClassDeclaration.forFactory("decl_api_op"))
+                .get("channels")
+                .forEach(c -> byName.put(c.get("name").asText(), c));
+
+        JsonNode place = byName.get("place");
+        assertThat(place.get("codec").asText()).isEqualTo("json");
+        assertThat(place.get("description").asText()).isEqualTo("Places an order");
+        assertThat(place.get("schema"))
+                .isEqualTo(
+                        JSON.readTree(
+                                """
+                        {"type":"object","properties":{"pair":{"type":"string"},"amount":{"type":"number"}},
+                         "required":["pair","amount"]}
+                        """));
+        assertThat(byName.get("declared").get("schema"))
+                .as("a declared schema overrides the derived one")
+                .isEqualTo(JSON.readTree("{\"type\":\"object\",\"required\":[\"pair\"]}"));
+        assertThat(byName.get("audit").get("codec").asText()).isEqualTo("text");
+        assertThat(byName.get("audit").has("schema")).isFalse();
+        assertThat(byName.get("audit").has("description")).isFalse();
+        assertThat(byName.get("parsed").get("codec").asText()).isEqualTo("custom");
+        assertThat(byName.get("placed").get("codec").asText()).isEqualTo("json");
+        assertThat(byName.get("placed").at("/schema/properties/status/type").asText())
+                .as("an output states the schema of its tasklet's output type")
+                .isEqualTo("string");
+        assertThat(byName.get("encoded").get("codec").asText()).isEqualTo("custom");
+    }
+
+    @Test
+    @DisplayName("a declared schema that is not an object with a type refuses the class")
+    void aBrokenSchemaIsRefusedByTheCore() {
+        FlezhaException refused =
+                Refused.by("topology.schema_invalid", () -> RelayClassRegistry.registerClass(BrokenSchemaRelay.class));
+
+        assertThat(Refused.details(refused, "topology.schema_invalid")).containsEntry("channel", "place");
     }
 
     @Test
@@ -349,6 +396,56 @@ class HostClassDeclarationTest {
                     .into(FullyDeclaredTask.class)
                     .keyed()
                     .output(s -> s.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    public record Quote(String pair, double amount) {}
+
+    public record Placed(String pair, double amount, String status) {}
+
+    /** Every API fact: described, derived, declared, text, parsed, and two outputs. */
+    public static final class ApiRelay implements Relay {
+        @Override
+        public String factoryId() {
+            return "decl_api_op";
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(Quote.class, "place")
+                    .describe("Places an order")
+                    .into(PlaceTask.class)
+                    .output("placed");
+            c.input(Quote.class, "declared")
+                    .schema("{\"type\":\"object\",\"required\":[\"pair\"]}")
+                    .into(PlaceTask.class);
+            c.input(String.class, "audit")
+                    .into(ChainedSinkTask.class)
+                    .output("encoded", s -> s.getBytes(StandardCharsets.UTF_8));
+            c.input(String.class, "parsed", bytes -> new String(bytes, StandardCharsets.UTF_8))
+                    .into(ChainedSinkTask.class);
+        }
+    }
+
+    /** A JSON entry whose declared schema has no {@code type}. */
+    public static final class BrokenSchemaRelay implements Relay {
+        @Override
+        public String factoryId() {
+            return "decl_broken_schema_op";
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(Quote.class, "place").schema("{\"properties\":{}}").into(PlaceTask.class);
+        }
+    }
+
+    @Tasklet.Spec(name = "decl_place_task")
+    public static final class PlaceTask implements Tasklet<Quote, Void, Placed> {
+
+        @Override
+        public void run(Quote input, Ctx<Void, Placed> ctx) throws com.flezha.sdk.tasklet.TaskletException {
+            ctx.emit(new Placed(input.pair(), input.amount(), "placed"));
         }
     }
 

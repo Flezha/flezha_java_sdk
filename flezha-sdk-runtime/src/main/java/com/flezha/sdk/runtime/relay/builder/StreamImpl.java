@@ -156,29 +156,32 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
     @Override
     @Nonnull
     public Stream<T> output(@Nonnull String channel, @Nonnull Function<T, byte[]> serializer) {
-        return attachSink(channel, serializer);
+        return attachSink(channel, serializer, "custom");
     }
 
     @Override
     @Nonnull
     public Stream<T> output(@Nonnull String channel) {
-        return attachSink(channel, PlainPayload::encode);
+        return attachSink(channel, PlainPayload::encode, null);
     }
 
     @Override
     @Nonnull
     public Stream<T> output(@Nonnull Function<T, byte[]> serializer) {
-        return attachSink(null, serializer);
+        return attachSink(null, serializer, "custom");
     }
 
     @Override
     @Nonnull
     public Stream<T> output() {
-        return attachSink(null, PlainPayload::encode);
+        return attachSink(null, PlainPayload::encode, null);
     }
 
-    /** Record an output, which leaves as a plugin output. */
-    private Stream<T> attachSink(@Nullable String channel, Function<T, byte[]> serializer) {
+    /**
+     * Record an output, which leaves as a plugin output. A {@code null} codec is the plain
+     * encoding's, read off the channel's payload type.
+     */
+    private Stream<T> attachSink(@Nullable String channel, Function<T, byte[]> serializer, @Nullable String codec) {
         owner.checkMutable();
         ChannelEntry entry = owner.channel(channelId());
         owner.closeChain(channelId(), null, HostLink.output(channel));
@@ -191,6 +194,7 @@ final class StreamImpl<T> extends Stream<T> implements EdgeSite {
         // and the core refuses the class, so nothing is registered either way.
         if (entry.pluginSinkSerializer == null) {
             entry.pluginSinkSerializer = value -> serializer.apply(cast(value));
+            owner.declareFormat(channelId(), codec != null ? codec : DerivedSchema.plainCodec(entry.payloadType));
         }
         return this;
     }

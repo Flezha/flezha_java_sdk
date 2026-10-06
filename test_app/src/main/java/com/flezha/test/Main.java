@@ -61,6 +61,8 @@ public final class Main {
      * message, when}} sends this app's own code makes with {@code local},
      * each once the file {@code when} names exists, printing
      * {@code local_send <relay> ok} or {@code local_send <relay> err <code>}.
+     * An entry with {@code call} calls its {@code value} instead, printing
+     * {@code call <relay> ok <answer>} or {@code call <relay> err <code>}.
      */
     private static void startLocalSends(FlezhaRunner runner, String script) throws Exception {
         JsonNode sends = new ObjectMapper().readTree(script);
@@ -71,11 +73,10 @@ public final class Main {
                     while (!Files.exists(Path.of(send.path("when").asText()))) {
                         Thread.sleep(50);
                     }
-                    runner.send(relay, send.path("message").asText(), send.path("channel").asText(),
-                            SendOpts.of().local());
-                    System.out.println("local_send " + relay + " ok");
+                    System.out.println(drillStep(runner, send));
                 } catch (FlezhaException e) {
-                    System.out.println("local_send " + relay + " err " + e.code());
+                    String verb = send.path("call").asBoolean() ? "call " : "local_send ";
+                    System.out.println(verb + relay + " err " + e.code());
                 } catch (InterruptedException e) {
                     return;
                 }
@@ -83,6 +84,22 @@ public final class Main {
         }, "local-send-drill");
         drill.setDaemon(true);
         drill.start();
+    }
+
+    /**
+     * One drill entry: a local send of its {@code message}, or with {@code call} a call of its
+     * {@code value} through the controller, answering {@code call <relay> ok <answer JSON>}.
+     */
+    private static String drillStep(FlezhaRunner runner, JsonNode step) {
+        String relay = step.path("relay").asText();
+        String channel = step.path("channel").asText();
+        if (!step.path("call").asBoolean()) {
+            runner.send(relay, step.path("message").asText(), channel, SendOpts.of().local());
+            return "local_send " + relay + " ok";
+        }
+        JsonNode value = step.path("value");
+        Object payload = value.isTextual() ? value.asText() : value;
+        return "call " + relay + " ok " + runner.call(relay, channel, payload, JsonNode.class);
     }
 
     /**
@@ -186,6 +203,7 @@ public final class Main {
                 .registerFactory(RelayCallRelays.CallToolSession.class)
                 .registerFactory(PartRelays.PartEcho.class)
                 .registerFactory(PartRelays.PartEchoSteps.class)
+                .registerFactory(OrdersRelay.class)
                 // The §5 short forms, registered by the classes the author wrote, as
                 // every hand-written relay is: nothing collects itself.
                 .registerFactory(SugarDoNothing.class)

@@ -8,6 +8,7 @@ import com.flezha.sdk.FlezhaRunner;
 import com.flezha.sdk.channel.CallTarget;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.EdgeStream;
+import com.flezha.sdk.channel.EntryChannel;
 import com.flezha.sdk.channel.OutputChain;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.channel.Stream;
@@ -75,7 +76,7 @@ public final class ConformanceRun {
      * BY NAME, which is what makes the skip checkable.
      */
     private static final List<String> SURFACES =
-            List.of("merge", "branch", "steps", "shorthand", "shorthand_typed_output", "call");
+            List.of("merge", "branch", "steps", "shorthand", "shorthand_typed_output", "call", "schema");
 
     /** Where the compile-fail fixtures live, relative to the repository root. */
     private static final String COMPILE_FAIL = "sdk/java/flezha-sdk-api/src/test/resources/compile_fail/";
@@ -282,10 +283,20 @@ public final class ConformanceRun {
             case "into" -> handles.put(call[1], wire(s, call[1]));
             case "retry_max" -> s.retryMax(Integer.parseInt(call[1]));
             case "on_full" -> s.onFull(overflow(call[1]));
+            case "schema" -> entry(s, call[0]).schema(call[1]);
             // Read by taskletClass() as the tasklet was minted.
             case "mailbox" -> {}
             default -> producerLink(s, call);
         }
+    }
+
+    /** The entry handle a link only an entry channel carries is declared on. */
+    private static EntryChannel<String> entry(EdgeStream<String> s, String link) {
+        if (!(s instanceof EntryChannel<String> entry)) {
+            throw new IllegalStateException(
+                    "`" + link + "` is an entry-channel link on a stream this builder cannot give it");
+        }
+        return entry;
     }
 
     /** The producer-side links, which only a tasklet's output channel carries. */

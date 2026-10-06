@@ -1,5 +1,7 @@
 package com.flezha.sdk.channel;
 
+import javax.annotation.Nonnull;
+
 /**
  * The handle for a channel fed from outside the graph, returned by
  * {@link ChannelBuilder#input(Class, String)}. This is where a graph starts.
@@ -26,4 +28,27 @@ package com.flezha.sdk.channel;
  * at registration, and a retained handle used afterwards throws {@link IllegalStateException}
  * naming the relay.
  */
-public interface EntryChannel<T> extends EdgeStream<T> {}
+public interface EntryChannel<T> extends EdgeStream<T> {
+
+    /**
+     * Say what this channel is for, in one sentence. The relay's API announces it, so a person
+     * reading {@code flz relay info} or an AI agent calling the relay as a tool sees it.
+     */
+    @Nonnull
+    EntryChannel<T> describe(String description);
+
+    /**
+     * Declare the JSON Schema of this channel's input, overriding the one derived from a record
+     * input type. It must be a JSON object with a {@code type}, on a JSON channel; anything else
+     * fails registration with {@code topology.schema_invalid}.
+     *
+     * <pre>{@code
+     * c.input(Order.class, "place")
+     *         .describe("Places an order")
+     *         .schema("{\"type\":\"object\",\"required\":[\"pair\"]}")
+     *         .into(PlaceTasklet.class);
+     * }</pre>
+     */
+    @Nonnull
+    EntryChannel<T> schema(String json);
+}

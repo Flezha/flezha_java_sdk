@@ -205,6 +205,15 @@ public final class HostClassDeclaration {
             if (channel.keyed) {
                 c.put("keyed", true);
             }
+            if (channel.codec != null) {
+                c.put("codec", channel.codec);
+            }
+            if (channel.schema != null) {
+                c.put("schema", channel.schema);
+            }
+            if (!channel.description.isEmpty()) {
+                c.put("description", channel.description);
+            }
             out.add(c);
         }
         return out;

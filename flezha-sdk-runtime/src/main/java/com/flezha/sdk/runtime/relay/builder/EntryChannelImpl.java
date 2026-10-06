@@ -21,6 +21,20 @@ final class EntryChannelImpl<T> extends EdgeStreamImpl<T> implements EntryChanne
     }
 
     @Override
+    public EntryChannel<T> describe(String description) {
+        owner.checkMutable();
+        owner.channel(channelId).description = description;
+        return this;
+    }
+
+    @Override
+    public EntryChannel<T> schema(String json) {
+        owner.checkMutable();
+        owner.channel(channelId).schema = DerivedSchema.explicit(json);
+        return this;
+    }
+
+    @Override
     <U> EdgeStream<U> relink(Integer pending, Class<?> payloadType) {
         return new EntryChannelImpl<>(owner, channelId, name, pending, payloadType);
     }

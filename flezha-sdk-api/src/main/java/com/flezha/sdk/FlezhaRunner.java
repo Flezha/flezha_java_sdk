@@ -1,12 +1,18 @@
 package com.flezha.sdk;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.flezha.sdk.channel.PlainPayload;
 import com.flezha.sdk.control.Control;
 import com.flezha.sdk.internal.RegistryCore;
 import com.flezha.sdk.internal.RunnerHandle;
 import com.flezha.sdk.internal.RuntimeBridge;
 import com.flezha.sdk.relay.Relay;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -42,6 +48,8 @@ import javax.annotation.Nullable;
  * the Rust SDK's {@code FlezhaRunner}.
  */
 public final class FlezhaRunner implements AutoCloseable {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final String namespace;
 
@@ -269,6 +277,35 @@ public final class FlezhaRunner implements AutoCloseable {
                 .send(relayId, channel, message.getBytes(StandardCharsets.UTF_8), opts.msgId, opts.key, opts.local);
         JsonNode verdict = Control.read("Relay.send", answer);
         return verdict.isNull() ? null : verdict;
+    }
+
+    /**
+     * Call the entry channel {@code channel} of {@code relayId} with {@code value} through the
+     * controller, under the same role check as {@link #send(String, String, String)}, and answer
+     * what the relay answers through its outputs.
+     *
+     * <p>The value is encoded as an output with no codec encodes it: bytes unchanged, a string as
+     * UTF-8, anything else as JSON. A JSON answer reads into {@code answer}, a text answer as a
+     * {@code String}, a binary one as {@code byte[]}. A channel that does not answer reads as
+     * {@code {"accepted": true}}, so ask for a {@link JsonNode} or a {@code Map} there.
+     *
+     * <pre>{@code
+     * Placed placed = runner.call("orders-eu", "place", new Order("EUR/USD", 1000), Placed.class);
+     * }</pre>
+     *
+     * @throws FlezhaException the controller's code when it refuses the call, for example
+     *     {@code api.channel_unknown}; {@code control.unreadable_answer} when the answer does not
+     *     read as {@code answer}; {@code runtime.runner_not_started} on a never-started runner.
+     */
+    public <A> A call(String relayId, String channel, Object value, Class<A> answer) {
+        String payload = Base64.getEncoder().encodeToString(PlainPayload.encode(value));
+        ObjectNode opts = JsonNodeFactory.instance.objectNode().put("payload", "base64");
+        JsonNode reply = control().call("Relay.call_channel", relayId, channel, payload, opts);
+        try {
+            return JSON.treeToValue(reply.has("answer_codec") ? reply.path("answer") : reply, answer);
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            throw FlezhaException.of("control.unreadable_answer", Map.of("verb", "Relay.call_channel"), e);
+        }
     }
 
     /**

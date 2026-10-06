@@ -244,6 +244,25 @@ gateway.keyBy(line -> line.split(":")[0])
         .into(Outcome.class);   // Outcome implements Tasklet<Response<String, String>, ?, ?>
 ```
 
+## A relay's API
+
+Each entry channel is part of its relay's API, which `flz relay info`, the HTTP
+API and AI agents read. `.describe(...)` says what the channel is for. A record
+input type derives the channel's JSON Schema, and `.schema(json)` declares one
+instead.
+
+```java
+c.input(Order.class, "place").describe("Places an order").into(Place.class).output("placed");
+```
+
+Application code calls a channel by value with `runner.call`, beside
+`runner.send`. It answers what the relay's outputs answer, read as the type you
+ask for:
+
+```java
+Placed placed = runner.call("orders-eu", "place", new Order("EUR/USD", 1000), Placed.class);
+```
+
 ## Modules
 
 | Module | Purpose |
