@@ -20,6 +20,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * process. Whatever the host does with a violent failure, the Cell must be
  * served again and the aborting item must not produce twice.
  *
+ * <p>{@code slow} emits two seconds late, so the relay can be stopped or moved
+ * while the activation still runs.
+ *
  * <p>Every other input emits {@code ok:<input>}, which is how the e2e proves
  * the relay produces again once the remedy has landed.
  */
@@ -55,6 +58,13 @@ public final class WedgeProbeRelay implements Relay {
             }
             if ("abort".equals(input) && ABORTED.compareAndSet(false, true)) {
                 throw new AssertionError("wedge_probe: killing the worker holding this activation");
+            }
+            if ("slow".equals(input)) {
+                try {
+                    Thread.sleep(2_000L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
             }
             ctx.emit("ok:" + input);
         }
