@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flezha.sdk.runtime.relay.RelayClassRegistry;
+import com.flezha.sdk.runtime.state.TimerOp;
+import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.SpawnOptions;
 import com.flezha.sdk.tasklet.SpawnRequests;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -37,6 +39,18 @@ class ActivationDispatcherTest extends DispatchTestBase {
         ItemEffect fatal = soleEffect(work("poison_op", 0, Optional.empty(), 0, input(0, "bad-fatal", 4)));
         assertThat(fatal.verdict()).isInstanceOf(Verdict.NonRetryableError.class);
         assertThat(((Verdict.NonRetryableError) fatal.verdict()).message()).contains("fatal");
+    }
+
+    @Test
+    @DisplayName("an item sees the timers an earlier item of the same activation registered")
+    void anItemSeesTheTimersOfAnEarlierItem() {
+        RelayClassRegistry.registerClass(SetThenCancelRelay.class);
+        ActivationOutcome out = outcome(
+                work("set_then_cancel_op", 0, Optional.empty(), 0, input(0, "set", 100), input(0, "cancel", 100)));
+        List<ItemEffect> effects = ((ActivationOutcome.Work) out).effects();
+
+        assertThat(RECORDED).containsExactly("cancelled=true");
+        assertThat(effects.get(1).timers()).containsExactly(TimerOp.cancel(TimerKind.PROCESSING_TIME, 1_100));
     }
 
     @Test

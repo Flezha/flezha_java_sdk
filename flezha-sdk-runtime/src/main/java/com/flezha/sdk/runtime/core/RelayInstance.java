@@ -128,8 +128,9 @@ public final class RelayInstance {
     private ActivationOutcome dispatchWork(Activation activation, List<WorkItem> items, CoreCalls core) {
         Cell cell = cellFor(activation.target());
         List<ItemEffect> effects = new ArrayList<>(items.size());
+        ActivationTimers timers = new ActivationTimers(core, activation.token());
         for (int index = 0; index < items.size(); index++) {
-            ItemEffect effect = runItem(activation, cell, items.get(index), core, index);
+            ItemEffect effect = runItem(activation, cell, items.get(index), core, index, timers);
             effects.add(effect);
             // Stop at the first failed item; the core re-hands the tail.
             if (!(effect.verdict() instanceof Verdict.Ok)) {
@@ -140,17 +141,17 @@ public final class RelayInstance {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private ItemEffect runItem(Activation activation, Cell cell, WorkItem item, CoreCalls core, int index) {
+    private ItemEffect runItem(
+            Activation activation, Cell cell, WorkItem item, CoreCalls core, int index, ActivationTimers timers) {
         long now = item instanceof WorkItem.Input in ? in.now() : ((WorkItem.Timer) item).scheduledAt();
         OptionalLong offset = item instanceof WorkItem.Input in ? in.consumedOffset() : OptionalLong.empty();
         boolean replay = item instanceof WorkItem.Input in && in.replay();
 
         EmitContext ctx =
                 new EmitContext(this, cell, activation.token(), activation.changeSeq(), now, replay, offset.orElse(-1));
-        Supplier<PendingTimers> pending = () -> core.pendingTimers(activation.token());
         TimerSession session = item instanceof WorkItem.Timer timer
-                ? cell.timerPolicy.firingSession(pending, timer.scheduledAt(), timer.kind())
-                : cell.timerPolicy.session(pending, now);
+                ? cell.timerPolicy.firingSession(timers, timer.scheduledAt(), timer.kind())
+                : cell.timerPolicy.session(timers, now);
         ctx.timers = session;
         ctx.core = core;
         ctx.item = index;
@@ -182,7 +183,7 @@ public final class RelayInstance {
                     }
                 }
                 if (session != null) {
-                    timerOps.set(session.commit(new PendingTimers()));
+                    timerOps.set(session.commit(timers.live()));
                 }
             });
         }
@@ -280,6 +281,34 @@ public final class RelayInstance {
                 false,
                 Optional.empty(),
                 ctx.completion)));
+    }
+
+    /**
+     * The Cell's pending timers across one activation's items: read from the core at most once,
+     * and only when an item makes a timer call, then each item's committed set is the next one's.
+     */
+    private static final class ActivationTimers implements Supplier<PendingTimers> {
+        private final CoreCalls core;
+        private final long token;
+        private PendingTimers set;
+
+        ActivationTimers(CoreCalls core, long token) {
+            this.core = core;
+            this.token = token;
+        }
+
+        @Override
+        public PendingTimers get() {
+            if (set == null) {
+                set = core.pendingTimers(token);
+            }
+            return set;
+        }
+
+        /** Where a session commits: the carried set once read, else a set nothing reads. */
+        PendingTimers live() {
+            return set != null ? set : new PendingTimers();
+        }
     }
 
     // ------------------------------------------------------------------

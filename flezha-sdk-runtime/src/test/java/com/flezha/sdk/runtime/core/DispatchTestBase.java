@@ -474,6 +474,25 @@ abstract class DispatchTestBase {
         }
     }
 
+    public static final class SetThenCancelRelay extends Op {
+        public SetThenCancelRelay() {
+            super("set_then_cancel_op", c -> c.input(String.class, "in").into(SetThenCancelTask.class));
+        }
+    }
+
+    /** {@code set} registers a timer a second after now; {@code cancel} cancels that one. */
+    @Tasklet.Spec(name = "set_then_cancel_task")
+    public static final class SetThenCancelTask implements Tasklet<String, Void, Void> {
+        @Override
+        public void run(String input, Ctx<Void, Void> ctx) throws TaskletException {
+            if (input.equals("set")) {
+                ctx.timerAfter(Duration.ofSeconds(1));
+            } else {
+                RECORDED.add("cancelled=" + ctx.cancelProcessingTimeTimer(ctx.now() + 1_000));
+            }
+        }
+    }
+
     public static final class WallTimerRelay extends Op {
         public WallTimerRelay() {
             super("wall_timer_op", c -> c.input(String.class, "in").into(WallTimerTask.class));
