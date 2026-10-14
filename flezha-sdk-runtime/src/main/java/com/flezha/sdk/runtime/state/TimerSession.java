@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 
 /**
@@ -24,16 +25,28 @@ import javax.annotation.Nonnull;
  */
 public final class TimerSession {
 
-    private final PendingTimers pending;
+    private final Supplier<PendingTimers> seed;
+    private PendingTimers pending;
     private final List<TimerOp> ops = new ArrayList<>();
     private final TimerPolicy policy;
     private final long now;
     private boolean firing;
 
-    TimerSession(@Nonnull TimerPolicy policy, @Nonnull PendingTimers pending, long now) {
+    TimerSession(@Nonnull TimerPolicy policy, @Nonnull Supplier<PendingTimers> seed, long now) {
         this.policy = policy;
-        this.pending = pending;
+        this.seed = seed;
         this.now = now;
+    }
+
+    /** The Cell's pending set, read on first use; a firing's own removal applies on top. */
+    private PendingTimers pending() {
+        if (pending == null) {
+            pending = seed.get().copy();
+            if (firing) {
+                pending.apply(ops.get(0));
+            }
+        }
+        return pending;
     }
 
     /**
@@ -43,9 +56,7 @@ public final class TimerSession {
      * or the timer is still pending and the whole firing repeats.
      */
     void openFiring(@Nonnull TimerKind kind, long scheduledAt) {
-        TimerOp op = TimerOp.cancel(kind, scheduledAt);
-        pending.apply(op);
-        ops.add(op);
+        ops.add(TimerOp.cancel(kind, scheduledAt));
         firing = true;
     }
 
@@ -66,13 +77,13 @@ public final class TimerSession {
     }
 
     private long register(TimerKind kind, long scheduledAt) {
-        if (!pending.contains(kind, scheduledAt) && pending.size() >= policy.maxPerCell()) {
+        if (!pending().contains(kind, scheduledAt) && pending().size() >= policy.maxPerCell()) {
             policy.counters().refused().incrementAndGet();
             throw FlezhaException.of(
                     "runtime.timer_cap_exceeded", Map.of("tasklet", policy.tasklet(), "max", policy.maxPerCell()));
         }
         TimerOp op = TimerOp.register(kind, scheduledAt);
-        if (pending.apply(op)) {
+        if (pending().apply(op)) {
             ops.add(op);
         }
         return scheduledAt;
@@ -84,7 +95,7 @@ public final class TimerSession {
      */
     public boolean cancel(@Nonnull TimerKind kind, long scheduledAt) {
         TimerOp op = TimerOp.cancel(kind, scheduledAt);
-        boolean changed = pending.apply(op);
+        boolean changed = pending().apply(op);
         if (changed) {
             ops.add(op);
         }
@@ -113,7 +124,9 @@ public final class TimerSession {
                 counters.cancelled().incrementAndGet();
             }
         }
-        live.replaceWith(pending);
+        if (pending != null) {
+            live.replaceWith(pending);
+        }
         return ops;
     }
 }

@@ -3,6 +3,7 @@ package com.flezha.sdk.runtime.core;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.PlainPayload;
 import com.flezha.sdk.native_.FlzCore;
+import com.flezha.sdk.runtime.state.PendingTimers;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.util.Arrays;
 import java.util.function.Supplier;
@@ -38,6 +39,12 @@ public interface CoreCalls {
 
     default void effectRelease(long token, int item) {}
 
+    /** The pending timers of the Cell {@code token} runs, as the core keeps them. */
+    @Nonnull
+    default PendingTimers pendingTimers(long token) {
+        return new PendingTimers();
+    }
+
     /** The native context's entries. */
     @Nonnull
     static CoreCalls of(long ctx) {
@@ -62,6 +69,12 @@ public interface CoreCalls {
             @Override
             public void effectRelease(long token, int item) {
                 FlzCore.effectRelease(ctx, token, item);
+            }
+
+            @Override
+            @Nonnull
+            public PendingTimers pendingTimers(long token) {
+                return PendingTimers.ofPairs(FlzCore.pendingTimers(ctx, token));
             }
         };
     }

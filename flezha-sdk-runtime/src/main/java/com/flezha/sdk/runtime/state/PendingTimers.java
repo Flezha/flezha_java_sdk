@@ -20,6 +20,17 @@ public final class PendingTimers {
 
     public PendingTimers() {}
 
+    /** The set holding {@code pairs}, {@code [kind, at, ...]} with kind {@code 0} for event time. */
+    @Nonnull
+    public static PendingTimers ofPairs(@Nonnull long[] pairs) {
+        PendingTimers out = new PendingTimers();
+        for (int i = 0; i + 1 < pairs.length; i += 2) {
+            out.setFor(pairs[i] == 0 ? TimerKind.EVENT_TIME : TimerKind.PROCESSING_TIME)
+                    .add(pairs[i + 1]);
+        }
+        return out;
+    }
+
     /** Deep copy — a {@link TimerSession} works on one so a failed attempt leaves nothing behind. */
     @Nonnull
     public PendingTimers copy() {

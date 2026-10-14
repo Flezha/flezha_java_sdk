@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 
 /**
@@ -146,9 +147,10 @@ public final class RelayInstance {
 
         EmitContext ctx =
                 new EmitContext(this, cell, activation.token(), activation.changeSeq(), now, replay, offset.orElse(-1));
+        Supplier<PendingTimers> pending = () -> core.pendingTimers(activation.token());
         TimerSession session = item instanceof WorkItem.Timer timer
-                ? cell.timerPolicy.firingSession(new PendingTimers(), timer.scheduledAt(), timer.kind())
-                : cell.timerPolicy.session(new PendingTimers(), now);
+                ? cell.timerPolicy.firingSession(pending, timer.scheduledAt(), timer.kind())
+                : cell.timerPolicy.session(pending, now);
         ctx.timers = session;
         ctx.core = core;
         ctx.item = index;
