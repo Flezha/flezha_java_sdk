@@ -183,7 +183,9 @@ public final class RelayInstance {
                     }
                 }
                 if (session != null) {
-                    timerOps.set(session.commit(timers.live()));
+                    List<TimerOp> committed = session.commit(timers.live());
+                    timers.committed(committed);
+                    timerOps.set(committed);
                 }
             });
         }
@@ -291,6 +293,8 @@ public final class RelayInstance {
         private final CoreCalls core;
         private final long token;
         private PendingTimers set;
+        /** Ops committed before the set was read, applied when it is. */
+        private final List<TimerOp> unread = new ArrayList<>();
 
         ActivationTimers(CoreCalls core, long token) {
             this.core = core;
@@ -301,8 +305,21 @@ public final class RelayInstance {
         public PendingTimers get() {
             if (set == null) {
                 set = core.pendingTimers(token);
+                unread.forEach(set::apply);
             }
             return set;
+        }
+
+        /**
+         * An item's committed ops, a firing's removal included even when the item read nothing:
+         * the next item starts from the set they leave.
+         */
+        void committed(List<TimerOp> ops) {
+            if (set != null) {
+                ops.forEach(set::apply);
+            } else {
+                unread.addAll(ops);
+            }
         }
 
         /** Where a session commits: the carried set once read, else a set nothing reads. */

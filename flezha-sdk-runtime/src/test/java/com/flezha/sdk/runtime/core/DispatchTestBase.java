@@ -491,6 +491,9 @@ abstract class DispatchTestBase {
                 RECORDED.add("cancelled=" + ctx.cancelProcessingTimeTimer(ctx.now() + 1_000));
             }
         }
+
+        @Override
+        public void onTimer(long firedAt, TimerKind kind, Ctx<Void, Void> ctx) {}
     }
 
     public static final class WallTimerRelay extends Op {

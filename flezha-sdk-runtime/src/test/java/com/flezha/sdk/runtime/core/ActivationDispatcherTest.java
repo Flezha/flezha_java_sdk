@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flezha.sdk.runtime.relay.RelayClassRegistry;
+import com.flezha.sdk.runtime.state.PendingTimers;
 import com.flezha.sdk.runtime.state.TimerOp;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.SpawnOptions;
@@ -51,6 +52,32 @@ class ActivationDispatcherTest extends DispatchTestBase {
 
         assertThat(RECORDED).containsExactly("cancelled=true");
         assertThat(effects.get(1).timers()).containsExactly(TimerOp.cancel(TimerKind.PROCESSING_TIME, 1_100));
+    }
+
+    @Test
+    @DisplayName("an item after a firing no longer finds the fired timer pending")
+    void anItemAfterAFiringNoLongerFindsTheFiredTimer() {
+        RelayClassRegistry.registerClass(SetThenCancelRelay.class);
+        CoreCalls pendingAt1100 = new CoreCalls() {
+            @Override
+            public void part(long token, int item, byte[] payload) {}
+
+            @Override
+            public PendingTimers pendingTimers(long token) {
+                return PendingTimers.ofPairs(new long[] {1, 1_100});
+            }
+        };
+        ActivationResult result = new ActivationDispatcher(pendingAt1100)
+                .dispatch(work(
+                        "set_then_cancel_op",
+                        0,
+                        Optional.empty(),
+                        0,
+                        new WorkItem.Timer(TimerKind.PROCESSING_TIME, 1_100),
+                        input(0, "cancel", 100)));
+
+        assertThat(((ActivationOutcome.Work) result.outcome()).effects()).hasSize(2);
+        assertThat(RECORDED).containsExactly("cancelled=false");
     }
 
     @Test
