@@ -60,7 +60,7 @@ class EmitContextTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("a keyed plugin emit carries flz.cell / flz.seq / flz.key and the schema key")
+    @DisplayName("Keyed emit stamps flz.key on the wire")
     void keyedEmitCarriesIdentityStamps() {
         RelayClassRegistry.registerClass(KeyedEmitRelay.class);
         ItemEffect effect = soleEffect(work("keyed_op", 0, Optional.empty(), 5, input(0, "v", 1_000)));
@@ -77,7 +77,7 @@ class EmitContextTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("a key-less emit in a keyed Cell carries that Cell's own key, stamped like emitKeyed")
+    @DisplayName("A key-less emit in a keyed Cell carries that Cell's key")
     void keyLessEmitInAKeyedCellCarriesTheCellKey() {
         RelayClassRegistry.registerClass(KeyedEmitRelay.class);
         ItemEffect effect = soleEffect(work("keyed_op", 0, Optional.of("BTC/USD"), 5, input(0, "plain:v", 1_000)));

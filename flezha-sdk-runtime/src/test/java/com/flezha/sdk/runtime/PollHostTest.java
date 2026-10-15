@@ -151,7 +151,7 @@ class PollHostTest {
     }
 
     @Test
-    @DisplayName("activations blocked in user code do not consume the fetchers")
+    @DisplayName("Blocking user code does not consume a fetcher")
     @SuppressWarnings("try")
     void blockedActivationsDoNotConsumeFetchers() throws Exception {
         FakeCore core = new FakeCore();

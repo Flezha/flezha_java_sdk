@@ -34,7 +34,7 @@ class FlzCoreJniTest {
     }
 
     @Test
-    @DisplayName("schema version mismatch throws, naming both versions")
+    @DisplayName("Version mismatch refuses at context creation")
     void versionMismatchThrows() {
         assertThatThrownBy(() -> FlzCore.contextNew(999)).isInstanceOfSatisfying(FlezhaException.class, e -> {
             assertThat(e.code()).isEqualTo("runtime.schema_mismatch");

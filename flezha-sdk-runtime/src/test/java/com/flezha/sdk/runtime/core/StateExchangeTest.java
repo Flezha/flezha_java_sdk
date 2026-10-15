@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class StateExchangeTest extends DispatchTestBase {
 
     @Test
-    @DisplayName("a RestoreFold body tagged with an older version goes to the migration, not the codec")
+    @DisplayName("a Java Tasklet restores state written at an older version")
     void restoreFoldMigratesTaggedBodies() {
         RelayClassRegistry.registerClass(MigratingCounterRelay.class);
         ActivationDispatcher dispatcher = new ActivationDispatcher();
@@ -70,7 +70,7 @@ class StateExchangeTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("RestoreFold rebuilds snapshot + changes; SnapshotRequest and LiveStateRead read the result")
+    @DisplayName("The snapshot body round-trips through the restore path")
     void restoreSnapshotAndLiveRead() {
         RelayClassRegistry.registerClass(CounterRelay.class);
         ItemEffect first = soleEffect(work("counter_op", 0, Optional.empty(), 0, input(0, "a", 1)));

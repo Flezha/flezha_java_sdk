@@ -603,7 +603,7 @@ class RelayTopologyBuilderTest {
         }
 
         @Test
-        @DisplayName("a plugin-bound channel that is not keyed is refused under the tier")
+        @DisplayName("A tier class with a non-keyed plugin channel fails registration")
         void unkeyedChannelUnderTheTierRefused() {
             assertThatThrownBy(() -> build("r4", new Relay.Run.Flow(new Relay.Exactly.EffectivelyOnce()), c -> c.input(
                                     String.class, "in")

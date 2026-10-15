@@ -14,7 +14,6 @@ Command Dispatch :: Restore is a fold handed to Java
 Diagnostics Reach a Stream Without a Third-Party Logging Dependency :: No third-party logging facade on the compile classpath
 Each Cell SHALL run on its own Tasklet instance :: Concurrent Cells do not race on one instance
 Each Cell SHALL run on its own Tasklet instance :: Dynamic Cells each receive an instance
-Each Cell SHALL run on its own Tasklet instance :: Instance state does not leak between Cell keys
 Each Cell SHALL run on its own Tasklet instance :: The dispatcher's documentation matches its behaviour
 Factory visibility SHALL match its documentation :: Declared visibility matches documented visibility
 Flezha static accessor for the active runner :: currentRunner() reflects the singleton's lifecycle
@@ -22,11 +21,9 @@ Hot-path cost is bounded :: No JNI calls on ctx.change
 Hot-path cost is bounded :: No serialization on ctx.change
 JNI Bridge to flz_core_ffi :: Native buffer freed after copy into Java byte[]
 JNI Bridge to flz_core_ffi :: Shutdown wakes blocked Java pollers
-JNI Bridge to flz_core_ffi :: Version mismatch refuses at context creation
 Java SDK Entry Point :: Controller unavailable triggers exponential backoff retries
 Java SDK Entry Point :: RunnerBuilder is not importable
 Java SDK Entry Point :: Successful connection on a created runner
-Java SDK Entry Point :: start() with zero defined relay types is legal
 Java SDK data heartbeat reports dispatch progress :: A wedged Java runner is distinguishable from an idle one
 Java SDK data heartbeat reports dispatch progress :: The heartbeat carries dispatch progress
 Java SDK implements checkpoint ack granularity :: A park closes the open interval
@@ -38,7 +35,6 @@ Java SDK implements stream late-input correction :: A replay does not lower the 
 Java SDK implements stream late-input correction :: A replayed slice dispatches in event-time order
 Java SDK implements stream late-input correction :: Beyond-window default is process-as-arrival
 Java SDK implements the effectively-once output tier :: A poisoned tier invocation parks inside the effect record
-Java SDK implements the effectively-once output tier :: A tier class with a non-keyed plugin channel fails registration
 Java SDK implements the effectively-once output tier :: A tier invocation ships one effect record, not separate frames
 Java SDK implements the effectively-once output tier :: Effect-record bytes are byte-identical to the Rust encoder
 Java SDK implements the steps relay durable loop and suspension :: A resumed loop restarts at the journaled iteration
@@ -63,16 +59,13 @@ Relay Type Declaration :: Declaring or removing a type on a closed runner is ref
 Relay Type Declaration :: Duplicate factoryId across two flow relay classes is rejected
 Relay Type Declaration :: Dynamic-mode tasklet declares and creates cells lazily
 Relay Type Declaration :: Removing a type that is not defined is rejected
-Relay Type Declaration :: Removing a type with live instances is refused and keeps it defined
 Relay Type Declaration :: Typed entry channel deserializes at the edge
 Relay Type Declaration :: Unreachable node fails declaration
 Relay Type Declaration :: Wiring mismatch fails declaration with a diagnosable error
 Relay declares durable, frozen at instance start :: Resolved value frozen at instance start
 Per-Cell flusher with toggle-aware drain :: Changes returned in a completion reach the WAL
 Per-Cell flusher with toggle-aware drain :: Persistence disabled drains and discards
-Tasklet Interface and Per-Cell Dispatch :: A key-less emit in a keyed Cell carries that Cell's key
 Tasklet Interface and Per-Cell Dispatch :: Inter-tasklet zero-copy preserves value identity
-Tasklet Interface and Per-Cell Dispatch :: Keyed emit stamps flz.key on the wire
 Tasklet Interface and Per-Cell Dispatch :: Plugin-bound emit attaches the channel name as metadata on the wire
 Tasklet Interface and Per-Cell Dispatch :: Plugin-bound emitWithMeta appends user metadata after the channel key
 Tasklet Interface and Per-Cell Dispatch :: Reserved flz. metadata key in user map is rejected
@@ -83,28 +76,21 @@ Tasklet Interface and Per-Cell Dispatch :: Static-mode cellsFor fan-out enqueues
 Tasklet Interface and Per-Cell Dispatch :: emitKeyed on a non-keyed channel is rejected
 Tasklet Interface and Per-Cell Dispatch :: emitWithMeta on an inter-tasklet channel returns error
 Tasklet Interface and Per-Cell Dispatch :: now() is constant within one invocation
-Tasklet Interface and Per-Cell Dispatch :: stableId() is byte-identical to the Rust SDK
 Tasklet Interface and Per-Cell Dispatch :: stableId() is replay-stable and ordinal-distinct
 Public Java SDK handler classes use canonical Relay vocabulary :: New handlers wire into dispatch
 Public Relay / Tasklet / Cell user-facing API names :: User extends Relay
-Runner lifecycle — start, run, awaitTermination, close :: close() wakes a thread blocked in awaitTermination()
 Runner lifecycle — start, run, awaitTermination, close :: run() blocks until shutdown
 Runner lifecycle — start, run, awaitTermination, close :: start() returns immediately after the handshake, before shutdown
-Runner lifecycle — start, run, awaitTermination, close :: try-with-resources still works for short-lived usage
 Sticky Per-Cell Ordering Under ThreadPool Dispatch :: Different cells of same tasklet may run concurrently
 Sticky Per-Cell Ordering Under ThreadPool Dispatch :: Per-cell inputs delivered in arrival order
 Sticky Per-Cell Ordering Under ThreadPool Dispatch :: Same cell never runs concurrently under load
-The Java Tasklet surface declares migrations :: a Java Tasklet restores state written at an older version
 The Java SDK Honours FLEZHA_LOG_LEVEL :: The variable sets the level
 The Java SDK SHALL document its actual state-mutation enforcement level :: A bypassed mutation's actual fate is described
 The Java SDK SHALL document its actual state-mutation enforcement level :: Documentation does not claim enforcement that does not exist
 The Java SDK SHALL document its actual state-mutation enforcement level :: The asymmetry with Rust is stated
 The Java SDK SHALL emit a cell_state_snapshot on CompactCell :: A live Cell produces a snapshot at its current seq
 The Java SDK SHALL emit a cell_state_snapshot on CompactCell :: The response is never a zero-length body
-The Java SDK SHALL emit a cell_state_snapshot on CompactCell :: The snapshot body round-trips through the restore path
 The Java SDK SHALL ship its declared compact_after_bytes to the Controller :: A declared override reaches the Controller
-The Java class declaration carries per-Tasklet schema versions :: two Tasklets with different versions declare both
-The Java runtime is a poll host over the shared core :: Blocking user code does not consume a fetcher
 The Java runtime is a poll host over the shared core :: Java reproduces the schema fixtures byte-identically
 The Java runtime is a poll host over the shared core :: Kernel classes are gone
 The Java runtime is a poll host over the shared core :: Per-cell state is host-held without host locking

@@ -159,7 +159,7 @@ class RunnerLifecycleTest {
     }
 
     @Test
-    @DisplayName("zero-relay start is legal; the handshake supplier serves an empty set")
+    @DisplayName("start() with zero defined relay types is legal")
     void zeroRelayStartIsLegal() {
         FlezhaRunner runner = Flezha.createRunner("ns_zero").start();
         assertThat(runner.getNamespace()).isEqualTo("ns_zero");
@@ -230,7 +230,7 @@ class RunnerLifecycleTest {
     }
 
     @Test
-    @DisplayName("removing a type with live instances throws runtime.relay_type_in_use and keeps it defined")
+    @DisplayName("Removing a type with live instances is refused and keeps it defined")
     void removeWithLiveInstancesRefuses() {
         FlezhaRunner runner =
                 Flezha.createRunner("ns_live").registerFactory(RelayA.class).start();
@@ -403,7 +403,7 @@ class RunnerLifecycleTest {
     }
 
     @Test
-    @DisplayName("try-with-resources starts the runner for the block and closes it at the end")
+    @DisplayName("try-with-resources still works for short-lived usage")
     void tryWithResourcesWorks() {
         try (FlezhaRunner r =
                 Flezha.createRunner("ns_try").registerFactory(RelayA.class).start()) {
@@ -414,7 +414,7 @@ class RunnerLifecycleTest {
     }
 
     @Test
-    @DisplayName("close() from another thread wakes a thread blocked in awaitTermination()")
+    @DisplayName("close() wakes a thread blocked in awaitTermination()")
     void closeWakesAwaitTermination() throws Exception {
         FlezhaRunner runner =
                 Flezha.createRunner("ns_await").registerFactory(RelayA.class).start();

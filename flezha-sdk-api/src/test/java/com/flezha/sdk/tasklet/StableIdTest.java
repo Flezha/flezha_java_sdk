@@ -3,6 +3,7 @@ package com.flezha.sdk.tasklet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -19,6 +20,7 @@ class StableIdTest {
     }
 
     @Test
+    @DisplayName("stableId() is byte-identical to the Rust SDK")
     void matchesTheRustCrossLanguageFixture() {
         assertThat(StableId.derive(identity(), 42, 0).toString()).isEqualTo("bbf81fd4955afd1724203700a240e822");
         assertThat(StableId.derive(identity(), 42, 1).toString()).isEqualTo("bbf81fd4965afd1724203700a240e95d");

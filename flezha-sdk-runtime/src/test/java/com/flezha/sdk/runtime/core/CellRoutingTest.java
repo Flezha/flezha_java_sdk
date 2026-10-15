@@ -82,7 +82,7 @@ class CellRoutingTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("static mode: cellsFor routes, and each Cell runs its OWN Tasklet instance")
+    @DisplayName("Instance state does not leak between Cell keys")
     void staticCellsUsePerCellInstances() {
         RelayClassRegistry.registerClass(StaticRelay.class);
 

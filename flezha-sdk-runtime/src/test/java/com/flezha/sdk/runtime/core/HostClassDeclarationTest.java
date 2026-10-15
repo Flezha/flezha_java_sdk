@@ -104,7 +104,7 @@ class HostClassDeclarationTest {
     }
 
     @Test
-    @DisplayName("each Tasklet declares its own schema version, never the class maximum")
+    @DisplayName("two Tasklets with different versions declare both")
     void perTaskletSchemaVersions() throws Exception {
         RelayClassRegistry.registerClass(MixedVersionRelay.class);
         JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_mixed_version_op"));
