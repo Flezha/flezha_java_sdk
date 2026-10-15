@@ -117,10 +117,20 @@ public final class Control {
         return call("PluginManager.list");
     }
 
-    /** One cell's live state, and the change sequence it was read at. */
+    /**
+     * A relay's live state, and the change sequence it was read at. {@code cell} is
+     * {@code <tasklet>[/<cell_key>]}: a tasklet's Cells, or one of them; null reads every
+     * Cell of the relay.
+     */
     @Nonnull
-    public JsonNode cellState(String relayId, String cellKey) {
-        return call("Relay.cell_state", relayId, cellKey);
+    public JsonNode cellState(String relayId, @Nullable String cell) {
+        return cell == null ? cellState(relayId) : call("Relay.cell_state", relayId, cell);
+    }
+
+    /** Every Cell of {@code relayId}: {@link #cellState(String, String)} with no selector. */
+    @Nonnull
+    public JsonNode cellState(String relayId) {
+        return call("Relay.cell_state", relayId);
     }
 
     /**

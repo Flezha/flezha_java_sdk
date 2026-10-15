@@ -80,6 +80,20 @@ class ControlTest {
     }
 
     @Test
+    @DisplayName("a state read sends the controller's selector, and none for the whole relay")
+    void aStateReadSendsTheSelectorAndNoneForTheWholeRelay() {
+        control.cellState("pages", "count/home");
+        control.cellState("pages", null);
+        control.cellState("pages");
+
+        assertThat(FlezhaImpl.ADMIN_CALLS)
+                .containsExactly(
+                        List.of("Relay.cell_state", "[\"pages\",\"count/home\"]"),
+                        List.of("Relay.cell_state", "[\"pages\"]"),
+                        List.of("Relay.cell_state", "[\"pages\"]"));
+    }
+
+    @Test
     @DisplayName("a start answer of another shape is refused naming it")
     void aStartAnswerOfAnotherShapeIsRefused() {
         FlezhaImpl.ADMIN_ANSWER = "{\"id\":\"my_echo\",\"outcome\":\"duplicate\"}";
