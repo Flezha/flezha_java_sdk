@@ -165,7 +165,7 @@ class ActivationDispatcherTest extends DispatchTestBase {
         RelayClassRegistry.registerClass(RefusingRelay.class);
         REFUSE.set(true);
 
-        assertThatThrownBy(() -> RelayInstance.materialize(OP, "refusing_op"))
+        assertThatThrownBy(() -> RelayInstance.materialize(OP, "refusing_op", gone -> {}))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage(REFUSAL);
     }

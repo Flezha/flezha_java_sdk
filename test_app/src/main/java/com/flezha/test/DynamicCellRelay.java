@@ -23,7 +23,9 @@ public final class DynamicCellRelay implements Relay {
                 .onFull(OverflowPolicy.DROP_NOTHING)
                 .filter(input -> !input.equals("drop"))
                 .keyBy(DynamicCellRelay::key)
-                .into(DynamicCellTasklet.class)
+                .into(System.getenv("DYN_TEST_TTL_MS") == null
+                        ? DynamicCellTasklet.class
+                        : EvictingDynamicCellTasklet.class)
                 .output("kafka");
     }
 

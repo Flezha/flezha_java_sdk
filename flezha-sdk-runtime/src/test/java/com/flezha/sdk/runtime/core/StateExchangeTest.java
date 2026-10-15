@@ -151,6 +151,24 @@ class StateExchangeTest extends DispatchTestBase {
                 .isEqualTo("{\"n\":42}");
     }
 
+    @Test
+    @DisplayName("a Cell that left starts again at its initial state, and a relay that left is no live instance")
+    void aLeaveDropsTheCellOrTheWholeInstance() {
+        RelayClassRegistry.registerClass(CounterRelay.class);
+        soleEffect(work("counter_op", 0, Optional.empty(), 0, input(0, "a", 1)));
+
+        ActivationOutcome left = outcome(command("counter_op", 0, Optional.empty(), new ActivationKind.Leave(false)));
+        assertThat(left).isInstanceOf(ActivationOutcome.StateApplied.class);
+        ActivationOutcome json =
+                outcome(command("counter_op", 0, Optional.empty(), new ActivationKind.LiveStateRead()));
+        assertThat(new String(((ActivationOutcome.StateJson) json).json(), StandardCharsets.UTF_8))
+                .isEqualTo("{\"n\":0}");
+        assertThat(dispatcher.instancesOf("counter_op")).isEqualTo(1);
+
+        outcome(command("counter_op", 0, Optional.empty(), new ActivationKind.Leave(true)));
+        assertThat(dispatcher.instancesOf("counter_op")).isZero();
+    }
+
     // A Void state has nothing to ship: the empty object is what the migration
     // serialize and the graceful shutdown's state ship carry for it.
     @Test

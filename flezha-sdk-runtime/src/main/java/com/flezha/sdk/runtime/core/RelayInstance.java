@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 
@@ -66,8 +67,12 @@ public final class RelayInstance {
 
     private record CellAddress(int tasklet, String cellKey) {}
 
-    private RelayInstance(String relayId, String factoryId, RelayTopology topology) {
+    /** What the dispatcher does when this relay leaves the runner: let it go. */
+    private final Consumer<RelayInstance> left;
+
+    private RelayInstance(String relayId, String factoryId, RelayTopology topology, Consumer<RelayInstance> left) {
         this.relayId = relayId;
+        this.left = left;
         this.factoryId = factoryId;
         this.topology = topology;
         this.steps = topology.steps();
@@ -79,10 +84,10 @@ public final class RelayInstance {
         this.routing = new CellRouting(topology, routers, edgeCodec, steps);
     }
 
-    static RelayInstance materialize(String relayId, String factoryId) {
+    static RelayInstance materialize(String relayId, String factoryId, Consumer<RelayInstance> left) {
         RelayTopology topology = RelayClassRegistry.getTopology(factoryId);
         if (topology != null) {
-            return new RelayInstance(relayId, factoryId, topology);
+            return new RelayInstance(relayId, factoryId, topology, left);
         }
         throw new IllegalStateException("unknown factory `" + factoryId + "` for relay `" + relayId + "`");
     }
@@ -118,6 +123,16 @@ public final class RelayInstance {
             }
             case ActivationKind.KeyRequest request -> new ActivationOutcome.Prepared(routing.prepare(request));
             case ActivationKind.CompensateRun comp -> compensateRun(activation, comp.outputs(), core);
+            case ActivationKind.Leave leave -> {
+                CellRef target = activation.target();
+                if (leave.wholeRelay()) {
+                    left.accept(this);
+                } else {
+                    cells.remove(
+                            new CellAddress(target.tasklet(), target.cellKey().orElse("")));
+                }
+                yield new ActivationOutcome.StateApplied();
+            }
         };
     }
 

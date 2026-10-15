@@ -55,7 +55,7 @@ public final class ActivationDispatcher {
                     activation.target().relay(),
                     (id, existing) -> existing != null && existing.factoryId().equals(activation.factory())
                             ? existing
-                            : RelayInstance.materialize(id, activation.factory()));
+                            : RelayInstance.materialize(id, activation.factory(), gone -> instances.remove(id, gone)));
             return new ActivationResult(activation.token(), instance.dispatch(activation, core));
         } catch (Throwable t) {
             String message = t.getMessage() == null ? t.toString() : t.getMessage();

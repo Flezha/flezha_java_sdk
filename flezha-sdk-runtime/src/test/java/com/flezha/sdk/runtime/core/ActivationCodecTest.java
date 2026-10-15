@@ -118,7 +118,8 @@ class ActivationCodecTest {
                 Map.entry(
                         new ActivationKind.KeyRequest(2, List.of(new byte[] {0x70}), true, false),
                         "06020101700100000166"),
-                Map.entry(new ActivationKind.CompensateRun(List.of(new byte[] {0x0A})), "0701010a000166"));
+                Map.entry(new ActivationKind.CompensateRun(List.of(new byte[] {0x0A})), "0701010a000166"),
+                Map.entry(new ActivationKind.Leave(true), "0801000166"));
         for (Map.Entry<ActivationKind, String> entry : kinds) {
             Activation act = new Activation(1, new CellRef("o", 0, Optional.empty()), entry.getKey(), 0, "f");
             byte[] bytes = ActivationCodec.encodeActivation(act);

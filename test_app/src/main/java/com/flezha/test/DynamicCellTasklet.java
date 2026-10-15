@@ -13,10 +13,11 @@ import java.util.Optional;
  * The dynamic-mode consumer of {@link DynamicCellRelay}. It
  * declares no keying member of any kind — the edge's {@code keyBy} is what makes
  * it dynamic — and applies a Change per input so the controller writes a WAL
- * file per lazily-created Cell. It declares no idle TTL, so every Cell is kept.
+ * file per lazily-created Cell. It declares no idle TTL, so every Cell is kept;
+ * {@link EvictingDynamicCellTasklet} is the one a run arming a TTL wires.
  */
 @Tasklet.Spec(name = "dynamic_cell_tasklet")
-public final class DynamicCellTasklet implements Tasklet<String, DynamicCellTasklet.State, byte[]> {
+public class DynamicCellTasklet implements Tasklet<String, DynamicCellTasklet.State, byte[]> {
 
     public record State(List<String> seen) {}
 

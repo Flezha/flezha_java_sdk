@@ -10,7 +10,7 @@ import java.util.OptionalLong;
 import javax.annotation.Nonnull;
 
 /**
- * Postcard codec for the poll-core activation boundary (schema version 3),
+ * Postcard codec for the poll-core activation boundary (schema version 4),
  * byte-identical to {@code flz_core::schema}. Both directions exist for every
  * type: the shim decodes Activations and encodes ActivationResults on the hot
  * path; the inverses back the cross-language fixtures.
@@ -127,6 +127,7 @@ public final class ActivationCodec {
                         .bool(request.wantEventTime());
             }
             case ActivationKind.CompensateRun comp -> w.varint(7).vec(comp.outputs(), Postcard.Writer::bytes);
+            case ActivationKind.Leave leave -> w.varint(8).bool(leave.wholeRelay());
         }
     }
 
@@ -144,6 +145,7 @@ public final class ActivationCodec {
             case 6 -> new ActivationKind.KeyRequest(
                     Math.toIntExact(r.varint()), r.vec(Postcard.Reader::bytes), r.bool(), r.bool());
             case 7 -> new ActivationKind.CompensateRun(r.vec(Postcard.Reader::bytes));
+            case 8 -> new ActivationKind.Leave(r.bool());
             default -> throw new IllegalArgumentException(
                     "postcard: unknown ActivationKind discriminant " + discriminant);
         };

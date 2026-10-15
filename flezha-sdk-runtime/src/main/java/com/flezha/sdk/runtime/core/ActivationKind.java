@@ -58,4 +58,10 @@ public sealed interface ActivationKind {
      * forward outputs cross; the host runs {@code compensate}.
      */
     record CompensateRun(@Nonnull List<byte[]> outputs) implements ActivationKind {}
+
+    /**
+     * Discriminant 8: the target Cell left this runner, or with {@code wholeRelay}
+     * every Cell of the target's relay did; the host drops what it holds for them.
+     */
+    record Leave(boolean wholeRelay) implements ActivationKind {}
 }
