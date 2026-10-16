@@ -73,10 +73,15 @@
                                         <exclude>META-INF/LICENSE.txt</exclude>
                                         <exclude>META-INF/NOTICE</exclude>
                                         <exclude>META-INF/NOTICE.txt</exclude>
+                                        <!-- An upstream module descriptor does not describe the merged jar. -->
+                                        <exclude>**/module-info.class</exclude>
+                                        <!-- The manifest transformer below writes this module's own. -->
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
                                     </excludes>
                                 </filter>
                             </filters>
                             <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer"/>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/LICENSE</resource>

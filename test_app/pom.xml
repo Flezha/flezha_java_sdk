@@ -129,6 +129,8 @@
                                              through the transformer above, so the incoming copy would be
                                              a duplicate entry. -->
                                         <exclude>META-INF/THIRD_PARTY_NOTICES.md</exclude>
+                                        <!-- The manifest transformer above writes this jar's own. -->
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
                                     </excludes>
                                 </filter>
                             </filters>
