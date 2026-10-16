@@ -257,12 +257,17 @@ class PollHostTest {
             throw new IllegalStateException("dispatcher blew up");
         };
 
-        try (PollHost ignored = start(core, dispatch, 1)) {
+        CapturedStderr stderr = CapturedStderr.start();
+        try (stderr;
+                PollHost ignored = start(core, dispatch, 1)) {
             core.handOut(activation(7, "unlucky"));
             assertThat(dispatched.await(10, TimeUnit.SECONDS)).isTrue();
             awaitTrue(() -> core.abandoned.contains(7L), "the activation was abandoned");
         }
         assertThat(core.completed.get()).isZero();
+        assertThat(stderr.lines())
+                .containsExactly("[flezha] activation processing failed: "
+                        + "java.lang.IllegalStateException: dispatcher blew up");
     }
 
     @Test
@@ -272,10 +277,15 @@ class PollHostTest {
         FakeCore core = new FakeCore();
         core.completeThrows = true;
 
-        try (PollHost ignored = start(core, PollHostTest::ok, 1)) {
+        CapturedStderr stderr = CapturedStderr.start();
+        try (stderr;
+                PollHost ignored = start(core, PollHostTest::ok, 1)) {
             core.handOut(activation(8, "unlucky"));
             awaitTrue(() -> core.abandoned.contains(8L), "the activation was abandoned");
         }
+        assertThat(stderr.lines())
+                .containsExactly("[flezha] activation processing failed: "
+                        + "java.lang.IllegalStateException: core refused the completion");
     }
 
     /**
@@ -289,7 +299,9 @@ class PollHostTest {
         FakeCore core = new FakeCore();
         core.pollErrors.set(1);
 
-        try (PollHost host = start(core, PollHostTest::ok, 2)) {
+        CapturedStderr stderr = CapturedStderr.start();
+        try (stderr;
+                PollHost host = start(core, PollHostTest::ok, 2)) {
             awaitTrue(() -> core.pollErrors.get() == 0, "a fetcher died on the poll Error");
             // The configured count is what the runner budgets for, so it must
             // come back — and the replacement must actually fetch.
@@ -299,6 +311,16 @@ class PollHostTest {
             core.handOut(activation(9, "after-the-death"));
             awaitTrue(() -> core.completed.get() == 1, "a replacement fetcher served new work");
         }
+        List<String> lines = stderr.lines();
+        assertThat(lines)
+                .startsWith(
+                        "[flezha] core poll failed: java.lang.StackOverflowError: fetcher died",
+                        "[flezha] fetcher thread ended unexpectedly; starting a replacement",
+                        "java.lang.StackOverflowError: fetcher died");
+        assertThat(lines.subList(3, lines.size()))
+                .as("the rest is the dead fetcher's stack trace")
+                .isNotEmpty()
+                .allSatisfy(line -> assertThat(line).startsWith("\tat "));
     }
 
     /**
@@ -324,7 +346,9 @@ class PollHostTest {
     @DisplayName("growth stops at the ceiling and the supervisor keeps waiting")
     void starvationGrowthStopsAtTheCeiling() throws Exception {
         FakeCore core = new FakeCore();
-        try (PollHost host = start(core, PollHostTest::ok, 1, 2)) {
+        CapturedStderr stderr = CapturedStderr.start();
+        try (stderr;
+                PollHost host = start(core, PollHostTest::ok, 1, 2)) {
             core.starvations.set(5);
             awaitTrue(() -> host.liveFetcherCount() == 2, "the pool grew to its ceiling");
             awaitTrue(() -> core.starvations.get() == 0, "every observation was consumed");
@@ -332,6 +356,10 @@ class PollHostTest {
             int waits = core.starvationWaits.get();
             awaitTrue(() -> core.starvationWaits.get() > waits, "the supervisor keeps waiting after refusing to grow");
         }
+        assertThat(stderr.lines())
+                .as("the ceiling is reported once, not once per observation")
+                .containsExactly("[flezha] starvation observed with 2 fetchers at the ceiling (2); "
+                        + "raise FLEZHA_WORKER_POOL_MAX if the work is genuinely blocked rather than wedged");
     }
 
     /**
@@ -344,11 +372,15 @@ class PollHostTest {
     void supervisorSurvivesAFailingWait() throws Exception {
         FakeCore core = new FakeCore();
         core.starvationErrors.set(2);
-        try (PollHost host = start(core, PollHostTest::ok, 1, 3)) {
+        CapturedStderr stderr = CapturedStderr.start();
+        try (stderr;
+                PollHost host = start(core, PollHostTest::ok, 1, 3)) {
             awaitTrue(() -> core.starvationErrors.get() == 0, "both failing waits were made");
             core.starvations.set(1);
             awaitTrue(() -> host.liveFetcherCount() == 2, "the supervisor still grows the pool");
         }
+        String failedWait = "[flezha] starvation wait failed: java.lang.IllegalStateException: starvation wait failed";
+        assertThat(stderr.lines()).containsExactly(failedWait, failedWait);
     }
 
     @Test

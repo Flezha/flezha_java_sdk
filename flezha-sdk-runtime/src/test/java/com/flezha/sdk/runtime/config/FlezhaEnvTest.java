@@ -2,6 +2,7 @@ package com.flezha.sdk.runtime.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flezha.sdk.runtime.CapturedStderr;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,8 +26,13 @@ class FlezhaEnvTest {
     @Test
     @DisplayName("malformed fetcher count falls back to the default")
     void fetcherCountMalformedFallback() {
-        var resolved = FlezhaEnv.resolve(Map.of("FLEZHA_WORKER_POOL_SIZE", "notanumber"));
-        assertThat(resolved.fetcherCount()).isEqualTo(FlezhaEnv.DEFAULT_FETCHER_COUNT);
+        try (CapturedStderr stderr = CapturedStderr.start()) {
+            var resolved = FlezhaEnv.resolve(Map.of("FLEZHA_WORKER_POOL_SIZE", "notanumber"));
+            assertThat(resolved.fetcherCount()).isEqualTo(FlezhaEnv.DEFAULT_FETCHER_COUNT);
+            assertThat(stderr.lines())
+                    .containsExactly("[flezha] Invalid FLEZHA_WORKER_POOL_SIZE=notanumber; falling back to "
+                            + FlezhaEnv.DEFAULT_FETCHER_COUNT);
+        }
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.flezha.sdk.runtime.relay.builder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flezha.sdk.runtime.CapturedStderr;
 import java.util.OptionalInt;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,8 +33,13 @@ class MailboxCapacityResolverTest {
     @Test
     @DisplayName("unparseable env value falls through to the default")
     void unparseableEnvFallsThroughToDefault() {
-        assertThat(MailboxCapacityResolver.resolveInner(OptionalInt.empty(), "banana"))
-                .isEqualTo(MailboxCapacityResolver.DEFAULT_MAILBOX_CAPACITY);
+        try (CapturedStderr stderr = CapturedStderr.start()) {
+            assertThat(MailboxCapacityResolver.resolveInner(OptionalInt.empty(), "banana"))
+                    .isEqualTo(MailboxCapacityResolver.DEFAULT_MAILBOX_CAPACITY);
+            assertThat(stderr.lines())
+                    .containsExactly("[flezha] Invalid FLEZHA_MAILBOX_CAPACITY=banana; falling back to "
+                            + MailboxCapacityResolver.DEFAULT_MAILBOX_CAPACITY);
+        }
     }
 
     @Test

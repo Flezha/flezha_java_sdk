@@ -3,6 +3,7 @@ package com.flezha.sdk.runtime.core;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flezha.sdk.runtime.CapturedStderr;
 import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import com.flezha.sdk.runtime.state.PendingTimers;
 import com.flezha.sdk.runtime.state.TimerOp;
@@ -103,7 +104,13 @@ class ActivationDispatcherTest extends DispatchTestBase {
     @Test
     @DisplayName("an unknown factory fails the whole activation as structural")
     void unknownFactoryIsStructural() {
-        ActivationOutcome out = outcome(work("no_such_factory", 0, Optional.empty(), 0, input(0, "x", 1)));
+        ActivationOutcome out;
+        try (CapturedStderr stderr = CapturedStderr.start()) {
+            out = outcome(work("no_such_factory", 0, Optional.empty(), 0, input(0, "x", 1)));
+            assertThat(stderr.lines())
+                    .containsExactly("[flezha] activation dispatch failed for `" + OP
+                            + "`: unknown factory `no_such_factory` for relay `" + OP + "`");
+        }
         assertThat(out).isInstanceOf(ActivationOutcome.Failed.class);
         WorkError error = ((ActivationOutcome.Failed) out).error();
         assertThat(error.nonRetryable()).isTrue();

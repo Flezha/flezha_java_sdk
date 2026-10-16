@@ -2,6 +2,7 @@ package com.flezha.sdk.runtime.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flezha.sdk.runtime.CapturedStderr;
 import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -50,16 +51,22 @@ class StateExchangeTest extends DispatchTestBase {
         RelayClassRegistry.registerClass(CounterRelay.class);
         ActivationDispatcher dispatcher = new ActivationDispatcher();
 
-        ActivationOutcome outcome = dispatcher
-                .dispatch(command(
-                        "counter_op",
-                        0,
-                        Optional.empty(),
-                        new ActivationKind.RestoreFold(
-                                Optional.of(new ActivationKind.RestoreBody(
-                                        "5".getBytes(StandardCharsets.UTF_8), OptionalInt.of(1))),
-                                List.of())))
-                .outcome();
+        ActivationOutcome outcome;
+        try (CapturedStderr stderr = CapturedStderr.start()) {
+            outcome = dispatcher
+                    .dispatch(command(
+                            "counter_op",
+                            0,
+                            Optional.empty(),
+                            new ActivationKind.RestoreFold(
+                                    Optional.of(new ActivationKind.RestoreBody(
+                                            "5".getBytes(StandardCharsets.UTF_8), OptionalInt.of(1))),
+                                    List.of())))
+                    .outcome();
+            assertThat(stderr.lines())
+                    .containsExactly("[flezha] activation dispatch failed for `" + OP
+                            + "`: tasklet `count_task` declares no state migration from schema_version 1");
+        }
 
         assertThat(outcome).isInstanceOf(ActivationOutcome.Failed.class);
         assertThat(((ActivationOutcome.Failed) outcome).error().message())
