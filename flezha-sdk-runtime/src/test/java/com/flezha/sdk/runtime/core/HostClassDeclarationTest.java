@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
-import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.relay.Relay;
 import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.RepositoryFixture;
@@ -299,24 +298,19 @@ class HostClassDeclarationTest {
     @Test
     @DisplayName("A durable chained loop whose terminal task releases nothing is refused")
     void chainedLoopTerminalWithoutHandoffIsRefusedByTheCore() {
-        // The refusal is the core's, raised where every host reaches it —
-        // declareClass — and is not restated in this SDK, exactly as the
-        // branching-chained-loop refusal already is. Only an inter-tasklet
-        // channel carries a journal codec, so a terminal whose only wiring is a
-        // plugin output ships an empty handoff and the crash-resumed loop reads
-        // that as convergence.
-        RelayClassRegistry.registerClass(ChainedTerminalIntoSinkSteps.class);
-        byte[] declaration = HostClassDeclaration.forFactory("decl_chained_sink");
+        // The refusal is the core's class check, reached at registration, and
+        // is not restated in this SDK. Only an inter-tasklet channel carries a
+        // journal codec, so a terminal whose only wiring is a plugin output
+        // ships an empty handoff and the crash-resumed loop reads that as
+        // convergence.
+        FlezhaException refused = Refused.by(
+                "topology.chained_loop_terminal_without_handoff",
+                () -> RelayClassRegistry.registerClass(ChainedTerminalIntoSinkSteps.class));
 
-        long ctx = FlzCore.newContext();
-        try {
-            FlezhaException refused = Refused.by(
-                    "topology.chained_loop_terminal_without_handoff", () -> FlzCore.declareClass(ctx, declaration));
-            assertThat(Refused.details(refused, "topology.chained_loop_terminal_without_handoff"))
-                    .containsEntry("tasklet", "decl_chained_sink_task");
-        } finally {
-            FlzCore.contextFree(ctx);
-        }
+        assertThat(Refused.details(refused, "topology.chained_loop_terminal_without_handoff"))
+                .containsEntry("tasklet", "decl_chained_sink_task");
+        assertThatThrownBy(() -> HostClassDeclaration.forFactory("decl_chained_sink"))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     private static List<JsonNode> nodes(JsonNode array) {
