@@ -87,6 +87,15 @@ public final class RepositoryFixture {
         return rows;
     }
 
+    /** The last column of the one row of {@code path} that starts {@code table|name}. */
+    public static String value(String path, String table, String name) throws IOException {
+        return rows(path).stream()
+                .filter(row -> row.get(0).equals(table) && row.get(1).equals(name))
+                .map(row -> row.get(row.size() - 1))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(path + " has no row " + table + "|" + name));
+    }
+
     /** The contract set's root, resolved once for every reader in this suite. */
     private static Path contractRoot() {
         if (ROOT == null) {

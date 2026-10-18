@@ -2,6 +2,7 @@ package com.flezha.sdk.runtime.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.runtime.RepositoryFixture;
 import com.flezha.sdk.runtime.state.TimerOp;
 import com.flezha.sdk.state.TimerKind;
@@ -24,13 +25,8 @@ class ActivationCodecTest {
 
     private static final String FIXTURE = "test/fixtures/postcard_bodies.txt";
 
-    /** The hex of the fixture row {@code <type>|<caseName>}. */
     private static String pinned(String type, String caseName) throws IOException {
-        return RepositoryFixture.rows(FIXTURE).stream()
-                .filter(row -> row.get(0).equals(type) && row.get(1).equals(caseName))
-                .map(row -> row.get(2))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError(FIXTURE + " has no row " + type + "|" + caseName));
+        return RepositoryFixture.value(FIXTURE, type, caseName);
     }
 
     private static Activation workActivation() {
@@ -72,6 +68,14 @@ class ActivationCodecTest {
                         true,
                         Optional.empty(),
                         complete))));
+    }
+
+    @Test
+    @DisplayName("the codec speaks the shared fixture's schema version")
+    void schemaVersionIsTheFixtures() throws IOException {
+        assertThat(FlzCore.SCHEMA_VERSION)
+                .isEqualTo(Integer.parseInt(
+                        RepositoryFixture.value("test/fixtures/wire_constants.txt", "schema_version", "activation")));
     }
 
     @Test

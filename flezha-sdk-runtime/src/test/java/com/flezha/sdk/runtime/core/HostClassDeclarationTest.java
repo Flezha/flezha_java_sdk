@@ -36,6 +36,9 @@ class HostClassDeclarationTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    /** The wire constants the declaration stamps are held to. */
+    private static final String CONSTANTS = "test/fixtures/wire_constants.txt";
+
     @AfterEach
     void reset() {
         RelayClassRegistry.reset();
@@ -48,8 +51,9 @@ class HostClassDeclarationTest {
         JsonNode decl = JSON.readTree(HostClassDeclaration.forFactory("decl_tier_op"));
 
         assertThat(decl.get("factory_id").asText()).isEqualTo("decl_tier_op");
-        assertThat(decl.get("sdk_lang").asInt()).isEqualTo(2);
-        assertThat(decl.get("change_format_id").asInt()).isEqualTo(4);
+        assertThat(decl.get("sdk_lang").asText()).isEqualTo(RepositoryFixture.value(CONSTANTS, "sdk_lang", "java"));
+        assertThat(decl.get("change_format_id").asText())
+                .isEqualTo(RepositoryFixture.value(CONSTANTS, "format_id", "kryo"));
         assertThat(decl.get("run"))
                 .as("the tree as the author wrote it; the core derives the granularity from it")
                 .isEqualTo(
