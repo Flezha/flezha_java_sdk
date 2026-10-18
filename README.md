@@ -3,7 +3,7 @@
 Java 21 SDK for authoring Flezha compute engines.
 
 **Support tier:**
-[tier 1](https://github.com/flezha/flezha/blob/main/docs/publishing/maturity.md#sdk-java),
+[tier 1](https://github.com/flezha/flezha/blob/main/docs/public/publishing/maturity.md#sdk-java),
 run by the maintainer in a live deployment, passes the full conformance run in CI and is
 permanently supported.
 
@@ -195,8 +195,8 @@ controller are refused at startup with the responsible declaration named.
 - **Run a graph without a controller:** `LocalRelay` executes a declared
   graph in the calling JVM. See
   [`local/`](flezha-sdk-examples/src/main/java/com/flezha/examples/local).
-- **Threading model, packaging and cross-SDK comparison:** `docs/sdk/java_sdk.md`.
-- **Wire protocol and framing:** `docs/sdk/protocol_spec.md`.
+- **Threading model, packaging and cross-SDK comparison:** `docs/internal/sdk/java_sdk.md`.
+- **Wire protocol and framing:** `docs/internal/sdk/protocol_spec.md`.
 
 ## Capabilities
 
@@ -322,14 +322,14 @@ runner.logger((level, format, args) ->
         slf4j.atLevel(Level.valueOf(level.name())).log(format, args));
 ```
 
-`docs/sdk/java_sdk.md` has the rest: what a supplied output is and is not
+`docs/internal/sdk/java_sdk.md` has the rest: what a supplied output is and is not
 filtered by, where the substitution lives, and what a failed write does.
 
 ## Further reading
 
-- `docs/sdk/protocol_spec.md`: wire protocol, framing, output identity stamps.
-- `docs/resilience/data_durability.md`: where state and output are lost vs not.
-- `docs/sdk/state_persistence.md`: Kryo registration and the Change machinery.
+- `docs/internal/sdk/protocol_spec.md`: wire protocol, framing, output identity stamps.
+- `docs/internal/resilience/data_durability.md`: where state and output are lost vs not.
+- `docs/internal/sdk/state_persistence.md`: Kryo registration and the Change machinery.
 
 ## License
 

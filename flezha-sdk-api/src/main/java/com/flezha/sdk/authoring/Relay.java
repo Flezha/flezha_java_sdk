@@ -11,7 +11,7 @@ import java.lang.annotation.Target;
 
 /**
  * Declares a whole single-tasklet relay on a class that implements
- * {@link com.flezha.sdk.tasklet.Tasklet}: the short form of {@code docs/sdk/authoring_contract.md}
+ * {@link com.flezha.sdk.tasklet.Tasklet}: the short form of {@code docs/internal/sdk/authoring_contract.md}
  * §5.
  *
  * <p>{@code runner.registerFactory(Echo.class)} reads it and declares a relay whose factory id

@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
  * Asserts the {@code @Relay} short forms register under their
  * ids and process input as the equivalent hand-written relays do, and that the 2-tasklet
  * reference relay matches the cross-SDK authoring contract (see
- * {@code docs/sdk/authoring_contract.md} §6).
+ * {@code docs/internal/sdk/authoring_contract.md} §6).
  */
 class SugarTwinTest {
 

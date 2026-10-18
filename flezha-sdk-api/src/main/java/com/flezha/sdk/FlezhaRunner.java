@@ -44,7 +44,7 @@ import javax.annotation.Nullable;
  * {@code close()} call.
  *
  * <p>Method names and lifecycle verbs follow
- * {@code docs/sdk/naming_conventions.md} (repository root), mirrored 1:1 with
+ * {@code docs/internal/sdk/naming_conventions.md} (repository root), mirrored 1:1 with
  * the Rust SDK's {@code FlezhaRunner}.
  */
 public final class FlezhaRunner implements AutoCloseable {
@@ -125,7 +125,7 @@ public final class FlezhaRunner implements AutoCloseable {
 
     /**
      * The registry, for a class that is a relay or a short form; anything else is refused by
-     * the contract's name for it ({@code docs/sdk/authoring_contract.md} §5.1).
+     * the contract's name for it ({@code docs/internal/sdk/authoring_contract.md} §5.1).
      */
     private RegistryCore checked(Class<?> declared, String what) {
         if (declared == null) {

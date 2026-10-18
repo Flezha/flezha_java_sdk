@@ -5,7 +5,7 @@ by the shared conformance suite under `FLEZHA_E2E_RUNTIME=java mix test
 --include system` and by the `mix bench --runtime java` regression bench. The
 factory ids it registers, the transports it supports and how it is launched are
 declared in `conformance.json` beside this file — see
-`docs/sdk/conformance.md`.
+`docs/internal/sdk/conformance.md`.
 
 The app declares its Relay classes via
 `Flezha.createRunner(ns).registerFactory(...)` — the integration-matrix core
@@ -27,7 +27,7 @@ short forms `SugarSteps` and the `per_input` `SugarStepsPerInput`; and the 2-tas
 `SugarEntry` → `SugarDownstream` reference relay, wired by `SugarStaticCellRelay`.
 `Main` registers each short form by its class with `registerFactory`, as it registers every
 other relay; `SugarTwinTest` asserts they register under their ids and process input as the
-equivalent hand-written relays do. See `docs/sdk/authoring_contract.md`.
+equivalent hand-written relays do. See `docs/internal/sdk/authoring_contract.md`.
 
 ## Build
 
