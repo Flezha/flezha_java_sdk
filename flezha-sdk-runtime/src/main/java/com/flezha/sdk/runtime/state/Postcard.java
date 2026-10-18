@@ -12,11 +12,11 @@ import javax.annotation.Nonnull;
  * Postcard codec: the cross-language wire contract with the Rust SDK's
  * {@code postcard::to_allocvec} / {@code postcard::from_bytes}.
  *
- * <p>Every structure the controller decodes from this SDK — the dead-letter
- * {@code ParkBody}, the effectively-once {@code EffectRecordBody}, the steps relay
- * task-journal entries and outbox items — is encoded with these primitives. The
- * format is field-order-sensitive and has no self-describing framing, so an
- * encoder and its Rust counterpart must agree field for field.
+ * <p>The SDK decodes the activations the shared core hands it and encodes the
+ * activation results it answers with these primitives
+ * ({@link com.flezha.sdk.runtime.core.ActivationCodec}). The format is
+ * field-order-sensitive and has no self-describing framing, so an encoder and
+ * its Rust counterpart must agree field for field.
  *
  * <p>Encoding rules: integers are LEB128 varints; {@code Vec<u8>} and
  * {@code String} are a varint length followed by raw (UTF-8) bytes;

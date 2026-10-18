@@ -81,7 +81,7 @@ class ActivationCodecTest {
     @Test
     @DisplayName("work activation bytes are pinned to the shared fixture")
     void workActivationBytesArePinned() throws IOException {
-        byte[] encoded = ActivationCodec.encodeActivation(workActivation());
+        byte[] encoded = ActivationCodecInverses.encodeActivation(workActivation());
         assertThat(hex(encoded)).isEqualTo(pinned("activation", "work"));
         assertThat(ActivationCodec.decodeActivation(encoded))
                 .usingRecursiveComparison()
@@ -93,7 +93,7 @@ class ActivationCodecTest {
     void resultBytesArePinned() throws IOException {
         byte[] encoded = ActivationCodec.encodeResult(resultFixture());
         assertThat(hex(encoded)).isEqualTo(pinned("result", "work"));
-        assertThat(ActivationCodec.decodeResult(encoded))
+        assertThat(ActivationCodecInverses.decodeResult(encoded))
                 .usingRecursiveComparison()
                 .isEqualTo(resultFixture());
     }
@@ -105,7 +105,7 @@ class ActivationCodecTest {
         byte[] encoded = ActivationCodec.encodeResult(completing);
 
         assertThat(hex(encoded)).isEqualTo(pinned("result", "completing"));
-        assertThat(ActivationCodec.decodeResult(encoded))
+        assertThat(ActivationCodecInverses.decodeResult(encoded))
                 .usingRecursiveComparison()
                 .isEqualTo(completing);
     }
@@ -130,7 +130,7 @@ class ActivationCodecTest {
                 Map.entry("leave", new ActivationKind.Leave(true)));
         for (Map.Entry<String, ActivationKind> kind : kinds.entrySet()) {
             Activation act = new Activation(1, new CellRef("o", 0, Optional.empty()), kind.getValue(), 0, "f");
-            byte[] bytes = ActivationCodec.encodeActivation(act);
+            byte[] bytes = ActivationCodecInverses.encodeActivation(act);
             assertThat(hex(bytes)).as(kind.getKey()).isEqualTo(pinned("activation", kind.getKey()));
             assertThat(ActivationCodec.decodeActivation(bytes))
                     .usingRecursiveComparison()
@@ -179,7 +179,7 @@ class ActivationCodecTest {
         for (ActivationOutcome outcome : outcomes) {
             ActivationResult result = new ActivationResult(7, outcome);
             byte[] bytes = ActivationCodec.encodeResult(result);
-            ActivationResult decoded = ActivationCodec.decodeResult(bytes);
+            ActivationResult decoded = ActivationCodecInverses.decodeResult(bytes);
             assertThat(decoded).usingRecursiveComparison().isEqualTo(result);
             assertThat(ActivationCodec.encodeResult(decoded)).isEqualTo(bytes);
         }
@@ -203,7 +203,7 @@ class ActivationCodecTest {
         byte[] bytes = ActivationCodec.encodeResult(result);
         // token 1, outcome Work (0), one effect, verdict 3, message "bad".
         assertThat(hex(bytes)).startsWith("01" + "00" + "01" + "03" + "03" + "626164");
-        assertThat(ActivationCodec.decodeResult(bytes))
+        assertThat(ActivationCodecInverses.decodeResult(bytes))
                 .usingRecursiveComparison()
                 .isEqualTo(result);
     }

@@ -13,12 +13,9 @@ package com.flezha.sdk.channel;
  * @param maxAttempts   total attempts (first run included); default 3
  * @param backoffBaseMs exponential backoff base in milliseconds: attempt n
  *                      sleeps {@code base * 2^(n-1)} (±50% jitter), capped
- *                      at {@link #RETRY_BACKOFF_MAX_MS}
+ *                      at the core's 5 000 ms
  */
 public record RetryPolicy(int maxAttempts, long backoffBaseMs) {
 
     public static final RetryPolicy DEFAULT = new RetryPolicy(3, 50L);
-
-    /** Cap on the per-attempt retry backoff, jitter included. */
-    public static final long RETRY_BACKOFF_MAX_MS = 5_000L;
 }

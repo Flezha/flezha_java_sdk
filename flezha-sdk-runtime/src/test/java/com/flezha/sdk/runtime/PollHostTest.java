@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.runtime.core.Activation;
-import com.flezha.sdk.runtime.core.ActivationCodec;
+import com.flezha.sdk.runtime.core.ActivationCodecInverses;
 import com.flezha.sdk.runtime.core.ActivationKind;
 import com.flezha.sdk.runtime.core.ActivationOutcome;
 import com.flezha.sdk.runtime.core.ActivationResult;
@@ -52,7 +52,7 @@ class PollHostTest {
         private volatile boolean shuttingDown = false;
 
         void handOut(Activation activation) {
-            handouts.add(ActivationCodec.encodeActivation(activation));
+            handouts.add(ActivationCodecInverses.encodeActivation(activation));
         }
 
         void shutDown() {
