@@ -10,12 +10,7 @@ public final class FailingTurnUndoAllRelay extends FailingTurnLoopRelay {
 
     @Override
     public Run run() {
-        return Run.steps();
-    }
-
-    @Override
-    public Durable durable() {
-        return TestEnv.fixtureDurable();
+        return Run.steps(Each.PER_INPUT);
     }
 
 }
