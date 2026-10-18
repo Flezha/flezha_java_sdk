@@ -2,8 +2,10 @@ package com.flezha.sdk.runtime.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flezha.sdk.runtime.RepositoryFixture;
 import com.flezha.sdk.runtime.state.TimerOp;
 import com.flezha.sdk.state.TimerKind;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -14,12 +16,22 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Cross-language byte pin for activation schema version 2: the same values
- * the Rust fixture suite ({@code flz_core/src/schema.rs}) encodes must
- * produce the same bytes here. A mismatch means the schema changed — bump
- * {@code SCHEMA_VERSION} on both sides.
+ * Cross-language byte pin: the values {@code flz_core} encodes into the rows of {@code
+ * test/fixtures/postcard_bodies.txt} must produce the same bytes here and decode back to the same
+ * values. A mismatch means the schema changed — bump {@code SCHEMA_VERSION} on both sides.
  */
 class ActivationCodecTest {
+
+    private static final String FIXTURE = "test/fixtures/postcard_bodies.txt";
+
+    /** The hex of the fixture row {@code <type>|<caseName>}. */
+    private static String pinned(String type, String caseName) throws IOException {
+        return RepositoryFixture.rows(FIXTURE).stream()
+                .filter(row -> row.get(0).equals(type) && row.get(1).equals(caseName))
+                .map(row -> row.get(2))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(FIXTURE + " has no row " + type + "|" + caseName));
+    }
 
     private static Activation workActivation() {
         return new Activation(
@@ -63,21 +75,20 @@ class ActivationCodecTest {
     }
 
     @Test
-    @DisplayName("work activation bytes are pinned to the Rust fixture")
-    void workActivationBytesArePinned() {
+    @DisplayName("work activation bytes are pinned to the shared fixture")
+    void workActivationBytesArePinned() throws IOException {
         byte[] encoded = ActivationCodec.encodeActivation(workActivation());
-        assertThat(hex(encoded))
-                .isEqualTo("2a046f702d310301016b0002000102aabb010a666c7a2e6f66667365740137010701e8070100d00f090166");
+        assertThat(hex(encoded)).isEqualTo(pinned("activation", "work"));
         assertThat(ActivationCodec.decodeActivation(encoded))
                 .usingRecursiveComparison()
                 .isEqualTo(workActivation());
     }
 
     @Test
-    @DisplayName("result bytes are pinned to the Rust fixture")
-    void resultBytesArePinned() {
+    @DisplayName("result bytes are pinned to the shared fixture")
+    void resultBytesArePinned() throws IOException {
         byte[] encoded = ActivationCodec.encodeResult(resultFixture());
-        assertThat(hex(encoded)).isEqualTo("2a0001000101010101036f757401026b32000001020107e8070101d00f00010000");
+        assertThat(hex(encoded)).isEqualTo(pinned("result", "work"));
         assertThat(ActivationCodec.decodeResult(encoded))
                 .usingRecursiveComparison()
                 .isEqualTo(resultFixture());
@@ -85,13 +96,11 @@ class ActivationCodecTest {
 
     @Test
     @DisplayName("a completion request is the effect's last field")
-    void completionIsTheEffectsLastField() {
-        ActivationResult completing = resultFixture(Optional.of("3".getBytes(StandardCharsets.UTF_8)));
+    void completionIsTheEffectsLastField() throws IOException {
+        ActivationResult completing = resultFixture(Optional.of("done".getBytes(StandardCharsets.UTF_8)));
         byte[] encoded = ActivationCodec.encodeResult(completing);
 
-        // The pinned fixture's absent completion (`00`) becomes `01`, the
-        // length and the bytes, after the dlq's `00`.
-        assertThat(hex(encoded)).isEqualTo("2a0001000101010101036f757401026b32000001020107e8070101d00f000100010133");
+        assertThat(hex(encoded)).isEqualTo(pinned("result", "completing"));
         assertThat(ActivationCodec.decodeResult(encoded))
                 .usingRecursiveComparison()
                 .isEqualTo(completing);
@@ -99,33 +108,26 @@ class ActivationCodecTest {
 
     @Test
     @DisplayName("command activation kinds are pinned and round-trip")
-    void commandKindBytesArePinned() {
-        List<Map.Entry<ActivationKind, String>> kinds = List.of(
+    void commandKindBytesArePinned() throws IOException {
+        Map<String, ActivationKind> kinds = Map.ofEntries(
                 Map.entry(
+                        "restore_fold",
                         new ActivationKind.RestoreFold(
                                 Optional.of(new ActivationKind.RestoreBody(new byte[] {0x0F}, OptionalInt.empty())),
                                 List.of(
                                         new ActivationKind.RestoreBody(new byte[] {0x01}, OptionalInt.empty()),
-                                        // A body the host must migrate: pinned
-                                        // so the tagged shape stays byte-identical
-                                        // to the core's.
-                                        new ActivationKind.RestoreBody(new byte[] {0x02}, OptionalInt.of(1)))),
-                        "0101010f000201010001020101000166"),
-                Map.entry(new ActivationKind.SnapshotRequest(), "02000166"),
-                Map.entry(new ActivationKind.LiveStateRead(), "03000166"),
-                Map.entry(new ActivationKind.ApplyState("{}".getBytes()), "04027b7d000166"),
-                Map.entry(new ActivationKind.MigrationSerialize(), "05000166"),
-                Map.entry(
-                        new ActivationKind.KeyRequest(2, List.of(new byte[] {0x70}), true, false),
-                        "06020101700100000166"),
-                Map.entry(new ActivationKind.CompensateRun(List.of(new byte[] {0x0A})), "0701010a000166"),
-                Map.entry(new ActivationKind.Leave(true), "0801000166"));
-        for (Map.Entry<ActivationKind, String> entry : kinds) {
-            Activation act = new Activation(1, new CellRef("o", 0, Optional.empty()), entry.getKey(), 0, "f");
+                                        new ActivationKind.RestoreBody(new byte[] {0x02}, OptionalInt.of(1))))),
+                Map.entry("snapshot_request", new ActivationKind.SnapshotRequest()),
+                Map.entry("live_state_read", new ActivationKind.LiveStateRead()),
+                Map.entry("apply_state", new ActivationKind.ApplyState("{}".getBytes(StandardCharsets.UTF_8))),
+                Map.entry("migration_serialize", new ActivationKind.MigrationSerialize()),
+                Map.entry("key_request", new ActivationKind.KeyRequest(2, List.of(new byte[] {0x70}), true, false)),
+                Map.entry("compensate_run", new ActivationKind.CompensateRun(List.of(new byte[] {0x0A}))),
+                Map.entry("leave", new ActivationKind.Leave(true)));
+        for (Map.Entry<String, ActivationKind> kind : kinds.entrySet()) {
+            Activation act = new Activation(1, new CellRef("o", 0, Optional.empty()), kind.getValue(), 0, "f");
             byte[] bytes = ActivationCodec.encodeActivation(act);
-            // Envelope prefix (token 1, target o/0/None) is 5 bytes.
-            assertThat(hex(bytes).substring(0, 10)).isEqualTo("01016f0000");
-            assertThat(hex(bytes).substring(10)).isEqualTo(entry.getValue());
+            assertThat(hex(bytes)).as(kind.getKey()).isEqualTo(pinned("activation", kind.getKey()));
             assertThat(ActivationCodec.decodeActivation(bytes))
                     .usingRecursiveComparison()
                     .isEqualTo(act);
