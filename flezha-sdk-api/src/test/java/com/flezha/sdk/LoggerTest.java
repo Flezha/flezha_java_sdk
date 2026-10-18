@@ -46,10 +46,6 @@ class LoggerTest {
         Flezha.LOGGER.set(ConsoleLogger.fromEnv());
     }
 
-    private String stderr() {
-        return captured.text();
-    }
-
     @Test
     @DisplayName("a named level parses case-insensitively; unset, blank or unrecognised all mean warn")
     void levelNamesParse() {
@@ -70,15 +66,15 @@ class LoggerTest {
         new ConsoleLogger(LogLevel.WARN).info("i");
         new ConsoleLogger(LogLevel.WARN).warn("w");
         new ConsoleLogger(LogLevel.WARN).error("e");
-        assertThat(stderr()).contains("[flezha] w", "[flezha] e").doesNotContain("[flezha] d", "[flezha] i");
+        assertThat(captured.text()).contains("[flezha] w", "[flezha] e").doesNotContain("[flezha] d", "[flezha] i");
 
         captured.reset();
         new ConsoleLogger(LogLevel.DEBUG).debug("d");
-        assertThat(stderr()).contains("[flezha] d");
+        assertThat(captured.text()).contains("[flezha] d");
 
         captured.reset();
         new ConsoleLogger(LogLevel.ERROR).warn("w");
-        assertThat(stderr()).isEmpty();
+        assertThat(captured.text()).isEmpty();
     }
 
     @Test
@@ -136,7 +132,7 @@ class LoggerTest {
         Flezha.log().warn("in-flight activations did not finish within {}ms", 5000);
 
         assertThat(sink.lines).containsExactly("WARN in-flight activations did not finish within 5000ms");
-        assertThat(stderr()).as("the default sink no longer sees it").isEmpty();
+        assertThat(captured.text()).as("the default sink no longer sees it").isEmpty();
     }
 
     @Test
@@ -174,7 +170,7 @@ class LoggerTest {
 
         assertThat(Flezha.currentRunner()).as("the slot was released").isEmpty();
         assertThat(sink.lines).containsExactly("WARN while running", "WARN after close");
-        assertThat(stderr()).isEmpty();
+        assertThat(captured.text()).isEmpty();
     }
 
     @Test
