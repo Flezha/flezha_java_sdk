@@ -54,6 +54,26 @@
                 <targetPath>com/flezha/sdk</targetPath>
             </resource>
         </resources>
+        <plugins>
+            <!-- `CapturedStderr` as a test jar, so the runtime's tests capture
+                 standard error with the same helper. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>com/flezha/sdk/CapturedStderr*</include>
+                            </includes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 
     <profiles>

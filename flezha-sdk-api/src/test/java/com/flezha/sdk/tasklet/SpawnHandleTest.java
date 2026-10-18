@@ -3,9 +3,8 @@ package com.flezha.sdk.tasklet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flezha.sdk.CapturedStderr;
 import com.flezha.sdk.FlezhaException;
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -174,14 +173,15 @@ class SpawnHandleTest {
     @Test
     @DisplayName("without a control plane every read answers unavailable, the call still returns, and one line says so")
     void withoutAControlPlaneEveryReadAnswersUnavailable() {
-        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-        SpawnHandle handle = capturingStderr(
-                stderr, () -> new StubCtx(false, 42).spawnSteps("worker", PAYLOAD, SpawnOptions.id("w1")));
+        SpawnHandle handle;
+        try (CapturedStderr stderr = CapturedStderr.start()) {
+            handle = new StubCtx(false, 42).spawnSteps("worker", PAYLOAD, SpawnOptions.id("w1"));
+            assertThat(stderr.text())
+                    .startsWith("[flezha] spawnSteps(factory `worker`, id `w1`) failed: spawn.unavailable: ")
+                    .endsWith(System.lineSeparator())
+                    .hasLineCount(1);
+        }
 
-        assertThat(stderr.toString(StandardCharsets.UTF_8))
-                .startsWith("[flezha] spawnSteps(factory `worker`, id `w1`) failed: spawn.unavailable: ")
-                .endsWith(System.lineSeparator())
-                .hasLineCount(1);
         assertThatThrownBy(handle::tryResult).isInstanceOfSatisfying(FlezhaException.class, e -> assertThat(e.code())
                 .isEqualTo("spawn.unavailable"));
         assertThatThrownBy(handle::await).isInstanceOfSatisfying(FlezhaException.class, e -> assertThat(e.code())
@@ -192,13 +192,15 @@ class SpawnHandleTest {
     @DisplayName(
             "without a control plane a replayed spawn answers skipped with its id, or an empty one, and logs nothing")
     void withoutAControlPlaneAReplayedSpawnAnswersSkipped() throws Exception {
-        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         Ctx<Void, Object> replaying = new StubCtx(true, 42);
-        SpawnHandle unnamed = capturingStderr(stderr, () -> replaying.spawnSteps("worker", PAYLOAD));
-        SpawnHandle named =
-                capturingStderr(stderr, () -> replaying.spawnSteps("worker", PAYLOAD, SpawnOptions.id("w1")));
+        SpawnHandle unnamed;
+        SpawnHandle named;
+        try (CapturedStderr stderr = CapturedStderr.start()) {
+            unnamed = replaying.spawnSteps("worker", PAYLOAD);
+            named = replaying.spawnSteps("worker", PAYLOAD, SpawnOptions.id("w1"));
+            assertThat(stderr.text()).isEmpty();
+        }
 
-        assertThat(stderr.toString(StandardCharsets.UTF_8)).isEmpty();
         assertThat(unnamed.tryResult()).contains(new SpawnResult("", SpawnOutcome.SKIPPED_ON_REPLAY));
         assertThat(named.await()).isEqualTo(new SpawnResult("w1", SpawnOutcome.SKIPPED_ON_REPLAY));
     }
@@ -219,16 +221,6 @@ class SpawnHandleTest {
     void thePolicyIsCarriedOnTheWire() {
         assertThat(IfRunning.DELIVER.wire()).isEqualTo("deliver");
         assertThat(IfRunning.ERROR.wire()).isEqualTo("error");
-    }
-
-    private static SpawnHandle capturingStderr(ByteArrayOutputStream into, Supplier<SpawnHandle> spawn) {
-        PrintStream stderr = System.err;
-        System.setErr(new PrintStream(into, true, StandardCharsets.UTF_8));
-        try {
-            return spawn.get();
-        } finally {
-            System.setErr(stderr);
-        }
     }
 
     /**

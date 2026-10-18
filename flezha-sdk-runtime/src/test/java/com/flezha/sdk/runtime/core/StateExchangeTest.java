@@ -2,7 +2,7 @@ package com.flezha.sdk.runtime.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.flezha.sdk.runtime.CapturedStderr;
+import com.flezha.sdk.CapturedStderr;
 import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;

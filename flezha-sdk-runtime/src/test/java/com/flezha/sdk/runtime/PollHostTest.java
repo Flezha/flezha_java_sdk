@@ -2,6 +2,7 @@ package com.flezha.sdk.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flezha.sdk.CapturedStderr;
 import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.runtime.core.Activation;
 import com.flezha.sdk.runtime.core.ActivationCodecInverses;

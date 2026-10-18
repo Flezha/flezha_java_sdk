@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -32,26 +31,23 @@ class LoggerTest {
         }
     }
 
-    private PrintStream realErr;
-    private ByteArrayOutputStream captured;
+    private CapturedStderr captured;
 
     @BeforeEach
     void captureStandardError() {
-        realErr = System.err;
-        captured = new ByteArrayOutputStream();
-        System.setErr(new PrintStream(captured, true, UTF_8));
+        captured = CapturedStderr.start();
     }
 
     @AfterEach
     void restoreProcessState() {
-        System.setErr(realErr);
+        captured.close();
         Flezha.currentRunner().ifPresent(FlezhaRunner::close);
         com.flezha.sdk.runtime.FlezhaImpl.resetForTests();
         Flezha.LOGGER.set(ConsoleLogger.fromEnv());
     }
 
     private String stderr() {
-        return captured.toString(UTF_8);
+        return captured.text();
     }
 
     @Test

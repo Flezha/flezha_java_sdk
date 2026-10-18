@@ -2,7 +2,7 @@ package com.flezha.sdk.runtime.relay.builder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.flezha.sdk.runtime.CapturedStderr;
+import com.flezha.sdk.CapturedStderr;
 import java.util.OptionalInt;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

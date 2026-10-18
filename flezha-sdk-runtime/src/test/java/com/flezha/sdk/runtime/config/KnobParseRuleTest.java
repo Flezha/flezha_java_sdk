@@ -2,7 +2,7 @@ package com.flezha.sdk.runtime.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.flezha.sdk.runtime.CapturedStderr;
+import com.flezha.sdk.CapturedStderr;
 import com.flezha.sdk.runtime.RepositoryFixture;
 import org.junit.jupiter.api.Test;
 

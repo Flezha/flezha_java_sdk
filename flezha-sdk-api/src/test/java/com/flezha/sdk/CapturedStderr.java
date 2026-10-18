@@ -1,4 +1,4 @@
-package com.flezha.sdk.runtime;
+package com.flezha.sdk;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -22,9 +22,19 @@ public final class CapturedStderr implements AutoCloseable {
         return new CapturedStderr();
     }
 
+    /** Everything written so far, from any thread. */
+    public String text() {
+        return captured.toString(StandardCharsets.UTF_8);
+    }
+
     /** Every line written so far, from any thread. */
     public List<String> lines() {
-        return captured.toString(StandardCharsets.UTF_8).lines().toList();
+        return text().lines().toList();
+    }
+
+    /** Forget what was written so far. */
+    public void reset() {
+        captured.reset();
     }
 
     @Override
