@@ -295,18 +295,21 @@ FLEZHA_E2E_RUNTIME=java mix test --include system   # from repo root: the shared
 
 ## Environment
 
-| Variable | Default | Notes |
-|---|---|---|
-| `FLEZHA_TRANSPORT` | `uds` | `uds` or `quic`. |
-| `FLEZHA_QUIC_ADDRESSES` | `127.0.0.1:4433` | QUIC only. Comma list of names or literals, re-resolved every attempt. |
-| `FLEZHA_CA_CERT_PATH` | `app_data/certs/ca.pem` | QUIC only. |
-| `FLEZHA_SERVER_CERT_PATH` | `app_data/certs/cert.pem` | Server mode only. |
-| `FLEZHA_SERVER_KEY_PATH` | `app_data/certs/key.pem` | Server mode only. |
-| `FLEZHA_SOCKET_FILES_PATH` | resolved by the socket ladder | UDS only. Set, it wins outright; unset, the ladder walks `$XDG_RUNTIME_DIR/flezha`, `/run/flezha`, `app_data/sockets`. |
-| `FLEZHA_RUNNER_ID_PATH` | `/var/lib/flezha-runner/id` | Durable stable identity. Unwritable means a fresh id per boot and lost bindings. |
-| `FLEZHA_WORKER_POOL_SIZE` | `availableProcessors()` | Shared runner draining every Cell mailbox. |
-| `FLEZHA_LOG_LEVEL` | `warn` | `debug`, `info`, `warn` or `error` for the default logger. Unset, blank and unrecognised all mean `warn`. |
-| `FLEZHA_NATIVE_LIB_DIR` | `$TMPDIR` | Where `libflz_core_ffi` is extracted. Set it on containers where `/tmp` is `noexec`. |
+- `FLEZHA_TRANSPORT`: `uds` or `quic`.
+- `FLEZHA_QUIC_ADDRESSES`: QUIC only. Comma list of names or literals, re-resolved every attempt.
+- `FLEZHA_CA_CERT_PATH`: QUIC only.
+- `FLEZHA_SERVER_CERT_PATH`: Server mode only.
+- `FLEZHA_SERVER_KEY_PATH`: Server mode only.
+- `FLEZHA_SOCKET_FILES_PATH`: UDS only. Set, it wins outright; unset, the ladder walks `$XDG_RUNTIME_DIR/flezha`, `/run/flezha`, `app_data/sockets`.
+- `FLEZHA_RUNNER_ID_PATH`: Durable stable identity. Unwritable means a fresh id per boot and lost bindings.
+- `FLEZHA_WORKER_POOL_SIZE`: Shared runner draining every Cell mailbox.
+- `FLEZHA_LOG_LEVEL`: `debug`, `info`, `warn` or `error` for the default logger. Unset, blank and unrecognised all mean `warn`.
+- `FLEZHA_NATIVE_LIB_DIR`: Where `libflz_core_ffi` is extracted. Set it on containers where `/tmp` is `noexec`.
+
+Their types and defaults are in
+[Runner environment variables](https://github.com/flezha/flezha/blob/main/docs/public/configuration/runner_environment.md#every-variable),
+the server pair's in
+[Controller environment variables](https://github.com/flezha/flezha/blob/main/docs/public/configuration/environment_variables.md#every-variable).
 
 ## Diagnostics
 
