@@ -107,9 +107,12 @@ public final class ActivationCodecInverses {
                 r.vec(ActivationCodec::decodeOutput),
                 r.optionalVarint(),
                 r.varint(),
-                r.vec(TimerOp::decode),
+                r.vec(m -> new TimerOp(ActivationCodec.timerKind(m), m.varint(), m.bool())),
                 r.bool(),
-                r.some() ? Optional.of(DlqEntry.decode(r)) : Optional.empty(),
+                r.some()
+                        ? Optional.of(
+                                new DlqEntry(r.string(), r.string(), Math.toIntExact(r.varint()), r.optionalBytes()))
+                        : Optional.empty(),
                 r.optionalBytes());
     }
 

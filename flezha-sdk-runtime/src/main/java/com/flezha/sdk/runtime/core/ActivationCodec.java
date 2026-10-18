@@ -209,7 +209,7 @@ public final class ActivationCodec {
         return r.some() ? Optional.of(r.string()) : Optional.empty();
     }
 
-    private static TimerKind timerKind(Postcard.Reader r) {
+    static TimerKind timerKind(Postcard.Reader r) {
         int ordinal = Math.toIntExact(r.varint());
         TimerKind[] kinds = TimerKind.values();
         if (ordinal < 0 || ordinal >= kinds.length) {
