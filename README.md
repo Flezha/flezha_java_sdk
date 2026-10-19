@@ -18,7 +18,7 @@ property the rest of this document keeps returning to.
 Functionally at parity with the Rust SDK: every relay shape, durability tier
 and delivery guarantee available there is available here.
 
-## Add it
+## Install
 
 ```xml
 <dependency>
@@ -28,8 +28,26 @@ and delivery guarantee available there is available here.
 </dependency>
 ```
 
-Java 21 or later. `flezha-sdk-testing` is a separate artifact, with `<scope>test</scope>`.
-Nothing runs at compile time: the classes you write are the classes the runtime reads.
+`flezha-sdk-testing` is a separate artifact, with `<scope>test</scope>`. Nothing
+runs at compile time: the classes you write are the classes the runtime reads.
+
+The SDK is not on Maven Central yet. Until it is, install it into your local Maven
+repository from a checkout as
+[`examples/echo`](examples/echo/README.md#building-from-a-checkout) shows.
+
+## Supported Java versions
+
+Java 21 or newer. The build compiles for release 21 and refuses an older JDK.
+
+## The native library
+
+The runtime is hosted on `flz_core` through its C library, `libflz_core_ffi`,
+over JNI. The published `flezha-sdk` jar bundles it for Linux (x64, arm64),
+macOS (x64, arm64) and Windows (x64). At first use the SDK extracts the one for
+the host into `java.io.tmpdir`, under a name that carries its content hash, and
+loads it from there; `FLEZHA_NATIVE_LIB_DIR` names another directory, for a
+container whose `/tmp` is `noexec`. Any other host is refused at that first
+load, naming the platforms the jar carries.
 
 ## A complete example
 
@@ -170,10 +188,8 @@ misuse such as an emit on a channel the tasklet does not own. Branch on its
 `code()`, for example `topology.duplicate_factory_id` or `quota.exceeded`, and read
 the values its message names from `details()`.
 
-To run this without a controller, replace the main with `LocalRelay`, which
-executes the same declared wiring inside the calling JVM and delivers output
-to a callback. Nothing is durable in that mode, and declarations requiring a
-controller are refused at startup with the responsible declaration named.
+To run this without a controller, replace the main with `LocalRelay`
+([Local mode](https://github.com/flezha/flezha/blob/main/docs/public/topics/core/running_and_testing.md#local-mode)).
 
 ## Where to go
 
@@ -192,9 +208,16 @@ controller are refused at startup with the responsible declaration named.
   The output is `flezha-sdk-api/target/site/apidocs/index.html`. The plugin skips
   when its output appears current, so delete that directory if an edit does not
   appear.
-- **Run a graph without a controller:** `LocalRelay` executes a declared
-  graph in the calling JVM. See
-  [`local/`](flezha-sdk-examples/src/main/java/com/flezha/examples/local).
+- **Local mode, testing and the relay API:** `LocalRelay` runs a declared
+  graph in the calling JVM, with no controller
+  ([Local mode](https://github.com/flezha/flezha/blob/main/docs/public/topics/core/running_and_testing.md#local-mode),
+  [`local/`](flezha-sdk-examples/src/main/java/com/flezha/examples/local)).
+  `TaskletTestHarness`, in `flezha-sdk-testing`, drives one tasklet and checks
+  its replay
+  ([Check a tasklet on its own](https://github.com/flezha/flezha/blob/main/docs/public/topics/core/running_and_testing.md#check-a-tasklet-on-its-own)).
+  A relay's entry channels, answering a caller, `call(...)` to another relay,
+  and `runner.send` and `runner.call` from application code are in
+  [Sending and calling](https://github.com/flezha/flezha/blob/main/docs/public/topics/core/sending_and_calling.md).
 - **Threading model, packaging and cross-SDK comparison:** `docs/internal/sdk/java_sdk.md`.
 - **Wire protocol and framing:** `docs/internal/sdk/protocol_spec.md`.
 
@@ -217,51 +240,6 @@ controller are refused at startup with the responsible declaration named.
 Each is a declaration the controller must honour, so declare what you need rather
 than what sounds reassuring: a correction window sizes the controller's input-log
 retention, and a tier without keyed outputs is refused at registration.
-
-## Answering and calling
-
-A channel ends in one output or one `call(...)`. The first output an input
-causes answers the outside caller of that input, and still reaches the output's
-plugins and listeners. `call(target, Answer.class, deadlineMs)` sends each value,
-after the chain's transforms and key, to another relay: `CallTarget.id("pricing")`
-names an instance, and `CallTarget.factory("agent")` an instance of a factory, the
-one the chain's `keyBy` names (`.create(false)` refuses to start it,
-`.channel("turn")` picks its entry channel, `.answerChannel("quotes")` names the
-callee's channel whose output answers). The request is written as `output()`
-writes it.
-
-The call waits for nothing. Its outcome arrives later as a
-`Response<Req, Ans>` on a new entry channel, `<channel>.response`, which must
-feed a tasklet, the calling one included. A `Response` carries `request()`,
-`answer()` (decoded as `input(Answer.class, ...)` decodes) or `error()` (a
-`FlezhaException`; `call.timeout` once the deadline passes), `ok()`, `target()`
-(the callee's instance id) and `created()` (whether this call started it).
-
-```java
-Stream<String> gateway = c.input(String.class, "in").into(Account.class).named("gateway");
-gateway.keyBy(line -> line.split(":")[0])
-        .call(CallTarget.factory("agent"), String.class, 30_000)
-        .into(Outcome.class);   // Outcome implements Tasklet<Response<String, String>, ?, ?>
-```
-
-## A relay's API
-
-Each entry channel is part of its relay's API, which `flz relay info`, the HTTP
-API and AI agents read. `.describe(...)` says what the channel is for. A record
-input type derives the channel's JSON Schema, and `.schema(json)` declares one
-instead.
-
-```java
-c.input(Order.class, "place").describe("Places an order").into(Place.class).output("placed");
-```
-
-Application code calls a channel by value with `runner.call`, beside
-`runner.send`. It answers what the relay's outputs answer, read as the type you
-ask for:
-
-```java
-Placed placed = runner.call("orders-eu", "place", new Order("EUR/USD", 1000), Placed.class);
-```
 
 ## Modules
 
@@ -290,7 +268,8 @@ native cross-build.
 ```bash
 mvn -f sdk/java/pom.xml test                    # unit suite, no controller needed
 mvn -f sdk/java/pom.xml -P coverage verify      # + JaCoCo
-FLEZHA_E2E_RUNTIME=java mix test --include system   # from repo root: the shared conformance suite
+FLEZHA_E2E_RUNTIME=java mix test --include sdk_smoke   # from repo root: the shared smoke tier
+FLEZHA_E2E_RUNTIME=java mix test --include system      # from repo root: the full conformance suite
 ```
 
 ## Environment
@@ -336,5 +315,5 @@ filtered by, where the substitution lives, and what a failed write does.
 
 ## License
 
-Apache-2.0, [`LICENSES/Apache-2.0.txt`](../../LICENSES/Apache-2.0.txt). The
-per-path map for the whole repository is [`REUSE.toml`](../../REUSE.toml).
+Apache-2.0, [`LICENSE`](LICENSE), with the bundled third-party code in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
