@@ -83,6 +83,9 @@ public final class FlezhaImpl implements RunnerHandle {
             handSignalsToCore();
             FlzCore.start(core, namespace);
         } catch (RuntimeException | Error e) {
+            // The core holds what it said while connecting until a take; no
+            // supervisor is left to take it.
+            PollHost.logNotices(FlzCore.takeNotices());
             FlzCore.contextFree(core);
             throw e;
         }
