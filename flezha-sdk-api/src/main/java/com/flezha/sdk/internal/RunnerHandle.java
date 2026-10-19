@@ -29,21 +29,10 @@ public interface RunnerHandle {
     /** Graceful shutdown; idempotent; runs the api layer's slot-release hook. */
     void close();
 
-    /**
-     * Remove {@code factoryId}'s class from the runtime class registries —
-     * unregister-first, then scan live instances; a live hit re-registers the
-     * class and throws {@code runtime.relay_type_in_use}
-     * (the transient unregistered window is benign: a failing
-     * {@code AddRelay} is re-placed by convergence).
-     */
+    /** Undeclare {@code factoryId}'s class; the core refuses one with live instances. */
     void removeType(String factoryId);
 
-    /**
-     * Declare the runner's FULL current factory set to the core after a
-     * post-start define/remove. The set reaches the controller on the next
-     * connect/reconnect init frame; the ABI has no entry point that pushes it
-     * to a live controller.
-     */
+    /** Declare the runner's full factory set to the core, which sends it to the controller. */
     void syncFactories(List<String> factoryIds);
 
     /**

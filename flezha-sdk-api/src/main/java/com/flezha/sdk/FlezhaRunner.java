@@ -187,13 +187,10 @@ public final class FlezhaRunner implements AutoCloseable {
 
     /**
      * Connect to the controller and return {@code this} for chaining. Blocks
-     * only for the connect handshake (send init, wait for
-     * {@code AssignRunnerId} — retried with exponential backoff until the
-     * controller is reachable), never for the runner's ongoing lifetime.
+     * only for the connect, up to {@code FLEZHA_RUNNER_START_WAIT_MS}.
      * Claims the JVM-wide singleton slot by compare-and-set; the loser fails
      * WITHOUT connecting, mutating shared state, or spawning a thread.
-     * Starting with zero declared relay types is legal — the init frame
-     * carries an empty factory list, and types may be defined later.
+     * Starting with zero declared relay types is legal; types may be defined later.
      *
      * @throws FlezhaException {@code runtime.runner_already_running} if a runner is already
      *     running in this JVM, or on a second {@code start()} of this runner; the core's own code
@@ -369,11 +366,6 @@ public final class FlezhaRunner implements AutoCloseable {
         }
     }
 
-    /** This runner's full current factory set. */
-    private List<String> declaredFactoryIds() {
-        return factories.factoryIds();
-    }
-
     /**
      * Declare the FULL current factory set to the core after a post-start
      * define/remove — full-set semantics make a redeclaration idempotent, and
@@ -383,17 +375,16 @@ public final class FlezhaRunner implements AutoCloseable {
     private void syncFactoriesIfStarted() {
         RunnerHandle h = handle.get();
         if (h != null) {
-            h.syncFactories(declaredFactoryIds());
+            h.syncFactories(factories.factoryIds());
         }
     }
 
     /**
      * Invoke the runtime implementation via {@link RuntimeBridge}. It lives in
      * {@code flezha-sdk-runtime} so this api module compiles standalone. The
-     * {@code Supplier} feeds the initial handshake AND every reconnect
-     * re-handshake (so post-start mutations resync naturally); the
-     * {@code Runnable} is the release hook for the JVM-wide slot, run exactly
-     * once when the runner closes.
+     * {@code Supplier} names the classes declared at start; the {@code Runnable}
+     * is the release hook for the JVM-wide slot, run exactly once when the
+     * runner closes.
      */
     private RunnerHandle startRuntime() {
         return (RunnerHandle) RuntimeBridge.invoke(
@@ -402,7 +393,7 @@ public final class FlezhaRunner implements AutoCloseable {
                 new Class<?>[] {String.class, Supplier.class, Runnable.class},
                 "Failed to start the Flezha runner",
                 namespace,
-                (Supplier<List<String>>) this::declaredFactoryIds,
+                (Supplier<List<String>>) factories::factoryIds,
                 (Runnable) Flezha::releaseSlot);
     }
 }

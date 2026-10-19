@@ -53,14 +53,8 @@ final class PollHost implements AutoCloseable {
     private static final long SUPERVISOR_WAIT_MS = 1_000;
 
     /**
-     * The core calls this host makes. A seam, so the fetch/dispatch model and
-     * the supervisor are testable without the native library — the production
-     * implementation is a set of {@code FlzCore} calls on one context.
-     */
-    /**
-     * The production {@link CoreCalls}: the four native calls over one core
-     * handle. One definition, because a deployed runner and a local run drive
-     * the same seam and a second copy would be free to drift from it.
+     * The production {@link CoreCalls}, over one core handle. One definition,
+     * because a deployed runner and a local run drive the same seam.
      */
     static CoreCalls of(long core) {
         return new CoreCalls() {
@@ -92,6 +86,10 @@ final class PollHost implements AutoCloseable {
         };
     }
 
+    /**
+     * The core calls this host makes: a seam, so the fetch/dispatch model and
+     * the supervisor are testable without the native library.
+     */
     interface CoreCalls {
         /**
          * @return {@code null} when the poll timed out, a zero-length array
