@@ -238,6 +238,15 @@ public final class FlzCore {
      */
     public static native long monotonicNanos();
 
+    /**
+     * The core's notices held since the last take, as a JSON array of
+     * {@code {"level", "target", "text"}}, {@code level} one of {@code info},
+     * {@code warn}, {@code error} or {@code always} (the local-mode banner).
+     * The first take starts the holding: from then on a notice waits for the
+     * next take instead of going to standard error. Context-free.
+     */
+    public static native String takeNotices();
+
     /** Wake every blocked poller and stop the runner loop. */
     public static native void shutdown(long ctx);
 

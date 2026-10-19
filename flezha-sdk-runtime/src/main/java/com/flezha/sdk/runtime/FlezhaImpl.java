@@ -77,7 +77,7 @@ public final class FlezhaImpl implements RunnerHandle {
             @Nonnull Runnable onTerminated) {
         FlezhaEnv.ResolvedConfig config = FlezhaEnv.resolveFromEnv();
 
-        long core = FlzCore.newContext();
+        long core = PollHost.newContext();
         Set<String> declared = ConcurrentHashMap.newKeySet();
         try {
             for (String factoryId : declaredFactoryIds.get()) {

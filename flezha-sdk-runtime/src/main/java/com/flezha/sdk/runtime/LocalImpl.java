@@ -55,7 +55,7 @@ public final class LocalImpl implements LocalRunHandle {
     @Nonnull
     public static LocalRunHandle start(@Nonnull Class<?> type) {
         String factoryId = RelayClassRegistry.registerClass(type);
-        long core = FlzCore.newContext();
+        long core = PollHost.newContext();
         try {
             FlzCore.declareClass(core, HostClassDeclaration.forFactory(factoryId));
             FlzCore.localStart(core, factoryId, factoryId + "-local");

@@ -292,8 +292,8 @@ the server pair's in
 
 ## Diagnostics
 
-The SDK writes its own diagnostics to standard error, prefixed `[flezha]`, at
-`warn` and above. There is no logging dependency and nothing to add: a fresh
+The SDK writes its own diagnostics, the core's notices among them, to standard
+error, prefixed `[flezha]`, at `warn` and above. There is no logging dependency and nothing to add: a fresh
 application gets the failure paths and none of the chatter, and
 `FLEZHA_LOG_LEVEL` moves the line. To route them into the pipeline the
 application already runs, hand the runner a `Logger`; it is a functional

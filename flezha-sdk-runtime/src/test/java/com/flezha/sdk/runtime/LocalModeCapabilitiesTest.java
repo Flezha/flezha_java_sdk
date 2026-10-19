@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flezha.sdk.CapturedStderr;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.LocalOutput;
 import com.flezha.sdk.LocalRelay;
@@ -23,6 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.IntStream;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -57,6 +60,20 @@ import org.junit.jupiter.api.Test;
 class LocalModeCapabilitiesTest {
 
     private static final Duration BUDGET = Duration.ofSeconds(20);
+
+    /** Each run logs the core's local-mode banner, and nothing else may be logged. */
+    private static CapturedStderr stderr;
+
+    @BeforeAll
+    static void captureStderr() {
+        stderr = CapturedStderr.start();
+    }
+
+    @AfterAll
+    static void onlyBannersWereLogged() {
+        stderr.close();
+        assertThat(stderr.lines()).allMatch(line -> line.startsWith("[flezha] LOCAL MODE: "));
+    }
 
     /** Short enough to keep the run brief, long enough not to race the feed that arms it. */
     private static final Duration SESSION_TIMEOUT = Duration.ofMillis(200);

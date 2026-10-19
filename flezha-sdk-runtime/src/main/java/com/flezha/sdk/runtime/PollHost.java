@@ -1,6 +1,10 @@
 package com.flezha.sdk.runtime;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flezha.sdk.Flezha;
+import com.flezha.sdk.LogLevel;
 import com.flezha.sdk.Logger;
 import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.runtime.config.FlezhaEnv;
@@ -80,6 +84,11 @@ final class PollHost implements AutoCloseable {
             public void abandon(long token) {
                 FlzCore.abandon(core, token);
             }
+
+            @Override
+            public String takeNotices() {
+                return FlzCore.takeNotices();
+            }
         };
     }
 
@@ -107,6 +116,45 @@ final class PollHost implements AutoCloseable {
          * handout; no retry-ladder attempt is consumed.
          */
         void abandon(long token);
+
+        /** The core's notices held since the last take, as {@link FlzCore#takeNotices()} answers. */
+        default String takeNotices() {
+            return "[]";
+        }
+    }
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    /**
+     * A core context whose notices this host writes: the first take starts the
+     * core holding them for the supervisor, the local-mode banner included, and
+     * whatever an earlier context left is written now.
+     */
+    static long newContext() {
+        logNotices(FlzCore.takeNotices());
+        return FlzCore.newContext();
+    }
+
+    /**
+     * Write the core's notices, as {@link FlzCore#takeNotices()} answers them,
+     * through the SDK's logger, on the thread that took them and never a
+     * core thread. The local-mode banner is written at {@code error}, which
+     * no level hides.
+     */
+    static void logNotices(@Nonnull String taken) {
+        try {
+            for (JsonNode notice : JSON.readTree(taken)) {
+                LogLevel level =
+                        switch (notice.path("level").asText()) {
+                            case "info" -> LogLevel.INFO;
+                            case "warn" -> LogLevel.WARN;
+                            default -> LogLevel.ERROR;
+                        };
+                LOG.log(level, "{}", notice.path("text").asText());
+            }
+        } catch (JsonProcessingException e) {
+            LOG.error("unreadable core notices: {}", e.toString());
+        }
     }
 
     private final CoreCalls core;
@@ -189,6 +237,7 @@ final class PollHost implements AutoCloseable {
         while (!closing.get()) {
             int outcome;
             try {
+                logNotices(core.takeNotices());
                 outcome = core.waitStarvation(SUPERVISOR_WAIT_MS);
             } catch (Throwable t) {
                 if (closing.get()) {
@@ -429,6 +478,7 @@ final class PollHost implements AutoCloseable {
             joinQuietly(fetcher);
         }
         closing.set(true);
+        logNotices(core.takeNotices());
         activations.shutdown();
         try {
             if (!activations.awaitTermination(DRAIN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {

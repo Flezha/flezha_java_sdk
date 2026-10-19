@@ -2,9 +2,13 @@ package com.flezha.sdk.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flezha.sdk.CapturedStderr;
+import com.flezha.sdk.ConsoleLogger;
+import com.flezha.sdk.Flezha;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.LocalOutput;
 import com.flezha.sdk.LocalRelay;
+import com.flezha.sdk.Logger;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.relay.Relay;
 import com.flezha.sdk.tasklet.Ctx;
@@ -14,7 +18,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -28,6 +35,34 @@ class LocalModeEffectTest {
     private static final Duration BUDGET = Duration.ofSeconds(20);
 
     static final AtomicInteger RUNS = new AtomicInteger();
+
+    /** Each run logs the core's local-mode banner, and nothing else may be logged. */
+    private static CapturedStderr stderr;
+
+    @BeforeAll
+    static void captureStderr() {
+        stderr = CapturedStderr.start();
+    }
+
+    @AfterAll
+    static void onlyBannersWereLogged() {
+        stderr.close();
+        assertThat(stderr.lines()).allMatch(line -> line.startsWith("[flezha] LOCAL MODE: "));
+    }
+
+    @Test
+    @DisplayName("the core's local-mode banner reaches the runner's logger at error, which no level hides")
+    void theBannerReachesTheRunnersLogger() {
+        List<String> logged = new CopyOnWriteArrayList<>();
+        Flezha.createRunner("notices")
+                .logger((level, format, args) -> logged.add(level + " " + Logger.render(format, args)));
+        try {
+            release(AsksRelay.class, List.of("EURUSD"));
+        } finally {
+            Flezha.createRunner("notices").logger(ConsoleLogger.fromEnv());
+        }
+        assertThat(logged).anyMatch(line -> line.startsWith("ERROR LOCAL MODE: state is held in memory"));
+    }
 
     @Test
     @DisplayName("local mode runs the function every time")
