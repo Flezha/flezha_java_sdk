@@ -85,11 +85,10 @@ public final class ActivationCodec {
             case 2 -> new ActivationKind.SnapshotRequest();
             case 3 -> new ActivationKind.LiveStateRead();
             case 4 -> new ActivationKind.ApplyState(r.bytes());
-            case 5 -> new ActivationKind.MigrationSerialize();
-            case 6 -> new ActivationKind.KeyRequest(
+            case 5 -> new ActivationKind.KeyRequest(
                     Math.toIntExact(r.varint()), r.vec(Postcard.Reader::bytes), r.bool(), r.bool());
-            case 7 -> new ActivationKind.CompensateRun(r.vec(Postcard.Reader::bytes));
-            case 8 -> new ActivationKind.Leave(r.bool());
+            case 6 -> new ActivationKind.CompensateRun(r.vec(Postcard.Reader::bytes));
+            case 7 -> new ActivationKind.Leave(r.bool());
             default -> throw new IllegalArgumentException(
                     "postcard: unknown ActivationKind discriminant " + discriminant);
         };
@@ -121,11 +120,10 @@ public final class ActivationCodec {
             case ActivationOutcome.Snapshot snapshot -> w.varint(2).bytes(snapshot.state());
             case ActivationOutcome.StateJson state -> w.varint(3).bytes(state.json());
             case ActivationOutcome.StateApplied ignored -> w.varint(4);
-            case ActivationOutcome.MigrationState state -> w.varint(5).bytes(state.json());
-            case ActivationOutcome.Prepared prepared -> w.varint(6)
+            case ActivationOutcome.Prepared prepared -> w.varint(5)
                     .vec(prepared.answers(), ActivationCodec::encodePrepareResult);
             case ActivationOutcome.Failed failed -> {
-                w.varint(7);
+                w.varint(6);
                 encodeWorkError(w, failed.error());
             }
         }

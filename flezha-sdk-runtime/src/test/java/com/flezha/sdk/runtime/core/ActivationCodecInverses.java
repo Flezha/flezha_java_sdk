@@ -59,15 +59,14 @@ public final class ActivationCodecInverses {
             case ActivationKind.SnapshotRequest ignored -> w.varint(2);
             case ActivationKind.LiveStateRead ignored -> w.varint(3);
             case ActivationKind.ApplyState apply -> w.varint(4).bytes(apply.stateJson());
-            case ActivationKind.MigrationSerialize ignored -> w.varint(5);
             case ActivationKind.KeyRequest request -> {
-                w.varint(6).varint(Integer.toUnsignedLong(request.channel()));
+                w.varint(5).varint(Integer.toUnsignedLong(request.channel()));
                 w.vec(request.payloads(), Postcard.Writer::bytes)
                         .bool(request.wantKeys())
                         .bool(request.wantEventTime());
             }
-            case ActivationKind.CompensateRun comp -> w.varint(7).vec(comp.outputs(), Postcard.Writer::bytes);
-            case ActivationKind.Leave leave -> w.varint(8).bool(leave.wholeRelay());
+            case ActivationKind.CompensateRun comp -> w.varint(6).vec(comp.outputs(), Postcard.Writer::bytes);
+            case ActivationKind.Leave leave -> w.varint(7).bool(leave.wholeRelay());
         }
     }
 
@@ -92,9 +91,8 @@ public final class ActivationCodecInverses {
             case 2 -> new ActivationOutcome.Snapshot(r.bytes());
             case 3 -> new ActivationOutcome.StateJson(r.bytes());
             case 4 -> new ActivationOutcome.StateApplied();
-            case 5 -> new ActivationOutcome.MigrationState(r.bytes());
-            case 6 -> new ActivationOutcome.Prepared(r.vec(ActivationCodecInverses::decodePrepareResult));
-            case 7 -> new ActivationOutcome.Failed(decodeWorkError(r));
+            case 5 -> new ActivationOutcome.Prepared(r.vec(ActivationCodecInverses::decodePrepareResult));
+            case 6 -> new ActivationOutcome.Failed(decodeWorkError(r));
             default -> throw new IllegalArgumentException(
                     "postcard: unknown ActivationOutcome discriminant " + discriminant);
         };

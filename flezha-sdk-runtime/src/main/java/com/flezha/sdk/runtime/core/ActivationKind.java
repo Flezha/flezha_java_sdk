@@ -36,17 +36,14 @@ public sealed interface ActivationKind {
      */
     record SnapshotRequest() implements ActivationKind {}
 
-    /** Discriminant 3 — serialize the current state to JSON for a live read. */
+    /** Discriminant 3 — serialize the current state to JSON for a live read or a migration handover. */
     record LiveStateRead() implements ActivationKind {}
 
     /** Discriminant 4 — materialize a migrated-in state from its JSON form. */
     record ApplyState(@Nonnull byte[] stateJson) implements ActivationKind {}
 
-    /** Discriminant 5 — serialize the current state to JSON for a migration handover. */
-    record MigrationSerialize() implements ActivationKind {}
-
     /**
-     * Discriminant 6 — the batched prepare crossing: entry payloads whose
+     * Discriminant 5 — the batched prepare crossing: entry payloads whose
      * consumers need a key and/or an extracted event time. The host answers one
      * {@link PrepareAnswer} per payload, in order.
      */
@@ -54,13 +51,13 @@ public sealed interface ActivationKind {
             implements ActivationKind {}
 
     /**
-     * Discriminant 7: saga compensation for one steps relay Cell. The recorded
+     * Discriminant 6: saga compensation for one steps relay Cell. The recorded
      * forward outputs cross; the host runs {@code compensate}.
      */
     record CompensateRun(@Nonnull List<byte[]> outputs) implements ActivationKind {}
 
     /**
-     * Discriminant 8: the target Cell left this runner, or with {@code wholeRelay}
+     * Discriminant 7: the target Cell left this runner, or with {@code wholeRelay}
      * every Cell of the target's relay did; the host drops what it holds for them.
      */
     record Leave(boolean wholeRelay) implements ActivationKind {}

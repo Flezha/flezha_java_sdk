@@ -124,7 +124,6 @@ class ActivationCodecTest {
                 Map.entry("snapshot_request", new ActivationKind.SnapshotRequest()),
                 Map.entry("live_state_read", new ActivationKind.LiveStateRead()),
                 Map.entry("apply_state", new ActivationKind.ApplyState("{}".getBytes(StandardCharsets.UTF_8))),
-                Map.entry("migration_serialize", new ActivationKind.MigrationSerialize()),
                 Map.entry("key_request", new ActivationKind.KeyRequest(2, List.of(new byte[] {0x70}), true, false)),
                 Map.entry("compensate_run", new ActivationKind.CompensateRun(List.of(new byte[] {0x0A}))),
                 Map.entry("leave", new ActivationKind.Leave(true)));
@@ -146,7 +145,6 @@ class ActivationCodecTest {
                 new ActivationOutcome.Snapshot(new byte[] {0x05}),
                 new ActivationOutcome.StateJson("{\"a\":1}".getBytes()),
                 new ActivationOutcome.StateApplied(),
-                new ActivationOutcome.MigrationState("{}".getBytes()),
                 new ActivationOutcome.Prepared(List.of(
                         new PrepareResult.Ok(new PrepareAnswer(List.of("k1", "k2"), OptionalLong.of(77))),
                         new PrepareResult.Err(new WorkError("bad key", true)))),

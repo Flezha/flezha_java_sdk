@@ -115,8 +115,6 @@ public final class RelayInstance {
             }
             case ActivationKind.LiveStateRead ignored -> new ActivationOutcome.StateJson(
                     StateExchange.stateJson(cellFor(activation.target())));
-            case ActivationKind.MigrationSerialize ignored -> new ActivationOutcome.MigrationState(
-                    StateExchange.stateJson(cellFor(activation.target())));
             case ActivationKind.ApplyState apply -> {
                 StateExchange.applyState(cellFor(activation.target()), apply.stateJson());
                 yield new ActivationOutcome.StateApplied();

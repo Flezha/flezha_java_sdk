@@ -13,8 +13,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * State across the host boundary: the restore fold and its migration decision,
- * the snapshot and live-state reads, ApplyState / MigrationSerialize, and a
- * Void state.
+ * the snapshot and live-state reads, ApplyState, and a Void state.
  */
 class StateExchangeTest extends DispatchTestBase {
 
@@ -142,7 +141,7 @@ class StateExchangeTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("ApplyState replaces the state from its JSON form; MigrationSerialize reads it back")
+    @DisplayName("ApplyState replaces the state from its JSON form; LiveStateRead reads it back")
     void applyStateRoundTrips() {
         RelayClassRegistry.registerClass(CounterRelay.class);
         ActivationOutcome applied = outcome(command(
@@ -152,9 +151,9 @@ class StateExchangeTest extends DispatchTestBase {
                 new ActivationKind.ApplyState("{\"n\":42}".getBytes(StandardCharsets.UTF_8))));
         assertThat(applied).isInstanceOf(ActivationOutcome.StateApplied.class);
 
-        ActivationOutcome migrated =
-                outcome(command("counter_op", 0, Optional.empty(), new ActivationKind.MigrationSerialize()));
-        assertThat(new String(((ActivationOutcome.MigrationState) migrated).json(), StandardCharsets.UTF_8))
+        ActivationOutcome read =
+                outcome(command("counter_op", 0, Optional.empty(), new ActivationKind.LiveStateRead()));
+        assertThat(new String(((ActivationOutcome.StateJson) read).json(), StandardCharsets.UTF_8))
                 .isEqualTo("{\"n\":42}");
     }
 
@@ -176,22 +175,17 @@ class StateExchangeTest extends DispatchTestBase {
         assertThat(dispatcher.instancesOf("counter_op")).isZero();
     }
 
-    // A Void state has nothing to ship: the empty object is what the migration
-    // serialize and the graceful shutdown's state ship carry for it.
+    // A Void state has nothing to ship: the empty object is what a migration
+    // and the graceful shutdown's state ship carry for it.
     @Test
     @DisplayName("a Void state serializes as an empty object and reads back")
     void voidStateShipsAsEmptyObject() {
         RelayClassRegistry.registerClass(StatelessStateRelay.class);
 
-        ActivationOutcome migrated =
-                outcome(command("stateless_state_op", 0, Optional.empty(), new ActivationKind.MigrationSerialize()));
-        byte[] json = ((ActivationOutcome.MigrationState) migrated).json();
-        assertThat(new String(json, StandardCharsets.UTF_8)).isEqualTo("{}");
-
         ActivationOutcome read =
                 outcome(command("stateless_state_op", 0, Optional.empty(), new ActivationKind.LiveStateRead()));
-        assertThat(new String(((ActivationOutcome.StateJson) read).json(), StandardCharsets.UTF_8))
-                .isEqualTo("{}");
+        byte[] json = ((ActivationOutcome.StateJson) read).json();
+        assertThat(new String(json, StandardCharsets.UTF_8)).isEqualTo("{}");
 
         assertThat(outcome(command("stateless_state_op", 0, Optional.empty(), new ActivationKind.ApplyState(json))))
                 .isInstanceOf(ActivationOutcome.StateApplied.class);

@@ -22,24 +22,21 @@ public sealed interface ActivationOutcome {
     /** Discriminant 2 — the host-encoded compaction snapshot. */
     record Snapshot(@Nonnull byte[] state) implements ActivationOutcome {}
 
-    /** Discriminant 3 — the live-read JSON serialization. */
+    /** Discriminant 3 — the state's JSON serialization, for a live read or a migration handover. */
     record StateJson(@Nonnull byte[] json) implements ActivationOutcome {}
 
     /** Discriminant 4 — the migrated-in state was materialized. */
     record StateApplied() implements ActivationOutcome {}
 
-    /** Discriminant 5 — the migration-handover JSON serialization. */
-    record MigrationState(@Nonnull byte[] json) implements ActivationOutcome {}
-
     /**
-     * Discriminant 6 — one result per {@link ActivationKind.KeyRequest}
+     * Discriminant 5 — one result per {@link ActivationKind.KeyRequest}
      * payload, in order. A prepare failure enters the input channel's
      * retry-then-park ladder.
      */
     record Prepared(@Nonnull List<PrepareResult> answers) implements ActivationOutcome {}
 
     /**
-     * Discriminant 7 — the whole activation failed before per-item processing
+     * Discriminant 6 — the whole activation failed before per-item processing
      * (host-side panic equivalent).
      */
     record Failed(@Nonnull WorkError error) implements ActivationOutcome {}

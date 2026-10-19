@@ -26,9 +26,6 @@ public final class SpawnHandle {
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    /** How long after its request a result is awaited before it fails as {@code spawn.timeout}. */
-    public static final long RESULT_TIMEOUT_MS = 30_000;
-
     /** One read of the core's handle: its answer as JSON, or {@code null} while pending; a failure throws. */
     @FunctionalInterface
     interface Answer {
@@ -42,10 +39,7 @@ public final class SpawnHandle {
         this.answer = answer;
     }
 
-    /**
-     * Wait for the controller's answer. The core bounds the wait: {@link #RESULT_TIMEOUT_MS} after the
-     * request it resolves a timeout.
-     */
+    /** Wait for the controller's answer, to the core's bound: at the request's deadline it resolves a timeout. */
     @Nonnull
     public SpawnResult await() {
         return read(Long.MAX_VALUE)
