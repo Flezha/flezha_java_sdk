@@ -10,6 +10,8 @@ import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.relay.builder.RelayTopologyBuilder;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,8 +19,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Topology-level tests for the bounded-mailbox surface added by the
  * Rust→Java parity port: {@code OverflowPolicy} + {@code .onFull(...)} +
- * {@code Tasklet.mailboxCapacity()} + {@code FLEZHA_MAILBOX_CAPACITY} env
- * resolution + the two range refusals the core names off the resolved value.
+ * {@code Tasklet.mailboxCapacity()} + the two range refusals the core names off the declared
+ * value.
  */
 class BoundedMailboxTopologyTest {
 
@@ -52,20 +54,14 @@ class BoundedMailboxTopologyTest {
     }
 
     @Test
-    @DisplayName("a written Tasklet.mailboxCapacity() flows into the descriptor")
+    @DisplayName("a written Tasklet.mailboxCapacity() reaches the record; the core sizes the rest")
     void taskletOverrideHonored() {
         RelayTopology topology = RelayTopologyBuilder.build(new BigMailboxRelay());
-        int taskletId = topology.taskletNameToId().get("big_mailbox_tasklet");
-        assertThat(topology.tasklets().get(taskletId).mailboxCapacity()).isEqualTo(8192);
-    }
-
-    @Test
-    @DisplayName("default mailbox capacity is 1024 when no override and no env var present")
-    void defaultMailboxCapacity() {
-        RelayTopology topology = RelayTopologyBuilder.build(new TwoStageRelay());
-        for (TaskletDescriptor desc : topology.tasklets()) {
-            assertThat(desc.mailboxCapacity()).isEqualTo(1024);
-        }
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> tasklets =
+                (List<Map<String, Object>>) topology.declaration().get("tasklets");
+        assertThat(tasklets.get(topology.taskletNameToId().get("big_mailbox_tasklet")))
+                .containsEntry("mailbox_capacity", 8192);
     }
 
     @Test

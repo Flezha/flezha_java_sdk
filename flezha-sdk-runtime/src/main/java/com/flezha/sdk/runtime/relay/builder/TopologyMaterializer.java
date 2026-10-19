@@ -34,7 +34,6 @@ final class TopologyMaterializer {
             Relay relay,
             List<ChannelEntry> channels,
             List<TaskletEntry> tasklets,
-            int[] capacities,
             Map<String, Object> declaration,
             DerivedDeclaration derived) {
         List<ChannelDescriptor> descriptors = channelDescriptors(channels, derived);
@@ -50,7 +49,7 @@ final class TopologyMaterializer {
                 relay.factoryId(),
                 descriptors,
                 nameToId,
-                taskletDescriptors(tasklets, descriptors, capacities),
+                taskletDescriptors(tasklets, descriptors, derived),
                 taskletNameToId,
                 relay.run(),
                 relay.durable(),
@@ -106,18 +105,17 @@ final class TopologyMaterializer {
     }
 
     private static List<TaskletDescriptor> taskletDescriptors(
-            List<TaskletEntry> tasklets, List<ChannelDescriptor> channels, int[] capacities) {
+            List<TaskletEntry> tasklets, List<ChannelDescriptor> channels, DerivedDeclaration derived) {
         List<TaskletDescriptor> descriptors = new ArrayList<>(tasklets.size());
         for (int i = 0; i < tasklets.size(); i++) {
             TaskletEntry entry = tasklets.get(i);
             descriptors.add(new TaskletDescriptor(
                     entry.name,
                     entry.model,
-                    entry.dynamic,
+                    derived.dynamic(i),
                     inputChannel(channels, i),
                     entry.outputChannelId == null ? OptionalInt.empty() : OptionalInt.of(entry.outputChannelId),
-                    entry.kryoTypes,
-                    capacities[i]));
+                    entry.kryoTypes));
         }
         return descriptors;
     }

@@ -11,6 +11,7 @@ import com.flezha.sdk.relay.Relay;
 import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.RepositoryFixture;
 import com.flezha.sdk.runtime.relay.RelayClassRegistry;
+import com.flezha.sdk.runtime.relay.RelayTopology;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -96,14 +97,27 @@ class HostClassDeclarationTest {
         JsonNode tasklets = decl.get("tasklets");
         assertThat(tasklets).hasSize(1);
         assertThat(tasklets.get(0).get("name").asText()).isEqualTo("decl_task");
-        assertThat(tasklets.get(0).has("cell_mode"))
-                .as("single mode is the default")
-                .isFalse();
         assertThat(tasklets.get(0).get("clock").asText()).isEqualTo("wall");
         assertThat(tasklets.get(0).has("change_is_nochange"))
                 .as("this tasklet journals a Change, so a logical clock over it would advance")
                 .isFalse();
-        assertThat(tasklets.get(0).get("mailbox_capacity").asInt()).isPositive();
+        assertThat(tasklets.get(0).has("mailbox_capacity"))
+                .as("the core sizes a mailbox the tasklet does not declare")
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("the core derives the cell modes the shared case pins")
+    void theCoreDerivesTheSharedCellModes() throws Exception {
+        RelayTopology topology =
+                RelayClassRegistry.getTopology(RelayClassRegistry.registerClass(SharedModesRelay.class));
+        DerivedDeclaration derived = HostClassDeclaration.check(topology.declaration());
+        for (List<String> row : RepositoryFixture.rows("test/fixtures/derived_cell_modes.txt")) {
+            if (!row.get(0).equals("shape")) {
+                int at = topology.taskletNameToId().get(row.get(0));
+                assertThat(derived.modes().get(at)).as(row.get(0)).isEqualTo(row.get(1));
+            }
+        }
     }
 
     @Test
@@ -476,6 +490,7 @@ class HostClassDeclarationTest {
     @Tasklet.Spec(
             name = "decl_full_task",
             keys = {"a", "b"},
+            capacity = 2048,
             compactAfterBytes = 4096)
     public static final class FullyDeclaredTask implements Tasklet<String, FullyDeclaredTask.State, String> {
 
@@ -700,9 +715,41 @@ class HostClassDeclarationTest {
     public static final class VersionTwoTask implements Tasklet<String, Void, String> {
 
         @Override
+        public Void migrateState(int fromVersion, byte[] bytes) {
+            return null;
+        }
+
+        @Override
         public void run(String input, Ctx<Void, String> ctx) throws com.flezha.sdk.tasklet.TaskletException {
             ctx.emit(input);
         }
+    }
+
+    /** The shape of {@code test/fixtures/derived_cell_modes.txt}. */
+    public static final class SharedModesRelay implements Relay {
+        @Override
+        public String factoryId() {
+            return "decl_shared_modes";
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            var in = c.input(String.class, "in");
+            in.keyBy(s -> s).into(SharedSecondTask.class);
+            in.into(SharedPlainTask.class);
+        }
+    }
+
+    @Tasklet.Spec(name = "second")
+    public static final class SharedSecondTask implements Tasklet<String, Void, Void> {
+        @Override
+        public void run(String input, Ctx<Void, Void> ctx) {}
+    }
+
+    @Tasklet.Spec(name = "plain")
+    public static final class SharedPlainTask implements Tasklet<String, Void, Void> {
+        @Override
+        public void run(String input, Ctx<Void, Void> ctx) {}
     }
 
     @Tasklet.Spec(name = "v1_task")

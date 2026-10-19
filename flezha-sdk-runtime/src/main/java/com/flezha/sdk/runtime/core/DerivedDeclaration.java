@@ -10,14 +10,14 @@ import javax.annotation.Nullable;
  * What {@code flz_core::host::register::check} answered about a record: the
  * consumers each chain wires, the kind each channel ends up with, the name a
  * {@code named} link overrode, and the plugin descriptor a {@code output} link
- * named. The answer also carries the acknowledgement granularity the
+ * named, and the cell mode of each tasklet. The answer also carries the acknowledgement granularity the
  * checkpoint keys imply; no Java behaviour reads it (the controller derives it
  * from the registered topology), so it is not modelled here.
  *
  * <p>Everything here is the core's answer. The builder submits its record and
  * reads this back; it re-derives none of it.
  */
-public record DerivedDeclaration(@Nonnull List<Channel> channels) {
+public record DerivedDeclaration(@Nonnull List<Channel> channels, @Nonnull List<String> modes) {
 
     /** One channel as the core read it. */
     public record Channel(
@@ -47,6 +47,11 @@ public record DerivedDeclaration(@Nonnull List<Channel> channels) {
         throw new IllegalStateException("the core derived no channel at index " + index);
     }
 
+    /** Whether the core derived dynamic cell mode for the tasklet declared at {@code index}. */
+    public boolean dynamic(int index) {
+        return "dynamic".equals(modes.get(index));
+    }
+
     /** Read the derived declaration off the JSON the core handed back. */
     @Nonnull
     static DerivedDeclaration of(@Nonnull JsonNode json) {
@@ -66,6 +71,8 @@ public record DerivedDeclaration(@Nonnull List<Channel> channels) {
                     List.copyOf(consumers),
                     sink == null || sink.isNull() ? null : sink.asText()));
         }
-        return new DerivedDeclaration(List.copyOf(channels));
+        List<String> modes = new ArrayList<>();
+        json.get("modes").forEach(mode -> modes.add(mode.asText()));
+        return new DerivedDeclaration(List.copyOf(channels), List.copyOf(modes));
     }
 }

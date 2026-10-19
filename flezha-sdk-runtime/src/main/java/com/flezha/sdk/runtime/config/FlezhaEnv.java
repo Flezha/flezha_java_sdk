@@ -2,6 +2,7 @@ package com.flezha.sdk.runtime.config;
 
 import com.flezha.sdk.Flezha;
 import com.flezha.sdk.Logger;
+import com.flezha.sdk.native_.FlzCore;
 import java.util.Map;
 import java.util.function.Function;
 import javax.annotation.Nonnull;
@@ -61,21 +62,19 @@ public final class FlezhaEnv {
     }
 
     /**
-     * The one count rule every Flezha runtime shares: unset, blank, zero,
-     * negative or unparsable text all read as {@code fallback}, so a knob
-     * nobody meant to set never shrinks a pool to nothing.
+     * The one count rule every Flezha runtime shares, parsed by the core: unset, blank, zero,
+     * negative or unparsable text all read as {@code fallback}, so a knob nobody meant to set
+     * never shrinks a pool to nothing. Only text that is no whole number is warned about.
      */
     public static int parsePositive(String name, String raw, int fallback) {
-        if (raw == null || raw.isBlank()) {
-            return fallback;
+        String count = raw == null ? null : FlzCore.knob("positive", raw);
+        if (count != null && Long.parseLong(count) <= Integer.MAX_VALUE) {
+            return Integer.parseInt(count);
         }
-        try {
-            int parsed = Integer.parseInt(raw.trim());
-            return parsed <= 0 ? fallback : parsed;
-        } catch (NumberFormatException e) {
+        if (count != null || (raw != null && !raw.isBlank() && FlzCore.knob("int", raw) == null)) {
             LOG.warn("Invalid {}={}; falling back to {}", name, raw, fallback);
-            return fallback;
         }
+        return fallback;
     }
 
     public record ResolvedConfig(int fetcherCount, int fetcherMax) {}

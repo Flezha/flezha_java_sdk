@@ -246,6 +246,13 @@ public final class FlzCore {
     public static native long monotonicNanos();
 
     /**
+     * A knob's text parsed by the core's rule for {@code kind} ({@code positive}, {@code ms},
+     * {@code int} or {@code bool}), as its decimal text; null when it is no value of that kind.
+     * Context-free.
+     */
+    public static native String knob(String kind, String raw);
+
+    /**
      * The core's notices held since the last take, as a JSON array of
      * {@code {"level", "target", "text"}}, {@code level} one of {@code info},
      * {@code warn}, {@code error} or {@code always} (the local-mode banner).

@@ -11,8 +11,8 @@ import javax.annotation.Nonnull;
 /**
  * Frozen runtime descriptor for one tasklet node inside a {@link RelayTopology}: what
  * its class declares ({@link TaskletModel}), plus what the wiring decided about the node, its
- * identity, cell mode, resolved channel ids (cached at registration so the hot path needs zero
- * name lookups), encoded types and mailbox capacity.
+ * identity, the cell mode the core derived, resolved channel ids (cached at registration so the
+ * hot path needs zero name lookups) and encoded types.
  */
 public final class TaskletDescriptor {
 
@@ -22,7 +22,6 @@ public final class TaskletDescriptor {
     private final OptionalInt inputChannelId;
     private final OptionalInt outputChannelId;
     private final List<Class<?>> kryoTypes;
-    private final int mailboxCapacity;
 
     public TaskletDescriptor(
             @Nonnull String name,
@@ -30,15 +29,13 @@ public final class TaskletDescriptor {
             boolean dynamic,
             @Nonnull OptionalInt inputChannelId,
             @Nonnull OptionalInt outputChannelId,
-            @Nonnull List<Class<?>> kryoTypes,
-            int mailboxCapacity) {
+            @Nonnull List<Class<?>> kryoTypes) {
         this.name = name;
         this.model = model;
         this.dynamic = dynamic;
         this.inputChannelId = inputChannelId;
         this.outputChannelId = outputChannelId;
         this.kryoTypes = List.copyOf(kryoTypes);
-        this.mailboxCapacity = mailboxCapacity;
     }
 
     /** The node's identity: the tasklet's name, or the explicit node name given at wiring time. */
@@ -95,8 +92,8 @@ public final class TaskletDescriptor {
     }
 
     /**
-     * Whether some consumer edge into this node declares a {@code keyBy}: dynamic cell mode is
-     * read off the wiring, not off the tasklet.
+     * Whether the core derived dynamic cell mode: a chain keys its values before it reaches this
+     * node.
      */
     public boolean dynamic() {
         return dynamic;
@@ -110,10 +107,5 @@ public final class TaskletDescriptor {
     @Nonnull
     public OptionalInt outputChannelId() {
         return outputChannelId;
-    }
-
-    /** Resolved per-cell mailbox capacity (the declared one, then the env var, then the default). */
-    public int mailboxCapacity() {
-        return mailboxCapacity;
     }
 }

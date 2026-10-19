@@ -250,39 +250,8 @@ public final class RelayTopologyBuilder implements ChannelBuilder {
                 channels.get(chain.channel).chains.add(chain);
             }
         }
-        int[] capacities = new int[tasklets.size()];
-        for (int i = 0; i < tasklets.size(); i++) {
-            TaskletEntry tasklet = tasklets.get(i);
-            capacities[i] = MailboxCapacityResolver.resolve(tasklet.model.mailboxCapacity());
-        }
-        markKeyedTargetsDynamic();
-
-        Map<String, Object> record = HostClassDeclaration.forClass(factoryId, relay, channels, tasklets, capacities);
-        return TopologyMaterializer.materialize(
-                relay, channels, tasklets, capacities, record, HostClassDeclaration.check(record));
-    }
-
-    /**
-     * Cell mode is read off the WIRING, and the record states it: a
-     * tasklet that names its own keys is static, one a keyed chain closes
-     * onto is dynamic. A tasklet declaring both is NOT re-stated as dynamic
-     * — its keys are its declaration, and the contradiction with the keyed
-     * edge is the core's to name. Reading the builder's own record back is not
-     * a judgement — what an unkeyed sibling edge into one MEANS is the core's
-     * answer.
-     */
-    private void markKeyedTargetsDynamic() {
-        for (PendingEdge chain : pending) {
-            if (chain.superseded || chain.key == null) {
-                continue;
-            }
-            for (HostLink link : chain.links) {
-                Integer target = link.target();
-                if (target != null && tasklets.get(target).model.cellKeys().isEmpty()) {
-                    tasklets.get(target).dynamic = true;
-                }
-            }
-        }
+        Map<String, Object> record = HostClassDeclaration.forClass(factoryId, relay, channels, tasklets);
+        return TopologyMaterializer.materialize(relay, channels, tasklets, record, HostClassDeclaration.check(record));
     }
 
     // ---- Internals ----------------------------------------------------------
@@ -663,13 +632,6 @@ public final class RelayTopologyBuilder implements ChannelBuilder {
 
         /** What the node's class declares. */
         public TaskletModel model;
-
-        /**
-         * Set when some chain closing onto this node carries a key function —
-         * Cell mode is read off the WIRING, not off the tasklet, and the
-         * record states it so the core can judge the sibling edges.
-         */
-        public boolean dynamic;
 
         /** The class's encoded types, plus any only the wiring knows. */
         List<Class<?>> kryoTypes;

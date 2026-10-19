@@ -101,7 +101,7 @@ class TaskletFormDispatchTest extends DispatchTestBase {
                         .declaration()
                         .get("tasklets"))
                 .get(0);
-        assertThat(declared).containsEntry("cell_mode", "static").containsEntry("cell_keys", List.of("a", "b"));
+        assertThat(declared).containsEntry("cell_keys", List.of("a", "b"));
 
         soleEffect(work("static_op", 0, Optional.of("a"), 0, input(0, "a:1", 1)));
         soleEffect(work("static_op", 0, Optional.of("b"), 0, input(0, "b:1", 1)));

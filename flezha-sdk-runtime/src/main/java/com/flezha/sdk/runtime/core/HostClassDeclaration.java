@@ -81,8 +81,7 @@ public final class HostClassDeclaration {
             @Nonnull String factoryId,
             @Nonnull Relay settings,
             @Nonnull List<ChannelEntry> channels,
-            @Nonnull List<TaskletEntry> tasklets,
-            @Nonnull int[] capacities) {
+            @Nonnull List<TaskletEntry> tasklets) {
         Map<String, Object> decl = base(factoryId);
         if (!settings.description().isEmpty()) {
             decl.put("description", settings.description());
@@ -98,7 +97,7 @@ public final class HostClassDeclaration {
             decl.put("compact_after_bytes", compactAfterBytes);
         }
         decl.put("channels", channels(channels));
-        decl.put("tasklets", tasklets(tasklets, capacities));
+        decl.put("tasklets", tasklets(tasklets));
         return decl;
     }
 
@@ -231,21 +230,17 @@ public final class HostClassDeclaration {
         return out;
     }
 
-    private static List<Map<String, Object>> tasklets(List<TaskletEntry> tasklets, int[] capacities) {
+    private static List<Map<String, Object>> tasklets(List<TaskletEntry> tasklets) {
         List<Map<String, Object>> out = new ArrayList<>(tasklets.size());
-        for (int i = 0; i < tasklets.size(); i++) {
-            TaskletEntry desc = tasklets.get(i);
+        for (TaskletEntry desc : tasklets) {
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("name", desc.name);
             TaskletModel model = desc.model;
-            if (desc.dynamic) {
-                p.put("cell_mode", "dynamic");
-                model.cellIdleTtl().ifPresent(ttl -> p.put("idle_ttl_ms", ttl.toMillis()));
-                model.maxCells().ifPresent(cap -> p.put("max_cells", cap));
-            } else if (!model.cellKeys().isEmpty()) {
-                p.put("cell_mode", "static");
+            if (!model.cellKeys().isEmpty()) {
                 p.put("cell_keys", model.cellKeys());
             }
+            model.cellIdleTtl().ifPresent(ttl -> p.put("idle_ttl_ms", ttl.toMillis()));
+            model.maxCells().ifPresent(cap -> p.put("max_cells", cap));
             if (model.cellsForDeclared()) {
                 p.put("cells_for_overridden", true);
             }
@@ -253,7 +248,7 @@ public final class HostClassDeclaration {
                 p.put("compensate_overridden", true);
             }
             p.put("clock", model.clock().wireName());
-            p.put("mailbox_capacity", capacities[i]);
+            model.mailboxCapacity().ifPresent(capacity -> p.put("mailbox_capacity", capacity));
             // A Void state journals nothing, so a logical clock over it never
             // advances; the core names that.
             if (model.stateless()) {
@@ -264,6 +259,9 @@ public final class HostClassDeclaration {
             // they never declared.
             p.put("schema_version", model.schemaVersion());
             p.put("min_readable_schema_version", model.minReadableSchemaVersion());
+            if (model.migrates()) {
+                p.put("migrates", true);
+            }
             out.add(p);
         }
         return out;

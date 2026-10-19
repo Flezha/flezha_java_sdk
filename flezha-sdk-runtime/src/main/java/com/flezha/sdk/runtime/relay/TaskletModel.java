@@ -49,6 +49,7 @@ public final class TaskletModel {
     private final boolean cellsForDeclared;
     private final boolean compensateDeclared;
     private final boolean initStateDeclared;
+    private final boolean migrates;
     private final boolean kryoTypesListed;
     private final List<Class<?>> kryoTypes;
 
@@ -72,6 +73,7 @@ public final class TaskletModel {
         this.cellsForDeclared = Hook.CELLS_FOR.declaredBy(taskletClass);
         this.compensateDeclared = Hook.COMPENSATE.declaredBy(taskletClass);
         this.initStateDeclared = Hook.INIT_STATE.declaredBy(taskletClass);
+        this.migrates = Hook.MIGRATE_STATE.declaredBy(taskletClass) || Hook.MIGRATE_CHANGE.declaredBy(taskletClass);
         this.kryoTypesListed = Hook.KRYO_TYPES.declaredBy(taskletClass);
         this.clock = clockOf(Hook.EVENT_TIME.declaredBy(taskletClass));
         this.stateConstructor = stateless() || initStateDeclared ? null : stateConstructor();
@@ -269,6 +271,11 @@ public final class TaskletModel {
         return compensateDeclared;
     }
 
+    /** Whether the class writes a migration, so a schema floor below its version can be read up. */
+    public boolean migrates() {
+        return migrates;
+    }
+
     /** The declared mailbox capacity; empty takes the environment's or the default. */
     @Nonnull
     public OptionalInt mailboxCapacity() {
@@ -320,6 +327,8 @@ public final class TaskletModel {
         CELLS_FOR("cellsFor", Object.class),
         EVENT_TIME("eventTime", Object.class),
         INIT_STATE("initState", Optional.class),
+        MIGRATE_STATE("migrateState", int.class, byte[].class),
+        MIGRATE_CHANGE("migrateChange", int.class, byte[].class),
         KRYO_TYPES("kryoTypes");
 
         private final String method;

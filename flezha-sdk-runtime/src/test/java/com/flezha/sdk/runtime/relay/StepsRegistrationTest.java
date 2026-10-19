@@ -106,13 +106,12 @@ class StepsRegistrationTest {
     @DisplayName("a keyBy edge into a steps tasklet registers it in dynamic mode")
     void aKeyedEdgeIntoABoundedTaskletRegisters() throws Exception {
         String factoryId = RelayClassRegistry.registerClass(KeyedSteps.class);
-        JsonNode tasklets =
-                JSON.readTree(HostClassDeclaration.forFactory(factoryId)).get("tasklets");
+        RelayTopology topology = RelayClassRegistry.getTopology(factoryId);
 
-        assertThat(tasklets.get(1).get("name").asText()).isEqualTo("sink");
-        assertThat(tasklets.get(1).get("cell_mode").asText())
+        assertThat(topology.tasklets().get(1).name()).isEqualTo("sink");
+        assertThat(topology.tasklets().get(1).dynamic())
                 .as("a tasklet a keyed edge reaches is dynamic, as a flow relay's is")
-                .isEqualTo("dynamic");
+                .isTrue();
     }
 
     @Test
