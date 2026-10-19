@@ -4,8 +4,6 @@ import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.internal.RunnerHandle;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -19,17 +17,17 @@ import javax.annotation.Nonnull;
  * Implements the {@code RunnerHandle} SPI with the real lifecycle contract:
  * {@code close()} is idempotent, runs the api layer's {@code onTerminated}
  * release hook, then wakes every thread blocked in
- * {@code awaitTermination()}. Live instances are fakeable per factory id
- * ({@link #LIVE_INSTANCES}) so removal-refusal tests need no controller;
- * {@code syncFactories} records every shipped set ({@link #SYNCED_SETS}).
+ * {@code awaitTermination()}. {@code syncFactories} records every shipped set
+ * ({@link #SYNCED_SETS}); {@link #REMOVAL_REFUSAL} stands in for the core's
+ * refusal of a removal, so the api layer's handling of it needs no core.
  */
 public final class FlezhaImpl implements RunnerHandle {
 
     /** Successful start() count — guard tests assert a rejected start never reaches the runtime. */
     public static final AtomicInteger STARTS = new AtomicInteger();
 
-    /** Fakeable live-instance counts per factory id, consulted by {@link #removeType(String)}. */
-    public static final Map<String, Integer> LIVE_INSTANCES = new ConcurrentHashMap<>();
+    /** What the core answers the next {@link #removeType(String)} with, when set. */
+    public static volatile FlezhaException REMOVAL_REFUSAL;
 
     /** Every factory set {@link #syncFactories(List)} shipped, in call order. */
     public static final List<List<String>> SYNCED_SETS = new ArrayList<>();
@@ -71,7 +69,7 @@ public final class FlezhaImpl implements RunnerHandle {
 
     /** Test hook: clear the fake state between tests. */
     public static void resetForTests() {
-        LIVE_INSTANCES.clear();
+        REMOVAL_REFUSAL = null;
         synchronized (SYNCED_SETS) {
             SYNCED_SETS.clear();
         }
@@ -97,10 +95,8 @@ public final class FlezhaImpl implements RunnerHandle {
 
     @Override
     public void removeType(@Nonnull String factoryId) {
-        int live = LIVE_INSTANCES.getOrDefault(factoryId, 0);
-        if (live > 0) {
-            throw FlezhaException.of(
-                    "runtime.relay_type_in_use", java.util.Map.of("factory_id", factoryId, "live_instances", live));
+        if (REMOVAL_REFUSAL != null) {
+            throw REMOVAL_REFUSAL;
         }
         com.flezha.sdk.runtime.relay.RelayClassRegistry.unregisterClass(factoryId);
     }

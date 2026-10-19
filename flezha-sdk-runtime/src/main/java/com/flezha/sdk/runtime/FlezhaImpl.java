@@ -1,7 +1,6 @@
 package com.flezha.sdk.runtime;
 
 import com.flezha.sdk.Flezha;
-import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.Logger;
 import com.flezha.sdk.control.Control;
 import com.flezha.sdk.internal.RunnerHandle;
@@ -15,7 +14,6 @@ import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import com.flezha.sdk.tasklet.SpawnRequests;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -40,7 +38,6 @@ public final class FlezhaImpl implements RunnerHandle {
 
     private final String namespace;
     private final long core;
-    private final ActivationDispatcher dispatcher;
     private final PollHost pollHost;
     private final Set<String> declared;
     private final Runnable onTerminated;
@@ -57,7 +54,6 @@ public final class FlezhaImpl implements RunnerHandle {
             Runnable onTerminated) {
         this.namespace = namespace;
         this.core = core;
-        this.dispatcher = dispatcher;
         this.declared = declared;
         this.onTerminated = onTerminated;
         this.pollHost = new PollHost(
@@ -84,6 +80,7 @@ public final class FlezhaImpl implements RunnerHandle {
                 FlzCore.declareClass(core, HostClassDeclaration.forFactory(factoryId));
                 declared.add(factoryId);
             }
+            handSignalsToCore();
             FlzCore.start(core, namespace);
         } catch (RuntimeException | Error e) {
             FlzCore.contextFree(core);
@@ -97,8 +94,8 @@ public final class FlezhaImpl implements RunnerHandle {
                 namespace, core, dispatcher, config.fetcherCount(), config.fetcherMax(), declared, onTerminated);
         handle.pollHost.start();
 
-        // SIGTERM (Kubernetes pre-stop) triggers the graceful teardown even
-        // when the user never calls close(). Idempotent with close().
+        // An exit the application asks for still drains. Idempotent with
+        // close() and with the core's own drain on SIGTERM.
         Runtime.getRuntime().addShutdownHook(new Thread(handle::close, "flezha-graceful-shutdown"));
 
         LOG.info(
@@ -131,11 +128,7 @@ public final class FlezhaImpl implements RunnerHandle {
 
     @Override
     public void removeType(@Nonnull String factoryId) {
-        long live = dispatcher.instancesOf(factoryId);
-        if (live > 0) {
-            throw FlezhaException.of(
-                    "runtime.relay_type_in_use", Map.of("factory_id", factoryId, "live_instances", live));
-        }
+        FlzCore.undeclareClass(core, factoryId);
         RelayClassRegistry.unregisterClass(factoryId);
         declared.remove(factoryId);
     }
@@ -155,9 +148,9 @@ public final class FlezhaImpl implements RunnerHandle {
     }
 
     /**
-     * Post-start define/remove resync. New ids are declared to the core;
-     * removals have no ABI surface (the core keeps the declaration until the
-     * context ends) — a known limitation, logged and otherwise a no-op.
+     * Post-start define resync: each new id is declared to the core, which
+     * sends the controller the full set. A removal went through
+     * {@link #removeType}.
      */
     @Override
     public void syncFactories(@Nonnull List<String> factoryIds) {
@@ -176,10 +169,45 @@ public final class FlezhaImpl implements RunnerHandle {
                 LOG.error("declaring `{}` post-start failed: {}", factoryId, e.getMessage());
             }
         }
-        for (String known : declared) {
-            if (!factoryIds.contains(known)) {
-                LOG.debug("syncFactories: removal of `{}` has no core surface; declaration stays until close", known);
+    }
+
+    /**
+     * Leave SIGTERM and SIGINT to the core's handler, as the Ruby and Node
+     * SDKs do. The core's handler runs the one installed before it, and the
+     * JVM's would end the process with 143 and race the core's drain; a
+     * handler the application installed is kept. Reached by reflection,
+     * because {@code sun.misc.Signal} is the JDK's one signal API and naming it
+     * is a compiler warning.
+     */
+    static void handSignalsToCore() {
+        try {
+            Class<?> signalClass = Class.forName("sun.misc.Signal");
+            Class<?> handlerClass = Class.forName("sun.misc.SignalHandler");
+            java.lang.reflect.Method handle = signalClass.getMethod("handle", signalClass, handlerClass);
+            Object handedOver = java.lang.reflect.Proxy.newProxyInstance(
+                    handlerClass.getClassLoader(),
+                    new Class<?>[] {handlerClass},
+                    (proxy, method, args) -> switch (method.getName()) {
+                        case "equals" -> proxy == args[0];
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "toString" -> "handed to the flezha core";
+                        default -> null;
+                    });
+            Object systemDefault = handlerClass.getField("SIG_DFL").get(null);
+            for (String name : List.of("TERM", "INT")) {
+                Object signal = signalClass.getConstructor(String.class).newInstance(name);
+                Object previous = handle.invoke(null, signal, handedOver);
+                // The JVM's own handler comes back wrapped; an application's as it was set.
+                boolean jvms = previous.getClass().getName().equals("sun.misc.Signal$SunMiscHandler");
+                if (previous != systemDefault && !jvms) {
+                    handle.invoke(null, signal, previous);
+                }
             }
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            // -Xrs: the JVM handles neither signal, so there is nothing to hand over.
+            LOG.debug("the JVM keeps the termination signals: {}", e.getCause().getMessage());
+        } catch (ReflectiveOperationException e) {
+            LOG.warn("could not hand SIGTERM and SIGINT to the core ({}); the JVM's handling stays", e.toString());
         }
     }
 

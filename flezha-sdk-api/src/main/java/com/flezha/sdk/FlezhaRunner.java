@@ -27,8 +27,8 @@ import javax.annotation.Nullable;
  * {@link Flezha#createRunner(String)}.
  * Relay types may be declared and removed before AND after
  * {@link #start()}, until the started runner is closed; a post-start change
- * is declared to the core immediately and reaches the controller on the next
- * connect/reconnect init frame, which carries the runner's full factory set.
+ * is declared to the core immediately, which sends the controller the
+ * runner's full factory set.
  * A closed runner refuses every declaration and removal.
  *
  * <p>At most one runner is started per JVM (the slot is claimed by CAS inside
@@ -40,8 +40,10 @@ import javax.annotation.Nullable;
  * (ship-fresh-state-on-sdk-shutdown), releases the singleton slot, and wakes
  * every thread blocked in {@link #awaitTermination()}; on a never-started
  * runner it is a no-op. The same sequence is registered as a JVM shutdown
- * hook so SIGTERM (Kubernetes pre-stop) triggers it without an explicit
- * {@code close()} call.
+ * hook for an exit the application asks for. SIGTERM and SIGINT (Kubernetes
+ * pre-stop) are the core's: it ships every relay's state and exits 0, so the
+ * application's own JVM shutdown hooks do not run on them; a signal handler
+ * the application installed before {@link #start()} is kept.
  *
  * <p>Method names and lifecycle verbs follow
  * {@code docs/internal/sdk/naming_conventions.md} (repository root), mirrored 1:1 with
@@ -171,8 +173,8 @@ public final class FlezhaRunner implements AutoCloseable {
         String factoryId = core.definedFactoryIdOf(cls);
         RunnerHandle h = handle.get();
         if (h != null) {
-            // Started: the runtime owns the race-free live-instance check
-            // (unregister-first, re-register + throw on a live hit).
+            // Started: the core's coordinator checks for live instances,
+            // serialized with the controller's binds.
             h.removeType(factoryId);
             core.dropEntry(factoryId);
         } else {
@@ -375,8 +377,8 @@ public final class FlezhaRunner implements AutoCloseable {
     /**
      * Declare the FULL current factory set to the core after a post-start
      * define/remove — full-set semantics make a redeclaration idempotent, and
-     * the core carries the set to the controller on the next
-     * connect/reconnect init frame. A no-op on a never-started runner.
+     * the core sends the set to the controller. A no-op on a never-started
+     * runner.
      */
     private void syncFactoriesIfStarted() {
         RunnerHandle h = handle.get();

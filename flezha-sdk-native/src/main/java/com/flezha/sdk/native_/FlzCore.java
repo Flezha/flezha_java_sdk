@@ -43,6 +43,13 @@ public final class FlzCore {
     public static native void declareClass(long ctx, byte[] json);
 
     /**
+     * Undeclare one host class. After start the runner's coordinator refuses a
+     * class with live instances ({@code runtime.relay_type_in_use}), and the
+     * controller is sent the remaining set. Blocks for that round trip.
+     */
+    public static native void undeclareClass(long ctx, String factoryId);
+
+    /**
      * Judge one host class declaration without registering it: the one seam
      * every SDK's builder submits its record to. Returns the DERIVED
      * declaration's JSON bytes — the consumers, channel kinds, output names and
@@ -249,6 +256,12 @@ public final class FlzCore {
 
     /** Wake every blocked poller and stop the runner loop. */
     public static native void shutdown(long ctx);
+
+    /**
+     * Watch standard input and end the process on end of file, on the core's
+     * own thread, as the core's SIGTERM handler ends it. Context-free.
+     */
+    public static native void watchStdinEof();
 
     /** Destroy the context. The handle is dead afterwards. */
     public static native void contextFree(long ctx);

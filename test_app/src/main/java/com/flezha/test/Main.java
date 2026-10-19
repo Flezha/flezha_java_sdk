@@ -8,14 +8,15 @@ import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.FlezhaRunner;
 import com.flezha.sdk.LogLevel;
 import com.flezha.sdk.SendOpts;
+import com.flezha.sdk.native_.FlzCore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
  * Mirror of {@code test/apps/rust_runner/src/main.rs}. Accepts the
  * namespace as its first command-line argument; {@code run()} keeps the
- * process alive until shutdown, and a watcher thread exits on stdin EOF
- * because the Elixir e2e suite manages this app as an Erlang Port and
+ * process alive until shutdown, and the core's standard-input watch ends it
+ * on EOF because the Elixir e2e suite manages this app as an Erlang Port and
  * terminates it by closing the port (= our stdin).
  */
 public final class Main {
@@ -36,7 +37,7 @@ public final class Main {
             ConformanceRun.writeReport(report);
             return;
         }
-        spawnStdinEofExit();
+        FlzCore.watchStdinEof();
         // The same output and the same default the other conformance runners
         // supply, so one FLEZHA_LOG_LEVEL governs every language in a drill.
         FlezhaRunner runner = Flezha.createRunner(namespace)
@@ -216,19 +217,4 @@ public final class Main {
         return runner;
     }
 
-    private static void spawnStdinEofExit() {
-        Thread watcher = new Thread(() -> {
-            try {
-                byte[] buf = new byte[64];
-                while (System.in.read(buf) != -1) {
-                    // Discard; only EOF matters.
-                }
-            } catch (Exception ignored) {
-                // A broken stdin counts as EOF.
-            }
-            System.exit(0);
-        }, "stdin-eof-exit");
-        watcher.setDaemon(true);
-        watcher.start();
-    }
 }

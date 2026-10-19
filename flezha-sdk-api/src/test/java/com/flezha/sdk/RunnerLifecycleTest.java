@@ -234,15 +234,12 @@ class RunnerLifecycleTest {
     void removeWithLiveInstancesRefuses() {
         FlezhaRunner runner =
                 Flezha.createRunner("ns_live").registerFactory(RelayA.class).start();
-        com.flezha.sdk.runtime.FlezhaImpl.LIVE_INSTANCES.put("lifecycle_a", 1);
+        // The core's coordinator counts the instances; this is its answer.
+        com.flezha.sdk.runtime.FlezhaImpl.REMOVAL_REFUSAL = FlezhaException.of(
+                "runtime.relay_type_in_use", java.util.Map.of("factory_id", "lifecycle_a", "live_instances", 1));
 
         assertThatThrownBy(() -> runner.unregisterFactory(RelayA.class))
-                .isInstanceOfSatisfying(FlezhaException.class, e -> {
-                    assertThat(e.code()).isEqualTo("runtime.relay_type_in_use");
-                    assertThat(e.details())
-                            .containsEntry("factory_id", "lifecycle_a")
-                            .containsEntry("live_instances", 1);
-                });
+                .isSameAs(com.flezha.sdk.runtime.FlezhaImpl.REMOVAL_REFUSAL);
 
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
                 .as("the type stays defined after a refused removal")
@@ -250,11 +247,6 @@ class RunnerLifecycleTest {
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.SYNCED_SETS)
                 .as("a refused removal ships nothing")
                 .isEmpty();
-
-        // Once the instances stop, the removal succeeds.
-        com.flezha.sdk.runtime.FlezhaImpl.LIVE_INSTANCES.remove("lifecycle_a");
-        runner.unregisterFactory(RelayA.class);
-        assertThat(com.flezha.sdk.runtime.FlezhaImpl.SYNCED_SETS).containsExactly(List.of());
     }
 
     @Test
