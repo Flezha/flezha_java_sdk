@@ -253,6 +253,19 @@ public final class FlzCore {
     public static native String knob(String kind, String raw);
 
     /**
+     * The JSON error document the core's catalogue renders for {@code code} with its details
+     * filled from {@code detailsJson}, a JSON object. Context-free.
+     */
+    public static native String errorDocument(String code, String detailsJson);
+
+    /**
+     * A Response channel payload as the core's decoder reads it, in postcard: the target, whether
+     * the call started it, the request's bytes, then variant 0 and the answer's bytes or variant 1
+     * and the JSON error document. Throws {@code call.malformed_response}. Context-free.
+     */
+    public static native byte[] responseDecode(byte[] payload);
+
+    /**
      * The core's notices held since the last take, as a JSON array of
      * {@code {"level", "target", "text"}}, {@code level} one of {@code info},
      * {@code warn}, {@code error} or {@code always} (the local-mode banner).

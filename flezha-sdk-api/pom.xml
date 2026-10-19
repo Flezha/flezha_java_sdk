@@ -35,25 +35,7 @@
         </dependency>
     </dependencies>
 
-    <properties>
-        <!-- The contract set `flz_transport/errors.json` is read from: `contract/`
-             beside the package in its own repository, the enclosing tree in the
-             core's, or FLEZHA_CONTRACT_DIR, as the fixture tests resolve it. -->
-        <flezha.contract.dir>${project.basedir}/../contract</flezha.contract.dir>
-    </properties>
-
     <build>
-        <!-- The error catalogue FlezhaException renders the SDK's own refusals from;
-             FlezhaExceptionTest fails a build that did not package it. -->
-        <resources>
-            <resource>
-                <directory>${flezha.contract.dir}/flz_transport</directory>
-                <includes>
-                    <include>errors.json</include>
-                </includes>
-                <targetPath>com/flezha/sdk</targetPath>
-            </resource>
-        </resources>
         <plugins>
             <!-- `CapturedStderr` as a test jar, so the runtime's tests capture
                  standard error with the same helper. -->
@@ -75,29 +57,4 @@
             </plugin>
         </plugins>
     </build>
-
-    <profiles>
-        <profile>
-            <id>contract-in-core-tree</id>
-            <activation>
-                <file>
-                    <exists>${basedir}/../../../test/fixtures/contract.txt</exists>
-                </file>
-            </activation>
-            <properties>
-                <flezha.contract.dir>${project.basedir}/../../..</flezha.contract.dir>
-            </properties>
-        </profile>
-        <profile>
-            <id>contract-from-env</id>
-            <activation>
-                <property>
-                    <name>env.FLEZHA_CONTRACT_DIR</name>
-                </property>
-            </activation>
-            <properties>
-                <flezha.contract.dir>${env.FLEZHA_CONTRACT_DIR}</flezha.contract.dir>
-            </properties>
-        </profile>
-    </profiles>
 </project>

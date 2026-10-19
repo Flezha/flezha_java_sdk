@@ -68,6 +68,16 @@ public final class RuntimeBridge {
         return new IllegalStateException(failureContext + ": " + cause.getMessage(), cause);
     }
 
+    /** Whether {@code fqn} is on the classpath, found without initialising it. */
+    public static boolean present(String fqn) {
+        try {
+            Class.forName(fqn, false, RuntimeBridge.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+
     /**
      * Invoke the no-arg static method {@code fqn.method()}, silently doing
      * nothing when the runtime is not on the classpath or the call fails —
