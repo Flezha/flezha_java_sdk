@@ -132,7 +132,8 @@ class TaskletModelTest {
         assertThat(negative.code()).isEqualTo("topology.negative_setting");
         assertThat(negative.details())
                 .containsEntry("setting", "idleTtlSeconds")
-                .containsEntry("value", -1L);
+                // Rendered by the core, the details are read back as JSON, where -1 is an int.
+                .containsEntry("value", -1);
         assertThat(TaskletModel.read(EmptyName.class, null).errors())
                 .singleElement()
                 .extracting(FlezhaException::code)

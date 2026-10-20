@@ -41,7 +41,7 @@ class SpawnHandleTest {
                 new StubCtx(false, 42).spawnSteps("worker", PAYLOAD).await();
 
         assertThat(result).isEqualTo(new SpawnResult("worker-k7m2qzxw4pd3fn2a", SpawnOutcome.SPAWNED));
-        assertThat(core.requests).containsExactly("42/worker//p/deliver/false");
+        assertThat(core.requests).containsExactly("42/worker//p//false");
     }
 
     @Test
@@ -71,8 +71,7 @@ class SpawnHandleTest {
 
         assertThat(core.requests)
                 .containsExactly(
-                        "42/worker//p/deliver/false",
-                        "42/worker/w1/{\"symbol\":\"AAPL\",\"quantity\":10}/deliver/false");
+                        "42/worker//p//false", "42/worker/w1/{\"symbol\":\"AAPL\",\"quantity\":10}/deliver/false");
     }
 
     @Test
@@ -167,7 +166,7 @@ class SpawnHandleTest {
                         .await())
                 .isEqualTo(new SpawnResult("w1", SpawnOutcome.SKIPPED_ON_REPLAY));
 
-        assertThat(core.requests).containsExactly("42/worker//p/deliver/true", "42/worker/w1/p/deliver/true");
+        assertThat(core.requests).containsExactly("42/worker//p//true", "42/worker/w1/p/deliver/true");
     }
 
     @Test
@@ -176,10 +175,10 @@ class SpawnHandleTest {
         SpawnHandle handle;
         try (CapturedStderr stderr = CapturedStderr.start()) {
             handle = new StubCtx(false, 42).spawnSteps("worker", PAYLOAD, SpawnOptions.id("w1"));
+            // The API module alone has no core to render the message, so the code is all it says.
             assertThat(stderr.text())
-                    .startsWith("[flezha] spawnSteps(factory `worker`, id `w1`) failed: spawn.unavailable: ")
-                    .endsWith(System.lineSeparator())
-                    .hasLineCount(1);
+                    .isEqualTo("[flezha] spawnSteps(factory `worker`, id `w1`) failed: spawn.unavailable"
+                            + System.lineSeparator());
         }
 
         assertThatThrownBy(handle::tryResult).isInstanceOfSatisfying(FlezhaException.class, e -> assertThat(e.code())

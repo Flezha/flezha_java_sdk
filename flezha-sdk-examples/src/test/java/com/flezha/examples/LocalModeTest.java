@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flezha.examples.local.WordCountRelay;
+import com.flezha.sdk.CapturedStderr;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.LocalOutput;
 import com.flezha.sdk.LocalRelay;
@@ -17,6 +18,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -33,6 +36,20 @@ import org.junit.jupiter.api.Test;
 class LocalModeTest {
 
     private static final String SCENARIO = "test/fixtures/local_mode_word_count.txt";
+
+    /** Each run logs the core's local-mode banner, and nothing else may be logged. */
+    private static CapturedStderr stderr;
+
+    @BeforeAll
+    static void captureStderr() {
+        stderr = CapturedStderr.start();
+    }
+
+    @AfterAll
+    static void onlyBannersWereLogged() {
+        stderr.close();
+        assertThat(stderr.lines()).isNotEmpty().allMatch(line -> line.startsWith("[flezha] LOCAL MODE: "));
+    }
 
     @Test
     void a_declared_graph_runs_locally_and_releases_the_recorded_output() {

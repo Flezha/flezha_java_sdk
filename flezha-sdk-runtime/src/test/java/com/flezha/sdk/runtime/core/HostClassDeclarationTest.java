@@ -241,9 +241,12 @@ class HostClassDeclarationTest {
         assertEverySpellingExists("channel", channels, Set.of());
         // Cell mode splits the tasklet keys: a static tasklet declares its
         // key set, a dynamic one its TTL and cap. Both modes together are the
-        // section.
+        // section, with a tasklet that migrates older records.
+        RelayClassRegistry.registerClass(MixedVersionRelay.class);
         List<JsonNode> tasklets = new ArrayList<>(nodes(flow.get("tasklets")));
         tasklets.addAll(nodes(dynamic.get("tasklets")));
+        tasklets.addAll(nodes(JSON.readTree(HostClassDeclaration.forFactory("decl_mixed_version_op"))
+                .get("tasklets")));
         assertEverySpellingExists("tasklet", tasklets, Set.of());
     }
 

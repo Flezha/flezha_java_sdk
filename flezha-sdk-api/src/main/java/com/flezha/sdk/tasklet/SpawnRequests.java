@@ -45,14 +45,21 @@ public final class SpawnRequests {
     }
 
     /**
-     * Issue the request; an empty {@code id} asks the controller to generate one. With no requester
+     * Issue the request; an empty {@code id} asks the controller to generate one, and a {@code null}
+     * {@code ifRunning} sends no policy, the only choice the core accepts without an id. With no requester
      * installed there is no core to ask, so the handle answers what the core would: skipped on
      * replay, otherwise unavailable, with one warning here because no core reports it unread. {@code
      * offset} is the input-log offset of the item the request runs under, or -1 for none.
      */
     @Nonnull
     public static SpawnHandle request(
-            long token, String factoryId, String id, byte[] payload, IfRunning ifRunning, boolean replay, long offset) {
+            long token,
+            String factoryId,
+            String id,
+            byte[] payload,
+            @Nullable IfRunning ifRunning,
+            boolean replay,
+            long offset) {
         Requester current = requester;
         if (current == null) {
             if (replay) {
@@ -69,7 +76,8 @@ public final class SpawnRequests {
                 throw FlezhaException.of("spawn.unavailable", Map.of());
             });
         }
-        long handle = current.request(token, factoryId, id, payload, ifRunning.wire(), replay, offset);
+        long handle = current.request(
+                token, factoryId, id, payload, ifRunning == null ? "" : ifRunning.wire(), replay, offset);
         return new SpawnHandle(timeoutMs -> current.result(handle, timeoutMs));
     }
 }

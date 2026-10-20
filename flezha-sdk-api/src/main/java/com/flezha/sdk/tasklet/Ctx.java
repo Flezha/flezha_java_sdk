@@ -156,13 +156,7 @@ public interface Ctx<State, Output> {
     @Nonnull
     default SpawnHandle spawnSteps(String factoryId, Object payload) {
         return SpawnRequests.request(
-                activationToken(),
-                factoryId,
-                "",
-                PlainPayload.encode(payload),
-                IfRunning.DELIVER,
-                replaying(),
-                inputOffset());
+                activationToken(), factoryId, "", PlainPayload.encode(payload), null, replaying(), inputOffset());
     }
 
     /**
