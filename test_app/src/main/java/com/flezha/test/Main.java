@@ -203,6 +203,7 @@ public final class Main {
                 .registerFactory(RelayCallRelays.CallAgent.class)
                 .registerFactory(RelayCallRelays.CallGateway.class)
                 .registerFactory(RelayCallRelays.CallToolSession.class)
+                .registerFactory(RelayCallRelays.CallOrdersSteps.class)
                 .registerFactory(PartRelays.PartEcho.class)
                 .registerFactory(PartRelays.PartEchoSteps.class)
                 .registerFactory(OrdersRelay.class)

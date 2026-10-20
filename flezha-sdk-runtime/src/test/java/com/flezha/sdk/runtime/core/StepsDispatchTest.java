@@ -2,7 +2,9 @@ package com.flezha.sdk.runtime.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flezha.sdk.channel.CallTarget;
 import com.flezha.sdk.channel.ChannelBuilder;
+import com.flezha.sdk.channel.Response;
 import com.flezha.sdk.relay.Relay;
 import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import com.flezha.sdk.runtime.state.KryoCodec;
@@ -123,6 +125,43 @@ class StepsDispatchTest extends DispatchTestBase {
         @Override
         public void channels(ChannelBuilder c) {
             c.input(String.class, "in").into(LeafEmitTask.class).named("carry");
+        }
+    }
+
+    @Test
+    @DisplayName("a steps terminal ending in a call hands the core no edge output")
+    void stepsCallEndReleasesNoEdge() {
+        RelayClassRegistry.registerClass(CallEndSteps.class);
+        ItemEffect effect = soleEffect(work("call_end_steps", 0, Optional.empty(), 0, input(0, "3", 1)));
+
+        assertThat(effect.outputs()).extracting(Output::target).containsExactly(new OutputTarget.Plugin("ask"));
+    }
+
+    /** A per-input session whose producer's channel ends only in a call. */
+    public static final class CallEndSteps implements Relay {
+        @Override
+        public String factoryId() {
+            return "call_end_steps";
+        }
+
+        @Override
+        public Run run() {
+            return Run.steps(Each.PER_INPUT);
+        }
+
+        @Override
+        public Durable durable() {
+            return new Durable.Memory();
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            c.input(String.class, "in")
+                    .into(LeafEmitTask.class)
+                    .named("ask")
+                    .call(CallTarget.id("pricing"), String.class, 1_000)
+                    .map(String.class, Response::request)
+                    .into(LeafEmitTask.class);
         }
     }
 

@@ -38,6 +38,7 @@ class FactoryIdsTest {
             "call_echo",
             "call_gateway",
             "call_orders",
+            "call_orders_steps",
             "call_pricing",
             "call_split",
             "call_tool_session",

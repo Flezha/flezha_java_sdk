@@ -272,10 +272,7 @@ final class EmitContext implements Ctx<Object, Object> {
     }
 
     private static OptionalInt handoffProducer(ChannelDescriptor descriptor) {
-        return descriptor.kind() == ChannelKind.INTER_TASKLET
-                        && descriptor.pluginSink().isEmpty()
-                ? descriptor.producer()
-                : OptionalInt.empty();
+        return descriptor.kind() == ChannelKind.INTER_TASKLET ? descriptor.producer() : OptionalInt.empty();
     }
 
     /**
@@ -320,9 +317,9 @@ final class EmitContext implements Ctx<Object, Object> {
     private void collectEdgeOutputs(int channelId, ChannelDescriptor descriptor, Object value) {
         if (instance.steps) {
             // The consumer the fold discards: the channel's first keeps the target a
-            // well-formed Edge, and an inter-tasklet terminal names its producer, its
-            // value the pass's handoff (a chained loop's carry). A plugin-bound
-            // terminal releases nothing here.
+            // well-formed Edge, and a terminal the core derived inter-tasklet names
+            // its producer, its value the pass's handoff (a chained loop's carry).
+            // Any other terminal, a call end's included, releases nothing here.
             OptionalInt consumer = descriptor.consumers().isEmpty()
                     ? handoffProducer(descriptor)
                     : OptionalInt.of(descriptor.consumers().get(0).tasklet());

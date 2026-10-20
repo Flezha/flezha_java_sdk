@@ -84,6 +84,34 @@ public final class RelayCallRelays {
         }
     }
 
+    /** {@link CallOrders} as a durable session, so {@code order_ask}'s channel ends only in the call. */
+    public static final class CallOrdersSteps implements Relay {
+        @Override
+        public String factoryId() {
+            return "call_orders_steps";
+        }
+
+        @Override
+        public Run run() {
+            return Run.steps(Each.PER_INPUT);
+        }
+
+        @Override
+        public Durable durable() {
+            return TestEnv.fixtureDurable();
+        }
+
+        @Override
+        public Optional<Duration> maxDuration() {
+            return Optional.of(Duration.ofSeconds(600));
+        }
+
+        @Override
+        public void channels(ChannelBuilder c) {
+            new CallOrders().channels(c);
+        }
+    }
+
     /** A durable keep-progress session answering {@code answer:<turn>}. */
     public static final class CallAgent implements Relay {
         @Override
