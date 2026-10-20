@@ -6,7 +6,6 @@ import com.flezha.sdk.runtime.relay.ChannelDescriptor;
 import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import com.flezha.sdk.runtime.relay.RelayTopology;
 import com.flezha.sdk.runtime.relay.TaskletDescriptor;
-import com.flezha.sdk.runtime.state.CellId;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -31,7 +30,6 @@ import javax.annotation.Nonnull;
  */
 public final class RelayInstance {
 
-    private final String relayId;
     private final String factoryId;
 
     final RelayTopology topology;
@@ -62,8 +60,7 @@ public final class RelayInstance {
     /** What the dispatcher does when this relay leaves the runner: let it go. */
     private final Consumer<RelayInstance> left;
 
-    private RelayInstance(String relayId, String factoryId, RelayTopology topology, Consumer<RelayInstance> left) {
-        this.relayId = relayId;
+    private RelayInstance(String factoryId, RelayTopology topology, Consumer<RelayInstance> left) {
         this.left = left;
         this.factoryId = factoryId;
         this.topology = topology;
@@ -78,7 +75,7 @@ public final class RelayInstance {
     static RelayInstance materialize(String relayId, String factoryId, Consumer<RelayInstance> left) {
         RelayTopology topology = RelayClassRegistry.getTopology(factoryId);
         if (topology != null) {
-            return new RelayInstance(relayId, factoryId, topology, left);
+            return new RelayInstance(factoryId, topology, left);
         }
         throw new IllegalStateException("unknown factory `" + factoryId + "` for relay `" + relayId + "`");
     }
@@ -97,6 +94,9 @@ public final class RelayInstance {
     }
 
     ActivationOutcome dispatch(Activation activation, CoreCalls core) {
+        if (activation.cellIdentity().isPresent()) {
+            cellFor(activation.target()).identity = activation.cellIdentity().get();
+        }
         return switch (activation.kind()) {
             case ActivationKind.Work work -> dispatchWork(activation, work.items(), core);
             case ActivationKind.RestoreFold fold -> restoreFold(activation, fold);
@@ -311,12 +311,6 @@ public final class RelayInstance {
         // Tasklet is per-Cell scratch, never shared across keys.
         Tasklet<?, ?, ?> tasklet = instantiate(desc);
         Object state = desc.model().initialState(tasklet, cellKey);
-        return new Cell(
-                taskletId,
-                cellKey.orElse(""),
-                tasklet,
-                state,
-                codecs.get(taskletId),
-                CellId.of(relayId, desc.name(), cellKey));
+        return new Cell(taskletId, cellKey.orElse(""), tasklet, state, codecs.get(taskletId));
     }
 }

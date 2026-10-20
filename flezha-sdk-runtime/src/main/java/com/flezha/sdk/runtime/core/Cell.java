@@ -1,6 +1,5 @@
 package com.flezha.sdk.runtime.core;
 
-import com.flezha.sdk.runtime.state.CellId;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.tasklet.Tasklet;
 
@@ -14,15 +13,15 @@ final class Cell {
 
     Object state;
     final KryoCodec codec;
-    final CellId id;
+    /** The wire identity the core hands with the Cell's first activation. */
+    byte[] identity;
 
     @SuppressWarnings("rawtypes")
-    Cell(int taskletId, String cellKey, Tasklet tasklet, Object state, KryoCodec codec, CellId id) {
+    Cell(int taskletId, String cellKey, Tasklet tasklet, Object state, KryoCodec codec) {
         this.taskletId = taskletId;
         this.cellKey = cellKey;
         this.tasklet = tasklet;
         this.state = state;
         this.codec = codec;
-        this.id = id;
     }
 }

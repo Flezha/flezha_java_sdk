@@ -1,5 +1,6 @@
 package com.flezha.sdk.runtime.core;
 
+import java.util.Optional;
 import javax.annotation.Nonnull;
 
 /**
@@ -12,8 +13,16 @@ import javax.annotation.Nonnull;
  * <p>{@code factory} is the declared class's factory id, so the host can
  * resolve which registered class the instance belongs to.
  *
- * <p>Postcard-encoded — field order is the wire contract, schema version
- * {@code 2}. Pinned cross-language by {@code ActivationCodecTest}.
+ * <p>{@code cellIdentity} rides the Cell's first activation since the host
+ * last dropped or rebuilt it.
+ *
+ * <p>Postcard-encoded — field order is the wire contract, pinned
+ * cross-language by {@code ActivationCodecTest}.
  */
 public record Activation(
-        long token, @Nonnull CellRef target, @Nonnull ActivationKind kind, long changeSeq, @Nonnull String factory) {}
+        long token,
+        @Nonnull CellRef target,
+        @Nonnull ActivationKind kind,
+        long changeSeq,
+        @Nonnull String factory,
+        @Nonnull Optional<byte[]> cellIdentity) {}

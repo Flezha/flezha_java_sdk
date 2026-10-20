@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.runtime.Refused;
 import com.flezha.sdk.runtime.relay.TaskletModel.Hook;
-import com.flezha.sdk.runtime.state.CellId;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -101,8 +100,7 @@ class TaskletModelTest {
     void aRenamedClassKeepsItsState() {
         String before = TaskletModel.read(QuietSymbol.class, null).name();
         String after = TaskletModel.read(QuietPair.class, null).name();
-        assertThat(CellId.of("op", after, Optional.of("EUR/USD")))
-                .isEqualTo(CellId.of("op", before, Optional.of("EUR/USD")));
+        assertThat(after).isEqualTo(before);
     }
 
     @Test

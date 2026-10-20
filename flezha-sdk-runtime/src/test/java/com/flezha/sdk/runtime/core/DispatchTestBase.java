@@ -61,7 +61,12 @@ abstract class DispatchTestBase {
 
     static Activation work(String factory, int tasklet, Optional<String> key, long changeSeq, WorkItem... items) {
         return new Activation(
-                1, new CellRef(OP, tasklet, key), new ActivationKind.Work(List.of(items)), changeSeq, factory);
+                1,
+                new CellRef(OP, tasklet, key),
+                new ActivationKind.Work(List.of(items)),
+                changeSeq,
+                factory,
+                Optional.empty());
     }
 
     static WorkItem.Input input(int channel, String payload, long now) {
@@ -73,7 +78,7 @@ abstract class DispatchTestBase {
     }
 
     static Activation command(String factory, int tasklet, Optional<String> key, ActivationKind kind) {
-        return new Activation(1, new CellRef(OP, tasklet, key), kind, 0, factory);
+        return new Activation(1, new CellRef(OP, tasklet, key), kind, 0, factory, Optional.empty());
     }
 
     ActivationOutcome outcome(Activation activation) {

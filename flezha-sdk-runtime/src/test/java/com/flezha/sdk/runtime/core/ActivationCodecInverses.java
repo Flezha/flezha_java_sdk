@@ -21,7 +21,7 @@ public final class ActivationCodecInverses {
         w.varint(a.token());
         encodeCellRef(w, a.target());
         encodeKind(w, a.kind());
-        w.varint(a.changeSeq()).string(a.factory());
+        w.varint(a.changeSeq()).string(a.factory()).optionalBytes(a.cellIdentity());
         return w.toBytes();
     }
 

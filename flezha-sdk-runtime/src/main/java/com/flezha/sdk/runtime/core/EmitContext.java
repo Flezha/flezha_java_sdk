@@ -58,7 +58,6 @@ final class EmitContext implements Ctx<Object, Object> {
 
     int item;
 
-    private byte[] identityBytes;
     private int stableIdOrdinal;
 
     EmitContext(
@@ -90,10 +89,7 @@ final class EmitContext implements Ctx<Object, Object> {
     @Override
     @Nonnull
     public StableId stableId() {
-        if (identityBytes == null) {
-            identityBytes = cell.id.encodedBytes();
-        }
-        return StableId.derive(identityBytes, invocationSeq, stableIdOrdinal++);
+        return StableId.derive(cell.identity, invocationSeq, stableIdOrdinal++);
     }
 
     @Override

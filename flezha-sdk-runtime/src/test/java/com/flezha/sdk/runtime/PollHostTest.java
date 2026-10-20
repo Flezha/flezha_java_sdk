@@ -118,7 +118,12 @@ class PollHostTest {
 
     private static Activation activation(long token, String cellKey) {
         return new Activation(
-                token, new CellRef("op-1", 0, Optional.of(cellKey)), new ActivationKind.Work(List.of()), 0, "factory");
+                token,
+                new CellRef("op-1", 0, Optional.of(cellKey)),
+                new ActivationKind.Work(List.of()),
+                0,
+                "factory",
+                Optional.empty());
     }
 
     private static ActivationResult ok(Activation activation) {

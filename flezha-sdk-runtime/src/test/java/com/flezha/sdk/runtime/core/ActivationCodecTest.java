@@ -43,7 +43,8 @@ class ActivationCodecTest {
                                 1_000),
                         new WorkItem.Timer(TimerKind.EVENT_TIME, 2_000))),
                 9,
-                "f");
+                "f",
+                Optional.of("id".getBytes(StandardCharsets.UTF_8)));
     }
 
     private static ActivationResult resultFixture() {
@@ -128,7 +129,8 @@ class ActivationCodecTest {
                 Map.entry("compensate_run", new ActivationKind.CompensateRun(List.of(new byte[] {0x0A}))),
                 Map.entry("leave", new ActivationKind.Leave(true)));
         for (Map.Entry<String, ActivationKind> kind : kinds.entrySet()) {
-            Activation act = new Activation(1, new CellRef("o", 0, Optional.empty()), kind.getValue(), 0, "f");
+            Activation act =
+                    new Activation(1, new CellRef("o", 0, Optional.empty()), kind.getValue(), 0, "f", Optional.empty());
             byte[] bytes = ActivationCodecInverses.encodeActivation(act);
             assertThat(hex(bytes)).as(kind.getKey()).isEqualTo(pinned("activation", kind.getKey()));
             assertThat(ActivationCodec.decodeActivation(bytes))

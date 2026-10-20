@@ -129,7 +129,8 @@ class ActivationDispatcherTest extends DispatchTestBase {
                         new CellRef(OP, 0, Optional.empty()),
                         new ActivationKind.Work(List.of(input(0, "w1", 1, offset, replay))),
                         0,
-                        "spawn_probe"));
+                        "spawn_probe",
+                        Optional.empty()));
             }
         } finally {
             SpawnRequests.uninstall();

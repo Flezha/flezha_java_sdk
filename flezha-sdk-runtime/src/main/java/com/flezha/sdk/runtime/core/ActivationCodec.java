@@ -26,7 +26,8 @@ public final class ActivationCodec {
     @Nonnull
     public static Activation decodeActivation(@Nonnull byte[] bytes) {
         Postcard.Reader r = new Postcard.Reader(bytes);
-        Activation a = new Activation(r.varint(), decodeCellRef(r), decodeKind(r), r.varint(), r.string());
+        Activation a =
+                new Activation(r.varint(), decodeCellRef(r), decodeKind(r), r.varint(), r.string(), r.optionalBytes());
         if (!r.exhausted()) {
             throw new IllegalArgumentException("postcard: trailing bytes after Activation at " + r.pos());
         }

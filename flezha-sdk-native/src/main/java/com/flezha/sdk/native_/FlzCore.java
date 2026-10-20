@@ -17,7 +17,7 @@ package com.flezha.sdk.native_;
 public final class FlzCore {
 
     /** The activation schema version this shim was built against. */
-    public static final int SCHEMA_VERSION = 5;
+    public static final int SCHEMA_VERSION = 6;
 
     static {
         NativeLibraryLoader.loadNativeLibrary("libflz_core_ffi");
