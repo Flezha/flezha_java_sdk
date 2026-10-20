@@ -1,7 +1,7 @@
 package com.flezha.sdk.tasklet;
 
 import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.TimerKind;
+import com.flezha.sdk.state.TimerFiring;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -155,16 +155,15 @@ public interface Tasklet<Input, State, Output> {
      * Handles a timer this tasklet registered through {@link Ctx#timerAtEventTime} or
      * {@link Ctx#timerAfter}, with the same context {@link #run} gets.
      *
-     * <p>{@code firedAt} is the time the timer was scheduled at, never the moment it actually
-     * fired, and {@code ctx.now()} equals it, so a replay observes the same value. A failure here
-     * climbs the input channel's retry ladder as a failing {@code run} does.
+     * <p>{@code ctx.now()} equals the firing's {@code scheduledAt}, so a replay observes the same
+     * value. A failure here climbs the input channel's retry ladder as a failing {@code run} does.
      *
      * <p>The default throws naming the tasklet: registering a timer without handling it is an
      * authoring error.
      */
-    default void onTimer(long firedAt, TimerKind kind, Ctx<State, Output> ctx) throws TaskletException {
+    default void onTimer(TimerFiring firing, Ctx<State, Output> ctx) throws TaskletException {
         throw new UnsupportedOperationException(
-                label() + " registered a timer but does not override onTimer(firedAt, kind, ctx)");
+                label() + " registered a timer but does not override onTimer(firing, ctx)");
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.flezha.examples.timers;
 
 import com.flezha.sdk.state.Change;
+import com.flezha.sdk.state.TimerFiring;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -67,17 +68,17 @@ public final class SessionWindow implements Tasklet<String, SessionWindow.Sessio
         // The pattern: retract the deadline you set last time, then set a new one. Without the
         // cancel you would accumulate one live timer per click and close the session early.
         if (deadline >= 0) {
-            ctx.cancelProcessingTimeTimer(deadline);
+            ctx.cancelTimer(TimerKind.PROCESSING_TIME, deadline);
         }
         deadline = ctx.timerAfter(IDLE);
     }
 
     @Override
-    public void onTimer(long firedAt, TimerKind kind, Ctx<SessionState, ClosedSession> ctx) throws TaskletException {
+    public void onTimer(TimerFiring firing, Ctx<SessionState, ClosedSession> ctx) throws TaskletException {
         deadline = -1L;
         SessionState session = ctx.state();
         int clicks = session.clicks.size();
-        ctx.change(new Closed(firedAt));
-        ctx.emit(new ClosedSession(session.user, clicks, firedAt));
+        ctx.change(new Closed(firing.scheduledAt()));
+        ctx.emit(new ClosedSession(session.user, clicks, firing.scheduledAt()));
     }
 }

@@ -3,6 +3,7 @@ package com.flezha.sdk;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flezha.sdk.state.TimerFiring;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -55,7 +56,7 @@ class TaskletDefaultsTest {
     void anUnwrittenHookTheRuntimeWouldCallFailsNamingTheTasklet() {
         Minimal tasklet = new Minimal();
         String name = "tasklet `minimal`";
-        assertThatThrownBy(() -> tasklet.onTimer(1L, TimerKind.PROCESSING_TIME, null))
+        assertThatThrownBy(() -> tasklet.onTimer(new TimerFiring(TimerKind.PROCESSING_TIME, 1L), null))
                 .isInstanceOf(UnsupportedOperationException.class)
                 .hasMessageContaining(name)
                 .hasMessageContaining("onTimer");

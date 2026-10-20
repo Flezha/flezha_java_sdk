@@ -12,7 +12,7 @@ import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.OverflowPolicy;
 import com.flezha.sdk.relay.Relay;
 import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.TimerKind;
+import com.flezha.sdk.state.TimerFiring;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -352,8 +352,8 @@ class LocalModeCapabilitiesTest {
         }
 
         @Override
-        public void onTimer(long firedAt, TimerKind kind, Ctx<Void, byte[]> ctx) throws TaskletException {
-            ctx.emit(("closed@" + firedAt).getBytes(StandardCharsets.UTF_8));
+        public void onTimer(TimerFiring firing, Ctx<Void, byte[]> ctx) throws TaskletException {
+            ctx.emit(("closed@" + firing.scheduledAt()).getBytes(StandardCharsets.UTF_8));
         }
     }
 

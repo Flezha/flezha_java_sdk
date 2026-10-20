@@ -3,6 +3,7 @@ package com.flezha.test;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.relay.Relay;
 import com.flezha.sdk.state.Change;
+import com.flezha.sdk.state.TimerFiring;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -60,15 +61,15 @@ public final class TimerChurnRelay implements Relay {
             long at = ctx.timerAfter(Duration.ofMillis(1));
             long last = ctx.state().at;
             if (last != 0 && last != at) {
-                ctx.cancelProcessingTimeTimer(last);
+                ctx.cancelTimer(TimerKind.PROCESSING_TIME, last);
             }
             ctx.change(new Armed(at));
             ctx.emit(input.getBytes(StandardCharsets.UTF_8));
         }
 
         @Override
-        public void onTimer(long firedAt, TimerKind kind, Ctx<Last, byte[]> ctx) throws TaskletException {
-            ctx.emit(("fired:" + firedAt).getBytes(StandardCharsets.UTF_8));
+        public void onTimer(TimerFiring firing, Ctx<Last, byte[]> ctx) throws TaskletException {
+            ctx.emit(("fired:" + firing.scheduledAt()).getBytes(StandardCharsets.UTF_8));
         }
     }
 }

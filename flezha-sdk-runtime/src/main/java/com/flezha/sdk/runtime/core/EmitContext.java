@@ -145,13 +145,8 @@ final class EmitContext implements Ctx<Object, Object>, InvocationOrigin {
     }
 
     @Override
-    public void cancelEventTimeTimer(long scheduledAt) {
-        timer(TimerOp.cancel(TimerKind.EVENT_TIME, scheduledAt));
-    }
-
-    @Override
-    public void cancelProcessingTimeTimer(long scheduledAt) {
-        timer(TimerOp.cancel(TimerKind.PROCESSING_TIME, scheduledAt));
+    public void cancelTimer(@Nonnull TimerKind kind, long scheduledAt) {
+        timer(TimerOp.cancel(kind, scheduledAt));
     }
 
     @Override

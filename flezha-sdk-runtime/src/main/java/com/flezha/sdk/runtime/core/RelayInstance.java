@@ -144,7 +144,9 @@ public final class RelayInstance {
     }
 
     private ItemEffect runItem(Activation activation, Cell cell, WorkItem item, CoreCalls core, int index) {
-        long now = item instanceof WorkItem.Input in ? in.now() : ((WorkItem.Timer) item).scheduledAt();
+        long now = item instanceof WorkItem.Input in
+                ? in.now()
+                : ((WorkItem.Timer) item).firing().scheduledAt();
         OptionalLong offset = item instanceof WorkItem.Input in ? in.consumedOffset() : OptionalLong.empty();
         boolean replay = item instanceof WorkItem.Input in && in.replay();
 
@@ -190,7 +192,7 @@ public final class RelayInstance {
     private void invoke(Cell cell, WorkItem item, List<Object> mapped, EmitContext ctx) throws TaskletException {
         Tasklet tasklet = cell.tasklet;
         if (item instanceof WorkItem.Timer timer) {
-            tasklet.onTimer(timer.scheduledAt(), timer.kind(), ctx);
+            tasklet.onTimer(timer.firing(), ctx);
             return;
         }
         WorkItem.Input in = (WorkItem.Input) item;

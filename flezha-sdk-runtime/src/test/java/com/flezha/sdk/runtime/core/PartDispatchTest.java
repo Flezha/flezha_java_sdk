@@ -6,6 +6,7 @@ import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.relay.Relay;
 import com.flezha.sdk.runtime.relay.RelayClassRegistry;
+import com.flezha.sdk.state.TimerFiring;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -63,7 +64,8 @@ class PartDispatchTest extends DispatchTestBase {
     @DisplayName("a timer handler sends a part under its own item")
     void aTimerHandlerSendsAPart() {
         RelayClassRegistry.registerClass(PartRelay.class);
-        soleEffect(work("part_op", 0, Optional.empty(), 0, new WorkItem.Timer(TimerKind.PROCESSING_TIME, 5)));
+        soleEffect(work(
+                "part_op", 0, Optional.empty(), 0, new WorkItem.Timer(new TimerFiring(TimerKind.PROCESSING_TIME, 5))));
 
         assertThat(RECORDED).containsExactly("part 1/0/<fired 5>");
     }
@@ -135,8 +137,8 @@ class PartDispatchTest extends DispatchTestBase {
         }
 
         @Override
-        public void onTimer(long firedAt, TimerKind kind, Ctx<Void, String> ctx) {
-            ctx.part("fired " + firedAt);
+        public void onTimer(TimerFiring firing, Ctx<Void, String> ctx) {
+            ctx.part("fired " + firing.scheduledAt());
         }
     }
 

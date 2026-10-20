@@ -6,6 +6,7 @@ import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.relay.Relay;
 import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import com.flezha.sdk.state.Change;
+import com.flezha.sdk.state.TimerFiring;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -492,9 +493,9 @@ abstract class DispatchTestBase {
         }
 
         @Override
-        public void onTimer(long firedAt, TimerKind kind, Ctx<Void, Void> ctx) throws TaskletException {
-            TIMER_EVENTS.add(kind + "@" + firedAt + " now=" + ctx.now());
-            if (kind == TimerKind.EVENT_TIME) {
+        public void onTimer(TimerFiring firing, Ctx<Void, Void> ctx) throws TaskletException {
+            TIMER_EVENTS.add(firing.kind() + "@" + firing.scheduledAt() + " now=" + ctx.now());
+            if (firing.kind() == TimerKind.EVENT_TIME) {
                 ctx.timerAfter(Duration.ofMillis(7));
             }
         }
@@ -506,7 +507,10 @@ abstract class DispatchTestBase {
         }
     }
 
-    /** {@code set} registers a timer a second after now; {@code cancel} cancels that one. */
+    /**
+     * {@code set} registers a timer a second after now; {@code cancel} cancels that one, and
+     * {@code cancel-event} the event-time timer at the same timestamp.
+     */
     @Tasklet.Spec(name = "set_then_cancel_task")
     public static final class SetThenCancelTask implements Tasklet<String, Void, Void> {
         @Override
@@ -514,12 +518,13 @@ abstract class DispatchTestBase {
             if (input.equals("set")) {
                 ctx.timerAfter(Duration.ofSeconds(1));
             } else {
-                ctx.cancelProcessingTimeTimer(ctx.now() + 1_000);
+                TimerKind kind = input.equals("cancel-event") ? TimerKind.EVENT_TIME : TimerKind.PROCESSING_TIME;
+                ctx.cancelTimer(kind, ctx.now() + 1_000);
             }
         }
 
         @Override
-        public void onTimer(long firedAt, TimerKind kind, Ctx<Void, Void> ctx) {}
+        public void onTimer(TimerFiring firing, Ctx<Void, Void> ctx) {}
     }
 
     public static final class LeafEmitRelay extends Op {

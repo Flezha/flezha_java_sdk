@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.flezha.sdk.runtime.relay.RelayClassRegistry;
 import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.runtime.state.TimerOp;
+import com.flezha.sdk.state.TimerFiring;
 import com.flezha.sdk.state.TimerKind;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -108,7 +109,8 @@ class EmitContextTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("registrations ride the effect; a firing leaves its removal to the core; now() equals firedAt")
+    @DisplayName(
+            "registrations ride the effect; a firing leaves its removal to the core; now() equals the scheduled time")
     void timerOpsRideTheEffect() {
         RelayClassRegistry.registerClass(TimerRelay.class);
         ItemEffect armed = soleEffect(work("timer_op", 0, Optional.empty(), 0, input(0, "1000", 1_000)));
@@ -117,11 +119,11 @@ class EmitContextTest extends DispatchTestBase {
                         TimerOp.register(TimerKind.EVENT_TIME, 1_010),
                         TimerOp.register(TimerKind.PROCESSING_TIME, 1_005));
 
-        ItemEffect fired =
-                soleEffect(work("timer_op", 0, Optional.empty(), 0, new WorkItem.Timer(TimerKind.EVENT_TIME, 1_010)));
+        ItemEffect fired = soleEffect(work(
+                "timer_op", 0, Optional.empty(), 0, new WorkItem.Timer(new TimerFiring(TimerKind.EVENT_TIME, 1_010))));
         assertThat(fired.eventTime()).isEqualTo(1_010);
         assertThat(fired.timers())
-                .as("the chained timerAfter anchored on firedAt")
+                .as("the chained timerAfter anchored on the scheduled time")
                 .containsExactly(TimerOp.register(TimerKind.PROCESSING_TIME, 1_017));
         assertThat(TIMER_EVENTS).containsExactly("EVENT_TIME@1010 now=1010");
     }

@@ -2,6 +2,7 @@ package com.flezha.sdk.tasklet;
 
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.PlainPayload;
+import com.flezha.sdk.state.TimerKind;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
@@ -228,18 +229,10 @@ public interface Ctx<State, Output> {
     }
 
     /**
-     * Cancel a pending event-time timer by the timestamp
-     * {@link #timerAtEventTime} returned; cancelling one that is not pending changes nothing.
-     */
-    default void cancelEventTimeTimer(long scheduledAt) {
-        throw FlezhaException.of("runtime.timers_unavailable", Map.of());
-    }
-
-    /**
-     * Cancel a pending processing-time timer by the timestamp
+     * Cancel a pending timer of {@code kind} by the timestamp {@link #timerAtEventTime} or
      * {@link #timerAfter} returned; cancelling one that is not pending changes nothing.
      */
-    default void cancelProcessingTimeTimer(long scheduledAt) {
+    default void cancelTimer(TimerKind kind, long scheduledAt) {
         throw FlezhaException.of("runtime.timers_unavailable", Map.of());
     }
 

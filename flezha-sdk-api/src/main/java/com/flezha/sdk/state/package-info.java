@@ -17,8 +17,8 @@
  * <p>{@link com.flezha.sdk.state.RestoreInitPayload} carries a snapshot and change log for the
  * test harness to restore. {@link com.flezha.sdk.state.ReplayMismatch} reports a rebuild that did
  * not reproduce the observed state, which is the diagnostic for non-deterministic user code.
- * {@link com.flezha.sdk.state.TimerKind} distinguishes the timer families delivered to
- * {@code onTimer}.
+ * {@link com.flezha.sdk.state.TimerFiring} is the firing {@code onTimer} receives, and
+ * {@link com.flezha.sdk.state.TimerKind} the timer family it names.
  */
 @javax.annotation.ParametersAreNonnullByDefault
 package com.flezha.sdk.state;

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.flezha.sdk.native_.FlzCore;
 import com.flezha.sdk.runtime.RepositoryFixture;
 import com.flezha.sdk.runtime.state.TimerOp;
+import com.flezha.sdk.state.TimerFiring;
 import com.flezha.sdk.state.TimerKind;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -43,7 +44,7 @@ class ActivationCodecTest {
                                 1_000,
                                 WorkItem.Form.PREPARED,
                                 List.of(new byte[] {0x0C})),
-                        new WorkItem.Timer(TimerKind.EVENT_TIME, 2_000))),
+                        new WorkItem.Timer(new TimerFiring(TimerKind.EVENT_TIME, 2_000)))),
                 9,
                 "f",
                 Optional.of("id".getBytes(StandardCharsets.UTF_8)));

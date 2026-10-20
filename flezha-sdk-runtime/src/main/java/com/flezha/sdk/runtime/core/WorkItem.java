@@ -1,6 +1,6 @@
 package com.flezha.sdk.runtime.core;
 
-import com.flezha.sdk.state.TimerKind;
+import com.flezha.sdk.state.TimerFiring;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
@@ -41,5 +41,5 @@ public sealed interface WorkItem {
      * {@code scheduledAt} — a chained {@code timerAfter} anchors on the firing
      * that woke it, replay-stable.
      */
-    record Timer(@Nonnull TimerKind kind, long scheduledAt) implements WorkItem {}
+    record Timer(@Nonnull TimerFiring firing) implements WorkItem {}
 }

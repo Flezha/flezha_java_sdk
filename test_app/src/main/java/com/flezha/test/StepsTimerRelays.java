@@ -2,7 +2,7 @@ package com.flezha.test;
 
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.relay.Relay;
-import com.flezha.sdk.state.TimerKind;
+import com.flezha.sdk.state.TimerFiring;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -104,9 +104,9 @@ public final class StepsTimerRelays {
         }
 
         @Override
-        public void onTimer(long firedAt, TimerKind kind, Ctx<SeenState, String> ctx) throws TaskletException {
+        public void onTimer(TimerFiring firing, Ctx<SeenState, String> ctx) throws TaskletException {
             StepsE2eGate.holdAt("timer");
-            ctx.emit("fired:" + firedAt);
+            ctx.emit("fired:" + firing.scheduledAt());
         }
 
         private static long millis(String input, String prefix) {
@@ -154,8 +154,8 @@ public final class StepsTimerRelays {
         }
 
         @Override
-        public void onTimer(long firedAt, TimerKind kind, Ctx<SeenState, String> ctx) throws TaskletException {
-            ctx.emit("fired:" + firedAt);
+        public void onTimer(TimerFiring firing, Ctx<SeenState, String> ctx) throws TaskletException {
+            ctx.emit("fired:" + firing.scheduledAt());
         }
     }
 }

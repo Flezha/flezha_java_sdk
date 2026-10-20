@@ -2,6 +2,7 @@ package com.flezha.sdk.runtime.core;
 
 import com.flezha.sdk.runtime.state.Postcard;
 import com.flezha.sdk.runtime.state.TimerOp;
+import com.flezha.sdk.state.TimerFiring;
 import com.flezha.sdk.state.TimerKind;
 import java.util.List;
 import java.util.Map;
@@ -100,7 +101,7 @@ public final class ActivationCodec {
         int discriminant = Math.toIntExact(r.varint());
         return switch (discriminant) {
             case 0 -> decodeInput(r);
-            case 1 -> new WorkItem.Timer(timerKind(r), r.varint());
+            case 1 -> new WorkItem.Timer(new TimerFiring(timerKind(r), r.varint()));
             default -> throw new IllegalArgumentException("postcard: unknown WorkItem discriminant " + discriminant);
         };
     }

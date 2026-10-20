@@ -43,15 +43,22 @@ class ActivationDispatcherTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("each item of an activation hands the core its own timer ops, a cancel too")
+    @DisplayName("each item of an activation hands the core its own timer ops, a cancel of either kind too")
     void eachItemHandsTheCoreItsOwnTimerOps() {
         RelayClassRegistry.registerClass(SetThenCancelRelay.class);
-        ActivationOutcome out = outcome(
-                work("set_then_cancel_op", 0, Optional.empty(), 0, input(0, "set", 100), input(0, "cancel", 100)));
+        ActivationOutcome out = outcome(work(
+                "set_then_cancel_op",
+                0,
+                Optional.empty(),
+                0,
+                input(0, "set", 100),
+                input(0, "cancel", 100),
+                input(0, "cancel-event", 100)));
         List<ItemEffect> effects = ((ActivationOutcome.Work) out).effects();
 
         assertThat(effects.get(0).timers()).containsExactly(TimerOp.register(TimerKind.PROCESSING_TIME, 1_100));
         assertThat(effects.get(1).timers()).containsExactly(TimerOp.cancel(TimerKind.PROCESSING_TIME, 1_100));
+        assertThat(effects.get(2).timers()).containsExactly(TimerOp.cancel(TimerKind.EVENT_TIME, 1_100));
     }
 
     @Test

@@ -1,6 +1,6 @@
 package com.flezha.test;
 
-import com.flezha.sdk.state.TimerKind;
+import com.flezha.sdk.state.TimerFiring;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
@@ -30,9 +30,9 @@ public final class SessionTimeoutTasklet implements Tasklet<String, SessionTimeo
     }
 
     @Override
-    public void onTimer(long firedAt, TimerKind kind, Ctx<SessionTimeoutState, byte[]> ctx) throws TaskletException {
-        ctx.change(SessionTimeoutChange.closed(firedAt));
-        ctx.emit(("closed@" + firedAt).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    public void onTimer(TimerFiring firing, Ctx<SessionTimeoutState, byte[]> ctx) throws TaskletException {
+        ctx.change(SessionTimeoutChange.closed(firing.scheduledAt()));
+        ctx.emit(("closed@" + firing.scheduledAt()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     private static long timeoutMs() {

@@ -82,8 +82,8 @@ public final class ActivationCodecInverses {
                 }
             }
             case WorkItem.Timer timer -> w.varint(1)
-                    .varint(timer.kind().ordinal())
-                    .varint(timer.scheduledAt());
+                    .varint(timer.firing().kind().ordinal())
+                    .varint(timer.firing().scheduledAt());
         }
     }
 

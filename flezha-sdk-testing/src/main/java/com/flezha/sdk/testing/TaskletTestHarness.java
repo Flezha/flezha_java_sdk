@@ -8,21 +8,27 @@ import com.flezha.sdk.runtime.state.KryoCodec;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.ReplayMismatch;
 import com.flezha.sdk.state.RestoreInitPayload;
+import com.flezha.sdk.state.TimerFiring;
+import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.EmitKeys;
 import com.flezha.sdk.tasklet.StableId;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -39,6 +45,9 @@ import javax.annotation.Nullable;
  * compares the Kryo-serialized bytes. Equality means the Tasklet's state is
  * a deterministic function of the Change log — which is the umbrella's
  * correctness contract.
+ *
+ * <p>Timers a run sets are pending until {@link #fireTimer} or {@link #advanceEventTime} runs
+ * {@code onTimer} for them, as the core would.
  *
  * <p>A {@code ctx.effect} keeps its result on {@link #applyInputs}, and
  * {@link #replayEmitsEqual} serves the n-th input what the n-th applied input
@@ -60,6 +69,16 @@ public final class TaskletTestHarness<Input, State, Output> {
 
     /** Each applied input's effect results, in order. */
     private final List<Map<EffectCall, byte[]>> keptEffects = new ArrayList<>();
+
+    /** The longest effect name, in bytes, as the core refuses it. */
+    static final int MAX_EFFECT_NAME_BYTES = 255;
+
+    /** Event-time timers sort first, so the earliest due one is {@code first()}. */
+    private static final Comparator<TimerFiring> FIRING_ORDER =
+            Comparator.comparing(TimerFiring::kind).thenComparingLong(TimerFiring::scheduledAt);
+
+    /** The Cell's pending timers: a set, as the core holds them. */
+    private final NavigableSet<TimerFiring> pendingTimers = new TreeSet<>(FIRING_ORDER);
 
     /** Injected clock values, one per successive invocation; empty = ambient wall clock. */
     private final List<Long> clockScript = new ArrayList<>();
@@ -173,20 +192,65 @@ public final class TaskletTestHarness<Input, State, Output> {
         for (Input input : inputs) {
             Effects effects = new Effects(new HashMap<>(), false);
             keptEffects.add(effects.kept);
-            TestCtx ctx = new TestCtx(
-                    state, recordedChanges, recordedEmits, emitRecords, clockAt(invocation, input), effects);
-            invocation++;
-            int recorded = recordedChanges.size();
-            try {
-                tasklet.run(input, ctx);
-            } catch (TaskletException | FlezhaException e) {
-                // Test harness is forgiving — record but keep going.
-            }
-            // Encode what the invocation recorded, as the runtime's flush does, so a change the
-            // codec cannot write fails here, with UnregisteredClass, rather than first in production.
-            codec.serializeAll(recordedChanges.subList(recorded, recordedChanges.size()));
+            invoke(clockAt(invocation++, input), effects, ctx -> tasklet.run(input, ctx));
         }
         return this;
+    }
+
+    /**
+     * Fire one pending timer through {@code onTimer}, as the runtime does: it leaves the pending
+     * set first, {@code ctx.now()} is its scheduled time, and what the hook changes, emits or sets
+     * is recorded.
+     *
+     * @throws AssertionError when no such timer is pending, a firing the runtime never makes
+     */
+    @Nonnull
+    public TaskletTestHarness<Input, State, Output> fireTimer(@Nonnull TimerKind kind, long scheduledAt) {
+        TimerFiring firing = new TimerFiring(kind, scheduledAt);
+        if (!pendingTimers.remove(firing)) {
+            throw new AssertionError("no " + kind.label() + " timer pending at " + scheduledAt);
+        }
+        invoke(scheduledAt, new Effects(new HashMap<>(), false), ctx -> tasklet.onTimer(firing, ctx));
+        return this;
+    }
+
+    /**
+     * Fire every pending event-time timer at or below {@code highWater}, ascending: what an input
+     * advancing the Cell's event-time high-water does. A timer a firing sets at or below it fires too.
+     */
+    @Nonnull
+    public TaskletTestHarness<Input, State, Output> advanceEventTime(long highWater) {
+        while (!pendingTimers.isEmpty()
+                && pendingTimers.first().kind() == TimerKind.EVENT_TIME
+                && pendingTimers.first().scheduledAt() <= highWater) {
+            fireTimer(TimerKind.EVENT_TIME, pendingTimers.first().scheduledAt());
+        }
+        return this;
+    }
+
+    /** The Cell's pending timers, event-time ones first, each kind ascending. */
+    @Nonnull
+    public List<TimerFiring> pendingTimers() {
+        return List.copyOf(pendingTimers);
+    }
+
+    /** One user-code call at {@code now}, forgiving its failure as {@link #applyInputs} documents. */
+    private void invoke(long now, Effects effects, Hook<TestCtx> hook) {
+        TestCtx ctx = new TestCtx(state, recordedChanges, recordedEmits, emitRecords, now, effects, pendingTimers);
+        int recorded = recordedChanges.size();
+        try {
+            hook.call(ctx);
+        } catch (TaskletException | FlezhaException e) {
+            // Test harness is forgiving — record but keep going.
+        }
+        // Encode what the invocation recorded, as the runtime's flush does, so a change the
+        // codec cannot write fails here, with UnregisteredClass, rather than first in production.
+        codec.serializeAll(recordedChanges.subList(recorded, recordedChanges.size()));
+    }
+
+    @FunctionalInterface
+    private interface Hook<C> {
+        void call(C ctx) throws TaskletException;
     }
 
     /** Assert that the recorded Change list equals the supplied list. */
@@ -360,7 +424,14 @@ public final class TaskletTestHarness<Input, State, Output> {
         int n = 0;
         for (Input input : inputs) {
             Effects effects = new Effects(n < keptEffects.size() ? keptEffects.get(n) : Map.of(), true);
-            TestCtx ctx = new TestCtx(fresh, replayChanges, replayEmits, replayRecords, clockAt(n, input), effects);
+            TestCtx ctx = new TestCtx(
+                    fresh,
+                    replayChanges,
+                    replayEmits,
+                    replayRecords,
+                    clockAt(n, input),
+                    effects,
+                    new TreeSet<>(FIRING_ORDER));
             n++;
             try {
                 tasklet.run(input, ctx);
@@ -400,6 +471,7 @@ public final class TaskletTestHarness<Input, State, Output> {
         private final List<EmitRecord> records;
         private final long now;
         private final Effects effects;
+        private final Set<TimerFiring> timers;
         private int stableIdOrdinal;
 
         TestCtx(
@@ -408,13 +480,15 @@ public final class TaskletTestHarness<Input, State, Output> {
                 List<Object> recorded,
                 List<EmitRecord> records,
                 long now,
-                Effects effects) {
+                Effects effects,
+                Set<TimerFiring> timers) {
             this.cellState = cellState;
             this.changes = changes;
             this.recorded = recorded;
             this.records = records;
             this.now = now;
             this.effects = effects;
+            this.timers = timers;
         }
 
         @Override
@@ -448,6 +522,30 @@ public final class TaskletTestHarness<Input, State, Output> {
         @Override
         public long now() {
             return now;
+        }
+
+        /** Refused at the call, where the runtime refuses it when the item settles. */
+        @Override
+        public long timerAtEventTime(long scheduledAt) {
+            if (model.clock() != ClockKind.EVENT_TIME) {
+                throw FlezhaException.of(
+                        "runtime.event_time_timer_without_event_time_clock",
+                        Map.of("tasklet", model.name(), "clock", model.clock().wireName()));
+            }
+            timers.add(new TimerFiring(TimerKind.EVENT_TIME, scheduledAt));
+            return scheduledAt;
+        }
+
+        @Override
+        public long timerAfter(@Nonnull Duration delay) {
+            long scheduledAt = now + delay.toMillis();
+            timers.add(new TimerFiring(TimerKind.PROCESSING_TIME, scheduledAt));
+            return scheduledAt;
+        }
+
+        @Override
+        public void cancelTimer(@Nonnull TimerKind kind, long scheduledAt) {
+            timers.remove(new TimerFiring(kind, scheduledAt));
         }
 
         /** No-op: the harness drives one Tasklet directly, with no durable interval to close. */
@@ -532,9 +630,6 @@ public final class TaskletTestHarness<Input, State, Output> {
      */
     private static final class Effects implements CoreCalls {
 
-        /** The longest effect name, in bytes, as the core refuses it. */
-        private static final int MAX_NAME_BYTES = 255;
-
         final Map<EffectCall, byte[]> kept;
         private final boolean replaying;
         private final Map<String, Integer> ordinals = new HashMap<>();
@@ -556,7 +651,7 @@ public final class TaskletTestHarness<Input, State, Output> {
         @Override
         @Nonnull
         public byte[] effectBegin(long token, int item, @Nonnull String name) {
-            if (name.isEmpty() || name.getBytes(StandardCharsets.UTF_8).length > MAX_NAME_BYTES) {
+            if (name.isEmpty() || name.getBytes(StandardCharsets.UTF_8).length > MAX_EFFECT_NAME_BYTES) {
                 throw FlezhaException.of("effect.bad_name", Map.of("name", "\"" + name + "\""));
             }
             if (running != null) {
