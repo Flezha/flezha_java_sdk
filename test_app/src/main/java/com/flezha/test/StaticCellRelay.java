@@ -33,7 +33,7 @@ public final class StaticCellRelay implements Relay {
                 .output("kafka");
     }
 
-    @Tasklet.Spec(name = "static_entry_tasklet", keys = {"a", "b", "c", "d"})
+    @Tasklet.Spec(name = "static_entry_tasklet", cellKeys = {"a", "b", "c", "d"})
     public static final class StaticEntryTasklet implements Tasklet<String, StaticEntryTasklet.State, String> {
 
         public record State(List<String> seen) {}

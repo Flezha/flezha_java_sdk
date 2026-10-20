@@ -1,7 +1,5 @@
 package com.flezha.sdk.state;
 
-import java.util.Optional;
-
 /**
  * One recorded mutation of a cell's state, the unit that makes state durable.
  *
@@ -37,17 +35,4 @@ public interface Change<S> {
      * @param state the cell's current state, mutated in place
      */
     void applyTo(S state);
-
-    /**
-     * An optional key that lets this change collapse with others carrying the same key. By default
-     * there is none, and every change is recorded as it was applied.
-     *
-     * <p>Returning a key means only the latest change with that key survives a flush window. That
-     * suits a "current value of X" update, where the intermediate values carry no information. It
-     * is wrong for an additive delta such as an increment, where collapsing discards every value
-     * but the last and the total is silently short.
-     */
-    default Optional<CoalesceKey> coalesceKey() {
-        return Optional.empty();
-    }
 }

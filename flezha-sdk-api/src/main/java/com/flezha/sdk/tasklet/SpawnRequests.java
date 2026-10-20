@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.flezha.sdk.Flezha;
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.Logger;
+import com.flezha.sdk.internal.InvocationOrigin;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -48,18 +49,16 @@ public final class SpawnRequests {
      * Issue the request; an empty {@code id} asks the controller to generate one, and a {@code null}
      * {@code ifRunning} sends no policy, the only choice the core accepts without an id. With no requester
      * installed there is no core to ask, so the handle answers what the core would: skipped on
-     * replay, otherwise unavailable, with one warning here because no core reports it unread. {@code
-     * offset} is the input-log offset of the item the request runs under, or -1 for none.
+     * replay, otherwise unavailable, with one warning here because no core reports it unread. The
+     * activation and the input offset are {@code ctx}'s {@link InvocationOrigin}, none when it has
+     * no origin.
      */
     @Nonnull
     public static SpawnHandle request(
-            long token,
-            String factoryId,
-            String id,
-            byte[] payload,
-            @Nullable IfRunning ifRunning,
-            boolean replay,
-            long offset) {
+            Ctx<?, ?> ctx, String factoryId, String id, byte[] payload, @Nullable IfRunning ifRunning) {
+        boolean replay = ctx.replay();
+        long token = ctx instanceof InvocationOrigin origin ? origin.activationToken() : 0;
+        long offset = ctx instanceof InvocationOrigin origin ? origin.inputOffset() : -1;
         Requester current = requester;
         if (current == null) {
             if (replay) {

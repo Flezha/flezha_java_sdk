@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flezha.sdk.CapturedStderr;
 import com.flezha.sdk.FlezhaException;
+import com.flezha.sdk.internal.InvocationOrigin;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
@@ -265,19 +266,25 @@ class SpawnHandleTest {
     }
 
     /** Only the members the defaults of {@code spawnSteps} and {@code complete} read. */
-    private record StubCtx(boolean replay, long token, List<String> completed) implements Ctx<Void, Object> {
+    private record StubCtx(boolean replay, long token, List<String> completed)
+            implements Ctx<Void, Object>, InvocationOrigin {
         StubCtx(boolean replay, long token) {
             this(replay, token, new CopyOnWriteArrayList<>());
         }
 
         @Override
-        public boolean replaying() {
+        public boolean replay() {
             return replay;
         }
 
         @Override
         public long activationToken() {
             return token;
+        }
+
+        @Override
+        public long inputOffset() {
+            return -1;
         }
 
         @Override

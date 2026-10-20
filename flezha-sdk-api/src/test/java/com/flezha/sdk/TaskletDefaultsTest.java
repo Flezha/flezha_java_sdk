@@ -35,8 +35,8 @@ class TaskletDefaultsTest {
 
     @Test
     void theCellSettingsDefaultToTheRuntimesDefaults() {
-        assertThat(SPEC.keys()).isEmpty();
-        assertThat(SPEC.capacity()).as("unset").isEqualTo(-1);
+        assertThat(SPEC.cellKeys()).isEmpty();
+        assertThat(SPEC.mailboxCapacity()).as("unset").isEqualTo(-1);
         assertThat(SPEC.maxCells()).isEqualTo(100_000L);
         assertThat(SPEC.idleTtlSeconds()).isZero();
         assertThat(SPEC.maxTimersPerCell()).isEqualTo(10_000);

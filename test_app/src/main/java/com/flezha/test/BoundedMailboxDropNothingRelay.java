@@ -21,6 +21,6 @@ public final class BoundedMailboxDropNothingRelay implements Relay {
                 .output("drop_nothing_echo");
     }
 
-    @Tasklet.Spec(name = "drop_nothing_test_tasklet", capacity = BoundedMailboxTasklet.CAPACITY)
+    @Tasklet.Spec(name = "drop_nothing_test_tasklet", mailboxCapacity = BoundedMailboxTasklet.CAPACITY)
     public static final class DropNothingTestTasklet extends BoundedMailboxTasklet {}
 }

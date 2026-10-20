@@ -105,16 +105,22 @@ public final class Control {
         return call("PluginManager.disable", name, JsonNodeFactory.instance.objectNode());
     }
 
-    /** The relay ids running in this namespace. */
+    /**
+     * The relays in this namespace, one row each: its id, health, runner and node, and a partition
+     * group's width and members.
+     */
     @Nonnull
     public JsonNode listRelays() {
-        return call("Relay.list_relays");
+        return call("Relay.list");
     }
 
-    /** The plugins enabled in this namespace: name, provider, single, bound relays. */
+    /**
+     * The plugins enabled in this namespace, one row each: name, provider, single, bound relays and
+     * where it runs.
+     */
     @Nonnull
     public JsonNode listPlugins() {
-        return call("PluginManager.list");
+        return call("PluginManager.enabled");
     }
 
     /**

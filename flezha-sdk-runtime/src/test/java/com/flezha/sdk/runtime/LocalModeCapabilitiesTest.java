@@ -271,7 +271,7 @@ class LocalModeCapabilitiesTest {
     }
 
     /** The test app's {@code SugarDoNothing} short form. */
-    @com.flezha.sdk.authoring.Relay(id = "sugar_do_nothing", output = "sugar_do_nothing_echo")
+    @com.flezha.sdk.authoring.ShortRelay(factoryId = "sugar_do_nothing", output = "sugar_do_nothing_echo")
     public static final class SugarDoNothing extends EchoTasklet {}
 
     /** Releases the input under the key it resolves to, on the class's keyed output. */
@@ -321,7 +321,7 @@ class LocalModeCapabilitiesTest {
         }
     }
 
-    @Tasklet.Spec(name = "drop_nothing_test_tasklet", capacity = 4)
+    @Tasklet.Spec(name = "drop_nothing_test_tasklet", mailboxCapacity = 4)
     public static final class DropNothingTasklet extends EchoTasklet {}
 
     public static final class BoundedMailboxDropNothingRelay implements Relay {

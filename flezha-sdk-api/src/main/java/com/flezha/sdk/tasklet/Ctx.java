@@ -155,8 +155,7 @@ public interface Ctx<State, Output> {
      */
     @Nonnull
     default SpawnHandle spawnSteps(String factoryId, Object payload) {
-        return SpawnRequests.request(
-                activationToken(), factoryId, "", PlainPayload.encode(payload), null, replaying(), inputOffset());
+        return SpawnRequests.request(this, factoryId, "", PlainPayload.encode(payload), null);
     }
 
     /**
@@ -173,40 +172,16 @@ public interface Ctx<State, Output> {
      */
     @Nonnull
     default SpawnHandle spawnSteps(String factoryId, Object payload, SpawnOptions options) {
-        return SpawnRequests.request(
-                activationToken(),
-                factoryId,
-                options.id,
-                PlainPayload.encode(payload),
-                options.ifRunning,
-                replaying(),
-                inputOffset());
+        return SpawnRequests.request(this, factoryId, options.id, PlainPayload.encode(payload), options.ifRunning);
     }
 
     /**
-     * Whether this invocation is re-running already-processed input. Runtime
-     * detail: the dispatcher overrides it, and it is what makes
-     * {@link #spawnSteps} a live-processing-only side effect.
+     * Whether this invocation is re-running already-processed input. It is what makes
+     * {@link #spawnSteps} a live-processing-only side effect; read it to skip a side effect of
+     * the tasklet's own the same way.
      */
-    default boolean replaying() {
+    default boolean replay() {
         return false;
-    }
-
-    /**
-     * The poll core's token for the activation this invocation runs under, which every spawn
-     * handle it makes belongs to. Runtime detail: the dispatcher overrides it; 0 names none.
-     */
-    default long activationToken() {
-        return 0;
-    }
-
-    /**
-     * The input-log offset of the item this invocation runs, which a spawn request carries so a
-     * crash re-run of the same input resolves to the worker the first run spawned. Runtime detail:
-     * the dispatcher overrides it; -1 names none (a timer firing, a class without durable input).
-     */
-    default long inputOffset() {
-        return -1;
     }
 
     /**

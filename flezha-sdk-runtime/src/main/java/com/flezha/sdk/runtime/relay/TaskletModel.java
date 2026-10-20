@@ -64,7 +64,7 @@ public final class TaskletModel {
             throw FlezhaException.of("topology.tasklet_name_missing", Map.of("tasklet", taskletClass.getName()));
         }
         this.spec = declared != null ? declared : DEFAULTS;
-        this.name = declared != null ? declared.name() : shortForm.id();
+        this.name = declared != null ? declared.name() : shortForm.factoryId();
         Class<?>[] types = resolveTypes(taskletClass);
         this.typesResolved = types != null;
         this.inputType = typesResolved ? types[0] : Object.class;
@@ -149,8 +149,8 @@ public final class TaskletModel {
         if (name.isEmpty()) {
             errors.add(FlezhaException.of("topology.tasklet_name_missing", Map.of("tasklet", taskletClass.getName())));
         }
-        if (spec.capacity() != DEFAULTS.capacity()) {
-            refuseNegative("capacity", spec.capacity());
+        if (spec.mailboxCapacity() != DEFAULTS.mailboxCapacity()) {
+            refuseNegative("mailboxCapacity", spec.mailboxCapacity());
         }
         refuseNegative("maxCells", spec.maxCells());
         refuseNegative("idleTtlSeconds", spec.idleTtlSeconds());
@@ -259,7 +259,7 @@ public final class TaskletModel {
 
     @Nonnull
     public List<String> cellKeys() {
-        return List.of(spec.keys());
+        return List.of(spec.cellKeys());
     }
 
     public boolean cellsForDeclared() {
@@ -279,7 +279,9 @@ public final class TaskletModel {
     /** The declared mailbox capacity; empty takes the environment's or the default. */
     @Nonnull
     public OptionalInt mailboxCapacity() {
-        return spec.capacity() == DEFAULTS.capacity() ? OptionalInt.empty() : OptionalInt.of(spec.capacity());
+        return spec.mailboxCapacity() == DEFAULTS.mailboxCapacity()
+                ? OptionalInt.empty()
+                : OptionalInt.of(spec.mailboxCapacity());
     }
 
     /** The declared dynamic-cell cap; empty when it is the default. */

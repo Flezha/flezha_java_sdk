@@ -80,7 +80,7 @@ class RunnerLifecycleTest {
     }
 
     /** A short form: the tasklet class itself declares the relay. */
-    @com.flezha.sdk.authoring.Relay(id = "lifecycle_short", output = "out")
+    @com.flezha.sdk.authoring.ShortRelay(factoryId = "lifecycle_short", output = "out")
     public static final class ShortForm implements Tasklet<String, Void, String> {
         @Override
         public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
@@ -131,7 +131,7 @@ class RunnerLifecycleTest {
                 .as("a rejected start() must not reach the runtime")
                 .isEqualTo(startsBefore);
         assertThat(Flezha.currentRunner()).as("the active runner is untouched").containsSame(first);
-        assertThat(first.getNamespace()).isEqualTo("ns1");
+        assertThat(first.namespace()).isEqualTo("ns1");
     }
 
     @Test
@@ -162,7 +162,7 @@ class RunnerLifecycleTest {
     @DisplayName("start() with zero defined relay types is legal")
     void zeroRelayStartIsLegal() {
         FlezhaRunner runner = Flezha.createRunner("ns_zero").start();
-        assertThat(runner.getNamespace()).isEqualTo("ns_zero");
+        assertThat(runner.namespace()).isEqualTo("ns_zero");
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
                 .as("the init handshake must carry an empty factory list")
                 .isEmpty();
@@ -180,7 +180,7 @@ class RunnerLifecycleTest {
                 .registerFactory(RelayB.class)
                 .unregisterFactory(RelayB.class)
                 .start();
-        assertThat(runner.getNamespace()).isEqualTo("ns_shape");
+        assertThat(runner.namespace()).isEqualTo("ns_shape");
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
                 .containsExactly("lifecycle_a");
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.SYNCED_SETS)
@@ -326,13 +326,13 @@ class RunnerLifecycleTest {
     }
 
     @Test
-    @DisplayName("pre-start awaitTermination()/getRelays() throw runtime.runner_not_started; close() is a no-op")
+    @DisplayName("pre-start awaitTermination()/relays() throw runtime.runner_not_started; close() is a no-op")
     void preStartLifecycleCalls() {
         FlezhaRunner runner = Flezha.createRunner("ns_cold");
         assertThatThrownBy(runner::awaitTermination).isInstanceOfSatisfying(FlezhaException.class, e -> {
             assertThat(e.code()).isEqualTo("runtime.runner_not_started");
         });
-        assertThatThrownBy(runner::getRelays).isInstanceOfSatisfying(FlezhaException.class, e -> {
+        assertThatThrownBy(runner::relays).isInstanceOfSatisfying(FlezhaException.class, e -> {
             assertThat(e.code()).isEqualTo("runtime.runner_not_started");
         });
         assertThatCode(runner::close).doesNotThrowAnyException();
@@ -387,7 +387,7 @@ class RunnerLifecycleTest {
 
         FlezhaRunner second =
                 Flezha.createRunner("ns2").registerFactory(RelayB.class).start();
-        assertThat(second.getNamespace()).isEqualTo("ns2");
+        assertThat(second.namespace()).isEqualTo("ns2");
         assertThat(Flezha.currentRunner()).containsSame(second);
         assertThat(com.flezha.sdk.runtime.FlezhaImpl.LAST_DECLARED_SUPPLIER.get())
                 .as("generation 2's declared set starts empty and re-defines its own types")
@@ -399,7 +399,7 @@ class RunnerLifecycleTest {
     void tryWithResourcesWorks() {
         try (FlezhaRunner r =
                 Flezha.createRunner("ns_try").registerFactory(RelayA.class).start()) {
-            assertThat(r.getNamespace()).isEqualTo("ns_try");
+            assertThat(r.namespace()).isEqualTo("ns_try");
             assertThat(Flezha.currentRunner()).containsSame(r);
         }
         assertThat(Flezha.currentRunner()).isEmpty();
@@ -463,7 +463,7 @@ class RunnerLifecycleTest {
             }
             assertThat(loser.details())
                     .as("the loser must be told the winner's namespace")
-                    .containsEntry("namespace", winner.getNamespace());
+                    .containsEntry("namespace", winner.namespace());
             assertThat(Flezha.currentRunner()).containsSame(winner);
         } finally {
             pool.shutdownNow();

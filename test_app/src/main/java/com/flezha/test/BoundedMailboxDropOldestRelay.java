@@ -21,6 +21,6 @@ public final class BoundedMailboxDropOldestRelay implements Relay {
                 .output("drop_oldest_echo");
     }
 
-    @Tasklet.Spec(name = "drop_oldest_test_tasklet", capacity = BoundedMailboxTasklet.CAPACITY)
+    @Tasklet.Spec(name = "drop_oldest_test_tasklet", mailboxCapacity = BoundedMailboxTasklet.CAPACITY)
     public static final class DropOldestTestTasklet extends BoundedMailboxTasklet {}
 }

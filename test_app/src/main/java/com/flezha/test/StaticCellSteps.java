@@ -43,7 +43,7 @@ public final class StaticCellSteps implements Relay {
     }
 
     /** Emits its cell key beside the message, on the two cells it names. */
-    @Tasklet.Spec(name = "static_cell_step", keys = {"a", "b", "c"})
+    @Tasklet.Spec(name = "static_cell_step", cellKeys = {"a", "b", "c"})
     public static final class Keyed extends NoStateStep {
         @Override
         public List<String> cellsFor(String input) {

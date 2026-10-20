@@ -358,7 +358,7 @@ abstract class DispatchTestBase {
     /** Static keys a/b; counts runs per INSTANCE to pin per-Cell instances. */
     @Tasklet.Spec(
             name = "static_task",
-            keys = {"a", "b"})
+            cellKeys = {"a", "b"})
     public static final class StaticTask implements Tasklet<String, Void, Void> {
         private int instanceRuns;
 
@@ -578,7 +578,7 @@ abstract class DispatchTestBase {
     @Tasklet.Spec(name = "replay_probe_task")
     public static final class ReplayProbeTask extends Task<Void> {
         public ReplayProbeTask() {
-            super((input, ctx) -> RECORDED.add("replaying=" + ctx.replaying()));
+            super((input, ctx) -> RECORDED.add("replay=" + ctx.replay()));
         }
     }
 

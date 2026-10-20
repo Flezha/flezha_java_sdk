@@ -7,7 +7,7 @@ import com.flezha.sdk.tasklet.TaskletException;
 import java.util.List;
 
 /** Static-cell entry tasklet of the 2-tasklet reference relay. */
-@Tasklet.Spec(name = "macro_static_entry_tasklet", keys = {"a", "b", "c", "d"})
+@Tasklet.Spec(name = "macro_static_entry_tasklet", cellKeys = {"a", "b", "c", "d"})
 public class SugarEntry implements Tasklet<String, SugarEntryState, String> {
 
     /** One input the Cell has seen. */

@@ -16,7 +16,7 @@ import javax.annotation.Nonnull;
  */
 @Tasklet.Spec(
         name = "rollup",
-        keys = {"BTC/USD", "ETH/USD"})
+        cellKeys = {"BTC/USD", "ETH/USD"})
 public final class RollupTasklet implements Tasklet<String, RollupTasklet.Totals, String> {
 
     private static final int TICKS_PER_INTERVAL = 100;

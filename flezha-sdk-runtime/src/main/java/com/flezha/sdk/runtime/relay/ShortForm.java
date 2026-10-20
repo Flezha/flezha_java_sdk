@@ -1,12 +1,12 @@
 package com.flezha.sdk.runtime.relay;
 
 import com.flezha.sdk.FlezhaException;
-import com.flezha.sdk.authoring.Relay.Checkpoint;
-import com.flezha.sdk.authoring.Relay.Durable;
-import com.flezha.sdk.authoring.Relay.EffectivelyOnce;
-import com.flezha.sdk.authoring.Relay.Level;
-import com.flezha.sdk.authoring.Relay.Run;
-import com.flezha.sdk.authoring.Relay.Steps;
+import com.flezha.sdk.authoring.ShortRelay.Checkpoint;
+import com.flezha.sdk.authoring.ShortRelay.Durable;
+import com.flezha.sdk.authoring.ShortRelay.EffectivelyOnce;
+import com.flezha.sdk.authoring.ShortRelay.Level;
+import com.flezha.sdk.authoring.ShortRelay.Run;
+import com.flezha.sdk.authoring.ShortRelay.Steps;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.EdgeStream;
 import com.flezha.sdk.channel.OverflowPolicy;
@@ -24,14 +24,14 @@ import javax.annotation.Nonnull;
 
 /**
  * The short form, read at registration: a tasklet class annotated
- * {@link com.flezha.sdk.authoring.Relay @Relay} becomes a relay whose topology wires the
+ * {@link com.flezha.sdk.authoring.ShortRelay @ShortRelay} becomes a relay whose topology wires the
  * entry channel into the class and, when an output is written, the class to that plugin output, under
  * the settings tree the annotation writes.
  */
 final class ShortForm {
 
     /** The unwritten value of the annotation's numeric settings. */
-    private static final long NONE = com.flezha.sdk.authoring.Relay.NONE;
+    private static final long NONE = com.flezha.sdk.authoring.ShortRelay.NONE;
 
     private ShortForm() {}
 
@@ -40,13 +40,13 @@ final class ShortForm {
     static Relay of(@Nonnull Class<?> cls, @Nonnull ShortFormDeclaration d) {
         TaskletModel model = refuse(cls, d);
         Wiring wiring = new Wiring(cls, model.inputType(), d);
-        Relay.Run run = run(d.id(), d.settings().run());
-        Relay.Durable durable = durable(d.id(), d.settings().durable());
+        Relay.Run run = run(d.factoryId(), d.settings().run());
+        Relay.Durable durable = durable(d.factoryId(), d.settings().durable());
         long maxDurationMs = d.settings().maxDurationMs();
         return new Relay() {
             @Override
             public String factoryId() {
-                return d.id();
+                return d.factoryId();
             }
 
             @Override
@@ -161,24 +161,25 @@ final class ShortForm {
                     Map.of("class", cls.getName(), "annotation", ShortFormDeclaration.ANNOTATION));
         }
         if (Relay.class.isAssignableFrom(cls)) {
-            throw FlezhaException.of("topology.short_form_with_topology", Map.of("factory_id", d.id()));
+            throw FlezhaException.of("topology.short_form_with_topology", Map.of("factory_id", d.factoryId()));
         }
-        if (d.id().isEmpty()) {
+        if (d.factoryId().isEmpty()) {
             throw FlezhaException.of("topology.missing_factory_id", Map.of("relay", cls.getName()));
         }
         Tasklet.Spec spec = cls.getAnnotation(Tasklet.Spec.class);
-        if (spec != null && !spec.name().equals(d.id())) {
+        if (spec != null && !spec.name().equals(d.factoryId())) {
             throw FlezhaException.of(
                     "topology.short_form_name_mismatch",
-                    Map.of("class", cls.getName(), "factory_id", d.id(), "name", spec.name()));
+                    Map.of("class", cls.getName(), "factory_id", d.factoryId(), "name", spec.name()));
         }
         TaskletModel model = TaskletModel.read(cls, null);
         if (!d.output().isEmpty() && model.typesResolved() && model.outputType() == Void.class) {
-            throw FlezhaException.of("topology.output_without_type", Map.of("factory_id", d.id()));
+            throw FlezhaException.of("topology.output_without_type", Map.of("factory_id", d.factoryId()));
         }
         if (!d.onFull().isEmpty() && overflow(d.onFull()) == null) {
             throw FlezhaException.of(
-                    "topology.invalid_mode", Map.of("factory_id", d.id(), "knob", "onFull", "value", d.onFull()));
+                    "topology.invalid_mode",
+                    Map.of("factory_id", d.factoryId(), "knob", "onFull", "value", d.onFull()));
         }
         return model;
     }

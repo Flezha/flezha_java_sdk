@@ -186,7 +186,7 @@ class BoundedMailboxTopologyTest {
     }
 
     // Custom Tasklet with an explicit mailboxCapacity() override.
-    @Tasklet.Spec(name = "big_mailbox_tasklet", capacity = 8192)
+    @Tasklet.Spec(name = "big_mailbox_tasklet", mailboxCapacity = 8192)
     public static final class BigMailboxTasklet implements Tasklet<String, Void, Integer> {
 
         @Override
@@ -205,7 +205,7 @@ class BoundedMailboxTopologyTest {
         }
     }
 
-    @Tasklet.Spec(name = "zero_capacity_tasklet", capacity = 0)
+    @Tasklet.Spec(name = "zero_capacity_tasklet", mailboxCapacity = 0)
     public static final class ZeroCapacityTasklet implements Tasklet<String, Void, Integer> {
         @Override
         public void run(String input, Ctx<Void, Integer> ctx) {}
@@ -223,7 +223,7 @@ class BoundedMailboxTopologyTest {
         }
     }
 
-    @Tasklet.Spec(name = "huge_capacity_tasklet", capacity = 9_999_999)
+    @Tasklet.Spec(name = "huge_capacity_tasklet", mailboxCapacity = 9_999_999)
     public static final class HugeCapacityTasklet implements Tasklet<String, Void, Integer> {
 
         @Override

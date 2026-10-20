@@ -78,8 +78,8 @@ public interface Tasklet<Input, State, Output> {
 
     /**
      * The tasklet's name and scalar settings, read at registration. Every tasklet class carries
-     * it, except a short form ({@code @Relay} / {@code @Relay}), whose
-     * tasklet takes the relay's {@code id} as its name.
+     * it, except a short form ({@code @ShortRelay}), whose tasklet takes the relay's
+     * {@code factoryId} as its name.
      */
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.TYPE)
@@ -92,13 +92,13 @@ public interface Tasklet<Input, State, Output> {
         String name();
 
         /** Static cell keys. Non-empty together with a written {@link Tasklet#cellsFor}. */
-        String[] keys() default {};
+        String[] cellKeys() default {};
 
         /**
          * Per-cell mailbox capacity, 1 to 1 048 576. Unset ({@code -1}) takes
          * {@code FLEZHA_MAILBOX_CAPACITY}, else 1024.
          */
-        int capacity() default -1;
+        int mailboxCapacity() default -1;
 
         /** Dynamic-mode soft cap on live cells; inputs for a new key past it are dropped. */
         long maxCells() default 100_000L;
@@ -186,7 +186,7 @@ public interface Tasklet<Input, State, Output> {
     default void compensate(List<Output> completedOutput, Ctx<State, Output> ctx) throws TaskletException {}
 
     /**
-     * For static cells: which of the {@link Spec#keys()} this input goes to. Each named cell gets
+     * For static cells: which of the {@link Spec#cellKeys()} this input goes to. Each named cell gets
      * its own {@code run}; an empty list drops the input.
      */
     @Nonnull

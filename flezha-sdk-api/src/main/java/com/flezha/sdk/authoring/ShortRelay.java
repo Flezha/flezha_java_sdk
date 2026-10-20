@@ -15,8 +15,8 @@ import java.lang.annotation.Target;
  * §5.
  *
  * <p>{@code runner.registerFactory(Echo.class)} reads it and declares a relay whose factory id
- * is {@link #id()}, wiring the entry channel {@link #input()} into the class and, when
- * {@link #output()} is written, the class to that plugin output. The tasklet is named {@link #id()}.
+ * is {@link #factoryId()}, wiring the entry channel {@link #input()} into the class and, when
+ * {@link #output()} is written, the class to that plugin output. The tasklet is named {@link #factoryId()}.
  * Nothing is generated and nothing registers itself.
  *
  * <p>It takes the class settings the full form ({@link com.flezha.sdk.relay.Relay}) takes,
@@ -25,7 +25,7 @@ import java.lang.annotation.Target;
  * branches written at once are refused at registration as {@code topology.invalid_setting}:
  *
  * <pre>{@code
- * @Relay(id = "chat", run = @Run(steps = @Steps(each = Each.PER_INPUT)),
+ * @ShortRelay(factoryId = "chat", run = @Run(steps = @Steps(each = Each.PER_INPUT)),
  *         durable = @Durable(local = @Level(sleepAfterMs = 2_000)))
  * }</pre>
  *
@@ -34,14 +34,14 @@ import java.lang.annotation.Target;
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
-public @interface Relay {
+public @interface ShortRelay {
 
     /**
      * The factory id, which also names the tasklet. Required, and never derived from the class
      * name: the tasklet's name is part of every cell's state path, so a class rename must move
      * neither.
      */
-    String id() default "";
+    String factoryId() default "";
 
     /** Plugin output the tasklet's output is wired to. Empty (the default) declares no plugin channel. */
     String output() default "";

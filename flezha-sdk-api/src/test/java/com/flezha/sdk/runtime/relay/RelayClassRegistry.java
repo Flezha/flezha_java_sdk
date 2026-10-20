@@ -22,7 +22,7 @@ public final class RelayClassRegistry {
     public static String registerClass(Class<?> relayClass) throws Exception {
         ShortFormDeclaration shortForm = ShortFormDeclaration.of(relayClass);
         String factoryId = shortForm != null
-                ? shortForm.id()
+                ? shortForm.factoryId()
                 : ((Relay) relayClass.getDeclaredConstructor().newInstance()).factoryId();
         synchronized (REGISTERED) {
             if (!REGISTERED.contains(factoryId)) {

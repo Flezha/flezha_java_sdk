@@ -14,7 +14,7 @@ import java.util.Optional;
  * {@code sma}/{@code ohlc} tasklets and is the Java parity twin of the Rust {@code Windowed}
  * tasklet.
  */
-@Tasklet.Spec(name = "java_windowed", keys = {"win_2", "win_3"})
+@Tasklet.Spec(name = "java_windowed", cellKeys = {"win_2", "win_3"})
 public class Windowed implements Tasklet<WindowInput, WindowedState, Double> {
 
     /** Appends a value to a key's closes. */

@@ -44,7 +44,7 @@ public final class LocalRelay implements AutoCloseable {
 
     /**
      * Register {@code type}'s declared graph and start it locally. {@code type} is an
-     * relay class, or a tasklet class carrying the {@code @Relay} short form.
+     * relay class, or a tasklet class carrying the {@code @ShortRelay} short form.
      *
      * @throws RuntimeException naming the capability when the declaration
      *     needs a controller

@@ -186,7 +186,7 @@ class RelayTopologyBuilderTest {
 
     @Tasklet.Spec(
             name = "static_tasklet",
-            keys = {"a", "b", "c", "d"})
+            cellKeys = {"a", "b", "c", "d"})
     public static final class StaticTasklet implements Tasklet<String, Void, String> {
 
         @Override
@@ -266,7 +266,7 @@ class RelayTopologyBuilderTest {
 
     @Tasklet.Spec(
             name = "missing_pfo_tasklet",
-            keys = {"a", "b"})
+            cellKeys = {"a", "b"})
     public static final class MissingCellsForTasklet implements Tasklet<String, Void, String> {
 
         @Override

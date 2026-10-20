@@ -156,7 +156,7 @@ public final class RegistryCore {
      */
     private FlezhaException notDefined(Class<?> cls) {
         ShortFormDeclaration shortForm = ShortFormDeclaration.of(cls);
-        String factoryId = shortForm == null ? null : shortForm.id();
+        String factoryId = shortForm == null ? null : shortForm.factoryId();
         Throwable cause = null;
         try {
             if (factoryId == null && Relay.class.isAssignableFrom(cls)) {

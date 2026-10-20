@@ -37,6 +37,32 @@
 
     <build>
         <plugins>
+            <!-- The tests are compiled into the api's module, and one of them compiles
+                 a source against it through `javax.tools`. They run on the class path. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-testCompile</id>
+                        <configuration>
+                            <compilerArgs combine.children="append">
+                                <arg>--add-modules</arg>
+                                <arg>java.compiler</arg>
+                                <arg>--add-reads</arg>
+                                <arg>com.flezha.sdk.api=java.compiler</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <useModulePath>false</useModulePath>
+                </configuration>
+            </plugin>
             <!-- `CapturedStderr` as a test jar, so the runtime's tests capture
                  standard error with the same helper. -->
             <plugin>

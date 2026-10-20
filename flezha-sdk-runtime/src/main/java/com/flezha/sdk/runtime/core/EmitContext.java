@@ -2,6 +2,7 @@ package com.flezha.sdk.runtime.core;
 
 import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.ChannelKind;
+import com.flezha.sdk.internal.InvocationOrigin;
 import com.flezha.sdk.runtime.relay.ChannelDescriptor;
 import com.flezha.sdk.runtime.relay.ConsumerEdge;
 import com.flezha.sdk.runtime.relay.PluginSink;
@@ -34,7 +35,7 @@ import javax.annotation.Nullable;
  * {@link Output}s — edge transforms, keys and the consumer's event-time
  * extractor run here, so live delivery and replay cannot drift.
  */
-final class EmitContext implements Ctx<Object, Object> {
+final class EmitContext implements Ctx<Object, Object>, InvocationOrigin {
 
     private final RelayInstance instance;
     private final Cell cell;
@@ -103,7 +104,7 @@ final class EmitContext implements Ctx<Object, Object> {
     }
 
     @Override
-    public boolean replaying() {
+    public boolean replay() {
         return replay;
     }
 

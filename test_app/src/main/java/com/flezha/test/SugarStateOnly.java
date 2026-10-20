@@ -1,6 +1,6 @@
 package com.flezha.test;
 
-import com.flezha.sdk.authoring.Relay;
+import com.flezha.sdk.authoring.ShortRelay;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -10,7 +10,7 @@ import com.flezha.sdk.tasklet.TaskletException;
  * The short form with no output: its entry channel {@code ticks} feeds a tasklet that only keeps
  * state, so what it was sent is read back off the Cell rather than off an output.
  */
-@Relay(id = "sugar_state_only", input = "ticks")
+@ShortRelay(factoryId = "sugar_state_only", input = "ticks")
 public class SugarStateOnly implements Tasklet<String, SugarStateOnlyState, Void> {
 
     /** One input the Cell has seen. */

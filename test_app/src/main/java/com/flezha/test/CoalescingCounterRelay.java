@@ -4,9 +4,8 @@ import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.relay.Relay;
 
 /**
- * Demonstrates the per-Cell flusher's coalescing path: {@link TickChange}
- * carries a {@link com.flezha.sdk.state.CoalesceKey} so Changes with equal
- * {@code (interval, ts)} collapse to the latest within a flush window.
+ * The {@code coalescing_counter} fixture: {@link TickChange} records every tick.
+ * Coalescing is the Rust SDK's; this relay keeps the fixture's topology.
  */
 public final class CoalescingCounterRelay implements Relay {
 

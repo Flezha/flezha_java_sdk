@@ -81,7 +81,7 @@ public final class FlezhaRunner implements AutoCloseable {
 
     /** The namespace this runner was created for — its stable identity. */
     @Nonnull
-    public String getNamespace() {
+    public String namespace() {
         return namespace;
     }
 
@@ -93,7 +93,7 @@ public final class FlezhaRunner implements AutoCloseable {
      * call site, as a {@link FlezhaException} whose code names the refusal.
      *
      * <p>A short form is registered by the tasklet class the author wrote, annotated
-     * {@link com.flezha.sdk.authoring.Relay @Relay}: the call reads the annotation and
+     * {@link com.flezha.sdk.authoring.ShortRelay @ShortRelay}: the call reads the annotation and
      * declares the one-tasklet relay it describes. Nothing is generated.
      *
      * @throws FlezhaException on a duplicate factory id ({@code topology.duplicate_factory_id}), when
@@ -134,7 +134,7 @@ public final class FlezhaRunner implements AutoCloseable {
             throw new IllegalArgumentException(what + ": the relay class must not be null");
         }
         if (!Relay.class.isAssignableFrom(declared)
-                && !declared.isAnnotationPresent(com.flezha.sdk.authoring.Relay.class)) {
+                && !declared.isAnnotationPresent(com.flezha.sdk.authoring.ShortRelay.class)) {
             throw FlezhaException.of("topology.no_relay_exported", Map.of("module", declared.getName()));
         }
         return factories;
@@ -314,7 +314,7 @@ public final class FlezhaRunner implements AutoCloseable {
      * @throws FlezhaException {@code runtime.runner_not_started} on a never-started runner.
      */
     @Nonnull
-    public List<String> getRelays() {
+    public List<String> relays() {
         return started().relays();
     }
 

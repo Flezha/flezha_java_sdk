@@ -14,10 +14,6 @@
  * calls. This failure mode is silent under normal operation, because a direct assignment behaves
  * correctly for as long as the process survives.
  *
- * <p>{@link com.flezha.sdk.state.CoalesceKey} allows changes carrying equal keys to collapse to the
- * latest within a flush window, which suits "current value of X" updates and is wrong for
- * additive deltas, since collapsing those loses every value but the last.
- *
  * <p>{@link com.flezha.sdk.state.RestoreInitPayload} carries a snapshot and change log for the
  * test harness to restore. {@link com.flezha.sdk.state.ReplayMismatch} reports a rebuild that did
  * not reproduce the observed state, which is the diagnostic for non-deterministic user code.

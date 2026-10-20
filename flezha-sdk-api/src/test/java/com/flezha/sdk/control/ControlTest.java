@@ -76,7 +76,7 @@ class ControlTest {
                                 "[\"writer\",{\"relay_id\":\"my_other\",\"hooks\":[\"on_output\"],\"channel\":\"in\"}]"),
                         List.of("PluginManager.unbind", "[\"writer\",{\"relay_id\":\"my_echo\"}]"),
                         List.of("PluginManager.disable", "[\"writer\",{}]"),
-                        List.of("PluginManager.list", "[]"));
+                        List.of("PluginManager.enabled", "[]"));
     }
 
     @Test

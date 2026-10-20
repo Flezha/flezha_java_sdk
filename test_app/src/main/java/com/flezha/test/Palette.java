@@ -1,6 +1,6 @@
 package com.flezha.test;
 
-import com.flezha.sdk.authoring.Relay;
+import com.flezha.sdk.authoring.ShortRelay;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.tasklet.Ctx;
@@ -47,30 +47,30 @@ final class Palette {
         public void run(String input, Ctx<Log, String> ctx) {}
     }
 
-    @Tasklet.Spec(name = "plain", capacity = MAILBOX)
+    @Tasklet.Spec(name = "plain", mailboxCapacity = MAILBOX)
     public static final class Plain extends Role {}
 
     /** {@code plain} with a mailbox past the ceiling. */
-    @Tasklet.Spec(name = "plain", capacity = OVERSIZED_MAILBOX)
+    @Tasklet.Spec(name = "plain", mailboxCapacity = OVERSIZED_MAILBOX)
     public static final class PlainOversized extends Role {}
 
     /** {@code plain} with a mailbox of zero. */
-    @Tasklet.Spec(name = "plain", capacity = 0)
+    @Tasklet.Spec(name = "plain", mailboxCapacity = 0)
     public static final class PlainWithoutMailbox extends Role {}
 
-    @Tasklet.Spec(name = "second", capacity = MAILBOX)
+    @Tasklet.Spec(name = "second", mailboxCapacity = MAILBOX)
     public static final class Second extends Role {}
 
     /** A distinct class declaring the SAME name as {@code plain}: the collision. */
-    @Tasklet.Spec(name = "plain", capacity = MAILBOX)
+    @Tasklet.Spec(name = "plain", mailboxCapacity = MAILBOX)
     public static final class Twin extends Role {}
 
     /** Static mode with no router: {@code cellsFor} is deliberately absent. */
-    @Tasklet.Spec(name = "static", keys = {"a", "b"}, capacity = MAILBOX)
+    @Tasklet.Spec(name = "static", cellKeys = {"a", "b"}, mailboxCapacity = MAILBOX)
     public static final class StaticKeys extends Role {}
 
     /** Static mode with its router declared. */
-    @Tasklet.Spec(name = "routed", keys = {"a", "b"}, capacity = MAILBOX)
+    @Tasklet.Spec(name = "routed", cellKeys = {"a", "b"}, mailboxCapacity = MAILBOX)
     public static final class Routed extends Role {
 
         @Override
@@ -84,11 +84,11 @@ final class Palette {
      * chain closes onto is dynamic — so the role's own declaration is a plain
      * one.
      */
-    @Tasklet.Spec(name = "dynamic", capacity = MAILBOX)
+    @Tasklet.Spec(name = "dynamic", mailboxCapacity = MAILBOX)
     public static final class Dynamic extends Role {}
 
     /** A logical clock over a tasklet that keeps no state, so journals nothing. */
-    @Tasklet.Spec(name = "nochange", logicalClock = true, capacity = MAILBOX)
+    @Tasklet.Spec(name = "nochange", logicalClock = true, mailboxCapacity = MAILBOX)
     public static final class LogicalWithoutState implements Tasklet<String, Void, String> {
 
         @Override
@@ -96,7 +96,7 @@ final class Palette {
     }
 
     /** An event-time clock, declared by writing the extractor. */
-    @Tasklet.Spec(name = "eventtime", capacity = MAILBOX)
+    @Tasklet.Spec(name = "eventtime", mailboxCapacity = MAILBOX)
     public static final class EventTime extends Role {
 
         @Override
@@ -106,7 +106,7 @@ final class Palette {
     }
 
     /** {@code shorthand(plain, out, -).topology}: a short form that also implements the relay interface. */
-    @Relay(id = "plain", output = "out")
+    @ShortRelay(factoryId = "plain", output = "out")
     public static final class ShortFormWithTopology
             implements Tasklet<String, Void, String>, com.flezha.sdk.relay.Relay {
 
@@ -125,7 +125,7 @@ final class Palette {
     }
 
     /** {@code shorthand(plain, out, -).noout}: a short form with an output and no output. */
-    @Relay(id = "plain", output = "out")
+    @ShortRelay(factoryId = "plain", output = "out")
     public static final class OutputWithoutType implements Tasklet<String, Void, Void> {
 
         @Override

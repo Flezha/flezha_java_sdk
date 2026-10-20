@@ -1,24 +1,16 @@
 package com.flezha.test;
 
 import com.flezha.sdk.state.Change;
-import com.flezha.sdk.state.CoalesceKey;
-import java.util.Optional;
 
 /**
- * Per-tick Change carrying an interval bucket, timestamp, and delta. Used by
- * {@link CoalescingCounterRelay} to demonstrate the per-Cell flusher's
- * coalescing path: Changes with equal {@code (interval, ts)} collapse to the
- * latest within a flush window.
+ * Per-tick Change carrying an interval bucket, timestamp, and delta, folded by
+ * {@link CoalescingCounterRelay}. The Java SDK does not coalesce: every change
+ * is recorded as it was applied.
  */
 public record TickChange(int interval, long ts, long delta) implements Change<TickTasklet.State> {
 
     @Override
     public void applyTo(TickTasklet.State state) {
         state.last = delta;
-    }
-
-    @Override
-    public Optional<CoalesceKey> coalesceKey() {
-        return Optional.of(CoalesceKey.fromHash(interval, ts));
     }
 }

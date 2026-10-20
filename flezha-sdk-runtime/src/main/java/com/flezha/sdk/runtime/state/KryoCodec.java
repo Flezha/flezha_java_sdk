@@ -4,7 +4,6 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.KryoException;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-import com.flezha.sdk.state.CoalesceKey;
 import com.flezha.sdk.state.RestoreInitPayload;
 import com.flezha.sdk.state.StateSerializeException;
 import java.util.ArrayList;
@@ -136,9 +135,17 @@ public final class KryoCodec {
      * already registered, which keeps its id and takes no slot; derived ids sit
      * in a band above them. Append only: an insertion moves every later id.
      */
+    /**
+     * Holds the id of a built-in that left the codec, so every later id stays where saved records
+     * carry it. Registered, never instantiated.
+     */
+    private static final class ReservedSlot {
+        private ReservedSlot() {}
+    }
+
     private static final List<Class<?>> BUILTINS = List.of(
             RestoreInitPayload.class,
-            CoalesceKey.class,
+            ReservedSlot.class,
             byte[].class,
             int[].class,
             long[].class,

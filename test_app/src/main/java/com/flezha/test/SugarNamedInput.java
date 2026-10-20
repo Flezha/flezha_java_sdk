@@ -1,13 +1,13 @@
 package com.flezha.test;
 
-import com.flezha.sdk.authoring.Relay;
+import com.flezha.sdk.authoring.ShortRelay;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.nio.charset.StandardCharsets;
 
 /** The short form naming its entry channel {@code prices} rather than taking the default. */
-@Relay(id = "sugar_named_input", output = "sugar_named_input_sink", input = "prices")
+@ShortRelay(factoryId = "sugar_named_input", output = "sugar_named_input_sink", input = "prices")
 public class SugarNamedInput implements Tasklet<String, Void, byte[]> {
 
     @Override

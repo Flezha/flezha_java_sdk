@@ -179,8 +179,8 @@ public Durable durable() {
 | `maxDuration()` | a wall-clock stop for either run | none |
 | `description()` | shown by `flz relay info` | empty |
 
-The short form, `@Relay` on a tasklet class, takes the same tree as nested
-annotations: `@Relay(id = "chat", run = @Run(steps = @Steps(each = Each.PER_INPUT)))`.
+The short form, `@ShortRelay` on a tasklet class, takes the same tree as nested
+annotations: `@ShortRelay(factoryId = "chat", run = @Run(steps = @Steps(each = Each.PER_INPUT)))`.
 
 Anything Flezha refuses throws one unchecked type, `com.flezha.sdk.FlezhaException`:
 a registration, a refused connect, an administration call, a spawn read, and a
@@ -245,7 +245,7 @@ retention, and a tier without keyed outputs is refused at registration.
 
 | Module | Purpose |
 |---|---|
-| `flezha-sdk-api` | Public API: `Flezha`, `Relay` and its settings tree, `Tasklet` and `@Tasklet.Spec`, `Ctx`, `Change`, `StableId`, channel builders, the `@Relay` short form. No native dependency. |
+| `flezha-sdk-api` | Public API: `Flezha`, `Relay` and its settings tree, `Tasklet` and `@Tasklet.Spec`, `Ctx`, `Change`, `StableId`, channel builders, the `@ShortRelay` short form. No native dependency. |
 | `flezha-sdk-runtime` | Control plane, data plane, framing, worker pool, reconnect, state persistence, steps class registration. |
 | `flezha-sdk-native` | JNI bindings + bundled per-OS `libflz_core_ffi`. |
 | `flezha-sdk-testing` | `TaskletTestHarness`, added with `<scope>test</scope>`. |

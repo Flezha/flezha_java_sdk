@@ -289,7 +289,7 @@ class TaskletModelTest {
 
     @Tasklet.Spec(
             name = "keyed_window",
-            keys = {"1m", "1h"})
+            cellKeys = {"1m", "1h"})
     public static final class KeyedWindow implements Tasklet<Trade, Span, Void> {
         @Override
         public Span initState(Optional<String> cellKey) {

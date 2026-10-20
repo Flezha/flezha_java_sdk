@@ -101,7 +101,7 @@ public interface EdgeStream<T> {
      * <p>Total by signature: it names a Cell, it never declines. Discard
      * inputs with {@link #filter} before it. It is evaluated on the
      * <b>post-transform</b> value, so it must be the last link before
-     * {@code into}. Wiring it onto a Tasklet declaring {@code @Tasklet.Spec(keys = ...)}
+     * {@code into}. Wiring it onto a Tasklet declaring {@code @Tasklet.Spec(cellKeys = ...)}
      * (static mode) fails registration.
      */
     @Nonnull

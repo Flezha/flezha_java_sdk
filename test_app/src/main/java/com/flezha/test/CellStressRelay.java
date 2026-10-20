@@ -41,7 +41,7 @@ public final class CellStressRelay implements Relay {
     abstract static class StressTasklet<O> implements Tasklet<String, Void, O> {}
 
     /** Fans every input out to all eight Cells. */
-    @Tasklet.Spec(name = "stress_a", keys = {"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7"})
+    @Tasklet.Spec(name = "stress_a", cellKeys = {"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7"})
     public static final class StressTaskletA extends StressTasklet<String> {
 
         @Override
@@ -56,7 +56,7 @@ public final class CellStressRelay implements Relay {
     }
 
     /** Collapses the fan-out back onto {@code p0}. */
-    @Tasklet.Spec(name = "stress_b", keys = {"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7"})
+    @Tasklet.Spec(name = "stress_b", cellKeys = {"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7"})
     public static final class StressTaskletB extends StressTasklet<String> {
 
         @Override
@@ -71,7 +71,7 @@ public final class CellStressRelay implements Relay {
     }
 
     /** Second single-key hop. */
-    @Tasklet.Spec(name = "stress_c", keys = {"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7"})
+    @Tasklet.Spec(name = "stress_c", cellKeys = {"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7"})
     public static final class StressTaskletC extends StressTasklet<String> {
 
         @Override
@@ -86,7 +86,7 @@ public final class CellStressRelay implements Relay {
     }
 
     /** Terminal hop: hands the bytes to the {@code cell_stress_echo} plugin. */
-    @Tasklet.Spec(name = "stress_d", keys = {"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7"})
+    @Tasklet.Spec(name = "stress_d", cellKeys = {"p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7"})
     public static final class StressTaskletD extends StressTasklet<byte[]> {
 
         @Override

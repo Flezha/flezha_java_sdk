@@ -1,8 +1,8 @@
 package com.flezha.test;
 
-import com.flezha.sdk.authoring.Relay;
-import com.flezha.sdk.authoring.Relay.Run;
-import com.flezha.sdk.authoring.Relay.Steps;
+import com.flezha.sdk.authoring.ShortRelay;
+import com.flezha.sdk.authoring.ShortRelay.Run;
+import com.flezha.sdk.authoring.ShortRelay.Steps;
 import com.flezha.sdk.relay.Relay.Each;
 import com.flezha.sdk.tasklet.Ctx;
 import com.flezha.sdk.tasklet.Tasklet;
@@ -12,8 +12,8 @@ import com.flezha.sdk.tasklet.TaskletException;
  * The steps short form with its loop mode written: one iteration per message on
  * {@code input}, each emitting the text it received, and no completion after the first.
  */
-@Relay(
-        id = "sugar_steps_per_input",
+@ShortRelay(
+        factoryId = "sugar_steps_per_input",
         output = "sugar_steps_per_input_out",
         run = @Run(steps = @Steps(each = Each.PER_INPUT)))
 public class SugarStepsPerInput implements Tasklet<String, Void, String> {

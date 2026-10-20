@@ -4,14 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flezha.sdk.FlezhaException;
-import com.flezha.sdk.authoring.Relay;
-import com.flezha.sdk.authoring.Relay.Checkpoint;
-import com.flezha.sdk.authoring.Relay.Durable;
-import com.flezha.sdk.authoring.Relay.EffectivelyOnce;
-import com.flezha.sdk.authoring.Relay.Flow;
-import com.flezha.sdk.authoring.Relay.Level;
-import com.flezha.sdk.authoring.Relay.Run;
-import com.flezha.sdk.authoring.Relay.Steps;
+import com.flezha.sdk.authoring.ShortRelay;
+import com.flezha.sdk.authoring.ShortRelay.Checkpoint;
+import com.flezha.sdk.authoring.ShortRelay.Durable;
+import com.flezha.sdk.authoring.ShortRelay.EffectivelyOnce;
+import com.flezha.sdk.authoring.ShortRelay.Flow;
+import com.flezha.sdk.authoring.ShortRelay.Level;
+import com.flezha.sdk.authoring.ShortRelay.Run;
+import com.flezha.sdk.authoring.ShortRelay.Steps;
 import com.flezha.sdk.channel.ChannelBuilder;
 import com.flezha.sdk.channel.ChannelKind;
 import com.flezha.sdk.relay.Relay.Each;
@@ -220,8 +220,8 @@ class ShortFormTest extends DispatchTestBase {
         return ((Map<String, Map<String, Object>>) topology.declaration().get("run")).get("steps");
     }
 
-    @Relay(
-            id = "ticker",
+    @ShortRelay(
+            factoryId = "ticker",
             description = "every setting written",
             maxDurationMs = 60_000,
             run = @Run(flow = @Flow(effectivelyOnce = @EffectivelyOnce(checkpoint = @Checkpoint(every = 100)))),
@@ -233,13 +233,13 @@ class ShortFormTest extends DispatchTestBase {
         public void run(String input, Ctx<Count, Void> ctx) {}
     }
 
-    @Relay(id = "volatile", durable = @Durable(false))
+    @ShortRelay(factoryId = "volatile", durable = @Durable(false))
     public static final class Volatile extends EchoBody {}
 
-    @Relay(id = "two_runs", run = @Run(flow = @Flow, steps = @Steps))
+    @ShortRelay(factoryId = "two_runs", run = @Run(flow = @Flow, steps = @Steps))
     public static final class TwoRuns extends EchoBody {}
 
-    @Relay(id = "echo", output = "out")
+    @ShortRelay(factoryId = "echo", output = "out")
     public static final class Echo implements Tasklet<String, Void, String> {
         @Override
         public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
@@ -247,7 +247,7 @@ class ShortFormTest extends DispatchTestBase {
         }
     }
 
-    @Relay(id = "place", output = "placed", input = "order", run = @Run(steps = @Steps))
+    @ShortRelay(factoryId = "place", output = "placed", input = "order", run = @Run(steps = @Steps))
     public static final class Place implements Tasklet<String, Void, String> {
         @Override
         public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
@@ -255,7 +255,7 @@ class ShortFormTest extends DispatchTestBase {
         }
     }
 
-    @Relay(id = "chat", output = "replies", run = @Run(steps = @Steps(each = Each.PER_INPUT)))
+    @ShortRelay(factoryId = "chat", output = "replies", run = @Run(steps = @Steps(each = Each.PER_INPUT)))
     public static final class Chat implements Tasklet<String, Void, String> {
         @Override
         public void run(String input, Ctx<Void, String> ctx) throws TaskletException {
@@ -263,36 +263,36 @@ class ShortFormTest extends DispatchTestBase {
         }
     }
 
-    @Relay(id = "counter", input = "ticks")
+    @ShortRelay(factoryId = "counter", input = "ticks")
     @Tasklet.Spec(name = "counter", maxCells = 10)
     public static final class Counter implements Tasklet<String, Void, Void> {
         @Override
         public void run(String input, Ctx<Void, Void> ctx) {}
     }
 
-    @Relay(id = "prices", output = "out", input = "prices")
+    @ShortRelay(factoryId = "prices", output = "out", input = "prices")
     public static final class Prices extends EchoBody {}
 
-    @Relay(id = "never_registered", output = "out")
+    @ShortRelay(factoryId = "never_registered", output = "out")
     public static final class NeverRegistered extends EchoBody {}
 
-    @Relay(output = "out")
+    @ShortRelay(output = "out")
     public static final class Upcase extends EchoBody {}
 
-    @Relay(id = "counter")
+    @ShortRelay(factoryId = "counter")
     @Tasklet.Spec(name = "tally")
     public static final class Tally implements Tasklet<String, Void, Void> {
         @Override
         public void run(String input, Ctx<Void, Void> ctx) {}
     }
 
-    @Relay(id = "drain", output = "out")
+    @ShortRelay(factoryId = "drain", output = "out")
     public static final class Drain implements Tasklet<String, Void, Void> {
         @Override
         public void run(String input, Ctx<Void, Void> ctx) {}
     }
 
-    @Relay(id = "both")
+    @ShortRelay(factoryId = "both")
     public static final class Both implements Tasklet<String, Void, Void>, com.flezha.sdk.relay.Relay {
         @Override
         public void run(String input, Ctx<Void, Void> ctx) {}

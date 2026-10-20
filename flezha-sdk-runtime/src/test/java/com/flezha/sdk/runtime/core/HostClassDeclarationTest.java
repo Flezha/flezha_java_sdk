@@ -492,8 +492,8 @@ class HostClassDeclarationTest {
     /** A static, compensating, persistent tasklet: the widest tasklet declaration. */
     @Tasklet.Spec(
             name = "decl_full_task",
-            keys = {"a", "b"},
-            capacity = 2048,
+            cellKeys = {"a", "b"},
+            mailboxCapacity = 2048,
             compactAfterBytes = 4096)
     public static final class FullyDeclaredTask implements Tasklet<String, FullyDeclaredTask.State, String> {
 
