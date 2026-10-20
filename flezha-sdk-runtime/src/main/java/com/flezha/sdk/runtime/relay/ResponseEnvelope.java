@@ -4,7 +4,8 @@ import com.flezha.sdk.FlezhaException;
 import com.flezha.sdk.channel.PlainPayload;
 import com.flezha.sdk.channel.Response;
 import com.flezha.sdk.native_.FlzCore;
-import com.flezha.sdk.runtime.state.Postcard;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import javax.annotation.Nonnull;
 
 /**
@@ -20,15 +21,19 @@ public final class ResponseEnvelope {
     @Nonnull
     public static <Q, A> Response<Q, A> decode(
             @Nonnull byte[] bytes, @Nonnull Class<Q> request, @Nonnull Class<A> answer) {
-        Postcard.Reader parts = new Postcard.Reader(FlzCore.responseDecode(bytes));
-        String target = parts.string();
-        boolean created = parts.bool();
-        Q decodedRequest = PlainPayload.decode(parts.bytes(), request);
-        if (parts.varint() == 0) {
-            A value = PlainPayload.decode(parts.bytes(), answer);
+        int[] parts = new int[5];
+        byte[] decoded = FlzCore.responseDecode(bytes, parts);
+        int targetEnd = parts[0];
+        int requestEnd = targetEnd + parts[1];
+        String target = new String(decoded, 0, targetEnd, StandardCharsets.UTF_8);
+        boolean created = parts[3] == 1;
+        Q decodedRequest = PlainPayload.decode(Arrays.copyOfRange(decoded, targetEnd, requestEnd), request);
+        if (parts[4] == 1) {
+            A value = PlainPayload.decode(Arrays.copyOfRange(decoded, requestEnd, decoded.length), answer);
             return new Response<>(decodedRequest, value, null, target, created);
         }
-        FlezhaException failure = FlezhaException.fromDocument(parts.string());
+        FlezhaException failure = FlezhaException.fromDocument(
+                new String(decoded, requestEnd, decoded.length - requestEnd, StandardCharsets.UTF_8));
         return new Response<>(decodedRequest, null, failure, target, created);
     }
 }

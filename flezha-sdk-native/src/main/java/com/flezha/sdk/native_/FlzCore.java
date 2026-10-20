@@ -259,11 +259,12 @@ public final class FlzCore {
     public static native String errorDocument(String code, String detailsJson);
 
     /**
-     * A Response channel payload as the core's decoder reads it, in postcard: the target, whether
-     * the call started it, the request's bytes, then variant 0 and the answer's bytes or variant 1
-     * and the JSON error document. Throws {@code call.malformed_response}. Context-free.
+     * A Response channel payload as the core's decoder reads it: the target, the request's bytes and
+     * the answer's bytes or the JSON error document, back to back, with {@code [target length,
+     * request length, result length, created, answered]} written into {@code parts} (1 for true).
+     * Throws {@code call.malformed_response}. Context-free.
      */
-    public static native byte[] responseDecode(byte[] payload);
+    public static native byte[] responseDecode(byte[] payload, int[] parts);
 
     /**
      * The core's notices held since the last take, as a JSON array of
