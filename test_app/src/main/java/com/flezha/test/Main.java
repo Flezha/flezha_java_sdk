@@ -148,6 +148,7 @@ public final class Main {
                 .registerFactory(PartitionPassRelay.class)
                 .registerFactory(SessionTimeoutRelay.class)
                 .registerFactory(TimerCapRelay.class)
+                .registerFactory(TimerChurnRelay.class)
                 .registerFactory(MixedRelay.class)
                 .registerFactory(TierStoreRelay.class)
                 .registerFactory(RemoteTierStoreRelay.class)
