@@ -178,9 +178,6 @@ final class PollHost implements AutoCloseable {
     private final AtomicInteger nextFetcherId = new AtomicInteger();
     private final ExecutorService activations = Executors.newVirtualThreadPerTaskExecutor();
     private final AtomicBoolean closing = new AtomicBoolean(false);
-    /** Raised by a local run's end, which must stop the supervisor before any fetcher leaves. */
-    private volatile boolean unsupervised = false;
-
     private final Runnable onFetchersDrained;
     private final Thread supervisor = new Thread(this::superviseLoop, "flz-poll-supervisor");
 
@@ -234,7 +231,7 @@ final class PollHost implements AutoCloseable {
      * ceiling outruns that.
      */
     private void superviseLoop() {
-        while (!closing.get() && !unsupervised) {
+        while (!closing.get()) {
             int answer;
             try {
                 answer = core.poolSupervise();
@@ -257,9 +254,7 @@ final class PollHost implements AutoCloseable {
             if (answer == FlzCore.POOL_STOP) {
                 return;
             }
-            if ((answer == FlzCore.POOL_SPAWN_BASE || answer == FlzCore.POOL_SPAWN_GROWN)
-                    && !closing.get()
-                    && !unsupervised) {
+            if ((answer == FlzCore.POOL_SPAWN_BASE || answer == FlzCore.POOL_SPAWN_GROWN) && !closing.get()) {
                 startFetcher(answer == FlzCore.POOL_SPAWN_GROWN);
             }
         }
@@ -418,13 +413,10 @@ final class PollHost implements AutoCloseable {
      * process-wide poll core keeps running — there is no controller session
      * to shut down, and shutting the core would stop every later run in the
      * process — so the flag is raised first and the fetchers leave on their
-     * next poll timeout instead. The supervisor leaves before the flag: to the
-     * governor a fetcher leaving under a live supervisor is a pool gone short,
-     * which it replaces and logs.
+     * next poll timeout instead. The fetchers' leaving is not replaced: the
+     * local stop that precedes this call has already stopped the pool.
      */
     void stopFetching() {
-        unsupervised = true;
-        joinQuietly(supervisor);
         closing.set(true);
         close();
     }
