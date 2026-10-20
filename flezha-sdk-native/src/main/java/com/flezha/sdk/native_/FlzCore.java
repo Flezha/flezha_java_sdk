@@ -207,13 +207,6 @@ public final class FlzCore {
     public static native void effectRelease(long ctx, long token, int item);
 
     /**
-     * The pending timers of the Cell the activation {@code token} runs, as the core keeps them:
-     * {@code [kind, at, kind, at, ...]}, kind {@code 0} for event time and {@code 1} for processing
-     * time. Throws {@code runtime.unknown_activation_token} for a token no longer outstanding.
-     */
-    public static native long[] pendingTimers(long ctx, long token);
-
-    /**
      * Administer the namespace this connection proved: one entry for the whole
      * surface, because the verb is data. {@code verb} names a function of the
      * controller's published consumer surface ({@code "Relay.start"}) and

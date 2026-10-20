@@ -105,6 +105,7 @@ class FactoryIdsTest {
             "tier_chain",
             "tier_commit_block_steps",
             "tier_store",
+            "timer_cap",
             "timer_loop_steps",
             "transform_chain",
             "typed_once_steps",

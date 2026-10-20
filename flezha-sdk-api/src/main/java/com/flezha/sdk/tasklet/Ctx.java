@@ -227,8 +227,8 @@ public interface Ctx<State, Output> {
      * wall-clock time passes. That is inherent to event time;
      * {@link #timerAfter} is the answer to "nothing has arrived".
      *
-     * <p>Refused with {@code runtime.event_time_timer_without_event_time_clock} unless the
-     * tasklet writes {@link Tasklet#eventTime}.
+     * <p>Unless the tasklet writes {@link Tasklet#eventTime}, the item fails when it settles, not
+     * retried, with {@code runtime.event_time_timer_without_event_time_clock}.
      *
      * <p>Registering the same timestamp twice is idempotent — pending timers are
      * a set. Handle the firing in {@link Tasklet#onTimer}.
@@ -254,17 +254,17 @@ public interface Ctx<State, Output> {
 
     /**
      * Cancel a pending event-time timer by the timestamp
-     * {@link #timerAtEventTime} returned. {@code false} if none was pending.
+     * {@link #timerAtEventTime} returned; cancelling one that is not pending changes nothing.
      */
-    default boolean cancelEventTimeTimer(long scheduledAt) {
+    default void cancelEventTimeTimer(long scheduledAt) {
         throw FlezhaException.of("runtime.timers_unavailable", Map.of());
     }
 
     /**
      * Cancel a pending processing-time timer by the timestamp
-     * {@link #timerAfter} returned. {@code false} if none was pending.
+     * {@link #timerAfter} returned; cancelling one that is not pending changes nothing.
      */
-    default boolean cancelProcessingTimeTimer(long scheduledAt) {
+    default void cancelProcessingTimeTimer(long scheduledAt) {
         throw FlezhaException.of("runtime.timers_unavailable", Map.of());
     }
 

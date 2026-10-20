@@ -488,25 +488,12 @@ abstract class DispatchTestBase {
             if (input.equals("set")) {
                 ctx.timerAfter(Duration.ofSeconds(1));
             } else {
-                RECORDED.add("cancelled=" + ctx.cancelProcessingTimeTimer(ctx.now() + 1_000));
+                ctx.cancelProcessingTimeTimer(ctx.now() + 1_000);
             }
         }
 
         @Override
         public void onTimer(long firedAt, TimerKind kind, Ctx<Void, Void> ctx) {}
-    }
-
-    public static final class WallTimerRelay extends Op {
-        public WallTimerRelay() {
-            super("wall_timer_op", c -> c.input(String.class, "in").into(WallTimerTask.class));
-        }
-    }
-
-    @Tasklet.Spec(name = "wall_timer_task")
-    public static final class WallTimerTask extends Task<Void> {
-        public WallTimerTask() {
-            super((input, ctx) -> ctx.timerAtEventTime(1));
-        }
     }
 
     public static final class LeafEmitRelay extends Op {

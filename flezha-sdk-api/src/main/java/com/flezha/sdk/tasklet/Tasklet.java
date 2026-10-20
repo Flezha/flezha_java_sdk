@@ -109,7 +109,10 @@ public interface Tasklet<Input, State, Output> {
          */
         long idleTtlSeconds() default 0L;
 
-        /** Per-cell bound on pending timers; one more is refused with {@code runtime.timer_cap_exceeded}. */
+        /**
+         * Per-cell bound on pending timers. An item whose registrations pass it fails, not
+         * retried, with {@code runtime.timer_cap_exceeded}.
+         */
         int maxTimersPerCell() default 10_000;
 
         /** Per-cell change log size, in bytes, before the controller asks for a snapshot. */

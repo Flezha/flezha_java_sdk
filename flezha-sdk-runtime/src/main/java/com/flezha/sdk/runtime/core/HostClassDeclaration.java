@@ -249,6 +249,7 @@ public final class HostClassDeclaration {
             }
             p.put("clock", model.clock().wireName());
             model.mailboxCapacity().ifPresent(capacity -> p.put("mailbox_capacity", capacity));
+            p.put("max_timers_per_cell", model.maxTimersPerCell());
             // A Void state journals nothing, so a logical clock over it never
             // advances; the core names that.
             if (model.stateless()) {

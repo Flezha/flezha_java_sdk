@@ -8,10 +8,6 @@ import com.flezha.sdk.runtime.relay.RelayTopology;
 import com.flezha.sdk.runtime.relay.TaskletDescriptor;
 import com.flezha.sdk.runtime.state.CellId;
 import com.flezha.sdk.runtime.state.KryoCodec;
-import com.flezha.sdk.runtime.state.PendingTimers;
-import com.flezha.sdk.runtime.state.TimerOp;
-import com.flezha.sdk.runtime.state.TimerPolicy;
-import com.flezha.sdk.runtime.state.TimerSession;
 import com.flezha.sdk.tasklet.Tasklet;
 import com.flezha.sdk.tasklet.TaskletException;
 import java.util.ArrayList;
@@ -19,9 +15,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 
 /**
@@ -48,8 +42,6 @@ public final class RelayInstance {
 
     /** Per-Tasklet change/state codec (stable declared type ids). */
     private final List<KryoCodec> codecs = new ArrayList<>();
-
-    private final List<TimerPolicy> timerPolicies = new ArrayList<>();
 
     /**
      * Codec for transient edge payloads crossing the core. Class-name
@@ -79,7 +71,6 @@ public final class RelayInstance {
         for (TaskletDescriptor desc : topology.tasklets()) {
             routers.add(instantiate(desc));
             codecs.add(desc.codec());
-            timerPolicies.add(TimerPolicy.of(desc.model().maxTimersPerCell(), desc.name(), desc.clock()));
         }
         this.routing = new CellRouting(topology, routers, edgeCodec, steps);
     }
@@ -141,9 +132,8 @@ public final class RelayInstance {
     private ActivationOutcome dispatchWork(Activation activation, List<WorkItem> items, CoreCalls core) {
         Cell cell = cellFor(activation.target());
         List<ItemEffect> effects = new ArrayList<>(items.size());
-        ActivationTimers timers = new ActivationTimers(core, activation.token());
         for (int index = 0; index < items.size(); index++) {
-            ItemEffect effect = runItem(activation, cell, items.get(index), core, index, timers);
+            ItemEffect effect = runItem(activation, cell, items.get(index), core, index);
             effects.add(effect);
             // Stop at the first failed item; the core re-hands the tail.
             if (!(effect.verdict() instanceof Verdict.Ok)) {
@@ -153,24 +143,17 @@ public final class RelayInstance {
         return new ActivationOutcome.Work(effects);
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private ItemEffect runItem(
-            Activation activation, Cell cell, WorkItem item, CoreCalls core, int index, ActivationTimers timers) {
+    private ItemEffect runItem(Activation activation, Cell cell, WorkItem item, CoreCalls core, int index) {
         long now = item instanceof WorkItem.Input in ? in.now() : ((WorkItem.Timer) item).scheduledAt();
         OptionalLong offset = item instanceof WorkItem.Input in ? in.consumedOffset() : OptionalLong.empty();
         boolean replay = item instanceof WorkItem.Input in && in.replay();
 
         EmitContext ctx =
                 new EmitContext(this, cell, activation.token(), activation.changeSeq(), now, replay, offset.orElse(-1));
-        TimerSession session = item instanceof WorkItem.Timer timer
-                ? cell.timerPolicy.firingSession(timers, timer.scheduledAt(), timer.kind())
-                : cell.timerPolicy.session(timers, now);
-        ctx.timers = session;
+        ctx.timers = new ArrayList<>();
         ctx.core = core;
         ctx.item = index;
-        Tasklet tasklet = cell.tasklet;
 
-        AtomicReference<List<TimerOp>> timerOps = new AtomicReference<>(List.of());
         // An entry payload is decoded and mapped before any user code runs, so
         // a message the entry cannot read is told apart from a tasklet failing
         // on one it could: the core parks the former and keeps the run going.
@@ -183,24 +166,7 @@ public final class RelayInstance {
         }
         if (verdict == null) {
             List<Object> mapped = entryValues;
-            verdict = runUserCode(() -> {
-                if (item instanceof WorkItem.Timer timer) {
-                    tasklet.onTimer(timer.scheduledAt(), timer.kind(), ctx);
-                } else {
-                    WorkItem.Input in = (WorkItem.Input) item;
-                    List<Object> values = mapped != null
-                            ? routing.routedToCell(cell, in.channel(), mapped)
-                            : routing.valuesForCell(cell, in.channel(), in.payload());
-                    for (Object value : values) {
-                        tasklet.run(value, ctx);
-                    }
-                }
-                if (session != null) {
-                    List<TimerOp> committed = session.commit(timers.live());
-                    timers.committed(committed);
-                    timerOps.set(committed);
-                }
-            });
+            verdict = runUserCode(() -> invoke(cell, item, mapped, ctx));
         }
 
         if (!(verdict instanceof Verdict.Ok)) {
@@ -213,10 +179,27 @@ public final class RelayInstance {
                 ctx.outputs,
                 offset,
                 now,
-                timerOps.get(),
+                ctx.timers,
                 ctx.checkpointed,
                 Optional.empty(),
                 ctx.completion);
+    }
+
+    /** The item's user code: {@code onTimer} for a firing, else {@code run} per value routed to the Cell. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void invoke(Cell cell, WorkItem item, List<Object> mapped, EmitContext ctx) throws TaskletException {
+        Tasklet tasklet = cell.tasklet;
+        if (item instanceof WorkItem.Timer timer) {
+            tasklet.onTimer(timer.scheduledAt(), timer.kind(), ctx);
+            return;
+        }
+        WorkItem.Input in = (WorkItem.Input) item;
+        List<Object> values = mapped != null
+                ? routing.routedToCell(cell, in.channel(), mapped)
+                : routing.valuesForCell(cell, in.channel(), in.payload());
+        for (Object value : values) {
+            tasklet.run(value, ctx);
+        }
     }
 
     /**
@@ -276,8 +259,7 @@ public final class RelayInstance {
             outputs.add(edgeCodec.deserialize(bytes, Object.class));
         }
         // Compensation is wall-anchored (at-least-once, idempotent by
-        // author contract) and carries no timer session — structural, the
-        // same refusal the pre-core adapter enforced.
+        // author contract) and records no timer ops: a timer call is refused.
         EmitContext ctx = new EmitContext(
                 this, cell, activation.token(), activation.changeSeq(), System.currentTimeMillis(), false, -1);
         // A compensation runs no work item: the core answers its part with `part.outside_invocation`,
@@ -296,49 +278,6 @@ public final class RelayInstance {
                 false,
                 Optional.empty(),
                 ctx.completion)));
-    }
-
-    /**
-     * The Cell's pending timers across one activation's items: read from the core at most once,
-     * and only when an item makes a timer call, then each item's committed set is the next one's.
-     */
-    private static final class ActivationTimers implements Supplier<PendingTimers> {
-        private final CoreCalls core;
-        private final long token;
-        private PendingTimers set;
-        /** Ops committed before the set was read, applied when it is. */
-        private final List<TimerOp> unread = new ArrayList<>();
-
-        ActivationTimers(CoreCalls core, long token) {
-            this.core = core;
-            this.token = token;
-        }
-
-        @Override
-        public PendingTimers get() {
-            if (set == null) {
-                set = core.pendingTimers(token);
-                unread.forEach(set::apply);
-            }
-            return set;
-        }
-
-        /**
-         * An item's committed ops, a firing's removal included even when the item read nothing:
-         * the next item starts from the set they leave.
-         */
-        void committed(List<TimerOp> ops) {
-            if (set != null) {
-                ops.forEach(set::apply);
-            } else {
-                unread.addAll(ops);
-            }
-        }
-
-        /** Where a session commits: the carried set once read, else a set nothing reads. */
-        PendingTimers live() {
-            return set != null ? set : new PendingTimers();
-        }
     }
 
     // ------------------------------------------------------------------
@@ -378,7 +317,6 @@ public final class RelayInstance {
                 tasklet,
                 state,
                 codecs.get(taskletId),
-                timerPolicies.get(taskletId),
                 CellId.of(relayId, desc.name(), cellKey));
     }
 }

@@ -7,7 +7,7 @@ import com.flezha.sdk.runtime.relay.ConsumerEdge;
 import com.flezha.sdk.runtime.relay.PluginSink;
 import com.flezha.sdk.runtime.relay.TaskletDescriptor;
 import com.flezha.sdk.runtime.state.ClockKind;
-import com.flezha.sdk.runtime.state.TimerSession;
+import com.flezha.sdk.runtime.state.TimerOp;
 import com.flezha.sdk.state.Change;
 import com.flezha.sdk.state.TimerKind;
 import com.flezha.sdk.tasklet.Ctx;
@@ -49,8 +49,9 @@ final class EmitContext implements Ctx<Object, Object> {
     boolean checkpointed;
     Optional<byte[]> completion = Optional.empty();
 
+    /** This item's timer ops in call order, judged by the core at settle; {@code null} refuses a timer call. */
     @Nullable
-    TimerSession timers;
+    List<TimerOp> timers;
 
     /** The core's entries this invocation's parts and effects reach, under its work item. */
     CoreCalls core;
@@ -128,31 +129,32 @@ final class EmitContext implements Ctx<Object, Object> {
         return cell.cellKey.isEmpty() ? Optional.empty() : Optional.of(cell.cellKey);
     }
 
-    private TimerSession session() {
+    private long timer(TimerOp op) {
         if (timers == null) {
             throw FlezhaException.of("runtime.timers_unavailable", Map.of());
         }
-        return timers;
+        timers.add(op);
+        return op.scheduledAt();
     }
 
     @Override
     public long timerAtEventTime(long scheduledAt) {
-        return session().registerAtEventTime(scheduledAt);
+        return timer(TimerOp.register(TimerKind.EVENT_TIME, scheduledAt));
     }
 
     @Override
     public long timerAfter(@Nonnull Duration delay) {
-        return session().registerAfter(delay);
+        return timer(TimerOp.register(TimerKind.PROCESSING_TIME, now + delay.toMillis()));
     }
 
     @Override
-    public boolean cancelEventTimeTimer(long scheduledAt) {
-        return session().cancel(TimerKind.EVENT_TIME, scheduledAt);
+    public void cancelEventTimeTimer(long scheduledAt) {
+        timer(TimerOp.cancel(TimerKind.EVENT_TIME, scheduledAt));
     }
 
     @Override
-    public boolean cancelProcessingTimeTimer(long scheduledAt) {
-        return session().cancel(TimerKind.PROCESSING_TIME, scheduledAt);
+    public void cancelProcessingTimeTimer(long scheduledAt) {
+        timer(TimerOp.cancel(TimerKind.PROCESSING_TIME, scheduledAt));
     }
 
     @Override

@@ -144,6 +144,7 @@ public final class Main {
                 .registerFactory(DynamicCellRelay.class)
                 .registerFactory(PartitionPassRelay.class)
                 .registerFactory(SessionTimeoutRelay.class)
+                .registerFactory(TimerCapRelay.class)
                 .registerFactory(MixedRelay.class)
                 .registerFactory(TierStoreRelay.class)
                 .registerFactory(RemoteTierStoreRelay.class)

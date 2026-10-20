@@ -108,7 +108,7 @@ class EmitContextTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("registrations ride the effect; a firing's removal leads its ops; now() equals firedAt")
+    @DisplayName("registrations ride the effect; a firing leaves its removal to the core; now() equals firedAt")
     void timerOpsRideTheEffect() {
         RelayClassRegistry.registerClass(TimerRelay.class);
         ItemEffect armed = soleEffect(work("timer_op", 0, Optional.empty(), 0, input(0, "1000", 1_000)));
@@ -120,10 +120,9 @@ class EmitContextTest extends DispatchTestBase {
         ItemEffect fired =
                 soleEffect(work("timer_op", 0, Optional.empty(), 0, new WorkItem.Timer(TimerKind.EVENT_TIME, 1_010)));
         assertThat(fired.eventTime()).isEqualTo(1_010);
-        assertThat(fired.timers().get(0)).isEqualTo(TimerOp.cancel(TimerKind.EVENT_TIME, 1_010));
         assertThat(fired.timers())
                 .as("the chained timerAfter anchored on firedAt")
-                .contains(TimerOp.register(TimerKind.PROCESSING_TIME, 1_017));
+                .containsExactly(TimerOp.register(TimerKind.PROCESSING_TIME, 1_017));
         assertThat(TIMER_EVENTS).containsExactly("EVENT_TIME@1010 now=1010");
     }
 
@@ -136,16 +135,6 @@ class EmitContextTest extends DispatchTestBase {
         assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
         assertThat(((Verdict.RetryableError) effect.verdict()).message()).contains("runtime.no_output_channel");
         assertThat(effect.outputs()).isEmpty();
-    }
-
-    @Test
-    @DisplayName("an event-time timer under a wall clock is refused inside the invocation")
-    void eventTimeTimerWithoutEventTimeClockIsRefused() {
-        RelayClassRegistry.registerClass(WallTimerRelay.class);
-        ItemEffect effect = soleEffect(work("wall_timer_op", 0, Optional.empty(), 0, input(0, "x", 1)));
-        assertThat(effect.verdict()).isInstanceOf(Verdict.RetryableError.class);
-        assertThat(((Verdict.RetryableError) effect.verdict()).message())
-                .contains("runtime.event_time_timer_without_event_time_clock");
     }
 
     @Test
