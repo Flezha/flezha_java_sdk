@@ -90,6 +90,8 @@ The Java SDK SHALL document its actual state-mutation enforcement level :: Docum
 The Java SDK SHALL document its actual state-mutation enforcement level :: The asymmetry with Rust is stated
 The Java SDK SHALL emit a cell_state_snapshot on CompactCell :: A live Cell produces a snapshot at its current seq
 The Java SDK SHALL emit a cell_state_snapshot on CompactCell :: The response is never a zero-length body
+# Needs a controller and a runner process; the core's test/system/state_freshness_e2e_test.exs proves it on Java.
+The Java SDK SHALL hand termination signals to the core :: SIGTERM drains a Java runner through the core
 The Java SDK SHALL ship its declared compact_after_bytes to the Controller :: A declared override reaches the Controller
 The Java runtime is a poll host over the shared core :: Java reproduces the schema fixtures byte-identically
 The Java runtime is a poll host over the shared core :: Kernel classes are gone

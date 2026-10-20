@@ -45,8 +45,9 @@ final class CellRouting {
      * The values a Cell runs for one input: a prepared input's own values, each
      * decoded as an edge value; else the payload decoded and, when — and only
      * when — the core marks it untransformed, through the consumer edge's
-     * transforms. A flow producer evaluated the edge when its activation
-     * completed, so applying it again would compose the chain with itself.
+     * transforms, keeping the values that route to this Cell. A flow producer
+     * evaluated the edge when its activation completed, so applying it again
+     * would compose the chain with itself.
      */
     List<Object> valuesForCell(Cell cell, WorkItem.Input in) {
         if (in.form() == WorkItem.Form.PREPARED) {
@@ -57,9 +58,34 @@ final class CellRouting {
         ChannelDescriptor channel = channelOf(in.channel());
         Object base = decodePayload(channel, in.payload());
         ConsumerEdge edge = edgeInto(channel, cell.taskletId);
-        return edge != null && in.form() == WorkItem.Form.UNTRANSFORMED
-                ? EdgeTransforms.valuesOf(edge, base)
-                : List.of(base);
+        if (edge == null) {
+            return List.of(base);
+        }
+        List<Object> values =
+                in.form() == WorkItem.Form.UNTRANSFORMED ? EdgeTransforms.valuesOf(edge, base) : List.of(base);
+        return routedToCell(cell, edge, values);
+    }
+
+    /**
+     * Of the edge's values, those that route to this Cell by key or by
+     * {@code cellsFor}. The core routes a value by its one output key, so an
+     * unkeyed edge output into a static consumer reaches every declared Cell
+     * and only delivery can narrow it.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private List<Object> routedToCell(Cell cell, ConsumerEdge edge, List<Object> values) {
+        if (edge.key().isPresent()) {
+            return values.stream()
+                    .filter(v -> cell.cellKey.equals(edge.keyOf(v)))
+                    .toList();
+        }
+        if (topology.tasklet(cell.taskletId).cellKeys().isEmpty()) {
+            return values;
+        }
+        Tasklet router = routers.get(cell.taskletId);
+        return values.stream()
+                .filter(v -> ((List<String>) router.cellsFor(v)).contains(cell.cellKey))
+                .toList();
     }
 
     /**

@@ -50,6 +50,8 @@ class PollHostTest {
         private final AtomicInteger seatsLeft = new AtomicInteger();
         /** Every {@code poolSupervise} call. */
         private final AtomicInteger supervisorCalls = new AtomicInteger();
+        /** A {@code poolSupervise} call answered after a seat was given back. */
+        private volatile boolean supervisedAfterALeave = false;
         /** How many {@code poolSupervise} calls still throw an Exception. */
         private final AtomicInteger supervisorErrors = new AtomicInteger();
         /** What the next {@code takeNotices} answers. */
@@ -115,13 +117,15 @@ class PollHostTest {
             if (supervisorErrors.getAndUpdate(n -> Math.max(0, n - 1)) > 0) {
                 throw new IllegalStateException("pool supervisor failed");
             }
+            Integer answer = null;
             try {
-                Integer answer = decisions.poll(20, TimeUnit.MILLISECONDS);
-                if (answer != null) {
-                    return answer;
-                }
+                answer = decisions.poll(20, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+            }
+            supervisedAfterALeave |= seatsLeft.get() > 0;
+            if (answer != null) {
+                return answer;
             }
             return shuttingDown ? FlzCore.POOL_STOP : 0;
         }
@@ -396,10 +400,12 @@ class PollHostTest {
     void anIdleRunnerWritesTheCoresNotices() throws Exception {
         FakeCore core = new FakeCore().base(1);
         CapturedStderr stderr = CapturedStderr.start();
-        try (stderr;
-                PollHost ignored = start(core, PollHostTest::ok)) {
+        PollHost host = start(core, PollHostTest::ok);
+        try (stderr) {
             core.notices.set("[{\"level\":\"warn\",\"target\":\"t\",\"text\":\"Connection attempt 2 failed\"}]");
             awaitTrue(() -> stderr.lines().contains("[flezha] Connection attempt 2 failed"), "the notice was written");
+        } finally {
+            close(core, host);
         }
     }
 
@@ -441,6 +447,24 @@ class PollHostTest {
         supervisor.join(TimeUnit.SECONDS.toMillis(10));
         assertThat(supervisor.isAlive())
                 .as("the supervisor was still parking after close() returned")
+                .isFalse();
+    }
+
+    /** The governor reads a fetcher that leaves under a live supervisor as a pool to replace. */
+    @Test
+    @DisplayName("a local run's stop ends the supervisor before any fetcher leaves")
+    void aLocalStopEndsTheSupervisorFirst() throws Exception {
+        FakeCore core = new FakeCore();
+        // Polls shorter than the supervisor's wait, as the core's are.
+        core.policy[2] = 2;
+        PollHost host = start(core, PollHostTest::ok);
+        awaitTrue(() -> core.supervisorCalls.get() > 0, "the supervisor asked at least once");
+        host.stopFetching();
+        assertThat(core.seatsLeft.get())
+                .as("both fetchers gave their seats back")
+                .isEqualTo(2);
+        assertThat(core.supervisedAfterALeave)
+                .as("the supervisor asked the governor after a fetcher left")
                 .isFalse();
     }
 

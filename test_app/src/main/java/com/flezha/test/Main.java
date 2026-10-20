@@ -50,11 +50,14 @@ public final class Main {
             runner.run();
             return;
         }
+        // The drill starts once the runner has: a send before start() returns
+        // is refused `runtime.runner_not_started`.
+        define(runner).start();
         String localSends = System.getenv("FLEZHA_LOCAL_SEND_SCRIPT");
         if (localSends != null && !localSends.isEmpty()) {
             startLocalSends(runner, localSends);
         }
-        define(runner).run();
+        runner.awaitTermination();
     }
 
     /**

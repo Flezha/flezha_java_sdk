@@ -92,7 +92,7 @@ class LocalModeCapabilitiesTest {
     }
 
     @Test
-    @DisplayName("keyed_channels: a keyed output stamps the key the class resolved")
+    @DisplayName("keyed_channels: keyed emit stamps flz.key on the wire, with its Cell and seq")
     void aKeyedOutputStampsTheKeyTheClassResolved() {
         // `partition_pass` is the manifest's only keyed-channel class. Partitioning itself is the
         // controller's (a member's key-group range arrives with `AddRelay`), so what is asserted
@@ -107,7 +107,13 @@ class LocalModeCapabilitiesTest {
         assertThat(released)
                 .as("each release carries the key its own value resolved to")
                 .allSatisfy(output -> assertThat(output.metadata()).containsEntry("flz.key", key(payload(output))));
-        assertThat(released.get(0).metadata()).containsKeys("flz.cell", "flz.seq");
+        assertThat(released)
+                .as("the core stamps each keyed release with its Cell and its <changeSeq>.<emitOrdinal>")
+                .allSatisfy(output -> {
+                    assertThat(output.metadata().get("flz.cell"))
+                            .endsWith("/partition_pass_tasklet/" + key(payload(output)));
+                    assertThat(output.metadata().get("flz.seq")).matches("\\d+\\.0");
+                });
     }
 
     @Test

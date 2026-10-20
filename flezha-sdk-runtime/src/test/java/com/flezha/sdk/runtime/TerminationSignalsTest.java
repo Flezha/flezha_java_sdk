@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 class TerminationSignalsTest {
 
     @Test
+    @DisplayName("the JVM's SIGTERM handler gives way, and an application's own handler is kept")
     void theJvmsHandlerGivesWayAndTheApplicationsStays() throws Exception {
         Class<?> signalClass = Class.forName("sun.misc.Signal");
         Class<?> handlerClass = Class.forName("sun.misc.SignalHandler");
