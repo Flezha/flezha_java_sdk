@@ -26,9 +26,8 @@ public enum LogLevel {
 
     /**
      * The level named by {@code name}, case-insensitively. Unset, blank and
-     * unrecognised all read as {@code fallback}, the same rule
-     * {@code FlezhaEnv.parsePositive} applies to its own knob, so a name
-     * nobody meant to set never silences a runner.
+     * unrecognised all read as {@code fallback}, the rule the core applies to
+     * every count knob, so a name nobody meant to set never silences a runner.
      */
     @Nonnull
     public static LogLevel from(@Nullable String name, LogLevel fallback) {

@@ -18,6 +18,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.junit.jupiter.api.DisplayName;
@@ -25,8 +26,10 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The concurrency contract of the Java poll host: fetchers never run user
- * code, so an activation blocked in user code cannot consume one, and a
- * virtual thread completes its activation only after the dispatch returns.
+ * code, so an activation blocked in user code cannot consume one, a virtual
+ * thread completes its activation only after the dispatch returns, and the
+ * fetchers are the ones the core's pool governor asks for. The governor's
+ * policy itself is tested in the core; here its decisions are scripted.
  */
 class PollHostTest {
 
@@ -39,18 +42,27 @@ class PollHostTest {
         private volatile boolean completeThrows = false;
         /** How many {@code poll} calls still throw an Error (killing a fetcher). */
         private final AtomicInteger pollErrors = new AtomicInteger();
-        /** How many {@code waitStarvation} calls still report an observation. */
-        private final AtomicInteger starvations = new AtomicInteger();
-        /** Every {@code waitStarvation} call, observed or not. */
-        private final AtomicInteger starvationWaits = new AtomicInteger();
-        /** How many {@code waitStarvation} calls still throw an Exception. */
-        private final AtomicInteger starvationErrors = new AtomicInteger();
-        /** Never released: parking on it is how a quiet core spends its wait. */
-        private final CountDownLatch quiet = new CountDownLatch(1);
+        /** The policy {@code poolOpen} answers: base, ceiling, poll timeout, retire time, drain bound. */
+        private final int[] policy = {2, 20, 250, 30_000, 5_000};
+        /** The governor's decisions {@code poolSupervise} answers in turn, idle once none is left. */
+        private final LinkedBlockingQueue<Integer> decisions = new LinkedBlockingQueue<>();
+        /** Every seat given back. */
+        private final AtomicInteger seatsLeft = new AtomicInteger();
+        /** Every {@code poolSupervise} call. */
+        private final AtomicInteger supervisorCalls = new AtomicInteger();
+        /** How many {@code poolSupervise} calls still throw an Exception. */
+        private final AtomicInteger supervisorErrors = new AtomicInteger();
+        /** What the next {@code takeNotices} answers. */
+        private final AtomicReference<String> notices = new AtomicReference<>("[]");
         /** The thread the supervisor loop runs on, as this core sees it. */
         private volatile Thread supervisor;
-        /** What {@code FlzCore.shutdown} leaves behind: every poll and wait answers shutting down. */
+        /** What {@code FlzCore.shutdown} leaves behind: every poll answers shutting down, the supervisor stop. */
         private volatile boolean shuttingDown = false;
+
+        FakeCore base(int base) {
+            policy[0] = base;
+            return this;
+        }
 
         void handOut(Activation activation) {
             handouts.add(ActivationCodecInverses.encodeActivation(activation));
@@ -59,7 +71,6 @@ class PollHostTest {
         void shutDown() {
             shuttingDown = true;
             handouts.add(new byte[0]);
-            quiet.countDown();
         }
 
         @Override
@@ -93,21 +104,36 @@ class PollHostTest {
         }
 
         @Override
-        public int waitStarvation(long timeoutMs) {
+        public int[] poolOpen(int defaultBase) {
+            return policy.clone();
+        }
+
+        @Override
+        public int poolSupervise() {
             supervisor = Thread.currentThread();
-            starvationWaits.incrementAndGet();
-            if (starvationErrors.getAndUpdate(n -> Math.max(0, n - 1)) > 0) {
-                throw new IllegalStateException("starvation wait failed");
-            }
-            if (starvations.getAndUpdate(n -> Math.max(0, n - 1)) > 0) {
-                return FlzCore.STARVATION_OBSERVED;
+            supervisorCalls.incrementAndGet();
+            if (supervisorErrors.getAndUpdate(n -> Math.max(0, n - 1)) > 0) {
+                throw new IllegalStateException("pool supervisor failed");
             }
             try {
-                quiet.await(Math.min(timeoutMs, 20), TimeUnit.MILLISECONDS);
+                Integer answer = decisions.poll(20, TimeUnit.MILLISECONDS);
+                if (answer != null) {
+                    return answer;
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-            return shuttingDown ? FlzCore.STARVATION_SHUTTING_DOWN : FlzCore.STARVATION_TIMEOUT;
+            return shuttingDown ? FlzCore.POOL_STOP : 0;
+        }
+
+        @Override
+        public void poolLeft() {
+            seatsLeft.incrementAndGet();
+        }
+
+        @Override
+        public String takeNotices() {
+            return notices.getAndSet("[]");
         }
 
         @Override
@@ -130,22 +156,13 @@ class PollHostTest {
         return new ActivationResult(activation.token(), new ActivationOutcome.Work(List.of()));
     }
 
-    private static PollHost start(FakeCore core, Function<Activation, ActivationResult> dispatch, int fetchers) {
-        return start(core, dispatch, fetchers, fetchers * 10);
+    private static PollHost start(FakeCore core, Function<Activation, ActivationResult> dispatch) {
+        return start(core, dispatch, () -> {});
     }
 
     private static PollHost start(
-            FakeCore core, Function<Activation, ActivationResult> dispatch, int fetchers, int max) {
-        return start(core, dispatch, fetchers, max, () -> {});
-    }
-
-    private static PollHost start(
-            FakeCore core,
-            Function<Activation, ActivationResult> dispatch,
-            int fetchers,
-            int max,
-            Runnable onFetchersDrained) {
-        PollHost host = new PollHost(core, dispatch, fetchers, max, onFetchersDrained);
+            FakeCore core, Function<Activation, ActivationResult> dispatch, Runnable onFetchersDrained) {
+        PollHost host = new PollHost(core, dispatch, onFetchersDrained);
         host.start();
         return host;
     }
@@ -179,7 +196,7 @@ class PollHostTest {
         // As many blocked activations as there are fetchers: with dispatch
         // running on the fetcher itself, nothing below would ever be picked
         // up.
-        try (PollHost ignored = start(core, dispatch, 2)) {
+        try (PollHost ignored = start(core, dispatch)) {
             core.handOut(activation(1, "blocked-a"));
             core.handOut(activation(2, "blocked-b"));
             for (long token = 3; token <= 6; token++) {
@@ -230,7 +247,7 @@ class PollHostTest {
             return ok(activation);
         };
 
-        try (PollHost ignored = start(core, dispatch, 2)) {
+        try (PollHost ignored = start(core, dispatch)) {
             core.handOut(activation(1, "same-cell"));
             assertThat(insideFirst.await(10, TimeUnit.SECONDS))
                     .as("the first activation is held inside the dispatch")
@@ -256,7 +273,7 @@ class PollHostTest {
     @DisplayName("a throwing dispatch abandons rather than dropping the activation")
     @SuppressWarnings("try")
     void aThrowingDispatchAbandons() throws Exception {
-        FakeCore core = new FakeCore();
+        FakeCore core = new FakeCore().base(1);
         CountDownLatch dispatched = new CountDownLatch(1);
         Function<Activation, ActivationResult> dispatch = activation -> {
             dispatched.countDown();
@@ -265,7 +282,7 @@ class PollHostTest {
 
         CapturedStderr stderr = CapturedStderr.start();
         try (stderr;
-                PollHost ignored = start(core, dispatch, 1)) {
+                PollHost ignored = start(core, dispatch)) {
             core.handOut(activation(7, "unlucky"));
             assertThat(dispatched.await(10, TimeUnit.SECONDS)).isTrue();
             awaitTrue(() -> core.abandoned.contains(7L), "the activation was abandoned");
@@ -280,12 +297,12 @@ class PollHostTest {
     @DisplayName("a throwing complete abandons rather than dropping the activation")
     @SuppressWarnings("try")
     void aThrowingCompleteAbandons() throws Exception {
-        FakeCore core = new FakeCore();
+        FakeCore core = new FakeCore().base(1);
         core.completeThrows = true;
 
         CapturedStderr stderr = CapturedStderr.start();
         try (stderr;
-                PollHost ignored = start(core, PollHostTest::ok, 1)) {
+                PollHost ignored = start(core, PollHostTest::ok)) {
             core.handOut(activation(8, "unlucky"));
             awaitTrue(() -> core.abandoned.contains(8L), "the activation was abandoned");
         }
@@ -297,23 +314,21 @@ class PollHostTest {
     /**
      * A runner whose last fetcher died stays connected, heartbeating and
      * processing nothing — the wedge this host must not be able to reach on
-     * its own.
+     * its own. The dead fetcher gives its seat back; the governor's base
+     * answer is what replaces it.
      */
     @Test
-    @DisplayName("a fetcher killed by a throwable is replaced")
+    @DisplayName("a fetcher killed by a throwable gives its seat back and a base seat replaces it")
     void aDeadFetcherIsReplaced() throws Exception {
         FakeCore core = new FakeCore();
         core.pollErrors.set(1);
 
         CapturedStderr stderr = CapturedStderr.start();
         try (stderr;
-                PollHost host = start(core, PollHostTest::ok, 2)) {
-            awaitTrue(() -> core.pollErrors.get() == 0, "a fetcher died on the poll Error");
-            // The configured count is what the runner budgets for, so it must
-            // come back — and the replacement must actually fetch.
-            awaitTrue(
-                    () -> host.liveFetcherCount() == host.fetcherCount(),
-                    "the fetcher count returned to its configured size");
+                PollHost host = start(core, PollHostTest::ok)) {
+            awaitTrue(() -> core.seatsLeft.get() == 1 && host.liveFetcherCount() == 1, "a fetcher died");
+            core.decisions.add(FlzCore.POOL_SPAWN_BASE);
+            awaitTrue(() -> host.liveFetcherCount() == host.fetcherCount(), "the base count came back");
             core.handOut(activation(9, "after-the-death"));
             awaitTrue(() -> core.completed.get() == 1, "a replacement fetcher served new work");
         }
@@ -321,7 +336,7 @@ class PollHostTest {
         assertThat(lines)
                 .startsWith(
                         "[flezha] core poll failed: java.lang.StackOverflowError: fetcher died",
-                        "[flezha] fetcher thread ended unexpectedly; starting a replacement",
+                        "[flezha] fetcher thread ended unexpectedly; the pool replaces it",
                         "java.lang.StackOverflowError: fetcher died");
         assertThat(lines.subList(3, lines.size()))
                 .as("the rest is the dead fetcher's stack trace")
@@ -330,42 +345,28 @@ class PollHostTest {
     }
 
     /**
-     * The other half of the core's bring-your-own-thread contract. Java ships
-     * a fixed fetcher set, so without this a runner whose fetchers are all
-     * held processes nothing, recovers from nothing, and reports nothing —
-     * measured as 0 of 20 payloads delivered, forever.
+     * The other half of the core's bring-your-own-thread contract: without a
+     * grown fetcher a runner whose fetchers are all held processes nothing,
+     * recovers from nothing, and reports nothing — measured as 0 of 20
+     * payloads delivered, forever.
      */
     @Test
-    @DisplayName("observed starvation grows the fetcher set")
-    void starvationGrowsTheFetcherSet() throws Exception {
-        FakeCore core = new FakeCore();
-        try (PollHost host = start(core, PollHostTest::ok, 1, 3)) {
-            core.starvations.set(2);
-            awaitTrue(() -> host.liveFetcherCount() == 3, "the pool grew once per observation");
-            // A grown fetcher is a real one: it fetches.
+    @DisplayName("a grown seat is a fetcher that serves and retires once idle")
+    void aGrownSeatServesAndRetires() throws Exception {
+        FakeCore core = new FakeCore().base(1);
+        core.policy[3] = 500;
+        try (PollHost host = start(core, PollHostTest::ok)) {
+            core.decisions.add(FlzCore.POOL_SPAWN_GROWN);
+            core.decisions.add(FlzCore.POOL_SPAWN_GROWN);
+            awaitTrue(() -> host.liveFetcherCount() == 3, "each grown seat is a fetcher");
             core.handOut(activation(11, "after-the-growth"));
             awaitTrue(() -> core.completed.get() == 1, "a grown fetcher served work");
+            // Two timed-out polls of the core's 250 ms are the 500 ms retire time.
+            awaitTrue(() -> host.liveFetcherCount() == 1, "the grown fetchers retired and the base stayed");
+            assertThat(core.seatsLeft.get())
+                    .as("every retired fetcher gives its seat back")
+                    .isEqualTo(2);
         }
-    }
-
-    @Test
-    @DisplayName("growth stops at the ceiling and the supervisor keeps waiting")
-    void starvationGrowthStopsAtTheCeiling() throws Exception {
-        FakeCore core = new FakeCore();
-        CapturedStderr stderr = CapturedStderr.start();
-        try (stderr;
-                PollHost host = start(core, PollHostTest::ok, 1, 2)) {
-            core.starvations.set(5);
-            awaitTrue(() -> host.liveFetcherCount() == 2, "the pool grew to its ceiling");
-            awaitTrue(() -> core.starvations.get() == 0, "every observation was consumed");
-            assertThat(host.liveFetcherCount()).as("the ceiling holds exactly").isEqualTo(host.maxFetcherCount());
-            int waits = core.starvationWaits.get();
-            awaitTrue(() -> core.starvationWaits.get() > waits, "the supervisor keeps waiting after refusing to grow");
-        }
-        assertThat(stderr.lines())
-                .as("the ceiling is reported once, not once per observation")
-                .containsExactly("[flezha] starvation observed with 2 fetchers at the ceiling (2); "
-                        + "raise FLEZHA_WORKER_POOL_MAX if the work is genuinely blocked rather than wedged");
     }
 
     /**
@@ -374,27 +375,67 @@ class PollHostTest {
      * and no report of it — the exact wedge the thread exists to close.
      */
     @Test
-    @DisplayName("the supervisor survives a failing starvation wait")
-    void supervisorSurvivesAFailingWait() throws Exception {
-        FakeCore core = new FakeCore();
-        core.starvationErrors.set(2);
+    @DisplayName("the supervisor survives a failing answer")
+    void supervisorSurvivesAFailingAnswer() throws Exception {
+        FakeCore core = new FakeCore().base(1);
+        core.supervisorErrors.set(2);
         CapturedStderr stderr = CapturedStderr.start();
         try (stderr;
-                PollHost host = start(core, PollHostTest::ok, 1, 3)) {
-            awaitTrue(() -> core.starvationErrors.get() == 0, "both failing waits were made");
-            core.starvations.set(1);
-            awaitTrue(() -> host.liveFetcherCount() == 2, "the supervisor still grows the pool");
+                PollHost host = start(core, PollHostTest::ok)) {
+            awaitTrue(() -> core.supervisorErrors.get() == 0, "both failing answers were asked for");
+            core.decisions.add(FlzCore.POOL_SPAWN_GROWN);
+            awaitTrue(() -> host.liveFetcherCount() == 2, "the supervisor still starts fetchers");
         }
-        String failedWait = "[flezha] starvation wait failed: java.lang.IllegalStateException: starvation wait failed";
-        assertThat(stderr.lines()).containsExactly(failedWait, failedWait);
+        String failed = "[flezha] pool supervisor failed: java.lang.IllegalStateException: pool supervisor failed";
+        assertThat(stderr.lines()).containsExactly(failed, failed);
+    }
+
+    /** An idle runner still writes what the core said: the supervisor takes the notices on every answer. */
+    @Test
+    @DisplayName("an idle runner writes the core's notices on each supervisor answer")
+    void anIdleRunnerWritesTheCoresNotices() throws Exception {
+        FakeCore core = new FakeCore().base(1);
+        CapturedStderr stderr = CapturedStderr.start();
+        try (stderr;
+                PollHost ignored = start(core, PollHostTest::ok)) {
+            core.notices.set("[{\"level\":\"warn\",\"target\":\"t\",\"text\":\"Connection attempt 2 failed\"}]");
+            awaitTrue(() -> stderr.lines().contains("[flezha] Connection attempt 2 failed"), "the notice was written");
+        }
+    }
+
+    /** A dispatch that never returns holds the stop no longer than the governor's drain bound. */
+    @Test
+    @DisplayName("close() waits for in-flight activations no longer than the drain bound")
+    void closeIsBoundedByTheDrain() throws Exception {
+        FakeCore core = new FakeCore().base(1);
+        core.policy[4] = 300;
+        CountDownLatch never = new CountDownLatch(1);
+        CountDownLatch dispatching = new CountDownLatch(1);
+        Function<Activation, ActivationResult> dispatch = activation -> {
+            dispatching.countDown();
+            await(never, 30);
+            return ok(activation);
+        };
+        CapturedStderr stderr = CapturedStderr.start();
+        try (stderr) {
+            PollHost host = start(core, dispatch);
+            core.handOut(activation(1, "wedged"));
+            assertThat(dispatching.await(10, TimeUnit.SECONDS)).isTrue();
+            long started = System.nanoTime();
+            close(core, host);
+            assertThat(System.nanoTime() - started).isLessThan(TimeUnit.MILLISECONDS.toNanos(300 + 3_000));
+        } finally {
+            never.countDown();
+        }
+        assertThat(stderr.lines()).contains("[flezha] in-flight activations did not finish within 300ms");
     }
 
     @Test
     @DisplayName("close() joins the supervisor")
     void closeJoinsTheSupervisor() throws Exception {
-        FakeCore core = new FakeCore();
-        PollHost host = start(core, PollHostTest::ok, 1, 4);
-        awaitTrue(() -> core.starvationWaits.get() > 0, "the supervisor parked at least once");
+        FakeCore core = new FakeCore().base(1);
+        PollHost host = start(core, PollHostTest::ok);
+        awaitTrue(() -> core.supervisorCalls.get() > 0, "the supervisor asked at least once");
         close(core, host);
         Thread supervisor = core.supervisor;
         supervisor.join(TimeUnit.SECONDS.toMillis(10));
@@ -428,7 +469,7 @@ class PollHostTest {
             return ok(activation);
         };
 
-        PollHost host = start(core, dispatch, 2, 20, fetchersDrained::countDown);
+        PollHost host = start(core, dispatch, fetchersDrained::countDown);
         core.handOut(activation(1, "in-flight"));
         assertThat(dispatching.await(10, TimeUnit.SECONDS)).isTrue();
 
@@ -440,8 +481,12 @@ class PollHostTest {
 
     /** Wait on a latch the test is about to release; an interrupt is a failure. */
     private static void await(CountDownLatch latch) {
+        await(latch, 10);
+    }
+
+    private static void await(CountDownLatch latch, long seconds) {
         try {
-            assertThat(latch.await(10, TimeUnit.SECONDS))
+            assertThat(latch.await(seconds, TimeUnit.SECONDS))
                     .as("the test released the dispatch")
                     .isTrue();
         } catch (InterruptedException e) {

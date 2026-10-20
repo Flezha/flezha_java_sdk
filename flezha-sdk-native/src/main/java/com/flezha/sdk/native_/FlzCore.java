@@ -108,27 +108,38 @@ public final class FlzCore {
      */
     public static native void complete(long ctx, byte[] result);
 
-    /** {@link #waitStarvation} saw work queued with no thread left to take it. */
-    public static final int STARVATION_OBSERVED = 1;
+    /** {@link #poolSupervise}: spawn a fetcher that never retires. */
+    public static final int POOL_SPAWN_BASE = 1;
 
-    /** {@link #waitStarvation} reached its timeout with nothing owed. */
-    public static final int STARVATION_TIMEOUT = 0;
+    /** {@link #poolSupervise}: the pool is over; the supervisor leaves. */
+    public static final int POOL_STOP = 2;
 
-    /** {@link #waitStarvation} returned because the core is shutting down. */
-    public static final int STARVATION_SHUTTING_DOWN = 2;
+    /** {@link #poolSupervise}: spawn a fetcher that leaves after the retire time idle. */
+    public static final int POOL_SPAWN_GROWN = 3;
 
     /**
-     * Block up to {@code timeoutMs} until the core observes starvation —
-     * runnable work with no thread inside {@link #poll} and the jobs-underway
-     * cap not reached. Returns {@link #STARVATION_OBSERVED},
-     * {@link #STARVATION_TIMEOUT} or {@link #STARVATION_SHUTTING_DOWN}.
+     * Open the core's pool governor over this host's {@code defaultBase} and
+     * write its policy into {@code policy}: base, ceiling, poll timeout, retire
+     * time and drain bound, the last three in milliseconds. The base seats are
+     * taken: the host starts that many fetchers next.
+     */
+    public static native void poolOpen(long ctx, int defaultBase, int[] policy);
+
+    /**
+     * The governor's next decision, at most a second away:
+     * {@link #POOL_SPAWN_GROWN}, {@link #POOL_SPAWN_BASE} (a fetcher left and
+     * is replaced), {@link #POOL_STOP}, or anything else for nothing to do.
+     * A spawn answer has reserved its seat; a fetcher that cannot start gives
+     * it back through {@link #poolLeft}.
      *
      * <p>The other half of the bring-your-own-thread contract: the core caps
      * how much runs, the host supplies threads, and this is how the host is
-     * told it owes one. A host that ships a fixed worker count and never calls
-     * it wedges with no recovery and no report when every worker is held.
+     * told it owes one.
      */
-    public static native int waitStarvation(long ctx, long timeoutMs);
+    public static native int poolSupervise(long ctx);
+
+    /** Give back one fetcher's seat: one that left, or one that never started. */
+    public static native void poolLeft(long ctx);
 
     /**
      * Abandon a polled activation by token: its untouched items are re-handed

@@ -7,7 +7,6 @@ import com.flezha.sdk.Flezha;
 import com.flezha.sdk.LogLevel;
 import com.flezha.sdk.Logger;
 import com.flezha.sdk.native_.FlzCore;
-import com.flezha.sdk.runtime.config.FlezhaEnv;
 import com.flezha.sdk.runtime.core.Activation;
 import com.flezha.sdk.runtime.core.ActivationCodec;
 import com.flezha.sdk.runtime.core.ActivationResult;
@@ -30,27 +29,22 @@ import javax.annotation.Nullable;
  * and one virtual thread per activation that runs the dispatch, encodes the
  * result and calls {@code complete} itself.
  *
- * <p>The core decides what runs next and caps how much may be underway; a
- * host's only job is to bring threads, and this one brings three kinds —
- * fetchers ({@link #fetchLoop}), a virtual thread per activation
- * ({@link #runActivation}) and a supervisor against a wedge
- * ({@link #superviseLoop}). Each carries the rule that shapes it.
+ * <p>The core decides what runs next, caps how much may be underway and, through
+ * its pool governor, how many fetchers poll; a host's only job is to bring
+ * threads, and this one brings three kinds — fetchers ({@link #fetchLoop}), a
+ * virtual thread per activation ({@link #runActivation}) and the governor's
+ * supervisor ({@link #superviseLoop}). Each carries the rule that shapes it.
  */
 final class PollHost implements AutoCloseable {
 
     private static final Logger LOG = Flezha.log();
 
-    /** Poll timeout per turn; bounds how fast {@link #close()} joins a fetcher. */
-    private static final long POLL_TIMEOUT_MS = 250;
-
-    /** How long {@link #close()} waits for fetchers and for in-flight activations. */
-    private static final long DRAIN_TIMEOUT_MS = 5_000;
-
     /**
-     * The supervisor's park length. Only bounds how often it re-arms and how
-     * fast {@link #close()} joins it — the core decides when the wait returns.
+     * The base this host hands the governor: fetchers never run user code —
+     * they poll, decode and hand off to a virtual thread — so two saturate the
+     * core's handout. How much work is underway is the core's number.
      */
-    private static final long SUPERVISOR_WAIT_MS = 1_000;
+    static final int DEFAULT_FETCHERS = 2;
 
     /**
      * The production {@link CoreCalls}, over one core handle. One definition,
@@ -70,8 +64,20 @@ final class PollHost implements AutoCloseable {
             }
 
             @Override
-            public int waitStarvation(long timeoutMs) {
-                return FlzCore.waitStarvation(core, timeoutMs);
+            public int[] poolOpen(int defaultBase) {
+                int[] policy = new int[5];
+                FlzCore.poolOpen(core, defaultBase, policy);
+                return policy;
+            }
+
+            @Override
+            public int poolSupervise() {
+                return FlzCore.poolSupervise(core);
+            }
+
+            @Override
+            public void poolLeft() {
+                FlzCore.poolLeft(core);
             }
 
             @Override
@@ -100,13 +106,13 @@ final class PollHost implements AutoCloseable {
 
         void complete(@Nonnull byte[] result);
 
-        /**
-         * Park up to {@code timeoutMs} for the core to observe starvation.
-         *
-         * @return {@link FlzCore#STARVATION_OBSERVED},
-         *     {@code STARVATION_TIMEOUT} or {@code STARVATION_SHUTTING_DOWN}.
-         */
-        int waitStarvation(long timeoutMs);
+        /** The governor's policy over {@code defaultBase}, as {@link FlzCore#poolOpen} writes it. */
+        int[] poolOpen(int defaultBase);
+
+        /** The governor's next decision, as {@link FlzCore#poolSupervise} answers it. */
+        int poolSupervise();
+
+        void poolLeft();
 
         /**
          * Re-hand an activation's untouched items and release its cell, as
@@ -159,16 +165,16 @@ final class PollHost implements AutoCloseable {
     private final Function<Activation, ActivationResult> dispatch;
 
     /**
-     * The fetchers currently running. ONE structure, not a list plus a
-     * counter: a replacement joins it and a departing thread leaves it, so
-     * "the configured count is restored" is a size comparison rather than two
-     * things that can disagree, and {@link #close()} joins what is actually
-     * alive rather than the threads this host happened to start with.
+     * The fetchers currently running: what {@link #close()} joins, and empty
+     * once the last one left on the core's word.
      */
     private final Set<Thread> live = ConcurrentHashMap.newKeySet();
 
-    private final int configuredFetchers;
-    private final int maxFetchers;
+    private final int base;
+    private final int ceiling;
+    private final long pollTimeoutMs;
+    private final long retireMs;
+    private final long drainMs;
     private final AtomicInteger nextFetcherId = new AtomicInteger();
     private final ExecutorService activations = Executors.newVirtualThreadPerTaskExecutor();
     private final AtomicBoolean closing = new AtomicBoolean(false);
@@ -178,70 +184,63 @@ final class PollHost implements AutoCloseable {
     PollHost(
             @Nonnull CoreCalls core,
             @Nonnull Function<Activation, ActivationResult> dispatch,
-            int fetcherCount,
-            int fetcherMax,
             @Nonnull Runnable onFetchersDrained) {
         this.core = core;
         this.dispatch = dispatch;
         this.onFetchersDrained = onFetchersDrained;
-        this.configuredFetchers = Math.max(1, fetcherCount);
-        this.maxFetchers = Math.max(this.configuredFetchers, fetcherMax);
+        int[] policy = core.poolOpen(DEFAULT_FETCHERS);
+        this.base = policy[0];
+        this.ceiling = policy[1];
+        this.pollTimeoutMs = policy[2];
+        this.retireMs = policy[3];
+        this.drainMs = policy[4];
         this.supervisor.setDaemon(true);
-        for (int i = 0; i < configuredFetchers; i++) {
-            newFetcher();
-        }
     }
 
-    /** Start the fetchers. Separate from construction so no thread sees a half-built host. */
+    /** Start the base fetchers in the seats the governor reserved, then its supervisor. */
     void start() {
-        // A snapshot: a fetcher that dies at once adds its replacement, already
-        // started, to `live` while this is still walking it.
-        List.copyOf(live).forEach(Thread::start);
+        for (int i = 0; i < base; i++) {
+            startFetcher(false);
+        }
         supervisor.start();
     }
 
-    /** The configured fetcher count — what a replacement restores the pool to. */
+    /** The base the governor keeps the fetchers at. */
     int fetcherCount() {
-        return configuredFetchers;
+        return base;
     }
 
-    /** The ceiling the supervisor may grow the pool to. */
+    /** The ceiling the governor may grow the fetchers to. */
     int maxFetcherCount() {
-        return maxFetchers;
+        return ceiling;
     }
 
-    /** Fetchers currently running. Restored by {@link #replaceFetcher}. */
+    /** Fetchers currently running. */
     int liveFetcherCount() {
         return live.size();
     }
 
     /**
-     * The supervisor loop: park in the core's starvation wait, and answer
-     * every observation with one more fetcher. A fixed fetcher set is not
-     * enough on its own — a virtual thread that parks inside {@code complete},
-     * pushing into a consumer nobody is draining, holds its fetcher's handout,
-     * and with every fetcher held the runner processes nothing and reports
-     * nothing. What one more fetcher does <em>not</em> buy is a thread against
-     * user code that never returns; no ceiling outruns that.
-     *
-     * <p>Growth is self-limiting without a settle here — a new fetcher's own
-     * {@code poll} entry restarts the core's dwell, so the next one is at
-     * least a dwell away and only if the runner is still stuck. The ceiling
-     * refusal is latched rather than logged per park: a sustained wedge would
-     * otherwise print the same line every second forever.
+     * The governor's supervisor: one answer per wait, at most a second apart,
+     * each spawn answer one fetcher, and the core's notices written on each. A
+     * fixed fetcher set is not enough on its own — a virtual thread that parks
+     * inside {@code complete}, pushing into a consumer nobody is draining,
+     * holds its fetcher's handout, and with every fetcher held the runner
+     * processes nothing and reports nothing. What one more fetcher does
+     * <em>not</em> buy is a thread against user code that never returns; no
+     * ceiling outruns that.
      */
     private void superviseLoop() {
-        boolean atCeilingLogged = false;
         while (!closing.get()) {
-            int outcome;
+            int answer;
             try {
+                answer = core.poolSupervise();
                 logNotices(core.takeNotices());
-                outcome = core.waitStarvation(SUPERVISOR_WAIT_MS);
             } catch (Throwable t) {
                 if (closing.get()) {
                     return;
                 }
-                LOG.error("starvation wait failed: {}", t.toString());
+                LOG.error("pool supervisor failed: {}", t.toString());
                 // Same rule the fetch loop applies: an Exception is one bad
                 // turn, an Error is the JVM telling this thread it is
                 // finished. A supervisor that stopped on a transient failure
@@ -252,80 +251,30 @@ final class PollHost implements AutoCloseable {
                 }
                 continue;
             }
-            if (outcome == FlzCore.STARVATION_SHUTTING_DOWN) {
+            if (answer == FlzCore.POOL_STOP) {
                 return;
             }
-            if (outcome != FlzCore.STARVATION_OBSERVED || closing.get()) {
-                continue;
+            if ((answer == FlzCore.POOL_SPAWN_BASE || answer == FlzCore.POOL_SPAWN_GROWN) && !closing.get()) {
+                startFetcher(answer == FlzCore.POOL_SPAWN_GROWN);
             }
-            atCeilingLogged = growOneFetcher(atCeilingLogged);
         }
     }
 
     /**
-     * Add one fetcher if the ceiling allows. Returns the new latch state for
-     * the ceiling warning. Only the supervisor grows the pool, so the
-     * size check needs no lock — a concurrent {@link #replaceFetcher} restores
-     * a death rather than adding to the pool.
+     * Start one fetcher into a seat the governor reserved. A thread that never
+     * ran gives its seat back and is not counted: a phantom fetcher would keep
+     * the set non-empty, so the runner would never read as drained.
      */
-    private boolean growOneFetcher(boolean atCeilingLogged) {
-        if (live.size() >= maxFetchers) {
-            if (!atCeilingLogged) {
-                LOG.warn(
-                        "starvation observed with {} fetchers at the ceiling ({}); "
-                                + "raise {} if the work is genuinely blocked rather than wedged",
-                        live.size(),
-                        maxFetchers,
-                        FlezhaEnv.FLEZHA_WORKER_POOL_MAX);
-            }
-            return true;
-        }
-        if (!startFetcher("a fetcher for observed starvation")) {
-            return atCeilingLogged;
-        }
-        LOG.info("starvation observed; grew the fetcher set to {} (ceiling {})", live.size(), maxFetchers);
-        return false;
-    }
-
-    /** A fetcher thread, already counted as live. The caller starts it. */
-    private Thread newFetcher() {
-        Thread t = new Thread(this::fetchLoop, "flz-fetcher-" + nextFetcherId.incrementAndGet());
-        t.setDaemon(true);
-        live.add(t);
-        return t;
-    }
-
-    /**
-     * Replace a fetcher that ended on a throwable. Nothing else would bring it
-     * back: a runner whose last fetcher died stays connected, heartbeating and
-     * processing nothing, which is the wedge this host must not be able to
-     * reach on its own.
-     */
-    private void replaceFetcher(Throwable cause) {
-        LOG.error("fetcher thread ended unexpectedly; starting a replacement", cause);
-        if (closing.get()) {
-            return;
-        }
-        startFetcher("a replacement");
-    }
-
-    /**
-     * Start one fetcher and keep {@code live} honest about it. A thread that
-     * never ran must not stay counted: a phantom fetcher would keep the set
-     * non-empty and the runner would never read as drained — and would also
-     * consume a slot under the supervisor's ceiling.
-     *
-     * @return whether a fetcher actually joined the pool.
-     */
-    private boolean startFetcher(String why) {
-        Thread fetcher = newFetcher();
+    private void startFetcher(boolean grown) {
+        Thread fetcher = new Thread(() -> fetchLoop(grown), "flz-fetcher-" + nextFetcherId.incrementAndGet());
+        fetcher.setDaemon(true);
+        live.add(fetcher);
         try {
             fetcher.start();
-            return true;
         } catch (Throwable t) {
             live.remove(fetcher);
-            LOG.error("could not start {} fetcher", why, t);
-            return false;
+            core.poolLeft();
+            LOG.error("could not start a fetcher", t);
         }
     }
 
@@ -340,30 +289,37 @@ final class PollHost implements AutoCloseable {
      * virtual threads make ({@code complete}, emits) pin only for their
      * duration, which is how JNI and virtual threads are meant to compose.
      */
-    private void fetchLoop() {
+    private void fetchLoop(boolean grown) {
+        boolean leftOnWord = false;
         try {
-            fetchTurns();
+            leftOnWord = fetchTurns(grown);
         } catch (Throwable t) {
-            // Anything that escaped the loop's own per-turn guards. The
-            // replacement joins `live` BEFORE this thread leaves it, so the
-            // set never empties on a replacement and reads as a drained runner.
-            replaceFetcher(t);
+            // Anything that escaped the loop's own per-turn guards. The seat
+            // goes back below, and the governor replaces a fetcher the pool
+            // is short of.
+            LOG.error("fetcher thread ended unexpectedly; the pool replaces it", t);
+        } finally {
+            core.poolLeft();
         }
         live.remove(Thread.currentThread());
-        if (live.isEmpty()) {
+        if (leftOnWord && live.isEmpty()) {
             onFetchersDrained.run();
         }
     }
 
-    private void fetchTurns() {
-        // The core says when: a zero-length poll result is the core shutting
-        // down, which it reports only once the shutdown sequence has shipped
-        // every Cell's state through these same fetchers. The flag is what a
-        // fetcher spawned late reads.
+    /**
+     * The fetch turns: {@code true} when the core's word or the host's stop
+     * ended them, {@code false} on retiring. The core says when: a zero-length
+     * poll result is the core shutting down, which it reports only once the
+     * shutdown sequence has shipped every Cell's state through these same
+     * fetchers. The flag is what a fetcher spawned late reads.
+     */
+    private boolean fetchTurns(boolean grown) {
+        long idleMs = 0;
         while (!closing.get()) {
             byte[] bytes;
             try {
-                bytes = core.poll(POLL_TIMEOUT_MS);
+                bytes = core.poll(pollTimeoutMs);
             } catch (Throwable t) {
                 if (closing.get()) {
                     break;
@@ -380,11 +336,15 @@ final class PollHost implements AutoCloseable {
                 continue;
             }
             if (bytes == null) {
+                if (grown && (idleMs += pollTimeoutMs) >= retireMs) {
+                    return false;
+                }
                 continue;
             }
             if (bytes.length == 0) {
                 break;
             }
+            idleMs = 0;
             Activation activation;
             try {
                 activation = ActivationCodec.decodeActivation(bytes);
@@ -399,6 +359,7 @@ final class PollHost implements AutoCloseable {
                 break;
             }
         }
+        return true;
     }
 
     /**
@@ -479,17 +440,17 @@ final class PollHost implements AutoCloseable {
         logNotices(core.takeNotices());
         activations.shutdown();
         try {
-            if (!activations.awaitTermination(DRAIN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-                LOG.warn("in-flight activations did not finish within {}ms", DRAIN_TIMEOUT_MS);
+            if (!activations.awaitTermination(drainMs, TimeUnit.MILLISECONDS)) {
+                LOG.warn("in-flight activations did not finish within {}ms", drainMs);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
     }
 
-    private static void joinQuietly(Thread thread) {
+    private void joinQuietly(Thread thread) {
         try {
-            thread.join(DRAIN_TIMEOUT_MS);
+            thread.join(drainMs);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

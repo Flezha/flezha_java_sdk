@@ -5,7 +5,6 @@ import com.flezha.sdk.LocalOutput;
 import com.flezha.sdk.Logger;
 import com.flezha.sdk.internal.LocalRunHandle;
 import com.flezha.sdk.native_.FlzCore;
-import com.flezha.sdk.runtime.config.FlezhaEnv;
 import com.flezha.sdk.runtime.core.ActivationCodec;
 import com.flezha.sdk.runtime.core.ActivationDispatcher;
 import com.flezha.sdk.runtime.core.CoreCalls;
@@ -43,10 +42,9 @@ public final class LocalImpl implements LocalRunHandle {
     private final Thread outputs;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
-    private LocalImpl(long core, ActivationDispatcher dispatcher, FlezhaEnv.ResolvedConfig config) {
+    private LocalImpl(long core, ActivationDispatcher dispatcher) {
         this.core = core;
-        this.pollHost = new PollHost(
-                PollHost.of(core), dispatcher::dispatch, config.fetcherCount(), config.fetcherMax(), () -> {});
+        this.pollHost = new PollHost(PollHost.of(core), dispatcher::dispatch, () -> {});
         this.outputs = new Thread(this::drainOutputs, "flz-local-sink");
         this.outputs.setDaemon(true);
     }
@@ -64,7 +62,7 @@ public final class LocalImpl implements LocalRunHandle {
             throw e;
         }
         ActivationDispatcher dispatcher = new ActivationDispatcher(CoreCalls.of(core));
-        LocalImpl handle = new LocalImpl(core, dispatcher, FlezhaEnv.resolveFromEnv());
+        LocalImpl handle = new LocalImpl(core, dispatcher);
         handle.pollHost.start();
         handle.outputs.start();
         return handle;

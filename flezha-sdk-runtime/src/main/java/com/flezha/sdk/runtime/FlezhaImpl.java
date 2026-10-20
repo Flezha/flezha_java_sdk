@@ -5,7 +5,6 @@ import com.flezha.sdk.Logger;
 import com.flezha.sdk.control.Control;
 import com.flezha.sdk.internal.RunnerHandle;
 import com.flezha.sdk.native_.FlzCore;
-import com.flezha.sdk.runtime.config.FlezhaEnv;
 import com.flezha.sdk.runtime.core.ActivationDispatcher;
 import com.flezha.sdk.runtime.core.CoreCalls;
 import com.flezha.sdk.runtime.core.CoreSpawnRequester;
@@ -45,19 +44,12 @@ public final class FlezhaImpl implements RunnerHandle {
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     private FlezhaImpl(
-            String namespace,
-            long core,
-            ActivationDispatcher dispatcher,
-            int fetchers,
-            int fetcherMax,
-            Set<String> declared,
-            Runnable onTerminated) {
+            String namespace, long core, ActivationDispatcher dispatcher, Set<String> declared, Runnable onTerminated) {
         this.namespace = namespace;
         this.core = core;
         this.declared = declared;
         this.onTerminated = onTerminated;
-        this.pollHost = new PollHost(
-                PollHost.of(core), dispatcher::dispatch, fetchers, fetcherMax, terminationLatch::countDown);
+        this.pollHost = new PollHost(PollHost.of(core), dispatcher::dispatch, terminationLatch::countDown);
     }
 
     /**
@@ -71,8 +63,6 @@ public final class FlezhaImpl implements RunnerHandle {
             @Nonnull String namespace,
             @Nonnull Supplier<List<String>> declaredFactoryIds,
             @Nonnull Runnable onTerminated) {
-        FlezhaEnv.ResolvedConfig config = FlezhaEnv.resolveFromEnv();
-
         long core = PollHost.newContext();
         Set<String> declared = ConcurrentHashMap.newKeySet();
         try {
@@ -93,8 +83,7 @@ public final class FlezhaImpl implements RunnerHandle {
         ActivationDispatcher dispatcher = new ActivationDispatcher(CoreCalls.of(core));
         SpawnRequests.install(new CoreSpawnRequester(core));
 
-        FlezhaImpl handle = new FlezhaImpl(
-                namespace, core, dispatcher, config.fetcherCount(), config.fetcherMax(), declared, onTerminated);
+        FlezhaImpl handle = new FlezhaImpl(namespace, core, dispatcher, declared, onTerminated);
         handle.pollHost.start();
 
         // An exit the application asks for still drains. Idempotent with
