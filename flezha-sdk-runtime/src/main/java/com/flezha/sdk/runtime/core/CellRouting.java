@@ -35,42 +35,34 @@ final class CellRouting {
 
     private final KryoCodec edgeCodec;
 
-    /** Whether this class's producers release their values untransformed. */
-    private final boolean structuredSteps;
-
     @SuppressWarnings("rawtypes")
-    CellRouting(RelayTopology topology, List<Tasklet> routers, KryoCodec edgeCodec, boolean structuredSteps) {
+    CellRouting(RelayTopology topology, List<Tasklet> routers, KryoCodec edgeCodec) {
         this.topology = topology;
         this.routers = routers;
         this.edgeCodec = edgeCodec;
-        this.structuredSteps = structuredSteps;
     }
 
     /**
      * Decode an input payload and keep only the values that route to this
      * Cell, applying the consumer edge's transform chain when — and only
-     * when — the payload reached here untransformed: an entry payload, whose
-     * producer is the wire, or a steps stage's released value. A flow
-     * producer evaluated the edge when its activation completed, so applying
-     * it again would compose the chain with itself.
+     * when — the core marks the payload untransformed. A flow producer
+     * evaluated the edge when its activation completed, so applying it again
+     * would compose the chain with itself.
      */
-    List<Object> valuesForCell(Cell cell, int channelId, byte[] payload) {
-        return routedToCell(cell, channelId, mappedValues(cell, channelId, payload));
+    List<Object> valuesForCell(Cell cell, WorkItem.Input in) {
+        return routedToCell(cell, in.channel(), mappedValues(cell, in));
     }
 
     /**
-     * The payload decoded and, when it reached here untransformed, through
+     * The payload decoded and, when the core marks it untransformed, through
      * the consumer edge's transforms: every value the edge yields, before
      * keying decides which of them are this Cell's.
      */
-    List<Object> mappedValues(Cell cell, int channelId, byte[] payload) {
-        ChannelDescriptor channel = channelOf(channelId);
-        Object base = decodePayload(channel, payload);
+    List<Object> mappedValues(Cell cell, WorkItem.Input in) {
+        ChannelDescriptor channel = channelOf(in.channel());
+        Object base = decodePayload(channel, in.payload());
         ConsumerEdge edge = edgeInto(channel, cell.taskletId);
-        if (edge == null) {
-            return List.of(base);
-        }
-        return channel.kind() == ChannelKind.ENTRY || structuredSteps
+        return edge != null && in.form() == WorkItem.Form.UNTRANSFORMED
                 ? EdgeTransforms.valuesOf(edge, base)
                 : List.of(base);
     }

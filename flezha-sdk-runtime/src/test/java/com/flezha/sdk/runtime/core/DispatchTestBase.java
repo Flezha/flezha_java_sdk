@@ -74,7 +74,13 @@ abstract class DispatchTestBase {
     }
 
     static WorkItem.Input input(int channel, String payload, long now, OptionalLong offset, boolean replay) {
-        return new WorkItem.Input(channel, payload.getBytes(StandardCharsets.UTF_8), List.of(), offset, replay, now);
+        byte[] bytes = payload.getBytes(StandardCharsets.UTF_8);
+        return new WorkItem.Input(channel, bytes, List.of(), offset, replay, now, WorkItem.Form.UNTRANSFORMED);
+    }
+
+    /** An inter-tasklet value on channel 1, in the form the core hands it. */
+    static WorkItem.Input handoff(byte[] payload, WorkItem.Form form) {
+        return new WorkItem.Input(1, payload, List.of(), OptionalLong.empty(), false, 2, form);
     }
 
     static Activation command(String factory, int tasklet, Optional<String> key, ActivationKind kind) {

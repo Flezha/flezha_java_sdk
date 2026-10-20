@@ -127,12 +127,8 @@ class CellRoutingTest extends DispatchTestBase {
         assertThat(edge.eventTime()).isEmpty();
 
         // The Edge payload round-trips through the consumer's Work dispatch.
-        ItemEffect consumed = soleEffect(work(
-                "pipeline_op",
-                1,
-                Optional.empty(),
-                0,
-                new WorkItem.Input(1, edge.payload(), List.of(), OptionalLong.empty(), false, 2)));
+        ItemEffect consumed = soleEffect(
+                work("pipeline_op", 1, Optional.empty(), 0, handoff(edge.payload(), WorkItem.Form.TRANSFORMED)));
         assertThat(consumed.verdict()).isInstanceOf(Verdict.Ok.class);
         assertThat(RECORDED).containsExactly("=mid:v");
     }
@@ -143,18 +139,31 @@ class CellRoutingTest extends DispatchTestBase {
         RelayClassRegistry.registerClass(MappedPipelineRelay.class);
         ItemEffect produced = soleEffect(work("mapped_pipeline_op", 0, Optional.empty(), 0, input(0, "v", 1)));
         Output edge = produced.outputs().get(0);
-        soleEffect(work(
-                "mapped_pipeline_op",
-                1,
-                Optional.empty(),
-                0,
-                new WorkItem.Input(1, edge.payload(), List.of(), OptionalLong.empty(), false, 2)));
+        soleEffect(
+                work("mapped_pipeline_op", 1, Optional.empty(), 0, handoff(edge.payload(), WorkItem.Form.TRANSFORMED)));
 
         // collectEdgeOutputs applied the chain when the producing activation
         // completed, so the payload crosses already mapped and delivery adds
         // nothing. Every other transform in the tree sits on an ENTRY channel,
         // where the producer is the wire and delivery IS the one application.
         assertThat(RECORDED).containsExactly("=M:mid:v");
+    }
+
+    @Test
+    @DisplayName("the input form comes from the core: only an untransformed payload runs the edge")
+    void theInputFormComesFromTheCore() {
+        RelayClassRegistry.registerClass(MappedPipelineRelay.class);
+        Output edge = soleEffect(work("mapped_pipeline_op", 0, Optional.empty(), 0, input(0, "v", 1)))
+                .outputs()
+                .get(0);
+        RECORDED.clear();
+        for (WorkItem.Form form : List.of(WorkItem.Form.UNTRANSFORMED, WorkItem.Form.TRANSFORMED)) {
+            soleEffect(work("mapped_pipeline_op", 1, Optional.empty(), 0, handoff(edge.payload(), form)));
+        }
+
+        // Whatever the relay's run: an entry payload and a steps release come
+        // untransformed, a stream producer's output transformed.
+        assertThat(RECORDED).containsExactly("=M:M:mid:v", "=M:mid:v");
     }
 
     @Test
@@ -188,11 +197,7 @@ class CellRoutingTest extends DispatchTestBase {
     /** Hand one produced Edge output to `cellKey`'s cell of its consumer. */
     private void deliver(String factory, int tasklet, String cellKey, Output produced) {
         soleEffect(work(
-                factory,
-                tasklet,
-                Optional.of(cellKey),
-                0,
-                new WorkItem.Input(1, produced.payload(), List.of(), OptionalLong.empty(), false, 2)));
+                factory, tasklet, Optional.of(cellKey), 0, handoff(produced.payload(), WorkItem.Form.TRANSFORMED)));
     }
 
     @Test

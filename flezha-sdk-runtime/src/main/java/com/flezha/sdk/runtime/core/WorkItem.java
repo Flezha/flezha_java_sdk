@@ -19,8 +19,18 @@ public sealed interface WorkItem {
             @Nonnull List<Map.Entry<String, String>> metadata,
             @Nonnull OptionalLong consumedOffset,
             boolean replay,
-            long now)
+            long now,
+            @Nonnull Form form)
             implements WorkItem {}
+
+    /**
+     * Whether the consuming edge's chain still applies to an input's payload;
+     * the core decides it. Variant order is the postcard enum discriminant.
+     */
+    enum Form {
+        UNTRANSFORMED,
+        TRANSFORMED
+    }
 
     /**
      * Discriminant 1 — a validated timer firing. Its {@code now} IS

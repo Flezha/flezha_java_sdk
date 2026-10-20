@@ -69,7 +69,7 @@ public final class RelayInstance {
             routers.add(instantiate(desc));
             codecs.add(desc.codec());
         }
-        this.routing = new CellRouting(topology, routers, edgeCodec, steps);
+        this.routing = new CellRouting(topology, routers, edgeCodec);
     }
 
     static RelayInstance materialize(String relayId, String factoryId, Consumer<RelayInstance> left) {
@@ -194,9 +194,8 @@ public final class RelayInstance {
             return;
         }
         WorkItem.Input in = (WorkItem.Input) item;
-        List<Object> values = mapped != null
-                ? routing.routedToCell(cell, in.channel(), mapped)
-                : routing.valuesForCell(cell, in.channel(), in.payload());
+        List<Object> values =
+                mapped != null ? routing.routedToCell(cell, in.channel(), mapped) : routing.valuesForCell(cell, in);
         for (Object value : values) {
             tasklet.run(value, ctx);
         }
@@ -216,7 +215,7 @@ public final class RelayInstance {
         if (channel == null || channel.kind() != ChannelKind.ENTRY) {
             return null;
         }
-        return routing.mappedValues(cell, in.channel(), in.payload());
+        return routing.mappedValues(cell, in);
     }
 
     /**

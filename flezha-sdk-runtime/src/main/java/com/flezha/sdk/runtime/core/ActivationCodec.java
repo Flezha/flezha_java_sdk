@@ -104,7 +104,8 @@ public final class ActivationCodec {
                     r.vec(m -> Map.entry(m.string(), m.string())),
                     r.optionalVarint(),
                     r.bool(),
-                    r.varint());
+                    r.varint(),
+                    variant(r, WorkItem.Form.values()));
             case 1 -> new WorkItem.Timer(timerKind(r), r.varint());
             default -> throw new IllegalArgumentException("postcard: unknown WorkItem discriminant " + discriminant);
         };
@@ -209,11 +210,16 @@ public final class ActivationCodec {
     }
 
     static TimerKind timerKind(Postcard.Reader r) {
+        return variant(r, TimerKind.values());
+    }
+
+    /** A fieldless enum, read as its declaration-order discriminant. */
+    private static <E extends Enum<E>> E variant(Postcard.Reader r, E[] values) {
         int ordinal = Math.toIntExact(r.varint());
-        TimerKind[] kinds = TimerKind.values();
-        if (ordinal < 0 || ordinal >= kinds.length) {
-            throw new IllegalArgumentException("postcard: unknown TimerKind ordinal " + ordinal);
+        if (ordinal < 0 || ordinal >= values.length) {
+            String name = values[0].getDeclaringClass().getSimpleName();
+            throw new IllegalArgumentException("postcard: unknown " + name + " ordinal " + ordinal);
         }
-        return kinds[ordinal];
+        return values[ordinal];
     }
 }

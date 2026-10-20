@@ -14,7 +14,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalLong;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -136,18 +135,8 @@ class StepsDispatchTest extends DispatchTestBase {
 
         // The one released value reaches BOTH children — the driver's fan-out —
         // and each evaluates its own edge in valuesForCell.
-        soleEffect(work(
-                "fanout_steps",
-                1,
-                Optional.empty(),
-                0,
-                new WorkItem.Input(1, released, List.of(), OptionalLong.empty(), false, 2)));
-        soleEffect(work(
-                "fanout_steps",
-                2,
-                Optional.empty(),
-                0,
-                new WorkItem.Input(1, released, List.of(), OptionalLong.empty(), false, 3)));
+        soleEffect(work("fanout_steps", 1, Optional.empty(), 0, handoff(released, WorkItem.Form.UNTRANSFORMED)));
+        soleEffect(work("fanout_steps", 2, Optional.empty(), 0, handoff(released, WorkItem.Form.UNTRANSFORMED)));
 
         assertThat(RECORDED)
                 .as("the mapped edge applies once (never producer-side AND again here)")

@@ -76,6 +76,7 @@ public final class ActivationCodecInverses {
                 w.varint(0).varint(Integer.toUnsignedLong(input.channel())).bytes(input.payload());
                 w.vec(input.metadata(), ActivationCodec::encodeMetadataPair);
                 w.optionalVarint(input.consumedOffset()).bool(input.replay()).varint(input.now());
+                w.varint(input.form().ordinal());
             }
             case WorkItem.Timer timer -> w.varint(1)
                     .varint(timer.kind().ordinal())
