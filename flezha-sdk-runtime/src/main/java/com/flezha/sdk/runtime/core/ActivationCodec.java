@@ -3,6 +3,7 @@ package com.flezha.sdk.runtime.core;
 import com.flezha.sdk.runtime.state.Postcard;
 import com.flezha.sdk.runtime.state.TimerOp;
 import com.flezha.sdk.state.TimerKind;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -98,17 +99,22 @@ public final class ActivationCodec {
     private static WorkItem decodeWorkItem(Postcard.Reader r) {
         int discriminant = Math.toIntExact(r.varint());
         return switch (discriminant) {
-            case 0 -> new WorkItem.Input(
-                    Math.toIntExact(r.varint()),
-                    r.bytes(),
-                    r.vec(m -> Map.entry(m.string(), m.string())),
-                    r.optionalVarint(),
-                    r.bool(),
-                    r.varint(),
-                    variant(r, WorkItem.Form.values()));
+            case 0 -> decodeInput(r);
             case 1 -> new WorkItem.Timer(timerKind(r), r.varint());
             default -> throw new IllegalArgumentException("postcard: unknown WorkItem discriminant " + discriminant);
         };
+    }
+
+    private static WorkItem.Input decodeInput(Postcard.Reader r) {
+        int channel = Math.toIntExact(r.varint());
+        byte[] payload = r.bytes();
+        List<Map.Entry<String, String>> metadata = r.vec(m -> Map.entry(m.string(), m.string()));
+        OptionalLong consumedOffset = r.optionalVarint();
+        boolean replay = r.bool();
+        long now = r.varint();
+        WorkItem.Form form = variant(r, WorkItem.Form.values());
+        List<byte[]> values = form == WorkItem.Form.PREPARED ? r.vec(Postcard.Reader::bytes) : List.of();
+        return new WorkItem.Input(channel, payload, metadata, consumedOffset, replay, now, form, values);
     }
 
     // ------------------------------------------------------------------
@@ -183,7 +189,7 @@ public final class ActivationCodec {
     private static void encodePrepareResult(Postcard.Writer w, PrepareResult result) {
         switch (result) {
             case PrepareResult.Ok ok -> {
-                w.varint(0).vec(ok.answer().keys(), Postcard.Writer::string);
+                w.varint(0).vec(ok.answer().values(), ActivationCodec::encodePreparedValue);
                 w.optionalVarint(ok.answer().eventTime());
             }
             case PrepareResult.Err err -> {
@@ -191,6 +197,12 @@ public final class ActivationCodec {
                 encodeWorkError(w, err.error());
             }
         }
+    }
+
+    private static void encodePreparedValue(Postcard.Writer w, PrepareAnswer.Value value) {
+        w.varint(Integer.toUnsignedLong(value.consumer()))
+                .vec(value.keys(), Postcard.Writer::string)
+                .bytes(value.bytes());
     }
 
     private static void encodeWorkError(Postcard.Writer w, WorkError error) {

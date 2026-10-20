@@ -77,6 +77,9 @@ public final class ActivationCodecInverses {
                 w.vec(input.metadata(), ActivationCodec::encodeMetadataPair);
                 w.optionalVarint(input.consumedOffset()).bool(input.replay()).varint(input.now());
                 w.varint(input.form().ordinal());
+                if (input.form() == WorkItem.Form.PREPARED) {
+                    w.vec(input.values(), Postcard.Writer::bytes);
+                }
             }
             case WorkItem.Timer timer -> w.varint(1)
                     .varint(timer.kind().ordinal())
@@ -129,7 +132,10 @@ public final class ActivationCodecInverses {
     private static PrepareResult decodePrepareResult(Postcard.Reader r) {
         int discriminant = Math.toIntExact(r.varint());
         return switch (discriminant) {
-            case 0 -> new PrepareResult.Ok(new PrepareAnswer(r.vec(Postcard.Reader::string), r.optionalVarint()));
+            case 0 -> new PrepareResult.Ok(new PrepareAnswer(
+                    r.vec(v -> new PrepareAnswer.Value(
+                            Math.toIntExact(v.varint()), v.vec(Postcard.Reader::string), v.bytes())),
+                    r.optionalVarint()));
             case 1 -> new PrepareResult.Err(decodeWorkError(r));
             default -> throw new IllegalArgumentException(
                     "postcard: unknown PrepareResult discriminant " + discriminant);

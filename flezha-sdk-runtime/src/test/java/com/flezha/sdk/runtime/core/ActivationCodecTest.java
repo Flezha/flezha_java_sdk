@@ -41,7 +41,8 @@ class ActivationCodecTest {
                                 OptionalLong.of(7),
                                 true,
                                 1_000,
-                                WorkItem.Form.TRANSFORMED),
+                                WorkItem.Form.PREPARED,
+                                List.of(new byte[] {0x0C})),
                         new WorkItem.Timer(TimerKind.EVENT_TIME, 2_000))),
                 9,
                 "f",
@@ -101,6 +102,24 @@ class ActivationCodecTest {
     }
 
     @Test
+    @DisplayName("a prepare answer's bytes are pinned to the shared fixture")
+    void prepareAnswerBytesArePinned() throws IOException {
+        ActivationResult prepared = new ActivationResult(
+                42,
+                new ActivationOutcome.Prepared(List.of(
+                        new PrepareResult.Ok(new PrepareAnswer(
+                                List.of(new PrepareAnswer.Value(1, List.of("a"), new byte[] {0x0B})),
+                                OptionalLong.of(5))),
+                        new PrepareResult.Err(new WorkError("no", true)))));
+        byte[] encoded = ActivationCodec.encodeResult(prepared);
+
+        assertThat(hex(encoded)).isEqualTo(pinned("result", "prepared"));
+        assertThat(ActivationCodecInverses.decodeResult(encoded))
+                .usingRecursiveComparison()
+                .isEqualTo(prepared);
+    }
+
+    @Test
     @DisplayName("a completion request is the effect's last field")
     void completionIsTheEffectsLastField() throws IOException {
         ActivationResult completing = resultFixture(Optional.of("done".getBytes(StandardCharsets.UTF_8)));
@@ -149,7 +168,9 @@ class ActivationCodecTest {
                 new ActivationOutcome.StateJson("{\"a\":1}".getBytes()),
                 new ActivationOutcome.StateApplied(),
                 new ActivationOutcome.Prepared(List.of(
-                        new PrepareResult.Ok(new PrepareAnswer(List.of("k1", "k2"), OptionalLong.of(77))),
+                        new PrepareResult.Ok(new PrepareAnswer(
+                                List.of(new PrepareAnswer.Value(1, List.of("k1", "k2"), new byte[] {0x09})),
+                                OptionalLong.of(77))),
                         new PrepareResult.Err(new WorkError("bad key", true)))),
                 new ActivationOutcome.Failed(new WorkError("boom", false)),
                 new ActivationOutcome.Work(List.of(new ItemEffect(

@@ -194,17 +194,14 @@ public final class RelayInstance {
             return;
         }
         WorkItem.Input in = (WorkItem.Input) item;
-        List<Object> values =
-                mapped != null ? routing.routedToCell(cell, in.channel(), mapped) : routing.valuesForCell(cell, in);
-        for (Object value : values) {
+        for (Object value : mapped != null ? mapped : routing.valuesForCell(cell, in)) {
             tasklet.run(value, ctx);
         }
     }
 
     /**
-     * The values an input on an entry channel becomes through the entry
-     * decoder and the entry edge's transforms, before keying, or {@code null}
-     * for anything else, which decodes inside the invocation. Throws what the
+     * The values an input on an entry channel runs, or {@code null} for
+     * anything else, which decodes inside the invocation. Throws what the
      * decoder or a transform threw; the caller classifies that as unreadable.
      */
     private List<Object> entryValues(Cell cell, WorkItem item) {
@@ -215,7 +212,7 @@ public final class RelayInstance {
         if (channel == null || channel.kind() != ChannelKind.ENTRY) {
             return null;
         }
-        return routing.mappedValues(cell, in);
+        return routing.valuesForCell(cell, in);
     }
 
     /**

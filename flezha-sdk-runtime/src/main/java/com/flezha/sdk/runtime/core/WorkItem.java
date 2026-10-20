@@ -20,16 +20,20 @@ public sealed interface WorkItem {
             @Nonnull OptionalLong consumedOffset,
             boolean replay,
             long now,
-            @Nonnull Form form)
+            @Nonnull Form form,
+            @Nonnull List<byte[]> values)
             implements WorkItem {}
 
     /**
      * Whether the consuming edge's chain still applies to an input's payload;
-     * the core decides it. Variant order is the postcard enum discriminant.
+     * the core decides it. A {@code PREPARED} input carries this Cell's values
+     * from the prepare crossing, each encoded as an edge value. Variant order
+     * is the postcard enum discriminant.
      */
     enum Form {
         UNTRANSFORMED,
-        TRANSFORMED
+        TRANSFORMED,
+        PREPARED
     }
 
     /**

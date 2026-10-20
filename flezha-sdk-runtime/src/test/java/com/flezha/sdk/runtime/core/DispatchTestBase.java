@@ -75,12 +75,27 @@ abstract class DispatchTestBase {
 
     static WorkItem.Input input(int channel, String payload, long now, OptionalLong offset, boolean replay) {
         byte[] bytes = payload.getBytes(StandardCharsets.UTF_8);
-        return new WorkItem.Input(channel, bytes, List.of(), offset, replay, now, WorkItem.Form.UNTRANSFORMED);
+        return new WorkItem.Input(
+                channel, bytes, List.of(), offset, replay, now, WorkItem.Form.UNTRANSFORMED, List.of());
     }
 
     /** An inter-tasklet value on channel 1, in the form the core hands it. */
     static WorkItem.Input handoff(byte[] payload, WorkItem.Form form) {
-        return new WorkItem.Input(1, payload, List.of(), OptionalLong.empty(), false, 2, form);
+        return new WorkItem.Input(1, payload, List.of(), OptionalLong.empty(), false, 2, form, List.of());
+    }
+
+    /** An entry payload on channel 0 with the values its crossing answered for the Cell. */
+    static WorkItem.Input prepared(String payload, List<byte[]> values) {
+        byte[] bytes = payload.getBytes(StandardCharsets.UTF_8);
+        return new WorkItem.Input(0, bytes, List.of(), OptionalLong.empty(), false, 1, WorkItem.Form.PREPARED, values);
+    }
+
+    /** Every Cell key one prepare answer's values name, in answer order. */
+    static List<String> keysAnswered(PrepareResult result) {
+        return ((PrepareResult.Ok) result)
+                .answer().values().stream()
+                        .flatMap(value -> value.keys().stream())
+                        .toList();
     }
 
     static Activation command(String factory, int tasklet, Optional<String> key, ActivationKind kind) {

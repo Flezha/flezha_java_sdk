@@ -33,8 +33,8 @@ class CellRoutingTest extends DispatchTestBase {
                         false)));
         List<PrepareResult> answers = ((ActivationOutcome.Prepared) prepared).answers();
         assertThat(answers).hasSize(2);
-        assertThat(((PrepareResult.Ok) answers.get(0)).answer().keys()).containsExactly("AAPL");
-        assertThat(((PrepareResult.Ok) answers.get(1)).answer().keys())
+        assertThat(keysAnswered(answers.get(0))).containsExactly("AAPL");
+        assertThat(keysAnswered(answers.get(1)))
                 .as("the filtered value yields no key")
                 .isEmpty();
 
@@ -61,7 +61,7 @@ class CellRoutingTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("flatMap fans one payload across keys; each Cell receives only its own slot")
+    @DisplayName("flatMap fans one payload across keys; each Cell runs only its own prepared value")
     void fanOutKeysEveryYieldedValue() {
         RelayClassRegistry.registerClass(FanOutRelay.class);
 
@@ -70,14 +70,15 @@ class CellRoutingTest extends DispatchTestBase {
                 0,
                 Optional.empty(),
                 new ActivationKind.KeyRequest(0, List.of("AAPL:3".getBytes(StandardCharsets.UTF_8)), true, false)));
-        assertThat(((PrepareResult.Ok) ((ActivationOutcome.Prepared) prepared)
-                                .answers()
-                                .get(0))
-                        .answer()
-                        .keys())
-                .containsExactly("AAPL@1m", "AAPL@5m");
+        PrepareResult answer = ((ActivationOutcome.Prepared) prepared).answers().get(0);
+        assertThat(keysAnswered(answer)).containsExactly("AAPL@1m", "AAPL@5m");
 
-        soleEffect(work("fan_out", 0, Optional.of("AAPL@5m"), 0, input(0, "AAPL:3", 1)));
+        List<byte[]> mine = ((PrepareResult.Ok) answer)
+                .answer().values().stream()
+                        .filter(value -> value.keys().contains("AAPL@5m"))
+                        .map(PrepareAnswer.Value::bytes)
+                        .toList();
+        soleEffect(work("fan_out", 0, Optional.of("AAPL@5m"), 0, prepared("not decoded", mine)));
         assertThat(RECORDED).containsExactly("AAPL@5m=AAPL@5m");
     }
 
@@ -97,11 +98,8 @@ class CellRoutingTest extends DispatchTestBase {
                 0,
                 Optional.empty(),
                 new ActivationKind.KeyRequest(0, List.of("b:9".getBytes(StandardCharsets.UTF_8)), true, false)));
-        assertThat(((PrepareResult.Ok) ((ActivationOutcome.Prepared) prepared)
-                                .answers()
-                                .get(0))
-                        .answer()
-                        .keys())
+        assertThat(keysAnswered(
+                        ((ActivationOutcome.Prepared) prepared).answers().get(0)))
                 .containsExactly("b");
     }
 

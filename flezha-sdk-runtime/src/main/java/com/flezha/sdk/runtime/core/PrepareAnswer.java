@@ -6,9 +6,15 @@ import javax.annotation.Nonnull;
 
 /**
  * One payload's prepare answers, in {@link ActivationKind.KeyRequest} payload
- * order. {@code keys} carries the routing keys when {@code wantKeys} (one for
- * a dynamic consumer, any number for a static fan-out, empty = every declared
- * Cell); {@code eventTime} the extracted event time when
+ * order. {@code values} carries, when {@code wantKeys}, every value each keyed
+ * consumer's edge yields; {@code eventTime} the extracted event time when
  * {@code wantEventTime}.
  */
-public record PrepareAnswer(@Nonnull List<String> keys, @Nonnull OptionalLong eventTime) {}
+public record PrepareAnswer(@Nonnull List<Value> values, @Nonnull OptionalLong eventTime) {
+
+    /**
+     * One value for one keyed consumer, encoded as an edge value, and the Cells
+     * it reaches: one key for a dynamic consumer, any number for a static fan-out.
+     */
+    public record Value(int consumer, @Nonnull List<String> keys, @Nonnull byte[] bytes) {}
+}
