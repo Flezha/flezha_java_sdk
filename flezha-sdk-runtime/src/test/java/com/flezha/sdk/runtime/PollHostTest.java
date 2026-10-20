@@ -351,8 +351,8 @@ class PollHostTest {
      * payloads delivered, forever.
      */
     @Test
-    @DisplayName("a grown seat is a fetcher that serves and retires once idle")
-    void aGrownSeatServesAndRetires() throws Exception {
+    @DisplayName("a grown fetcher retires once idle, after serving like any fetcher")
+    void aGrownFetcherRetires() throws Exception {
         FakeCore core = new FakeCore().base(1);
         core.policy[3] = 500;
         try (PollHost host = start(core, PollHostTest::ok)) {
