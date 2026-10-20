@@ -59,7 +59,6 @@ final class EmitContext implements Ctx<Object, Object> {
 
     private byte[] identityBytes;
     private int stableIdOrdinal;
-    private int emitOrdinal;
 
     EmitContext(
             RelayInstance instance, Cell cell, long token, long invocationSeq, long now, boolean replay, long offset) {
@@ -359,12 +358,7 @@ final class EmitContext implements Ctx<Object, Object> {
         }
     }
 
-    /**
-     * A plugin output. A keyed channel of a class that records no effects
-     * carries the identity stamps; under the tier, and for a durable
-     * steps relay, the controller derives them from the effect record at flush
-     * time, so none ride here.
-     */
+    /** A plugin output; the core stamps a keyed one's identity at settle. */
     private void collectPluginOutput(
             ChannelDescriptor descriptor, byte[] bytes, @Nullable Map<String, String> meta, @Nullable String key) {
         List<Map.Entry<String, String>> metadata = new ArrayList<>();
@@ -375,12 +369,6 @@ final class EmitContext implements Ctx<Object, Object> {
                 }
             }
         }
-        if (descriptor.keyed() && !instance.topology.recordsEffects()) {
-            metadata.add(Map.entry("flz.cell", cell.id.encoded()));
-            metadata.add(Map.entry("flz.seq", invocationSeq + "." + emitOrdinal));
-            metadata.add(Map.entry("flz.key", key));
-        }
-        emitOrdinal++;
         outputs.add(new Output(
                 new OutputTarget.Plugin(descriptor.name()),
                 Optional.ofNullable(key),

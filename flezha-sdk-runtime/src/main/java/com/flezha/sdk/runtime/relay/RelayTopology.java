@@ -1,7 +1,5 @@
 package com.flezha.sdk.runtime.relay;
 
-import com.flezha.sdk.relay.Relay.Durable;
-import com.flezha.sdk.relay.Relay.Exactly;
 import com.flezha.sdk.relay.Relay.Run;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +25,6 @@ public final class RelayTopology {
     private final List<TaskletDescriptor> tasklets;
     private final Map<String, Integer> taskletNameToId;
     private final Run run;
-    private final Durable durable;
     private final Map<String, Object> declaration;
 
     public RelayTopology(
@@ -37,10 +34,8 @@ public final class RelayTopology {
             @Nonnull List<TaskletDescriptor> tasklets,
             @Nonnull Map<String, Integer> taskletNameToId,
             @Nonnull Run run,
-            @Nonnull Durable durable,
             @Nonnull Map<String, Object> declaration) {
         this.run = run;
-        this.durable = durable;
         this.declaration = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(declaration));
         this.factoryId = factoryId;
         this.channels = List.copyOf(channels);
@@ -52,18 +47,6 @@ public final class RelayTopology {
     /** Whether the class runs in steps: its stages are held and journaled rather than routed. */
     public boolean steps() {
         return run instanceof Run.Steps;
-    }
-
-    /**
-     * Whether each invocation's output rides one effect record the controller
-     * stamps at flush: under the effectively-once tier, and for a durable class
-     * that runs in steps, whose stage commit names the record.
-     */
-    public boolean recordsEffects() {
-        return switch (run) {
-            case Run.Flow flow -> flow.exactly() instanceof Exactly.EffectivelyOnce;
-            case Run.Steps ignored -> !(durable instanceof Durable.Memory);
-        };
     }
 
     /**

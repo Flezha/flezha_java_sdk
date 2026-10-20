@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The emit funnel: the Change and plugin output an invocation produces, the
- * identity stamps a keyed channel adds, the two keyed-emit refusals, the timer
+ * key a keyed channel's output names, the two keyed-emit refusals, the timer
  * ops that ride the effect, the checkpoint mark and the completion request.
  */
 class EmitContextTest extends DispatchTestBase {
@@ -60,20 +60,15 @@ class EmitContextTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("Keyed emit stamps flz.key on the wire")
-    void keyedEmitCarriesIdentityStamps() {
+    @DisplayName("a keyed emit names its key and carries the user's metadata only")
+    void keyedEmitNamesItsKey() {
         RelayClassRegistry.registerClass(KeyedEmitRelay.class);
         ItemEffect effect = soleEffect(work("keyed_op", 0, Optional.empty(), 5, input(0, "v", 1_000)));
 
         assertThat(effect.outputs()).hasSize(1);
         Output output = effect.outputs().get(0);
         assertThat(output.key()).contains("k-v");
-        Map<String, String> meta = metaMap(output);
-        assertThat(meta)
-                .containsEntry("flz.cell", OP + "/keyed_task/")
-                .containsEntry("flz.seq", "5.0")
-                .containsEntry("flz.key", "k-v")
-                .containsEntry("user", "meta");
+        assertThat(metaMap(output)).isEqualTo(Map.of("user", "meta"));
     }
 
     @Test
@@ -86,10 +81,6 @@ class EmitContextTest extends DispatchTestBase {
         assertThat(effect.outputs()).hasSize(1);
         Output output = effect.outputs().get(0);
         assertThat(output.key()).contains("BTC/USD");
-        assertThat(metaMap(output))
-                .containsEntry("flz.cell", OP + "/keyed_task/BTC/USD")
-                .containsEntry("flz.seq", "5.0")
-                .containsEntry("flz.key", "BTC/USD");
     }
 
     @Test
@@ -158,15 +149,12 @@ class EmitContextTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("ctx.checkpoint() marks the effect; tier outputs carry no host-side identity stamps")
+    @DisplayName("ctx.checkpoint() marks the effect")
     void checkpointFlagAndTierOutputs() {
         RelayClassRegistry.registerClass(CheckpointRelay.class);
         ItemEffect open = soleEffect(work("ckpt_op", 0, Optional.empty(), 0, input(0, "accumulate", 1)));
         assertThat(open.checkpoint()).isFalse();
         assertThat(open.outputs()).hasSize(1);
-        assertThat(metaMap(open.outputs().get(0)))
-                .as("under the tier the controller derives the stamps at flush")
-                .doesNotContainKeys("flz.cell", "flz.seq", "flz.key");
         assertThat(open.outputs().get(0).key()).contains("ck");
 
         ItemEffect closing = soleEffect(work("ckpt_op", 0, Optional.empty(), 0, input(0, "commit", 2)));

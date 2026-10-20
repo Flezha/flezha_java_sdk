@@ -22,12 +22,6 @@ public record CellId(String instanceId, String taskletName, String cellKey) {
         return new CellId(instanceId, taskletName, cellKey.orElse(""));
     }
 
-    /** Slash-joined form used only as an in-process map key / log label. */
-    @Nonnull
-    public String encoded() {
-        return instanceId + "/" + taskletName + "/" + cellKey;
-    }
-
     /**
      * Structured binary identity consumed by the controller's
      * {@code decode_cell_id}:

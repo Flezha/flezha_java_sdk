@@ -52,7 +52,6 @@ final class TopologyMaterializer {
                 taskletDescriptors(tasklets, descriptors, derived),
                 taskletNameToId,
                 relay.run(),
-                relay.durable(),
                 declaration);
     }
 
