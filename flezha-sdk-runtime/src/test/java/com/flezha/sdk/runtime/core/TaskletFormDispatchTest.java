@@ -66,6 +66,17 @@ class TaskletFormDispatchTest extends DispatchTestBase {
     }
 
     @Test
+    @DisplayName("A Java change carries no coalescing key: two equal changes in one input are both written")
+    void everyRecordedChangeIsWritten() {
+        RelayClassRegistry.registerClass(CounterRelay.class);
+        ItemEffect effect = soleEffect(work("counter_op", 0, Optional.empty(), 0, input(0, "twice", 1)));
+
+        assertThat(effect.changes()).hasSize(2);
+        assertThat(effect.changes().get(1)).isEqualTo(effect.changes().get(0));
+        assertThat(stateJson("counter_op", Optional.empty())).isEqualTo("{\"n\":2}");
+    }
+
+    @Test
     @DisplayName("A restart folds the log through applyTo, in seq order, back to the state before it")
     void aRestartFoldsTheLogThroughApplyTo() {
         RelayClassRegistry.registerClass(CounterRelay.class);

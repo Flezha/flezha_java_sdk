@@ -98,11 +98,13 @@ class ActivationDispatcherTest extends DispatchTestBase {
     }
 
     @Test
-    @DisplayName("a replayed item serves ctx.replay() = true")
+    @DisplayName(
+            "The replay flag is read by its shared name: ctx.replay() is true on a replayed item, false on a live one")
     void replayFlagReachesTheContext() {
         RelayClassRegistry.registerClass(ReplayProbeRelay.class);
         soleEffect(work("replay_probe", 0, Optional.empty(), 0, input(0, "x", 1, OptionalLong.empty(), true)));
-        assertThat(RECORDED).containsExactly("replay=true");
+        soleEffect(work("replay_probe", 0, Optional.empty(), 0, input(0, "y", 2, OptionalLong.empty(), false)));
+        assertThat(RECORDED).containsExactly("replay=true", "replay=false");
     }
 
     @Test

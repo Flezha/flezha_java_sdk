@@ -213,6 +213,9 @@ abstract class DispatchTestBase {
         @Override
         public void run(String input, Ctx<CounterState, String> ctx) throws TaskletException {
             ctx.change(new CountChange(1));
+            if (input.equals("twice")) {
+                ctx.change(new CountChange(1));
+            }
             if (input.startsWith("key:")) {
                 ctx.emitKeyed("k", input);
             } else {

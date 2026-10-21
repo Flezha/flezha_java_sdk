@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
  * while {@code CoalesceKey} held the second built-in id; its reserved slot keeps {@code long[]}, the
  * built-ins after it and a tasklet's listed types at the ids those bytes carry.
  */
+@DisplayName("State written before the removal still decodes")
 class KryoCodecGoldenTest {
 
     /** A cell's state holding a built-in registered after the reserved slot. */
