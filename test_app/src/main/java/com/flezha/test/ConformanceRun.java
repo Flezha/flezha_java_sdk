@@ -34,7 +34,7 @@ import java.util.function.Consumer;
  * The conformance run: every row of {@code test/fixtures/reference_topologies.txt}
  * driven through THIS SDK's builder.
  *
- * <p>{@code flz_core/src/host/check_tests.rs} is the same table driven against
+ * <p>{@code crates/flz_core/src/host/check_tests.rs} is the same table driven against
  * the record directly, because the core has no builder. This one maps the same
  * step vocabulary onto the Java graph builder, so what is measured here is what
  * an author of a Java relay actually writes.

@@ -279,7 +279,7 @@ FLEZHA_E2E_RUNTIME=java mix test --include system      # from repo root: the ful
 - `FLEZHA_CA_CERT_PATH`: QUIC only.
 - `FLEZHA_SERVER_CERT_PATH`: Server mode only.
 - `FLEZHA_SERVER_KEY_PATH`: Server mode only.
-- `FLEZHA_SOCKET_FILES_PATH`: UDS only. Set, it wins outright; unset, the ladder walks `$XDG_RUNTIME_DIR/flezha`, `/run/flezha`, `app_data/sockets`.
+- `FLEZHA_SOCKET_FILES_PATH`: UDS only. Set, it wins outright; unset, the ladder walks `$XDG_RUNTIME_DIR/flezha`, `/run/flezha`, `storage/app/sockets`.
 - `FLEZHA_RUNNER_ID_PATH`: Durable stable identity. Unwritable means a fresh id per boot and lost bindings.
 - `FLEZHA_WORKER_POOL_SIZE`: Shared runner draining every Cell mailbox.
 - `FLEZHA_LOG_LEVEL`: `debug`, `info`, `warn` or `error` for the default logger. Unset, blank and unrecognised all mean `warn`.

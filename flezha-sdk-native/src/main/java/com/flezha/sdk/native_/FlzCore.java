@@ -11,7 +11,7 @@ package com.flezha.sdk.native_;
  *
  * <p>Native method names are the short JNI form
  * ({@code Java_com_flezha_sdk_native_1_FlzCore_<method>}), matching the
- * exports in {@code flz_core_ffi/src/jni_glue.rs} 1:1. Failures throw
+ * exports in {@code crates/flz_core_ffi/src/jni_glue.rs} 1:1. Failures throw
  * {@link com.flezha.sdk.FlezhaException}, built from the core's error document.
  */
 public final class FlzCore {

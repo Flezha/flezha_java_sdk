@@ -97,7 +97,7 @@ local Maven repository before this resolves, and the controller's image
 ```sh
 scripts/build-native.sh --output sdk/java/flezha-sdk-native/src/main/resources/native
 mvn -f sdk/java/pom.xml -DskipTests install
-docker build -f docker/prod/Dockerfile.controller -t flezha/flezha:0.1.0 .
+docker build -f deploy/docker/prod/Dockerfile.controller -t flezha/flezha:0.1.0 .
 ```
 
 That is a one-time step. Once the SDK and the image are published, it goes away and the

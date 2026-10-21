@@ -62,4 +62,4 @@ Thumbs.db
 /contract/
 
 # Runtime state a locally started runner or controller leaves in its working directory
-app_data/
+storage/app/
