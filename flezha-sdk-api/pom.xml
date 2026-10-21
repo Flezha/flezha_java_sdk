@@ -43,6 +43,19 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <executions>
+                    <!-- jsr305 has no module name, so the module reads it from the class path
+                         rather than requiring it, and the exports lint would flag each of its
+                         annotations on a public signature. -->
+                    <execution>
+                        <id>default-compile</id>
+                        <configuration>
+                            <compilerArgs combine.children="append">
+                                <arg>--add-reads</arg>
+                                <arg>com.flezha.sdk.api=ALL-UNNAMED</arg>
+                                <arg>-Xlint:-exports</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </execution>
                     <execution>
                         <id>default-testCompile</id>
                         <configuration>

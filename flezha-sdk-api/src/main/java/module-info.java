@@ -2,10 +2,9 @@
  * The Flezha Java SDK's authoring surface. Every package an author writes against is exported;
  * {@code com.flezha.sdk.internal}, the bridge to the runtime, is exported to the runtime alone.
  */
-@SuppressWarnings({"module", "requires-automatic"})
+@SuppressWarnings("module")
 module com.flezha.sdk.api {
     requires transitive com.fasterxml.jackson.databind;
-    requires static jsr305;
 
     exports com.flezha.sdk;
     exports com.flezha.sdk.authoring;

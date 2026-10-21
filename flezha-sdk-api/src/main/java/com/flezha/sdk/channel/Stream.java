@@ -68,6 +68,9 @@ import javax.annotation.Nonnull;
  */
 public abstract class Stream<T> implements OutputChain<T> {
 
+    /** Made by the runtime's channel builder only. */
+    protected Stream() {}
+
     /**
      * Override the auto-derived channel name (the producer node's identity)
      * everywhere the channel name appears: wire metadata, journals, errors.
