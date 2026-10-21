@@ -34,13 +34,12 @@ class PublicNamesTest {
     @DisplayName("every concept has its one public spelling")
     void everyConceptHasItsOnePublicSpelling() throws IOException {
         List<String> wrong = new ArrayList<>();
-        for (String line : RepositoryFixture.lines("test/fixtures/sdk_public_names.txt")) {
-            String[] row = line.split("\\|", -1);
-            for (String path : row[COLUMN].trim().split("\\s+")) {
+        for (List<String> row : RepositoryFixture.rows("test/fixtures/sdk_public_names.txt")) {
+            for (String path : row.get(COLUMN).split("\\s+")) {
                 String name = path.startsWith("!") ? path.substring(1) : path;
                 boolean hidden = !name.equals(path);
                 if (!path.equals("-") && resolves(name) == hidden) {
-                    wrong.add(row[0] + ": `" + name + "` is " + (hidden ? "public" : "missing"));
+                    wrong.add(row.get(0) + ": `" + name + "` is " + (hidden ? "public" : "missing"));
                 }
             }
         }
