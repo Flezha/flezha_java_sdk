@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 class PollHostTest {
 
     /** A stand-in core: hands out queued activations and records answers. */
-    private static final class FakeCore implements PollHost.CoreCalls {
+    private static final class FakeCore implements PollHost.CoreCalls, AutoCloseable {
         private final LinkedBlockingQueue<byte[]> handouts = new LinkedBlockingQueue<>();
         private final AtomicInteger completed = new AtomicInteger();
         private final List<Long> abandoned = new CopyOnWriteArrayList<>();
@@ -71,6 +71,16 @@ class PollHostTest {
         void shutDown() {
             shuttingDown = true;
             handouts.add(new byte[0]);
+        }
+
+        /**
+         * Listed after the host in a try, so it closes first, as {@code FlezhaImpl.close()}
+         * tells the core first: a host closed without the core's word waits out its drain
+         * bound on every join.
+         */
+        @Override
+        public void close() {
+            shutDown();
         }
 
         @Override
@@ -196,7 +206,8 @@ class PollHostTest {
         // As many blocked activations as there are fetchers: with dispatch
         // running on the fetcher itself, nothing below would ever be picked
         // up.
-        try (PollHost ignored = start(core, dispatch)) {
+        try (PollHost ignored = start(core, dispatch);
+                core) {
             core.handOut(activation(1, "blocked-a"));
             core.handOut(activation(2, "blocked-b"));
             for (long token = 3; token <= 6; token++) {
@@ -247,7 +258,8 @@ class PollHostTest {
             return ok(activation);
         };
 
-        try (PollHost ignored = start(core, dispatch)) {
+        try (PollHost ignored = start(core, dispatch);
+                core) {
             core.handOut(activation(1, "same-cell"));
             assertThat(insideFirst.await(10, TimeUnit.SECONDS))
                     .as("the first activation is held inside the dispatch")
@@ -282,7 +294,8 @@ class PollHostTest {
 
         CapturedStderr stderr = CapturedStderr.start();
         try (stderr;
-                PollHost ignored = start(core, dispatch)) {
+                PollHost ignored = start(core, dispatch);
+                core) {
             core.handOut(activation(7, "unlucky"));
             assertThat(dispatched.await(10, TimeUnit.SECONDS)).isTrue();
             awaitTrue(() -> core.abandoned.contains(7L), "the activation was abandoned");
@@ -302,7 +315,8 @@ class PollHostTest {
 
         CapturedStderr stderr = CapturedStderr.start();
         try (stderr;
-                PollHost ignored = start(core, PollHostTest::ok)) {
+                PollHost ignored = start(core, PollHostTest::ok);
+                core) {
             core.handOut(activation(8, "unlucky"));
             awaitTrue(() -> core.abandoned.contains(8L), "the activation was abandoned");
         }
@@ -325,7 +339,8 @@ class PollHostTest {
 
         CapturedStderr stderr = CapturedStderr.start();
         try (stderr;
-                PollHost host = start(core, PollHostTest::ok)) {
+                PollHost host = start(core, PollHostTest::ok);
+                core) {
             awaitTrue(() -> core.seatsLeft.get() == 1 && host.liveFetcherCount() == 1, "a fetcher died");
             core.decisions.add(FlzCore.POOL_SPAWN_BASE);
             awaitTrue(() -> host.liveFetcherCount() == host.fetcherCount(), "the base count came back");
@@ -355,7 +370,8 @@ class PollHostTest {
     void aGrownFetcherRetires() throws Exception {
         FakeCore core = new FakeCore().base(1);
         core.policy[3] = 500;
-        try (PollHost host = start(core, PollHostTest::ok)) {
+        try (PollHost host = start(core, PollHostTest::ok);
+                core) {
             core.decisions.add(FlzCore.POOL_SPAWN_GROWN);
             core.decisions.add(FlzCore.POOL_SPAWN_GROWN);
             awaitTrue(() -> host.liveFetcherCount() == 3, "each grown seat is a fetcher");
@@ -381,7 +397,8 @@ class PollHostTest {
         core.supervisorErrors.set(2);
         CapturedStderr stderr = CapturedStderr.start();
         try (stderr;
-                PollHost host = start(core, PollHostTest::ok)) {
+                PollHost host = start(core, PollHostTest::ok);
+                core) {
             awaitTrue(() -> core.supervisorErrors.get() == 0, "both failing answers were asked for");
             core.decisions.add(FlzCore.POOL_SPAWN_GROWN);
             awaitTrue(() -> host.liveFetcherCount() == 2, "the supervisor still starts fetchers");
