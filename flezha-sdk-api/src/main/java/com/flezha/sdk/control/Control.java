@@ -106,8 +106,9 @@ public final class Control {
     }
 
     /**
-     * The relays in this namespace, one row each: its id, health, runner and node, and a partition
-     * group's width and members.
+     * The relays in this namespace across the cluster: {@code rows}, one row each (its id, health,
+     * runner and node, and a partition group's width and members), and {@code unreachable}, the
+     * controllers that did not answer.
      */
     @Nonnull
     public JsonNode listRelays() {
