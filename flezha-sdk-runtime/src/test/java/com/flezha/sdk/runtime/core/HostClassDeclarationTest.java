@@ -184,7 +184,7 @@ class HostClassDeclarationTest {
     }
 
     @Test
-    @DisplayName("durable spells each level: false, local and remote, with or without sleeping")
+    @DisplayName("durable spells each level: false, local and remote, with or without sleeping and keeping")
     void durableSpellsEachLevel() throws Exception {
         RelayClassRegistry.registerClass(InMemoryRelay.class);
         RelayClassRegistry.registerClass(QuickSleeperRelay.class);
@@ -195,11 +195,11 @@ class HostClassDeclarationTest {
                 .isEqualTo(JSON.readTree("false"));
         assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_quick_sleeper_op"))
                         .get("durable"))
-                .isEqualTo(JSON.readTree("{\"local\": {\"sleep_after\": 600000}}"));
+                .isEqualTo(JSON.readTree("{\"local\": {\"sleep_after\": 600000, \"keep_finished\": 24}}"));
         assertThat(JSON.readTree(HostClassDeclaration.forFactory("decl_remote_steps"))
                         .get("durable"))
-                .as("a remote class that never sleeps")
-                .isEqualTo(JSON.readTree("{\"remote\": {\"sleep_after\": false}}"));
+                .as("a remote class that never sleeps and keeps for the controller's window")
+                .isEqualTo(JSON.readTree("{\"remote\": {\"sleep_after\": false, \"keep_finished\": true}}"));
     }
 
     @Test
@@ -666,7 +666,8 @@ class HostClassDeclarationTest {
 
         @Override
         public Durable durable() {
-            return new Durable.Local(Duration.ofMinutes(10));
+            return new Durable.Local(
+                    new Durable.SleepAfter.After(Duration.ofMinutes(10)), new Durable.KeepFinished.Hours(24));
         }
 
         @Override
@@ -688,7 +689,7 @@ class HostClassDeclarationTest {
 
         @Override
         public Durable durable() {
-            return new Durable.Remote(new Durable.SleepAfter.Never());
+            return new Durable.Remote(new Durable.SleepAfter.Never(), new Durable.KeepFinished.ControllerWindow());
         }
 
         @Override

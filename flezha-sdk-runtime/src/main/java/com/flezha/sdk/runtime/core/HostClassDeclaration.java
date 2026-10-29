@@ -153,24 +153,33 @@ public final class HostClassDeclaration {
     }
 
     /**
-     * {@code durable} as the tree's JSON: {@code false}, or the level with its {@code sleep_after};
-     * the run's default leaves {@code sleep_after} out.
+     * {@code durable} as the tree's JSON: {@code false}, or the level with its {@code sleep_after}
+     * and {@code keep_finished}; the run's default leaves {@code sleep_after} out, and keeping
+     * nothing leaves {@code keep_finished} out.
      */
     private static Object durableJson(Relay.Durable durable) {
         return switch (durable) {
             case Relay.Durable.Memory ignored -> false;
-            case Relay.Durable.Local local -> level("local", local.sleepAfter());
-            case Relay.Durable.Remote remote -> level("remote", remote.sleepAfter());
+            case Relay.Durable.Local local -> level("local", local.sleepAfter(), local.keepFinished());
+            case Relay.Durable.Remote remote -> level("remote", remote.sleepAfter(), remote.keepFinished());
         };
     }
 
-    private static Object level(String name, Relay.Durable.SleepAfter sleepAfter) {
-        return switch (sleepAfter) {
-            case Relay.Durable.SleepAfter.RunDefault ignored -> name;
-            case Relay.Durable.SleepAfter.Never ignored -> Map.of(name, Map.of("sleep_after", false));
-            case Relay.Durable.SleepAfter.After after -> Map.of(
-                    name, Map.of("sleep_after", after.interval().toMillis()));
-        };
+    private static Object level(
+            String name, Relay.Durable.SleepAfter sleepAfter, Relay.Durable.KeepFinished keepFinished) {
+        Map<String, Object> members = new LinkedHashMap<>();
+        switch (sleepAfter) {
+            case Relay.Durable.SleepAfter.RunDefault ignored -> {}
+            case Relay.Durable.SleepAfter.Never ignored -> members.put("sleep_after", false);
+            case Relay.Durable.SleepAfter.After after -> members.put(
+                    "sleep_after", after.interval().toMillis());
+        }
+        switch (keepFinished) {
+            case Relay.Durable.KeepFinished.Nothing ignored -> {}
+            case Relay.Durable.KeepFinished.ControllerWindow ignored -> members.put("keep_finished", true);
+            case Relay.Durable.KeepFinished.Hours hours -> members.put("keep_finished", hours.hours());
+        }
+        return members.isEmpty() ? name : Map.of(name, members);
     }
 
     private static Map<String, Object> base(String factoryId) {

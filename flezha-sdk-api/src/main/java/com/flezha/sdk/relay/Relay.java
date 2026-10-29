@@ -16,8 +16,8 @@ import javax.annotation.Nonnull;
  * <p>Every "one of" of the tree is a sealed interface and every nested setting a member of its
  * parent only, so a setting written under a parent that does not carry it does not compile:
  * {@code each} exists only on {@link Run.Steps}, {@code ack} only on
- * {@link Exactly.EffectivelyOnce}, {@code sleepAfter} only on {@link Durable.Local} and
- * {@link Durable.Remote}.
+ * {@link Exactly.EffectivelyOnce}, {@code sleepAfter} and {@code keepFinished} only on
+ * {@link Durable.Local} and {@link Durable.Remote}.
  *
  * <pre>{@code
  * public final class WordCountRelay implements Relay {
@@ -319,14 +319,20 @@ public interface Relay {
          *
          * @param sleepAfter how long an idle instance waits before it is evicted from its runner,
          *     waking on its next message with its cells restored
+         * @param keepFinished how long a finished instance keeps its state
          */
-        record Local(SleepAfter sleepAfter) implements Durable {
+        record Local(SleepAfter sleepAfter, KeepFinished keepFinished) implements Durable {
             public Local {
                 Objects.requireNonNull(sleepAfter, "sleepAfter");
+                Objects.requireNonNull(keepFinished, "keepFinished");
             }
 
             public Local() {
                 this(new SleepAfter.RunDefault());
+            }
+
+            public Local(SleepAfter sleepAfter) {
+                this(sleepAfter, new KeepFinished.Nothing());
             }
 
             public Local(Duration sleepAfter) {
@@ -340,14 +346,20 @@ public interface Relay {
          * without a durability backend is refused.
          *
          * @param sleepAfter as {@link Local#sleepAfter()}
+         * @param keepFinished as {@link Local#keepFinished()}
          */
-        record Remote(SleepAfter sleepAfter) implements Durable {
+        record Remote(SleepAfter sleepAfter, KeepFinished keepFinished) implements Durable {
             public Remote {
                 Objects.requireNonNull(sleepAfter, "sleepAfter");
+                Objects.requireNonNull(keepFinished, "keepFinished");
             }
 
             public Remote() {
                 this(new SleepAfter.RunDefault());
+            }
+
+            public Remote(SleepAfter sleepAfter) {
+                this(sleepAfter, new KeepFinished.Nothing());
             }
 
             public Remote(Duration sleepAfter) {
@@ -374,6 +386,22 @@ public interface Relay {
                     Objects.requireNonNull(interval, "interval");
                 }
             }
+        }
+
+        /**
+         * How long a finished instance keeps its state, so {@code flz relay info} can still show its
+         * cells and result.
+         */
+        sealed interface KeepFinished permits KeepFinished.Nothing, KeepFinished.ControllerWindow, KeepFinished.Hours {
+
+            /** Keeps nothing: the state is deleted when the instance finishes. The default. */
+            record Nothing() implements KeepFinished {}
+
+            /** Keeps it for the controller's window for kept runs, 72 hours by default. */
+            record ControllerWindow() implements KeepFinished {}
+
+            /** @param hours how long the state is kept, a positive whole number */
+            record Hours(long hours) implements KeepFinished {}
         }
     }
 }

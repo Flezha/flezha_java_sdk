@@ -175,7 +175,8 @@ public Durable durable() {
 | `ack` (effectively once) | `Ack.PerInput()` or `Ack.Checkpoint(every, maxDelayMs, outputs)` | per input |
 | `each` (steps) | `ONCE`, `PER_INPUT`, `CHAINED` | `ONCE` |
 | `onFailure` (steps) | `UNDO_ALL`, `KEEP_PROGRESS` | `UNDO_ALL` |
-| `durable()` | `Durable.Memory()`, `Durable.Local(sleepAfter)`, `Durable.Remote(sleepAfter)` | local; a flow never sleeps, a steps class after six hours |
+| `durable()` | `Durable.Memory()`, `Durable.Local(sleepAfter, keepFinished)`, `Durable.Remote(sleepAfter, keepFinished)` | local; a flow never sleeps, a steps class after six hours |
+| `keepFinished` (local, remote) | `KeepFinished.Nothing()`, `KeepFinished.Hours(n)`, or `KeepFinished.ControllerWindow()` for `FLEZHA_STEPS_RETENTION_HOURS` (72 by default); a kept instance's Cells and result stay readable by `flz relay info` | nothing |
 | `maxDuration()` | a wall-clock stop for either run | none |
 | `description()` | shown by `flz relay info` | empty |
 
