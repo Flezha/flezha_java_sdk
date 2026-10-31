@@ -194,11 +194,6 @@ To run this without a controller, replace the main with `LocalRelay`
 
 ## Where to go
 
-- **Learn the SDK in order:** [`flezha-sdk-examples/`](flezha-sdk-examples/README.md).
-  Twelve compiled examples, six forming a ladder from hello world to a tested
-  graph, and six covering specific problems you may or may not have. They are
-  built by the reactor and most are covered by a test, so an example that drifts
-  from the SDK breaks the build rather than misleading you.
 - **Look up a type or method:** the generated javadoc. Every concept is
   documented on the type it concerns, so the explanation for why a field cannot
   be assigned directly sits on `Ctx` and `Change`, where a reader encounters the
@@ -250,7 +245,7 @@ retention, and a tier without keyed outputs is refused at registration.
 | `flezha-sdk-runtime` | Control plane, data plane, framing, worker pool, reconnect, state persistence, steps class registration. |
 | `flezha-sdk-native` | JNI bindings + bundled per-OS `libflz_core_ffi`. |
 | `flezha-sdk-testing` | `TaskletTestHarness`, added with `<scope>test</scope>`. |
-| `flezha-sdk-examples` | Worked examples. Compiled by the build, so they cannot rot. |
+| `flezha-sdk-examples` | The local-mode example. Compiled and tested by the build, so it cannot rot. |
 | `flezha-sdk` | Fat-jar aggregator, the published artifact. |
 
 ## Build
