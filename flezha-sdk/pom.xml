@@ -102,4 +102,66 @@
             </plugin>
         </plugins>
     </build>
+
+    <!-- Maven Central asks every jar for a sources and a javadoc jar. This one has
+         no sources of its own: the sources are the shaded modules', the javadoc
+         the API module's. -->
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                        <configuration>
+                            <createSourcesJar>true</createSourcesJar>
+                        </configuration>
+                    </plugin>
+                    <!-- The javadoc is the API module's, which documents the whole
+                         authoring surface. -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>unpack-api-javadoc</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>unpack</goal>
+                                </goals>
+                                <configuration>
+                                    <artifactItems>
+                                        <artifactItem>
+                                            <groupId>com.flezha</groupId>
+                                            <artifactId>flezha-sdk-api</artifactId>
+                                            <version>${project.version}</version>
+                                            <classifier>javadoc</classifier>
+                                            <outputDirectory>${project.build.directory}/apidocs</outputDirectory>
+                                        </artifactItem>
+                                    </artifactItems>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-jar-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                                <configuration>
+                                    <classifier>javadoc</classifier>
+                                    <classesDirectory>${project.build.directory}/apidocs</classesDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

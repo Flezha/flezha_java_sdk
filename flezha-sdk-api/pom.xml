@@ -37,6 +37,17 @@
 
     <build>
         <plugins>
+            <!-- javadoc reads jsr305 from the class path the way the compile does. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <configuration>
+                    <additionalOptions>
+                        <additionalOption>--add-reads</additionalOption>
+                        <additionalOption>com.flezha.sdk.api=ALL-UNNAMED</additionalOption>
+                    </additionalOptions>
+                </configuration>
+            </plugin>
             <!-- The tests are compiled into the api's module, and one of them compiles
                  a source against it through `javax.tools`. They run on the class path. -->
             <plugin>
