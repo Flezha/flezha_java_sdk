@@ -90,18 +90,16 @@ builds the images and deploys `k8s/agentdesk.yaml` on k3s.
 
 ## Building from a checkout
 
-The SDK is not on Maven Central yet, so `com.flezha:flezha-sdk:0.1.0` has to be in your
-local Maven repository before this resolves, and the controller's image
-`flezha/flezha:0.1.0` has to be built. From the repository root:
+The controller's image `flezha/flezha:0.1.0` has to be built. To run the project against
+a Flezha checkout instead of the published SDK, also install the checkout's
+`com.flezha:flezha-sdk:0.1.0` into your local Maven repository, which Maven reads before
+Maven Central. From the repository root:
 
 ```sh
 scripts/build-native.sh --output sdk/java/flezha-sdk-native/src/main/resources/native
 mvn -f sdk/java/pom.xml -DskipTests install
 docker build -f deploy/docker/prod/Dockerfile.controller -t flezha/flezha:0.1.0 .
 ```
-
-That is a one-time step. Once the SDK and the image are published, it goes away and the
-commands above are all you need.
 
 ## Where to go next
 

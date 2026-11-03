@@ -31,9 +31,8 @@ and delivery guarantee available there is available here.
 `flezha-sdk-testing` is a separate artifact, with `<scope>test</scope>`. Nothing
 runs at compile time: the classes you write are the classes the runtime reads.
 
-The SDK is not on Maven Central yet. Until it is, install it into your local Maven
-repository from a checkout as
-[`examples/echo`](examples/echo/README.md#building-from-a-checkout) shows.
+To work on the SDK itself, install it into your local Maven repository from a
+checkout as [`examples/echo`](examples/echo/README.md#building-from-a-checkout) shows.
 
 ## Supported Java versions
 
