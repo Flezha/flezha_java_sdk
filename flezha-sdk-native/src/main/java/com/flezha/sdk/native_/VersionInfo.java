@@ -11,7 +11,7 @@ public final class VersionInfo {
      * generate this file in the future via a templated input plugin; for now
      * it is a hand-maintained constant that CI validates against the pom.
      */
-    public static final String VERSION = "0.1.0";
+    public static final String VERSION = "0.1.1";
 
     private VersionInfo() {}
 }

@@ -24,7 +24,7 @@ and delivery guarantee available there is available here.
 <dependency>
     <groupId>com.flezha</groupId>
     <artifactId>flezha-sdk</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.1</version>
 </dependency>
 ```
 

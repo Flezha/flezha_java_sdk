@@ -7,10 +7,10 @@
 # assets with their digests in one manifest, so obtaining them is a download
 # and a checksum rather than a checkout and a Rust toolchain.
 #
-#   scripts/fetch-core.sh --from <dir|url> [--version 0.1.0]
+#   scripts/fetch-core.sh --from <dir|url> [--version 0.1.1]
 #       the host's library, the fake controller and the contract set: what the
 #       three tiers need
-#   scripts/fetch-core.sh --from <dir|url> [--version 0.1.0] --all-platforms
+#   scripts/fetch-core.sh --from <dir|url> [--version 0.1.1] --all-platforms
 #       the five libraries a portable jar bundles, leaving any already staged
 #       alone so a set cross-built in the core's tree is never overwritten
 #
@@ -24,7 +24,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 FROM=""
-VERSION="0.1.0"
+VERSION="0.1.1"
 ALL_PLATFORMS=0
 while [[ $# -gt 0 ]]; do
   case "$1" in

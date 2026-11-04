@@ -49,7 +49,7 @@ public final class HostClassDeclaration {
      * output in place, so a version written into the thin jar's manifest is not
      * what the fat jar carries. The core packs it.
      */
-    private static final String SDK_VERSION = "0.1.0";
+    private static final String SDK_VERSION = "0.1.1";
 
     /** Header format byte for the host's plain change bodies (Kryo = 4). */
     private static final int FORMAT_ID_KRYO = 4;
